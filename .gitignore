@@ -10,3 +10,5 @@ puls3_server/.env
 
 # Pubspec overrides
 pubspec_overrides.yaml
+
+.vscode/settings.json

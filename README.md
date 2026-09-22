@@ -66,7 +66,8 @@ puls3 is in **early development**. What exists today:
 ### Roadmap
 
 | Milestone | Date | Goal |
-|---|---|---|
+| --- | --- | --- |
+| Stellar Odyssey (Perú) | Sep 25, 2026 | Prototype, Soroban Agent Identity Registry on testnet, Demo Day presentation (AI Agents track) |
 | Serverpod "Build Something Real" hackathon | Oct 14, 2026 | A working end-to-end MVP: create, find, hire, and pay agents on testnet |
 | HackMeridian (Lisbon) | Oct 25–26, 2026 | Reputation and a stronger Studio, presented in the Scale track |
 | Stellar Elite Bolivia bootcamp | 2026 | puls3 as the bootcamp project, on the path to the Stellar Community Fund |
@@ -74,7 +75,7 @@ puls3 is in **early development**. What exists today:
 ## Tech stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | App | [Flutter](https://flutter.dev) (web first) |
 | Backend | [Serverpod](https://serverpod.dev) (Dart) |
 | Smart contracts | [Soroban](https://developers.stellar.org/docs/build/smart-contracts) (Rust) |
@@ -90,6 +91,10 @@ docs/brand/      Brand guide, design tokens
 assets/brand/    Logos, marks, favicons, fonts
 design/          Design sources (logo lab)
 ```
+
+## Hackathon Note (Stellar Odyssey Perú)
+
+Per rules §8.1, this project existed prior to the Stellar Odyssey event. The codebase before the hackathon kickoff (Sep 19, 2026) was established at commit [`8bd23dc26605906683f32e2c177a2c7bde018db6`](https://github.com/Zer0-Knowledge-Hack/puls3/commit/8bd23dc26605906683f32e2c177a2c7bde018db6). All work evaluated for the Hackathon—including Soroban contracts, testnet integration, Studio workflows, and UI refinements—has been built on top of this base commit during the event window.
 
 ## Contributing
 
