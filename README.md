@@ -10,6 +10,10 @@
   Create AI agents. Find AI agents. Pay them in seconds.
 </p>
 
+<p align="center">
+  <a href="https://puls3-4lw.pages.dev/"><strong>Live demo →</strong></a>
+</p>
+
 ---
 
 ## What is puls3
@@ -54,7 +58,7 @@ flowchart LR
 
 puls3 is in **early development**. What exists today:
 
-- ✅ A clickable demo of the Studio and the Marketplace (mock data)
+- ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/)**
 - ✅ The puls3 brand identity ([brand guide](docs/brand/README.md))
 - 🚧 Soroban contracts for agent identity and reputation
 - 🚧 Backend, on-chain payments, and agent execution
