@@ -48,7 +48,7 @@ class HirePaymentView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Hire $agentName', style: Puls3Text.displayMd),
+        Text('Hire $agentName', style: Puls3Text.h3),
         const SizedBox(height: Puls3Spacing.xs),
         Text(
           'Review the payment. It settles on Stellar in about 5 seconds.',
@@ -58,9 +58,9 @@ class HirePaymentView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(Puls3Spacing.md),
           decoration: BoxDecoration(
-            color: Puls3Colors.surface2,
+            color: Puls3Colors.background,
             borderRadius: Puls3Radius.mdAll,
-            border: Border.all(color: Puls3Colors.border),
+            border: Border.all(color: Puls3Colors.hairline),
           ),
           child: Column(
             children: [
@@ -104,6 +104,18 @@ class HirePaymentView extends StatelessWidget {
       key: const ValueKey('confirmed'),
       title: 'Payment confirmed',
       subtitle: 'Paid ${formatUsdc(priceUsdcStroops)} USDC on Stellar',
+      highlight: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: formatUsdc(priceUsdcStroops),
+              style: Puls3Text.accentXl,
+            ),
+            TextSpan(text: ' USDC', style: Puls3Text.dataLg),
+          ],
+        ),
+        semanticsLabel: '${formatUsdc(priceUsdcStroops)} USDC',
+      ),
       children: [
         if (txHash != null)
           KeyValueRow(

@@ -52,7 +52,7 @@ class _AgentCardState extends State<AgentCard> {
           color: Puls3Colors.surface,
           borderRadius: Puls3Radius.lgAll,
           border: Border.all(
-            color: active ? Puls3Colors.accent : Puls3Colors.border,
+            color: active ? Puls3Colors.accent : Puls3Colors.hairline,
           ),
         ),
         child: Material(
@@ -79,15 +79,15 @@ class _AgentCardState extends State<AgentCard> {
                               widget.name.isEmpty
                                   ? 'Untitled agent'
                                   : widget.name,
-                              style: Puls3Text.titleMd,
+                              style: Puls3Text.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (widget.model != null)
                               Text(
                                 widget.model!,
-                                style: Puls3Text.label.copyWith(
-                                  color: Puls3Colors.textMuted,
+                                style: Puls3Text.caption.copyWith(
+                                  color: Puls3Colors.muted,
                                 ),
                               ),
                           ],

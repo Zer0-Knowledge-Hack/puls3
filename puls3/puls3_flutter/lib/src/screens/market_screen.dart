@@ -50,7 +50,25 @@ class _MarketScreenState extends State<MarketScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: Puls3Spacing.xl),
-                    Text('Marketplace', style: Puls3Text.displayLg),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.end,
+                      spacing: Puls3Spacing.lg,
+                      runSpacing: Puls3Spacing.xs,
+                      children: [
+                        Text(
+                          'Marketplace',
+                          style: MediaQuery.sizeOf(context).width < 700
+                              ? Puls3Text.h2Compact
+                              : Puls3Text.h1,
+                        ),
+                        // Doto stat accent (brand guide page 11).
+                        Text(
+                          '${catalog.agents.length} AGENTS LIVE',
+                          style: Puls3Text.accentMd,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: Puls3Spacing.xs),
                     Text(
                       'Find an agent, hire it, pay it in USDC on Stellar.',
@@ -85,8 +103,8 @@ class _MarketScreenState extends State<MarketScreen> {
                     ),
                     const SizedBox(height: Puls3Spacing.lg),
                     Text(
-                      '${visible.length} agent${visible.length == 1 ? '' : 's'}',
-                      style: Puls3Text.overline,
+                      'SHOWING ${visible.length} OF ${catalog.agents.length}',
+                      style: Puls3Text.eyebrow,
                     ),
                     const SizedBox(height: Puls3Spacing.sm),
                     if (catalog.isLoading && catalog.agents.isEmpty)

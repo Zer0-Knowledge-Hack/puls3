@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/agent.dart';
+import '../state/app_scope.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/content_width.dart';
 import '../ui/atoms/primary_button.dart';
+import '../ui/atoms/puls3_logo.dart';
 import '../ui/atoms/pulse_background.dart';
 import '../ui/atoms/section_label.dart';
-import '../ui/atoms/wordmark.dart';
+import '../ui/molecules/agent_mini_card.dart';
 import '../ui/molecules/built_on_stellar.dart';
 import '../ui/molecules/feature_point.dart';
 import '../ui/organisms/site_footer.dart';
 
-/// `/`: hero with the pulse motif, two CTAs and the "Why Stellar" block.
+/// `/`: hero (brand guide page 14) with the large halftone-3 lockup, an
+/// Unbounded headline, two CTAs and a pulse field in the corner, then the
+/// "Why Stellar" block.
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
@@ -19,74 +24,29 @@ class LandingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final narrow = size.width < 700;
+    final catalog = AppScope.of(context).catalog;
 
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
             ConstrainedBox(
-              constraints: BoxConstraints(minHeight: size.height * 0.86),
+              constraints: BoxConstraints(minHeight: size.height * 0.9),
               child: PulseBackground(
-                origin: Alignment(narrow ? 0 : 0.55, -0.1),
+                focalPoint: Alignment.bottomRight,
+                radiusFactor: narrow ? 0.7 : 0.5,
                 child: SafeArea(
                   bottom: false,
                   child: ContentWidth(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: Puls3Spacing.lg),
-                        const Row(
-                          children: [
-                            Wordmark(),
-                            SizedBox(width: Puls3Spacing.md),
-                            Expanded(
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: BuiltOnStellar(compact: true),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: narrow ? 96 : 160),
-                        const SectionLabel(
-                          'Agent Studio + Marketplace',
-                          color: Puls3Colors.secondary,
-                        ),
-                        const SizedBox(height: Puls3Spacing.md),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 760),
-                          child: Text(
-                            'The agent hub on Stellar',
-                            style: narrow
-                                ? Puls3Text.displayLg
-                                : Puls3Text.displayXl,
-                          ),
-                        ),
-                        const SizedBox(height: Puls3Spacing.md),
-                        Text(
-                          'Create agents. Find agents. Pay them in seconds.',
-                          style: Puls3Text.lead,
-                        ),
-                        const SizedBox(height: Puls3Spacing.xl),
-                        Wrap(
-                          spacing: Puls3Spacing.sm,
-                          runSpacing: Puls3Spacing.sm,
-                          children: [
-                            PrimaryButton(
-                              label: 'Open Studio',
-                              icon: Icons.auto_awesome_outlined,
-                              onPressed: () => context.go('/studio'),
-                            ),
-                            PrimaryButton(
-                              label: 'Explore Marketplace',
-                              icon: Icons.storefront_outlined,
-                              variant: PrimaryButtonVariant.outline,
-                              onPressed: () => context.go('/market'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: Puls3Spacing.xxxl),
-                      ],
+                    child: ListenableBuilder(
+                      listenable: catalog,
+                      builder: (context, _) => _Hero(
+                        narrow: narrow,
+                        featured: catalog.agents.take(2).toList(),
+                        onOpenStudio: () => context.go('/studio'),
+                        onExploreMarketplace: () => context.go('/market'),
+                        onOpenAgent: (a) => context.go('/agent/${a.id}'),
+                      ),
                     ),
                   ),
                 ),
@@ -94,7 +54,9 @@ class LandingScreen extends StatelessWidget {
             ),
             ContentWidth(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: Puls3Spacing.xxxl),
+                padding: const EdgeInsets.symmetric(
+                  vertical: Puls3Spacing.xxxl,
+                ),
                 child: _WhyStellar(narrow: narrow),
               ),
             ),
@@ -106,6 +68,100 @@ class LandingScreen extends StatelessWidget {
   }
 }
 
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.narrow,
+    required this.featured,
+    required this.onOpenStudio,
+    required this.onExploreMarketplace,
+    required this.onOpenAgent,
+  });
+
+  final bool narrow;
+  final List<Agent> featured;
+  final VoidCallback onOpenStudio;
+  final VoidCallback onExploreMarketplace;
+  final ValueChanged<Agent> onOpenAgent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: Puls3Spacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: Puls3Spacing.md,
+            runSpacing: Puls3Spacing.md,
+            children: [
+              // Mark >= 72 px, so the lockup shows the halftone 3.
+              Puls3Logo(markHeight: narrow ? 72 : 80),
+              const BuiltOnStellar(compact: true),
+            ],
+          ),
+        ),
+        SizedBox(height: narrow ? Puls3Spacing.xxl : Puls3Spacing.huge),
+        const SectionLabel(
+          'Agent Studio + Marketplace',
+          color: Puls3Colors.accent,
+        ),
+        const SizedBox(height: Puls3Spacing.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Text(
+            'The agent hub on Stellar.',
+            style: narrow ? Puls3Text.h1Compact : Puls3Text.display,
+          ),
+        ),
+        const SizedBox(height: Puls3Spacing.lg),
+        Text(
+          'Create agents. Find agents. Pay them in seconds.',
+          style: Puls3Text.lead,
+        ),
+        const SizedBox(height: Puls3Spacing.xl),
+        Wrap(
+          spacing: Puls3Spacing.sm,
+          runSpacing: Puls3Spacing.sm,
+          children: [
+            PrimaryButton(label: 'Open Studio', onPressed: onOpenStudio),
+            PrimaryButton(
+              label: 'Explore Marketplace',
+              variant: PrimaryButtonVariant.outline,
+              onPressed: onExploreMarketplace,
+            ),
+          ],
+        ),
+        if (featured.isNotEmpty) ...[
+          const SizedBox(height: Puls3Spacing.xxl),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Wrap(
+              spacing: Puls3Spacing.sm,
+              runSpacing: Puls3Spacing.sm,
+              children: [
+                for (final agent in featured)
+                  SizedBox(
+                    width: narrow ? double.infinity : 300,
+                    child: AgentMiniCard(
+                      name: agent.name,
+                      stellarAddress: agent.stellarAddress,
+                      priceUsdcStroops: agent.priceUsdcStroops,
+                      onTap: () => onOpenAgent(agent),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: Puls3Spacing.huge),
+      ],
+    );
+  }
+}
+
 class _WhyStellar extends StatelessWidget {
   const _WhyStellar({required this.narrow});
 
@@ -113,17 +169,17 @@ class _WhyStellar extends StatelessWidget {
 
   static const _points = [
     FeaturePoint(
-      icon: Icons.bolt_rounded,
+      stat: '~5s',
       title: '~5s settlement',
       body: 'Payments to agents finalize in seconds, not days.',
     ),
     FeaturePoint(
-      icon: Icons.savings_outlined,
+      stat: '<\$0.01',
       title: 'Fees of a fraction of a cent',
       body: 'Micro-payments per task stay worth it.',
     ),
     FeaturePoint(
-      icon: Icons.attach_money_rounded,
+      stat: 'USDC',
       title: 'Native USDC',
       body: 'Price and pay agents in a stable, dollar-backed asset.',
     ),
@@ -134,7 +190,7 @@ class _WhyStellar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel('Why Stellar'),
+        const SectionLabel('Why Stellar', color: Puls3Colors.accent),
         const SizedBox(height: Puls3Spacing.md),
         if (narrow)
           Column(

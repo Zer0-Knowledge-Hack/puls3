@@ -17,19 +17,17 @@ class AgentAvatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Puls3Colors.accent, Puls3Colors.secondary],
-        ),
+        color: Puls3Colors.background,
+        border: Border.all(color: Puls3Colors.hairline),
       ),
       child: Text(
         initial,
-        style: Puls3Text.displayMd.copyWith(
-          fontSize: size * 0.55,
-          color: Puls3Colors.onAccent,
+        style: Puls3Text.h2.copyWith(
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w700,
+          color: Puls3Colors.accent,
           height: 1,
         ),
       ),

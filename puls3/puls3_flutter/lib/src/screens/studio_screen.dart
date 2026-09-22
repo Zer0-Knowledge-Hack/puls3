@@ -164,7 +164,12 @@ class _StudioScreenState extends State<StudioScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: Puls3Spacing.xl),
-        Text('Agent Studio', style: Puls3Text.displayLg),
+        Text(
+          'Agent Studio',
+          style: MediaQuery.sizeOf(context).width < 700
+              ? Puls3Text.h2Compact
+              : Puls3Text.h1,
+        ),
         const SizedBox(height: Puls3Spacing.xs),
         Text(
           'Design an agent, give it a price, deploy it with its own wallet.',

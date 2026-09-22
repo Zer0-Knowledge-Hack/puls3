@@ -31,7 +31,7 @@ class ProgressStepRow extends StatelessWidget {
       ),
       StepStatus.pending => const Icon(
         Icons.radio_button_unchecked_rounded,
-        color: Puls3Colors.border,
+        color: Puls3Colors.hairline,
         size: 22,
       ),
     };

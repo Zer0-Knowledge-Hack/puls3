@@ -38,12 +38,12 @@ class PrimaryButton extends StatelessWidget {
       textStyle: WidgetStatePropertyAll(Puls3Text.button),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.disabled)
-            ? Puls3Colors.textMuted
+            ? Puls3Colors.muted
             : foreground,
       ),
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (!filled) return Puls3Colors.transparent;
-        if (states.contains(WidgetState.disabled)) return Puls3Colors.surface2;
+        if (states.contains(WidgetState.disabled)) return Puls3Colors.hairline;
         if (states.contains(WidgetState.hovered)) {
           return Color.lerp(Puls3Colors.accent, Puls3Colors.text, 0.15);
         }
@@ -52,7 +52,7 @@ class PrimaryButton extends StatelessWidget {
       side: WidgetStatePropertyAll(
         filled
             ? BorderSide.none
-            : const BorderSide(color: Puls3Colors.border, width: 1.2),
+            : const BorderSide(color: Puls3Colors.hairline, width: 1.2),
       ),
       overlayColor: WidgetStatePropertyAll(foreground.withValues(alpha: 0.08)),
     );
@@ -69,7 +69,7 @@ class PrimaryButton extends StatelessWidget {
               dimension: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Puls3Colors.textMuted,
+                color: Puls3Colors.muted,
               ),
             )
           else if (icon != null)

@@ -79,7 +79,10 @@ class _AgentDetailBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(agent.name, style: Puls3Text.displayLg),
+                  Text(
+                    agent.name,
+                    style: wide ? Puls3Text.h2 : Puls3Text.h2Compact,
+                  ),
                   const SizedBox(height: Puls3Spacing.xxs),
                   Wrap(
                     spacing: Puls3Spacing.sm,
@@ -116,7 +119,7 @@ class _AgentDetailBody extends StatelessWidget {
       decoration: BoxDecoration(
         color: Puls3Colors.surface,
         borderRadius: Puls3Radius.lgAll,
-        border: Border.all(color: Puls3Colors.border),
+        border: Border.all(color: Puls3Colors.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -148,7 +151,7 @@ class _AgentDetailBody extends StatelessWidget {
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back_rounded, size: 18),
           label: const Text('Marketplace'),
-          style: TextButton.styleFrom(foregroundColor: Puls3Colors.textMuted),
+          style: TextButton.styleFrom(foregroundColor: Puls3Colors.muted),
         ),
         const SizedBox(height: Puls3Spacing.lg),
         if (wide)
@@ -182,7 +185,7 @@ class _NotFound extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Agent not found', style: Puls3Text.displayMd),
+          Text('Agent not found', style: Puls3Text.h2),
           const SizedBox(height: Puls3Spacing.lg),
           PrimaryButton(label: 'Back to Marketplace', onPressed: onBack),
         ],

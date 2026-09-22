@@ -4,26 +4,37 @@ import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
 
-/// Signature motif: a radial halftone dot field that pulses outward from
-/// [origin], tinted from accent to lavender and fading into the background.
+/// Signature motif (brand guide page 12): a hex dot field whose dots shrink
+/// away from one focal point.
 ///
-/// Honors the platform "reduce motion" setting by rendering a still frame.
+/// Rules applied here:
+/// - Scale: grid step 18 to 28 px, center dot at least 6 px.
+/// - Density: one focal point, placed off the text block (corner or edge).
+/// - Color: amber within 35% of the radius, lavender beyond.
+/// - Opacity: 30% to 60% behind content.
+/// - Motion: a calm, slow pulse. Still when the platform asks for reduced
+///   motion.
 class PulseBackground extends StatefulWidget {
   const PulseBackground({
     super.key,
-    this.origin = const Alignment(0, -0.2),
-    this.intensity = 1.0,
-    this.spacing = 16,
+    this.focalPoint = Alignment.bottomRight,
+    this.gridStep = 22,
+    this.opacity = 0.55,
+    this.radiusFactor = 0.75,
     this.child,
   });
 
-  final Alignment origin;
+  /// Where the dense core sits. Keep it off the text block.
+  final Alignment focalPoint;
 
-  /// Overall opacity multiplier, from 0 to 1.
-  final double intensity;
+  /// Distance between dot centers, clamped to 18 to 28 px.
+  final double gridStep;
 
-  /// Distance between dot centers, in logical pixels.
-  final double spacing;
+  /// Layer opacity, clamped to 0.3 to 0.6.
+  final double opacity;
+
+  /// Field radius as a fraction of the surface's longest side.
+  final double radiusFactor;
   final Widget? child;
 
   @override
@@ -42,8 +53,9 @@ class _PulseBackgroundState extends State<PulseBackground>
     super.didChangeDependencies();
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (reduceMotion) {
-      _controller.stop();
-      _controller.value = 0.35;
+      _controller
+        ..stop()
+        ..value = 0;
     } else if (!_controller.isAnimating) {
       _controller.repeat();
     }
@@ -63,12 +75,15 @@ class _PulseBackgroundState extends State<PulseBackground>
         Positioned.fill(
           child: RepaintBoundary(
             child: IgnorePointer(
-              child: CustomPaint(
-                painter: _HalftonePulsePainter(
-                  progress: _controller,
-                  origin: widget.origin,
-                  intensity: widget.intensity.clamp(0.0, 1.0),
-                  spacing: widget.spacing,
+              child: Opacity(
+                opacity: widget.opacity.clamp(0.3, 0.6),
+                child: CustomPaint(
+                  painter: _HexPulsePainter(
+                    progress: _controller,
+                    focalPoint: widget.focalPoint,
+                    gridStep: widget.gridStep.clamp(18.0, 28.0),
+                    radiusFactor: widget.radiusFactor,
+                  ),
                 ),
               ),
             ),
@@ -80,73 +95,64 @@ class _PulseBackgroundState extends State<PulseBackground>
   }
 }
 
-class _HalftonePulsePainter extends CustomPainter {
-  _HalftonePulsePainter({
+class _HexPulsePainter extends CustomPainter {
+  _HexPulsePainter({
     required this.progress,
-    required this.origin,
-    required this.intensity,
-    required this.spacing,
+    required this.focalPoint,
+    required this.gridStep,
+    required this.radiusFactor,
   }) : super(repaint: progress);
 
   final Animation<double> progress;
-  final Alignment origin;
-  final double intensity;
-  final double spacing;
+  final Alignment focalPoint;
+  final double gridStep;
+  final double radiusFactor;
 
-  static const double _wavelength = 150;
+  static const double _amberCore = 0.35;
+  static const double _minDotRadius = 0.5;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final center = origin.alongSize(size);
-    final maxDistance = _farthestCorner(center, size);
-    final reach = math.min(maxDistance, 900.0);
-    final phase = progress.value * 2 * math.pi;
-    final maxRadius = spacing * 0.34;
-    final paint = Paint()..isAntiAlias = true;
+    final center = focalPoint.alongSize(size);
+    final reach = size.longestSide * radiusFactor;
+    // Center dot diameter: at least 6 px, about half the grid step.
+    final maxRadius = math.max(3.0, gridStep * 0.3);
+    // Calm breathing: dots swell by at most 8% and back.
+    final breath =
+        1 + 0.08 * (0.5 - 0.5 * math.cos(progress.value * 2 * math.pi));
 
-    // Offset every other row for a classic halftone lattice.
-    var row = 0;
-    for (var y = spacing / 2; y < size.height; y += spacing * 0.866, row++) {
-      final xOffset = row.isOdd ? spacing / 2 : 0.0;
-      for (var x = xOffset + spacing / 2; x < size.width; x += spacing) {
-        final dx = x - center.dx;
-        final dy = y - center.dy;
-        final distance = math.sqrt(dx * dx + dy * dy);
+    final amber = Paint()..color = Puls3Colors.accent;
+    final lavender = Paint()..color = Puls3Colors.lavender;
+
+    // Hex lattice anchored on the focal point, so the core dot is centered.
+    final rowStep = gridStep * math.sqrt(3) / 2;
+    final firstRow = -(center.dy / rowStep).ceil();
+    final lastRow = ((size.height - center.dy) / rowStep).ceil();
+    for (var row = firstRow; row <= lastRow; row++) {
+      final y = center.dy + row * rowStep;
+      final xShift = row.isOdd ? gridStep / 2 : 0.0;
+      final firstCol = -((center.dx + xShift) / gridStep).ceil();
+      final lastCol = ((size.width - center.dx) / gridStep).ceil();
+      for (var col = firstCol; col <= lastCol; col++) {
+        final x = center.dx + xShift + col * gridStep;
+        final distance = (Offset(x, y) - center).distance;
         final t = distance / reach;
         if (t >= 1) continue;
-
-        final falloff = math.pow(1 - t, 1.6).toDouble();
-        final wave = math.sin(distance / _wavelength * 2 * math.pi - phase);
-        final pulse = 0.25 + 0.75 * math.max(0.0, wave);
-        final radius =
-            maxRadius * (0.3 + 0.7 * pulse) * (0.35 + 0.65 * falloff);
-        final alpha = (0.08 + 0.5 * pulse) * falloff * intensity;
-        if (alpha < 0.01) continue;
-
-        paint.color = Color.lerp(
-          Puls3Colors.accent,
-          Puls3Colors.secondary,
-          t,
-        )!.withValues(alpha: alpha);
-        canvas.drawCircle(Offset(x, y), radius, paint);
+        final radius = maxRadius * math.pow(1 - t, 1.25) * breath;
+        if (radius < _minDotRadius) continue;
+        canvas.drawCircle(
+          Offset(x, y),
+          radius,
+          t <= _amberCore ? amber : lavender,
+        );
       }
     }
   }
 
-  double _farthestCorner(Offset c, Size s) {
-    final corners = [
-      Offset.zero,
-      Offset(s.width, 0),
-      Offset(0, s.height),
-      Offset(s.width, s.height),
-    ];
-    return corners.map((p) => (p - c).distance).reduce(math.max);
-  }
-
   @override
-  bool shouldRepaint(_HalftonePulsePainter oldDelegate) =>
-      oldDelegate.origin != origin ||
-      oldDelegate.intensity != intensity ||
-      oldDelegate.spacing != spacing;
+  bool shouldRepaint(_HexPulsePainter oldDelegate) =>
+      oldDelegate.focalPoint != focalPoint ||
+      oldDelegate.gridStep != gridStep ||
+      oldDelegate.radiusFactor != radiusFactor;
 }

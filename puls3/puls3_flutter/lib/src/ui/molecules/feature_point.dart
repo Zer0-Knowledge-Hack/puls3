@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
 
-/// A headline figure with a short explanation, e.g. "~5s settlement".
+/// A stat in Doto with a short headline and explanation.
 class FeaturePoint extends StatelessWidget {
   const FeaturePoint({
     super.key,
-    required this.icon,
+    required this.stat,
     required this.title,
     required this.body,
   });
 
-  final IconData icon;
+  /// Short figure shown in the Doto accent face, e.g. "~5s".
+  final String stat;
   final String title;
   final String body;
 
@@ -20,16 +21,16 @@ class FeaturePoint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(Puls3Spacing.lg),
       decoration: BoxDecoration(
-        color: Puls3Colors.surface.withValues(alpha: 0.85),
+        color: Puls3Colors.surface,
         borderRadius: Puls3Radius.lgAll,
-        border: Border.all(color: Puls3Colors.border),
+        border: Border.all(color: Puls3Colors.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Puls3Colors.accent, size: 22),
-          const SizedBox(height: Puls3Spacing.md),
-          Text(title, style: Puls3Text.displayMd.copyWith(fontSize: 30)),
+          Text(stat, style: Puls3Text.accentLg),
+          const SizedBox(height: Puls3Spacing.lg),
+          Text(title, style: Puls3Text.h3.copyWith(fontSize: 20)),
           const SizedBox(height: Puls3Spacing.xs),
           Text(body, style: Puls3Text.bodyMuted),
         ],

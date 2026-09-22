@@ -22,11 +22,11 @@ class SkillChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected ? Puls3Colors.onAccent : Puls3Colors.text;
     return Material(
-      color: selected ? Puls3Colors.accent : Puls3Colors.surface2,
+      color: selected ? Puls3Colors.accent : Puls3Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: Puls3Radius.pillAll,
         side: BorderSide(
-          color: selected ? Puls3Colors.accent : Puls3Colors.border,
+          color: selected ? Puls3Colors.accent : Puls3Colors.hairline,
         ),
       ),
       child: InkWell(
@@ -45,7 +45,7 @@ class SkillChip extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Puls3Text.label.copyWith(color: color),
+                  style: Puls3Text.caption.copyWith(color: color),
                 ),
               ),
               if (onDelete != null) ...[

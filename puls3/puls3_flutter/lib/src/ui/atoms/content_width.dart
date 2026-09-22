@@ -26,7 +26,8 @@ class ContentWidth extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: maxWidth + gutter * 2),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: gutter),
-          child: child,
+          // Fill the capped width so content aligns to one column.
+          child: SizedBox(width: double.infinity, child: child),
         ),
       ),
     );

@@ -18,7 +18,7 @@ class PriceTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountStyle = large ? Puls3Text.monoLg : Puls3Text.mono;
+    final amountStyle = large ? Puls3Text.dataLg : Puls3Text.data;
     return Text.rich(
       TextSpan(
         children: [
@@ -33,7 +33,7 @@ class PriceTag extends StatelessWidget {
           if (suffix != null)
             TextSpan(
               text: ' $suffix',
-              style: Puls3Text.label.copyWith(color: Puls3Colors.textMuted),
+              style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
             ),
         ],
       ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
 import '../atoms/content_width.dart';
-import '../atoms/wordmark.dart';
+import '../atoms/puls3_logo.dart';
 import '../molecules/wallet_chip.dart';
 
 /// A navigation destination shown in the [TopBar].
@@ -18,7 +18,8 @@ class TopBarLink {
   final String path;
 }
 
-/// App bar for every non-landing screen.
+/// App bar for every non-landing screen (brand guide page 14): 56 px tall,
+/// solid-3 lockup with C01-small at 28 px, text links, wallet action.
 class TopBar extends StatelessWidget implements PreferredSizeWidget {
   const TopBar({
     super.key,
@@ -37,7 +38,8 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isWalletConnecting;
   final VoidCallback onConnectWallet;
 
-  static const double height = 68;
+  static const double height = Puls3Spacing.topBarHeight;
+  static const double logoMarkHeight = 28;
 
   @override
   Size get preferredSize => const Size.fromHeight(height);
@@ -49,14 +51,17 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
       height: height,
       decoration: const BoxDecoration(
         color: Puls3Colors.background,
-        border: Border(bottom: BorderSide(color: Puls3Colors.border)),
+        border: Border(bottom: BorderSide(color: Puls3Colors.hairline)),
       ),
       child: ContentWidth(
         alignment: Alignment.center,
         child: Row(
           children: [
-            Wordmark(size: compact ? 24 : 28, onTap: () => onNavigate('/')),
-            SizedBox(width: compact ? Puls3Spacing.sm : Puls3Spacing.xl),
+            Puls3Logo(
+              markHeight: logoMarkHeight,
+              onTap: () => onNavigate('/'),
+            ),
+            SizedBox(width: compact ? Puls3Spacing.xs : Puls3Spacing.xl),
             for (final link in links)
               _NavLink(
                 label: link.label,
@@ -96,6 +101,7 @@ class _NavLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = selected ? Puls3Colors.text : Puls3Colors.muted;
     return InkWell(
       onTap: onTap,
       borderRadius: Puls3Radius.smAll,
@@ -104,34 +110,19 @@ class _NavLink extends StatelessWidget {
           horizontal: compact ? Puls3Spacing.xs : Puls3Spacing.sm,
           vertical: Puls3Spacing.xs,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (compact)
-              Tooltip(
+        child: compact
+            ? Tooltip(
                 message: label,
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: selected ? Puls3Colors.text : Puls3Colors.textMuted,
-                ),
+                child: Icon(icon, size: 20, color: color),
               )
-            else
-              Text(
+            : Text(
                 label,
-                style: Puls3Text.label.copyWith(
-                  color: selected ? Puls3Colors.text : Puls3Colors.textMuted,
+                style: Puls3Text.caption.copyWith(
+                  fontSize: 14,
+                  color: color,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
-            const SizedBox(height: 4),
-            AnimatedContainer(
-              duration: Puls3Durations.fast,
-              height: 2,
-              width: selected ? 18 : 0,
-              color: Puls3Colors.accent,
-            ),
-          ],
-        ),
       ),
     );
   }

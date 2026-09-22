@@ -21,10 +21,10 @@ class AddressBadge extends StatelessWidget {
     return Tooltip(
       message: address,
       child: Material(
-        color: Puls3Colors.surface2,
+        color: Puls3Colors.background,
         shape: const RoundedRectangleBorder(
           borderRadius: Puls3Radius.pillAll,
-          side: BorderSide(color: Puls3Colors.border),
+          side: BorderSide(color: Puls3Colors.hairline),
         ),
         child: InkWell(
           onTap: onTap,
@@ -37,9 +37,9 @@ class AddressBadge extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 14, color: Puls3Colors.secondary),
+                Icon(icon, size: 14, color: Puls3Colors.lavender),
                 const SizedBox(width: Puls3Spacing.xs),
-                Text(shortenAddress(address), style: Puls3Text.mono),
+                Text(shortenAddress(address), style: Puls3Text.data),
               ],
             ),
           ),

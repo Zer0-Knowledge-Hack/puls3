@@ -18,18 +18,18 @@ class BuiltOnStellar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: Puls3Radius.pillAll,
-        border: Border.all(color: Puls3Colors.border),
+        border: Border.all(color: Puls3Colors.hairline),
       ),
       child: Text.rich(
         TextSpan(
           children: [
             TextSpan(
               text: 'Built on ',
-              style: Puls3Text.label.copyWith(color: Puls3Colors.textMuted),
+              style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
             ),
             TextSpan(
               text: 'Stellar',
-              style: Puls3Text.label.copyWith(fontWeight: FontWeight.w800),
+              style: Puls3Text.caption.copyWith(fontWeight: FontWeight.w800),
             ),
           ],
         ),

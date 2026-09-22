@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
 import '../atoms/content_width.dart';
-import '../atoms/wordmark.dart';
+import '../atoms/puls3_logo.dart';
 import '../molecules/built_on_stellar.dart';
 
-/// Footer with the wordmark, a demo disclaimer and the Stellar lockup.
+/// Footer with the logo, a demo disclaimer and the Stellar lockup.
 class SiteFooter extends StatelessWidget {
   const SiteFooter({super.key});
 
@@ -13,7 +13,7 @@ class SiteFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Puls3Colors.border)),
+        border: Border(top: BorderSide(color: Puls3Colors.hairline)),
       ),
       padding: const EdgeInsets.symmetric(vertical: Puls3Spacing.lg),
       child: ContentWidth(
@@ -26,11 +26,11 @@ class SiteFooter extends StatelessWidget {
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Wordmark(size: 22),
+                const Puls3Logo(markHeight: 24),
                 const SizedBox(width: Puls3Spacing.sm),
                 Text(
                   'Demo build. Mock data, no real funds.',
-                  style: Puls3Text.label.copyWith(color: Puls3Colors.textMuted),
+                  style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
                 ),
               ],
             ),

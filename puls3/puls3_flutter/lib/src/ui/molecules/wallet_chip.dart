@@ -28,11 +28,11 @@ class WalletChip extends StatelessWidget {
         : (compact ? 'Connect' : 'Connect wallet');
 
     return Material(
-      color: connected ? Puls3Colors.surface2 : Puls3Colors.transparent,
+      color: connected ? Puls3Colors.surface : Puls3Colors.accent,
       shape: RoundedRectangleBorder(
         borderRadius: Puls3Radius.pillAll,
         side: BorderSide(
-          color: connected ? Puls3Colors.border : Puls3Colors.accent,
+          color: connected ? Puls3Colors.hairline : Puls3Colors.accent,
         ),
       ),
       child: InkWell(
@@ -40,7 +40,7 @@ class WalletChip extends StatelessWidget {
         onTap: connected || isConnecting ? null : onConnect,
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: Puls3Spacing.sm,
+            horizontal: Puls3Spacing.md,
             vertical: Puls3Spacing.xs,
           ),
           child: Row(
@@ -59,14 +59,14 @@ class WalletChip extends StatelessWidget {
                 const Icon(
                   Icons.account_balance_wallet_outlined,
                   size: 16,
-                  color: Puls3Colors.accent,
+                  color: Puls3Colors.onAccent,
                 ),
               const SizedBox(width: Puls3Spacing.xs),
               Text(
                 label,
                 style: connected
-                    ? Puls3Text.mono
-                    : Puls3Text.label.copyWith(color: Puls3Colors.accent),
+                    ? Puls3Text.data
+                    : Puls3Text.caption.copyWith(color: Puls3Colors.onAccent),
               ),
             ],
           ),

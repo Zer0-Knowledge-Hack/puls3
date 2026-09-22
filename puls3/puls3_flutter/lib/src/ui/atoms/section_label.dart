@@ -13,7 +13,7 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: Puls3Text.overline.copyWith(color: color),
+      style: Puls3Text.eyebrow.copyWith(color: color),
     );
   }
 }

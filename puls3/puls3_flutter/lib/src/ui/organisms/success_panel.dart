@@ -11,20 +11,25 @@ class SuccessPanel extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.children,
+    this.highlight,
   });
 
   final String title;
   final String subtitle;
   final List<Widget> children;
 
+  /// Optional accent shown above the title, e.g. a Doto amount.
+  final Widget? highlight;
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: Puls3Radius.lgAll,
       child: PulseBackground(
-        origin: const Alignment(0, -0.75),
-        intensity: 0.9,
-        spacing: 13,
+        focalPoint: Alignment.topRight,
+        opacity: 0.4,
+        gridStep: 18,
+        radiusFactor: 0.6,
         child: Padding(
           padding: const EdgeInsets.all(Puls3Spacing.lg),
           child: Column(
@@ -39,16 +44,9 @@ class SuccessPanel extends StatelessWidget {
                 child: Container(
                   width: 72,
                   height: 72,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Puls3Colors.success,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Puls3Colors.success.withValues(alpha: 0.45),
-                        blurRadius: 36,
-                        spreadRadius: 4,
-                      ),
-                    ],
                   ),
                   child: const Icon(
                     Icons.check_rounded,
@@ -57,11 +55,15 @@ class SuccessPanel extends StatelessWidget {
                   ),
                 ),
               ),
+              if (highlight != null) ...[
+                const SizedBox(height: Puls3Spacing.lg),
+                highlight!,
+              ],
               const SizedBox(height: Puls3Spacing.lg),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: Puls3Text.displayMd,
+                style: Puls3Text.h2Compact,
               ),
               const SizedBox(height: Puls3Spacing.xs),
               Text(

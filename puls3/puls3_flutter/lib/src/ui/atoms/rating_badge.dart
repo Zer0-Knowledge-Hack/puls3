@@ -15,7 +15,7 @@ class RatingBadge extends StatelessWidget {
       children: [
         const Icon(Icons.star_rounded, size: 16, color: Puls3Colors.accent),
         const SizedBox(width: 2),
-        Text(rating.toStringAsFixed(1), style: Puls3Text.label),
+        Text(rating.toStringAsFixed(1), style: Puls3Text.caption),
       ],
     );
   }

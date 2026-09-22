@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/stellar_format.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/primary_button.dart';
+import '../atoms/puls3_logo.dart';
 import '../molecules/key_value_row.dart';
 import '../molecules/progress_step_row.dart';
 import 'success_panel.dart';
@@ -33,6 +34,10 @@ class DeployProgressView extends StatelessWidget {
 
   bool get isDone => completedSteps >= steps.length;
 
+  /// Percent the status label counts toward while the current step runs.
+  double get _targetPercent =>
+      (completedSteps + 1).clamp(0, steps.length) / steps.length * 99;
+
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
@@ -47,7 +52,15 @@ class DeployProgressView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Deploying $agentName', style: Puls3Text.displayMd),
+        Row(
+          children: [
+            const Puls3Mark(size: 56),
+            const SizedBox(width: Puls3Spacing.md),
+            Expanded(child: _DeployStatus(target: _targetPercent)),
+          ],
+        ),
+        const SizedBox(height: Puls3Spacing.lg),
+        Text('Deploying $agentName', style: Puls3Text.h3),
         const SizedBox(height: Puls3Spacing.xs),
         Text(
           'Provisioning an on-chain identity and a Stellar wallet.',
@@ -104,6 +117,29 @@ class DeployProgressView extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Doto status label ("DEPLOYING 64%") that counts up toward [target].
+class _DeployStatus extends StatelessWidget {
+  const _DeployStatus({required this.target});
+
+  final double target;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: target),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => Text(
+        'DEPLOYING ${value.round()}%',
+        style: Puls3Text.accentMd,
+        maxLines: 1,
+        overflow: TextOverflow.fade,
+        softWrap: false,
+      ),
     );
   }
 }

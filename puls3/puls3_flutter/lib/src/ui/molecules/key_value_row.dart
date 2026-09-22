@@ -38,7 +38,7 @@ class KeyValueRow extends StatelessWidget {
                     textAlign: TextAlign.right,
                     maxLines: 1,
                     style: mono
-                        ? Puls3Text.mono
+                        ? Puls3Text.data
                         : Puls3Text.body.copyWith(fontWeight: FontWeight.w600),
                   ),
             ),

@@ -66,7 +66,7 @@ class AgentForm extends StatelessWidget {
         gap,
         DropdownButtonFormField<String>(
           initialValue: selectedModel,
-          dropdownColor: Puls3Colors.surface2,
+          dropdownColor: Puls3Colors.surface,
           style: Puls3Text.body,
           decoration: const InputDecoration(labelText: 'Model'),
           items: [
@@ -82,7 +82,7 @@ class AgentForm extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           controller: promptController,
-          style: Puls3Text.mono,
+          style: Puls3Text.data,
           minLines: 4,
           maxLines: 8,
           decoration: const InputDecoration(
@@ -125,12 +125,12 @@ class AgentForm extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           controller: priceController,
-          style: Puls3Text.mono,
+          style: Puls3Text.data,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: 'Price per task',
             suffixText: 'USDC',
-            suffixStyle: Puls3Text.mono,
+            suffixStyle: Puls3Text.data,
             errorText: priceError,
           ),
         ),
