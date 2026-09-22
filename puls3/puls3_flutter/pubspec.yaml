@@ -29,6 +29,8 @@ dependencies:
   cupertino_icons: ^1.0.5
   flutter:
     sdk: flutter
+  go_router: ^17.5.0
+  google_fonts: ^8.2.1
   puls3_client:
     path: ../puls3_client
   serverpod_auth_idp_flutter: 3.4.13
@@ -62,6 +64,7 @@ flutter:
   # https://flutter.dev/assets-and-images/#from-packages
   assets:
     - assets/config.json
+    - assets/mock/demo_agents.json
 dependency_overrides:
   flutter_secure_storage: ^10.0.0
 

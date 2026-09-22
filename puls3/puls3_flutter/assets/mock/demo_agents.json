@@ -1,0 +1,114 @@
+[
+  {
+    "id": "agt-001",
+    "name": "Ledger Scout",
+    "description": "Monitors Stellar accounts and summarizes balance changes, payments and trustline updates in plain English.",
+    "skills": [
+      "On-chain analytics",
+      "Monitoring",
+      "Summaries"
+    ],
+    "priceUsdcStroops": 5000000,
+    "rating": 4.9,
+    "stellarAddress": "GCDSVE4MGRNDOWEP7HX7HGMECBFAZPDI2J5PDGWDLOLLLIUIXFFSQFXZ",
+    "model": "Claude Sonnet"
+  },
+  {
+    "id": "agt-002",
+    "name": "Remit Pilot",
+    "description": "Plans cross-border payouts, compares anchor routes and prepares USDC transfers for review.",
+    "skills": [
+      "Payments",
+      "Anchors",
+      "Compliance"
+    ],
+    "priceUsdcStroops": 12500000,
+    "rating": 4.8,
+    "stellarAddress": "GCDUSFYTSJYZNVG2R537POTM4GX5O4WYPKDNHPQBPA3NWISYZ5WQP5AS",
+    "model": "GPT-4.1"
+  },
+  {
+    "id": "agt-003",
+    "name": "Soroban Auditor",
+    "description": "Reviews Soroban smart contracts for common pitfalls and explains findings with suggested fixes.",
+    "skills": [
+      "Smart contracts",
+      "Security",
+      "Rust"
+    ],
+    "priceUsdcStroops": 45000000,
+    "rating": 4.7,
+    "stellarAddress": "GCWJO7NSUK6NKZMVOAYSGFJCMKEG7OQPPAXW6UXZFZN43EMV3ZESMLX7",
+    "model": "Claude Opus"
+  },
+  {
+    "id": "agt-004",
+    "name": "Invoice Clerk",
+    "description": "Reads invoices, extracts line items and drafts matching USDC payment requests.",
+    "skills": [
+      "Document parsing",
+      "Payments",
+      "Accounting"
+    ],
+    "priceUsdcStroops": 2500000,
+    "rating": 4.6,
+    "stellarAddress": "GDTUAMMTCWEX5SESA4NTOOIIJTFRCHFNTVFKDHFPZX2IVJH6FII7TFQE",
+    "model": "Claude Haiku"
+  },
+  {
+    "id": "agt-005",
+    "name": "Market Pulse",
+    "description": "Tracks SDEX order books and liquidity pools and delivers a daily market brief.",
+    "skills": [
+      "On-chain analytics",
+      "Trading",
+      "Summaries"
+    ],
+    "priceUsdcStroops": 7500000,
+    "rating": 4.5,
+    "stellarAddress": "GAKGYUWFN5ZTCSST2PLW3HHQT3CWHO4MU67NDLHC7CY2VTAZTVRRGC4V",
+    "model": "Gemini 2.5 Pro"
+  },
+  {
+    "id": "agt-006",
+    "name": "Copy Forge",
+    "description": "Writes landing pages, release notes and social threads in your brand voice.",
+    "skills": [
+      "Copywriting",
+      "Marketing",
+      "Summaries"
+    ],
+    "priceUsdcStroops": 3000000,
+    "rating": 4.8,
+    "stellarAddress": "GCJXVJKC6ZNRYWNDFTLKCXDWFOT63JSXWWQ3EIAWQVA66SS6V2ZOCD6J",
+    "model": "Claude Sonnet"
+  },
+  {
+    "id": "agt-007",
+    "name": "Support Relay",
+    "description": "Answers wallet support tickets, triages bugs and escalates with full context.",
+    "skills": [
+      "Customer support",
+      "Triage",
+      "Monitoring"
+    ],
+    "priceUsdcStroops": 1000000,
+    "rating": 4.4,
+    "stellarAddress": "GA54RBD4A67MGUU4MJOTGSUNYAXFLVFQJOMH4IDACNG3KKJO27HMMKDE",
+    "model": "GPT-4.1 mini"
+  },
+  {
+    "id": "agt-008",
+    "name": "Data Weaver",
+    "description": "Cleans CSV exports, joins datasets and returns tidy tables with charts.",
+    "skills": [
+      "Data cleaning",
+      "Accounting",
+      "Document parsing"
+    ],
+    "priceUsdcStroops": 6000000,
+    "rating": 4.7,
+    "stellarAddress": "GB3WMS5CSYUAWA2J5R5QHPE5DWWYMQDRSVUE4MG2XXEFBHQVVDZIR5HN",
+    "model": "Llama 3.3 70B"
+  }
+]
