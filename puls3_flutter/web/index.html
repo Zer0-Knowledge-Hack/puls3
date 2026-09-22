@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="puls3: the agent hub on Stellar. Create agents, find agents, pay them in USDC.">
+  <!-- Colors below match docs/brand/tokens.json (dark set). -->
+  <meta name="theme-color" content="#0B0B0D">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="puls3">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+
+  <title>puls3</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Pre-Flutter loading state: C01 mark with a calm pulse and a Doto
+       status label (brand guide page 14). Removed on Flutter's first frame. -->
+  <style>
+    @font-face {
+      font-family: "Doto ROND";
+      src: url("assets/assets/fonts/Doto-ROND-wght.ttf") format("truetype");
+      font-weight: 100 900;
+      font-display: swap;
+    }
+    html, body { margin: 0; background: #0B0B0D; }
+    #p3-loader {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 28px; background: #0B0B0D;
+      transition: opacity .3s ease;
+    }
+    #p3-loader.p3-done { opacity: 0; pointer-events: none; }
+    #p3-loader img { width: 96px; height: 96px; animation: p3-pulse 4.2s ease-in-out infinite; }
+    #p3-loader span {
+      font: 22px "Doto ROND", monospace; letter-spacing: 2px; color: #FFB547;
+      font-variation-settings: "ROND" 100, "wght" 900;
+    }
+    @keyframes p3-pulse {
+      0%, 100% { transform: scale(1); opacity: .85; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) { #p3-loader img { animation: none; } }
+  </style>
+</head>
+<body>
+  <div id="p3-loader" role="status" aria-label="Loading puls3">
+    <img src="assets/assets/brand/mark/puls3-mark-c01-dark.svg" alt="">
+    <span>LOADING</span>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('p3-loader');
+      if (!el) return;
+      el.classList.add('p3-done');
+      setTimeout(function () { el.remove(); }, 350);
+    }, { once: true });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
