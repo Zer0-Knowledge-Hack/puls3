@@ -1,0 +1,51 @@
+{
+  "name": "puls3-logo-lab",
+  "version": "1.0.0",
+  "description": "puls3 logo exploration lab",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.526",
+    "@remotion/google-fonts": "4.0.526",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.526"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.526",
+    "@types/node": "^22.20.4",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "~19.2.0",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "fontkit": "^2.0.4",
+    "pdf-lib": "^1.17.1",
+    "prettier": "3.8.1",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "typecheck": "tsc --noEmit",
+    "export:svg": "tsx scripts/export-svg.tsx",
+    "stills": "remotion still ContactSheet out/contact-sheet.png && remotion still ContactSheetMarks out/contact-sheet-marks.png",
+    "shuffle": "remotion render Shuffle out/shuffle.mp4",
+    "export:svg:round2": "tsx scripts/export-svg-round2.tsx",
+    "gen:glyphs": "node scripts/gen-glyphs.mjs",
+    "export:svg:round3": "tsx scripts/export-svg-round3.tsx",
+    "brand:render": "node scripts/render-brand.mjs",
+    "brand:export": "tsx scripts/export-brand.tsx",
+    "brand:pdf": "node scripts/build-brand-pdf.mjs"
+  },
+  "sideEffects": [
+    "*.css",
+    "./src/fonts.ts",
+    "./src/round2/fonts.ts",
+    "./src/round3/fonts.ts",
+    "./src/brand/fonts.ts"
+  ]
+}
