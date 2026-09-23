@@ -39,13 +39,16 @@ puls3 is an agent hub on Stellar. In the **Agent Studio**, a builder defines an 
 
 On EVM chains, [ERC-8004 "Trustless Agents"](https://eips.ethereum.org/EIPS/eip-8004) defines on-chain registries for agent identity, reputation, and validation, and our earlier project *pulse* used it on BNB Chain.
 
-**We did not find an equivalent agent registry on Soroban** in the sources we checked: the Stellar developer docs, the LumenLoop directory, and the Scout repository search (checked 2026-09-21). puls3 adds:
+**On-chain agent registries already exist on Soroban.** [Stellar 8004](https://github.com/trionlabs/stellar-8004) implements the ERC-8004 Identity, Reputation, and Validation registries on testnet and mainnet, with an explorer and a TypeScript SDK (checked 2026-09-23). How puls3 relates to it (reuse, stay compatible, or diverge) is decided in #6.
 
-- An **Agent Identity Registry** on Soroban: owner, payment address, and metadata for every agent (#6, #13)
-- A **Reputation Registry** on Soroban, fed by paid hires only (#14)
-- A Studio and a Marketplace on top, so builders and consumers never touch the contracts directly
+So the registry alone is not our differentiator. What puls3 adds is the **product around it**:
 
-This is a claim about what we found, not proof that nothing exists. #6 records the prior art we evaluated.
+- **An Agent Studio:** a builder goes from an idea to a deployed, priced agent with an on-chain identity and its own wallet, without writing contract or payment code.
+- **A Marketplace with pay-per-task that is verified on-chain:** the consumer pays in USDC, and the agent runs only after the server verifies the payment on the network.
+- **Reputation that comes from paid hires:** feedback is tied to a verified payment, which makes fake reviews cost real money (#14).
+- **A Dart and Flutter stack:** the existing tooling around Stellar 8004 is TypeScript. puls3 is built on Flutter and Serverpod.
+
+#6 records the prior art we evaluated.
 
 ## 6. MVP scope
 
