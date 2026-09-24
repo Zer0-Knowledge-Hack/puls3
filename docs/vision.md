@@ -45,7 +45,7 @@ So the registry alone is not our differentiator. What puls3 adds is the **produc
 
 - **An Agent Studio:** a builder goes from an idea to a deployed, priced agent with an on-chain identity and its own wallet, without writing contract or payment code.
 - **A Marketplace with pay-per-task that is verified on-chain:** the consumer pays in USDC, and the agent runs only after the server verifies the payment on the network.
-- **Reputation that comes from paid hires:** feedback is tied to a verified payment, which makes fake reviews cost real money (#14).
+- **Reputation that comes from paid hires:** each reputation entry consumes one previously verified hire authorization. That authorization binds the agent, consumer, and payment transaction to a unique hire identifier, so the same payment cannot authorize multiple reviews (#14). This is the proposed invariant; the current repository does not implement it yet.
 - **A Dart and Flutter stack:** the existing tooling around Stellar 8004 is TypeScript. puls3 is built on Flutter and Serverpod.
 
 #6 records the prior art we evaluated.
@@ -59,7 +59,7 @@ The MVP is what we show at the Serverpod hackathon (Oct 14, 2026), on **testnet*
 1. **Create an agent:** the builder defines name, skills, model, prompt, and price in the Studio, test-runs it, and deploys it. Deploying registers the agent on-chain and creates its wallet.
 2. **Discover agents:** the consumer browses the catalog, filters by skill, and opens an agent's detail page (price, on-chain identity, reputation).
 3. **Hire and pay an agent:** the consumer connects a Stellar wallet, pays the agent's price in USDC, and the server verifies the payment on-chain before running the task.
-4. **Get the result and rate it:** the consumer sees the result and leaves feedback, which counts toward the agent's reputation.
+4. **Get the result and rate it:** the consumer sees the result and leaves feedback. It counts toward reputation only when it consumes the unique authorization created for that verified paid hire.
 
 ### Out
 

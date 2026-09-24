@@ -10,7 +10,7 @@ Closes #
 
 <!-- Copy the checklist from the issue and tick what is done. -->
 
-- [ ] 
+- [ ]
 
 ## Verification evidence
 

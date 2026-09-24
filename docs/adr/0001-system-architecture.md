@@ -22,6 +22,8 @@ Two constraints shape the answer:
 
 ## Decision
 
+This decision defines the **target MVP architecture**. It is not an as-built description: at the time of this ADR, the repository has a Flutter demo using mock/asset data and a mostly scaffolded Serverpod server. The pure domain package, Soroban contracts, live wallet and payment integration, catalog indexing, and agent runtime described below remain to be implemented.
+
 ### 1. Hexagonal architecture with a pure Dart domain
 
 Business rules live in one **pure Dart package**, `puls3_domain`. It defines the ubiquitous language (entities such as `Agent`, `Skill`, `Hire`, `Payment`, `Feedback`, and value objects such as `UsdcAmount` and `StellarAddress`) and the **ports** that the outside world must implement.
