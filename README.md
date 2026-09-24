@@ -31,7 +31,7 @@ AI agents are becoming economic actors: they do work, and they should get paid f
 - **Paying an agent is awkward.** Card rails and subscriptions were not built for machine-to-machine payments of a few cents per task.
 - **Agents do not own anything.** Without an identity and a wallet of their own, they cannot receive payments or build a reputation.
 
-On other chains, agent registries already exist. **On Stellar, no agent registry turned up in the sources we have checked so far**, so builders cannot create agents or find them there. puls3 is built to fill that gap.
+Agent registries already exist on Stellar: [Stellar 8004](https://github.com/trionlabs/stellar-8004) provides Identity, Reputation, and Validation registries on Soroban. puls3 does not differentiate by being the first registry. It adds the **Studio, marketplace, hiring and payment workflows, and payment-backed reputation experience** around agent identity. The exact on-chain enforcement design is still **Proposed** in [ADR-0002](docs/adr/0002-agent-registry-on-soroban.md), not implemented today.
 
 ## Why Stellar
 
