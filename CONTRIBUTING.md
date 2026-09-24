@@ -23,7 +23,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 | Git | Latest | Everything |
 | GitHub CLI (`gh`) | Latest | Optional, for PRs from the terminal |
 | Node.js | 18+ | Only for `design/logo-lab` |
-| Rust + Stellar CLI | Coming with #12 | Only for Soroban contracts |
+| Rust + Stellar CLI | Rust **1.98.1**+, Stellar CLI **28.0.0** | Only for Soroban contracts. See [contracts/README.md](contracts/README.md) |
 
 ### 1.1 Flutter and Dart
 
