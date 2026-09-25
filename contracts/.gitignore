@@ -4,3 +4,7 @@ target
 # Local settings
 .soroban
 .stellar
+
+# Local Stellar identities and env files
+**/.env
+identity*.json
