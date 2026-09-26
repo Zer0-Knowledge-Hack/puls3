@@ -5,6 +5,7 @@ environment:
   sdk: '^3.8.0'
 
 workspace:
+  - puls3_domain
   - puls3_client
   - puls3_server
   - puls3_flutter
