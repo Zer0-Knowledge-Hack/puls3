@@ -1,0 +1,60 @@
+{
+  "agents": [
+    {
+      "uri": "puls3://demo/payments-agent",
+      "metadata": [
+        { "key": "name", "value": "Payments Agent" },
+        { "key": "description", "value": "Demo agent that drafts Stellar payment operations for review." },
+        { "key": "category", "value": "payments" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/oracle-agent",
+      "metadata": [
+        { "key": "name", "value": "Oracle Agent" },
+        { "key": "description", "value": "Demo agent that publishes reference price feeds on testnet." },
+        { "key": "category", "value": "data" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/escrow-agent",
+      "metadata": [
+        { "key": "name", "value": "Escrow Agent" },
+        { "key": "description", "value": "Demo agent that coordinates two-party escrow releases." },
+        { "key": "category", "value": "escrow" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/market-maker",
+      "metadata": [
+        { "key": "name", "value": "Market Maker" },
+        { "key": "description", "value": "Demo agent that quotes testnet order-book spreads." },
+        { "key": "category", "value": "trading" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/identity-verifier",
+      "metadata": [
+        { "key": "name", "value": "Identity Verifier" },
+        { "key": "description", "value": "Demo agent that checks credential attestations off-chain." },
+        { "key": "category", "value": "identity" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/notifications-agent",
+      "metadata": [
+        { "key": "name", "value": "Notifications Agent" },
+        { "key": "category", "value": "tooling" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/analytics-agent",
+      "metadata": [
+        { "key": "name", "value": "Analytics Agent" },
+        { "key": "description", "value": "Demo agent that summarizes on-chain activity for dashboards." },
+        { "key": "category", "value": "analytics" },
+        { "key": "version", "value": "0.1.0" }
+      ]
+    }
+  ]
+}

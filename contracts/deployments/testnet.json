@@ -1,0 +1,16 @@
+{
+  "network": "testnet",
+  "deployed_at_utc": "TO-FILL",
+  "deployer": "TO-FILL",
+  "soroban_sdk": "28",
+  "identity_registry": {
+    "contract_id": "TO-FILL",
+    "wasm_hash_sha256": "TO-FILL",
+    "constructor": {
+      "owner": "TO-FILL",
+      "name": "Puls3 Agent",
+      "symbol": "P3AGENT"
+    }
+  },
+  "reputation_registry": null
+}
