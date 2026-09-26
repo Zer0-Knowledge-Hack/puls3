@@ -218,6 +218,14 @@ fn set_agent_uri_updates_lookup_and_frees_old_uri() {
     assert_eq!(client.agent_uri(&id), second);
     assert_eq!(client.agent_id_by_uri(&second), Some(id));
     assert_eq!(client.agent_id_by_uri(&first), None);
+    // The new index entry gets the same TTL as the URI it points to.
+    assert_eq!(
+        env.as_contract(&contract_id, || env
+            .storage()
+            .persistent()
+            .get_ttl(&DataKey::UriIndex(second.clone()))),
+        TTL_BUMP
+    );
     // The freed URI can be claimed by another agent.
     let other = Address::generate(&env);
     let taken = client.register_with_uri(&other, &first);
