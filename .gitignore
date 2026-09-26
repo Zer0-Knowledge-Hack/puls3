@@ -12,3 +12,17 @@ puls3_server/.env
 pubspec_overrides.yaml
 
 .vscode/settings.json
+
+# Sensitive / never-commit files
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.secret
+secrets/
+.stellar/
+.soroban/
+.config/stellar/
+*.log
+.DS_Store
