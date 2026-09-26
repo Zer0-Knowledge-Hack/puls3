@@ -16,6 +16,7 @@ pubspec_overrides.yaml
 # Sensitive / never-commit files
 **/.env
 **/.env.*
+!**/.env.example
 *.pem
 *.key
 *.p12

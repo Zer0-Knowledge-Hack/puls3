@@ -191,9 +191,8 @@ impl IdentityRegistryContract {
         e.storage()
             .persistent()
             .set(&DataKey::AgentUri(agent_id), &new_uri);
-        e.storage()
-            .persistent()
-            .set(&DataKey::UriIndex(new_uri.clone()), &agent_id);
+        let index_key = DataKey::UriIndex(new_uri.clone());
+        e.storage().persistent().set(&index_key, &agent_id);
         UriUpdated {
             agent_id,
             updated_by: caller,
@@ -203,6 +202,7 @@ impl IdentityRegistryContract {
         extend_instance(e);
         extend_persistent(e, &DataKey::Owner(agent_id));
         extend_persistent(e, &DataKey::AgentUri(agent_id));
+        extend_persistent(e, &index_key);
         Ok(())
     }
 
