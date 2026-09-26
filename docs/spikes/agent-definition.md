@@ -15,7 +15,7 @@ Since #33 was written, [Stellar 8004](https://github.com/trionlabs/stellar-8004)
 - An agent is a **manifest**: a small JSON document the builder writes in the Studio. The MVP manifest is **prompt-only**: no tools.
 - The manifest is **private and off-chain** (in the Serverpod database). What goes public is a **registration file** without the prompt, served over HTTPS, whose URL is the agent's `agent_uri` on-chain. The chain also stores a **salted hash** of the full manifest, so anyone can later check that the agent ran the version it committed to, without the prompt ever being published.
 - Deployed versions are **immutable**. Editing creates a new version; a hire always runs the version it was paid for.
-- Deploy = validate → store the version → create the agent wallet → register on-chain → confirm → activate. **Who signs the agent-wallet step is pending ADR-0003 (#7).**
+- Deploy = validate → store the version → create the agent wallet → register on-chain → confirm → activate. Who signs each step follows [ADR-0003](../adr/0003-payment-rail-and-custody.md) (#7).
 
 ## 1. Agent manifest: which fields define an agent?
 
@@ -78,15 +78,13 @@ This needs **no change to the Identity Registry interface**: `set_metadata` and 
 |---|---|---|---|
 | 1 | Validate the manifest (#34) | Server (domain rules) | Decided |
 | 2 | Store it as version *n*, generate the salt, compute `manifestHash` | Server | Decided |
-| 3 | Create the agent wallet | **Pending ADR-0003 (#7)**: server-held key vs. smart account | ⏳ |
+| 3 | Create the agent wallet: keypair, funding, USDC trustline | Server, with the agent's key (server-custodied G-account on testnet, [ADR-0003](../adr/0003-payment-rail-and-custody.md)) | Decided |
 | 4 | Register on-chain: `register_full(caller = builder, agent_uri, [puls3.manifestHash, puls3.manifestVersion])` | **Builder's wallet** signs (ADR-0001 §4) | Decided |
-| 5 | Point payments at the agent wallet: `set_agent_wallet(builder, agent_id, agent_wallet)` | Builder **and** the agent wallet authorize (ADR-0002). **How the agent wallet's authorization is produced is pending ADR-0003** | ⏳ |
+| 5 | Point payments at the agent wallet: `set_agent_wallet(builder, agent_id, agent_wallet)` | Builder **and** the agent wallet authorize (ADR-0002): the agent account is the transaction source (server signs), and the builder signs only their authorization entry with Freighter's `signAuthEntry` (ADR-0003) | Decided |
 | 6 | Confirm steps 4–5 with RPC `getTransaction`, read `agent_id` from the `Registered` event | Server (read only) | Decided |
 | 7 | Publish the registration file, mark the version active in the runtime | Server | Decided |
 
-If step 4 or 5 fails, the version stays in `pending` and the Studio shows the error; retrying repeats from the failed step. Steps 4 and 5 can go in one transaction only if ADR-0003 lets the server attach the agent wallet's auth entry to the builder's transaction; otherwise they are two.
-
-**This question is deliberately left open** until #7 decides custody. Everything else in this spike is independent of that decision.
+If step 4 or 5 fails, the version stays in `pending` and the Studio shows the error; retrying repeats from the failed step. Steps 4 and 5 are two transactions: step 4 has the builder as source, step 5 has the agent account as source.
 
 ## 6. Test run (playground)
 
@@ -106,7 +104,7 @@ If step 4 or 5 fails, the version stays in `pending` and the Studio shows the er
 
 ## Open questions
 
-1. **Agent wallet authorization at deploy** (question 5, steps 3 and 5): decided by ADR-0003 (#7).
+1. **Two-party signing of `set_agent_wallet`** (step 5): decided in ADR-0003, still to be proven end to end in #18.
 2. **Model allowlist for the MVP:** the Studio lists five models today; which ones the runtime (#20) supports first is a #20 decision.
 3. **Registration file hosting:** served by the Serverpod web server (simplest) vs. pinned to IPFS (survives our server going down). The MVP uses our server; the on-chain hash keeps it verifiable either way.
 4. **Who can read the prompt later:** only the owner in the MVP. Whether a builder can opt in to publishing it (e.g. for audited agents) is a product decision for after the MVP.

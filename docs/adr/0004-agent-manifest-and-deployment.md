@@ -19,7 +19,7 @@ puls3 must create its own supply of agents, so the Agent Studio needs a precise 
    - a public ERC-8004 registration file, **without the prompt**, is served over HTTPS and its URL is the agent's `agent_uri`;
    - on-chain metadata holds `puls3.manifestHash` (SHA-256 of `salt || canonical_json`, 32 bytes) and `puls3.manifestVersion`.
 4. **Deployed versions are immutable.** Editing creates a new version; each hire records and runs the version it was paid for.
-5. **Deploy steps:** validate → store version and hash → create agent wallet → `register_full` (builder signs) → `set_agent_wallet` (builder and agent wallet authorize) → confirm via RPC → publish the registration file and activate. **Steps 3 and 5 depend on the custody model in ADR-0003 (#7) and are not decided here.**
+5. **Deploy steps:** validate → store version and hash → create agent wallet → `register_full` (builder signs) → `set_agent_wallet` (builder and agent wallet authorize) → confirm via RPC → publish the registration file and activate. Steps 3 and 5 follow [ADR-0003](0003-payment-rail-and-custody.md): the server creates a custodied agent account, and `set_agent_wallet` uses the agent account as transaction source plus the builder's `signAuthEntry`.
 6. **Test runs** use the same runtime path with no payment and no on-chain writes; puls3 pays the LLM cost; 20 runs per builder per day to start.
 
 ## Consequences
@@ -27,7 +27,7 @@ puls3 must create its own supply of agents, so the Agent Studio needs a precise 
 | Issue | Impact |
 |---|---|
 | **#13** Identity Registry | **No interface change.** Uses `register_full` and `set_metadata` with the keys `puls3.manifestHash` and `puls3.manifestVersion`, both within ADR-0002's limits (key ≤ 64 chars, value ≤ 4,096 bytes) |
-| **#18** Register agent flow | Implements deploy steps 3–7. Steps 3 and 5 wait for ADR-0003 |
+| **#18** Register agent flow | Implements deploy steps 3–7, with the signing described in ADR-0003 |
 | **#20** Agent runtime | Loads the manifest by `(agent_id, manifestVersion)`, runs prompt-only tasks, enforces `input.max_chars` and `output.max_chars`, and exposes the test-run path without payment |
 | **#34** AgentManifest domain model | Implements the manifest type, the validation rules (spike, question 1), the canonical JSON form, and the salted hash, in pure Dart |
 | **#35** Agent Studio endpoints | Drafts CRUD, test run (with the daily quota and typed "quota exceeded" error), deploy, and new version. Never returns `system_prompt` to anyone but the owner |
