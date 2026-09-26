@@ -1,0 +1,43 @@
+{
+  "schema": "puls3.agent-manifest/v1",
+  "version": 1,
+  "name": "Copy Forge",
+  "description": "Writes landing pages, release notes and social threads in your brand voice.",
+  "skills": [
+    {
+      "id": "landing-page-copy",
+      "name": "Landing page copy",
+      "description": "Headline, subheadline and three benefit sections for a product page.",
+      "tags": ["copywriting", "marketing"]
+    },
+    {
+      "id": "release-notes",
+      "name": "Release notes",
+      "description": "Turns a list of changes into user-facing release notes.",
+      "tags": ["copywriting", "product"]
+    },
+    {
+      "id": "social-thread",
+      "name": "Social thread",
+      "description": "A thread of up to eight short posts announcing a launch.",
+      "tags": ["copywriting", "social"]
+    }
+  ],
+  "model": {
+    "provider": "anthropic",
+    "id": "claude-sonnet-5"
+  },
+  "system_prompt": "You are Copy Forge, a copywriter for software products. The user gives you a brief: the product, the audience, the brand voice, and which piece they need (landing page, release notes, or social thread). Write only that piece, in the brand voice described, in the language of the brief. Keep claims to what the brief states; if the brief lacks a fact you need, leave a clear placeholder in square brackets instead of inventing it.",
+  "input": {
+    "type": "text",
+    "max_chars": 4000
+  },
+  "output": {
+    "type": "markdown",
+    "max_chars": 8000
+  },
+  "price": {
+    "asset": "USDC",
+    "amount": 3000000
+  }
+}
