@@ -75,3 +75,37 @@ stellar contract init . --name <name>   # from this folder; existing files are n
 ```
 
 Then build, test, format, and lint as above.
+
+## Deploy
+
+Testnet deploy of the Identity Registry (#13) plus demo-agent seed data (#15).
+The Reputation Registry (#14) is not deployed here; `deployments/testnet.json`
+keeps a `reputation_registry: null` slot for it.
+
+### Prerequisites
+
+- A funded testnet identity in the Stellar CLI: `stellar keys generate <identity> --network testnet`
+  (then fund it via the [testnet friendbot](https://developers.stellar.org/docs/tools/testnet-faucet)).
+- Identity/network config from the repo-root `.env.example` (`STELLAR_ACCOUNT`,
+  `STELLAR_NETWORK`, optional `REGISTRY_NAME`/`REGISTRY_SYMBOL`). Keys stay in
+  the Stellar CLI identity store; no secret ever goes into `.env` or `deployments/`.
+
+### Deploy, seed, re-seed
+
+Run both scripts from the repo root:
+
+```bash
+scripts/deploy-testnet.sh <identity>    # builds, deploys, writes deployments/testnet.json
+scripts/seed-demo-agents.sh <identity>  # registers deployments/demo-agents.json
+```
+
+`<identity>` may be omitted when `STELLAR_ACCOUNT` is set. Both scripts fail
+fast with a clear error when the identity, network, or input files are missing.
+
+Re-seeding is safe: the seed script checks `agent_id_by_uri` before each
+register, skips already-registered URIs with a message, and reports
+`total_agents` before/after, so a second run registers nothing new.
+
+Inspect a deployed contract at
+`https://stellar.expert/explorer/testnet/contract/<contract-id>`, using the
+`contract_id` from `deployments/testnet.json`.
