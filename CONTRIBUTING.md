@@ -261,7 +261,7 @@ which scans every pull request and every push to `main`.
 | Server | server, generated client, domain, and workspace manifests | `dart analyze --fatal-infos`, `dart test`, reproducible `serverpod generate` |
 | App | Flutter app, generated client, and workspace manifests | `flutter analyze --fatal-infos`, `flutter test`, `flutter build web --release` |
 | Contracts | `contracts/` | format, Clippy, tests, and `stellar contract build` |
-| Secrets | all changes | Gitleaks CLI 8.30.1 |
+| Secrets | all changes | Gitleaks CLI 8.30.1 with the repository's Stellar seed rule |
 
 The Dart/Flutter and Rust dependency caches are restored automatically. The
 server job provides PostgreSQL and Redis service containers and creates an
