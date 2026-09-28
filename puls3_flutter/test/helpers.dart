@@ -34,6 +34,7 @@ Future<void> pumpApp(
   WidgetTester tester, {
   String location = '/',
   Size size = const Size(1440, 1000),
+  Future<String>? healthCheck,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = size;
@@ -45,6 +46,7 @@ Future<void> pumpApp(
       repository: const InMemoryAgentRepository(testAgents),
       wallet: MockWallet(),
       initialLocation: location,
+      healthCheck: healthCheck,
     ),
   );
   // Let the catalog load. The pulse animation repeats forever, so

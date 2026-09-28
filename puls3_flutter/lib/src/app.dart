@@ -49,11 +49,13 @@ class Puls3App extends StatefulWidget {
     super.key,
     required this.repository,
     required this.wallet,
+    this.healthCheck,
     this.initialLocation = '/',
   });
 
   final AgentRepository repository;
   final WalletPort wallet;
+  final Future<String>? healthCheck;
   final String initialLocation;
 
   @override
@@ -87,7 +89,54 @@ class _Puls3AppState extends State<Puls3App> {
         debugShowCheckedModeBanner: false,
         theme: Puls3Theme.dark(),
         routerConfig: _router,
+        builder: (context, child) => Column(
+          children: [
+            if (widget.healthCheck != null)
+              _BackendStatus(healthCheck: widget.healthCheck!),
+            Expanded(child: child ?? const SizedBox.shrink()),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _BackendStatus extends StatelessWidget {
+  const _BackendStatus({required this.healthCheck});
+
+  final Future<String> healthCheck;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: healthCheck,
+      builder: (context, snapshot) {
+        final label = switch (snapshot.connectionState) {
+          ConnectionState.waiting => 'Connecting to backend…',
+          _ when snapshot.hasError => 'Backend unavailable',
+          _ => 'Backend v${snapshot.data}',
+        };
+        return Semantics(
+          liveRegion: true,
+          child: ColoredBox(
+            color: Puls3Colors.surface,
+            child: SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Puls3Spacing.md,
+                  vertical: Puls3Spacing.xs,
+                ),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

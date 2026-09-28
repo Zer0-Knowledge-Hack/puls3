@@ -60,8 +60,34 @@ puls3 is in **early development**. What exists today:
 
 - ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/)**
 - ✅ The puls3 brand identity ([brand guide](docs/brand/README.md))
-- 🚧 Soroban contracts for agent identity and reputation
-- 🚧 Backend, on-chain payments, and agent execution
+- ✅ The Agent Identity Registry contract on Soroban, deployed on testnet with 7 demo agents ([evidence](#on-chain-evidence-testnet))
+- ✅ A real testnet USDC-rail payment to an agent, verified on-chain ([evidence](#on-chain-evidence-testnet))
+- ✅ The pure Dart domain model ([`puls3_domain/`](puls3_domain/))
+- 🚧 Reputation Registry contract
+- 🚧 Backend, the app wired to the chain, and agent execution
+
+### On-chain evidence (testnet)
+
+Everything below can be opened on [stellar.expert](https://stellar.expert/explorer/testnet) (Stellar testnet).
+
+| What | ID / hash | Link |
+|---|---|---|
+| **Agent Identity Registry** contract (#13) | `CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ` | [contract](https://stellar.expert/explorer/testnet/contract/CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ) |
+| Contract deployment | `05724ac7c0c488ce3c24c93957814cee56c66f349807cf359ea8b4bc73171449` | [tx](https://stellar.expert/explorer/testnet/tx/05724ac7c0c488ce3c24c93957814cee56c66f349807cf359ea8b4bc73171449) |
+| First demo agent registered (`puls3://demo/payments-agent`, agent 0) | `1499f85013ba2722991c1f0a04210101d7841bed444c928d933d07e041ac29f9` | [tx](https://stellar.expert/explorer/testnet/tx/1499f85013ba2722991c1f0a04210101d7841bed444c928d933d07e041ac29f9) |
+| Last demo agent registered (`puls3://demo/analytics-agent`, agent 6) | `4126614d1c16b0790c082e72cb76656cb7dffb6e5094dec98ec99cd4c219ea9f` | [tx](https://stellar.expert/explorer/testnet/tx/4126614d1c16b0790c082e72cb76656cb7dffb6e5094dec98ec99cd4c219ea9f) |
+| **Agent payment** (#7): a SAC `transfer` of 0.50 test USDC to the agent's muxed address, carrying hire id 7 | `17ac14e085609df8e042b84e6c25aac7e1c30344eaa1b1fd0bcbed399b65243f` | [tx](https://stellar.expert/explorer/testnet/tx/17ac14e085609df8e042b84e6c25aac7e1c30344eaa1b1fd0bcbed399b65243f) |
+
+Check the registry yourself with the Stellar CLI:
+
+```bash
+stellar contract invoke --id CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ \
+  --network testnet --source-account <any-funded-identity> -- total_agents      # 7
+stellar contract invoke --id CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ \
+  --network testnet --source-account <any-funded-identity> -- agent_uri --agent-id 0
+```
+
+How the payment works and how to reproduce it: [ADR-0003](docs/adr/0003-payment-rail-and-custody.md) and [`spikes/payments-poc/`](spikes/payments-poc/).
 
 ### Roadmap
 

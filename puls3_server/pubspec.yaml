@@ -1,6 +1,7 @@
 name: puls3_server
 description: Starting point for a Serverpod server.
-# version: 1.0.0
+version: 1.0.0
+publish_to: none
 # homepage: https://www.example.com
 
 environment:
@@ -9,6 +10,8 @@ environment:
 resolution: workspace
 
 dependencies:
+  puls3_domain:
+    path: ../puls3_domain
   serverpod: 3.4.13
   serverpod_auth_idp_server: 3.4.13
 

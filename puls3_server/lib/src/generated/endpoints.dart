@@ -15,10 +15,11 @@ import 'package:serverpod/serverpod.dart' as _i1;
 import '../auth/email_idp_endpoint.dart' as _i2;
 import '../auth/jwt_refresh_endpoint.dart' as _i3;
 import '../greetings/greeting_endpoint.dart' as _i4;
+import '../health/health_endpoint.dart' as _i5;
 import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
-    as _i5;
-import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _i6;
+import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
+    as _i7;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -40,6 +41,12 @@ class Endpoints extends _i1.EndpointDispatch {
         ..initialize(
           server,
           'greeting',
+          null,
+        ),
+      'health': _i5.HealthEndpoint()
+        ..initialize(
+          server,
+          'health',
           null,
         ),
     };
@@ -271,9 +278,25 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
       },
     );
-    modules['serverpod_auth_idp'] = _i5.Endpoints()
+    connectors['health'] = _i1.EndpointConnector(
+      name: 'health',
+      endpoint: endpoints['health']!,
+      methodConnectors: {
+        'check': _i1.MethodConnector(
+          name: 'check',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['health'] as _i5.HealthEndpoint).check(session),
+        ),
+      },
+    );
+    modules['serverpod_auth_idp'] = _i6.Endpoints()
       ..initializeEndpoints(server);
-    modules['serverpod_auth_core'] = _i6.Endpoints()
+    modules['serverpod_auth_core'] = _i7.Endpoints()
       ..initializeEndpoints(server);
   }
 }

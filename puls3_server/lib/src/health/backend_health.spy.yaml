@@ -1,0 +1,5 @@
+### Basic backend health information exposed to generated clients.
+class: BackendHealth
+fields:
+  ### The running puls3 application version.
+  version: String
