@@ -153,11 +153,15 @@ final class Hire {
   /// Why the hire failed. Set by [fail].
   final String? failureReason;
 
-  /// `requested` → `paid`, only with a payment that settles this hire.
+  /// `requested` → `paid`, only with a payment that settles this hire and was
+  /// made by its consumer, so the one who hires, pays and rates is the same.
   Hire pay(Payment payment, {required StellarAddress agentWallet}) {
     _require(HireStatus.requested, HireEvent.pay);
     if (!payment.settles(this, agentWallet: agentWallet)) {
       throw const PaymentDoesNotSettleHire();
+    }
+    if (payment.payer != consumer) {
+      throw const PaymentNotFromConsumer();
     }
     return _to(HireStatus.paid, paymentTransaction: payment.transaction);
   }
@@ -185,7 +189,7 @@ final class Hire {
     if (status != HireStatus.paid && status != HireStatus.inProgress) {
       throw InvalidHireTransition(status, HireEvent.fail);
     }
-    if (reason.isEmpty) {
+    if (reason.trim().isEmpty) {
       throw const InvalidHire(HireProblem.failureReasonEmpty);
     }
     return _to(HireStatus.failed, failureReason: reason);

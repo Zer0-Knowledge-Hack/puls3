@@ -112,5 +112,5 @@ Each invariant has at least one test named after it (`I1`, `I2`, …) that fails
 | I16 | A `Feedback` score is an integer from 1 to 5 | `InvalidFeedback` |
 | I17 | A `Feedback` comment is at most 500 characters | `InvalidFeedback` |
 | I18 | A `Hire` changes state only through the transitions of [Hire lifecycle](hire-lifecycle.md); any other event is rejected, and terminal states (`rated`, `cancelled`, `failed`) accept none | `InvalidHireTransition` |
-| I19 | A `Hire` reaches `paid` only with a `Payment` that settles it (I15), and keeps that payment's transaction hash from then on | `PaymentDoesNotSettleHire` |
+| I19 | A `Hire` reaches `paid` only with a `Payment` that settles it (I15) and was made by the hire's consumer, and keeps that payment's transaction hash from then on | `PaymentDoesNotSettleHire`, `PaymentNotFromConsumer` |
 | I20 | A `Hire` is rated only with feedback for that hire and agent, left by its consumer | `FeedbackDoesNotMatchHire` |

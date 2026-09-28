@@ -37,12 +37,12 @@ stateDiagram-v2
 
 | From | Event (method) | To | Guard | Triggered by |
 |---|---|---|---|---|
-| `requested` | `pay(payment, agentWallet:)` | `paid` | `payment.settles(hire, agentWallet:)`: the payment is for this hire, went to the agent's wallet, and its amount equals the hire price exactly (ADR-0003). Otherwise `PaymentDoesNotSettleHire` | Server, after verifying the transaction on the chain |
+| `requested` | `pay(payment, agentWallet:)` | `paid` | `payment.settles(hire, agentWallet:)`: the payment is for this hire, went to the agent's wallet, and its amount equals the hire price exactly (ADR-0003); otherwise `PaymentDoesNotSettleHire`. And `payment.payer` is the hire's consumer; otherwise `PaymentNotFromConsumer` | Server, after verifying the transaction on the chain |
 | `requested` | `cancel()` | `cancelled` | — | Consumer (app) or server |
 | `paid` | `start()` | `inProgress` | — | Server (agent runtime, #20) |
-| `paid` | `fail(reason:)` | `failed` | `reason` is not empty | Server (the runtime could not start the task) |
+| `paid` | `fail(reason:)` | `failed` | `reason` is not blank | Server (the runtime could not start the task) |
 | `inProgress` | `deliver()` | `delivered` | — | Agent, reported by the runtime |
-| `inProgress` | `fail(reason:)` | `failed` | `reason` is not empty | Agent or server (error or timeout) |
+| `inProgress` | `fail(reason:)` | `failed` | `reason` is not blank | Agent or server (error or timeout) |
 | `delivered` | `rate(feedback)` | `rated` | The feedback is for this hire, this agent, and was left by this hire's consumer. Otherwise `FeedbackDoesNotMatchHire` | Consumer (app) |
 
 Any other event in any state throws `InvalidHireTransition(from, event)`. That includes every event in the three terminal states.
@@ -50,6 +50,7 @@ Any other event in any state throws `InvalidHireTransition(from, event)`. That i
 ## Rules this guarantees
 
 - **A new hire always starts in `requested`.** The public constructor cannot create a hire in any other state.
+- **The consumer is one address throughout:** the one who hires is the one who pays (`pay` checks it) and the one who rates (`rate` checks it). It is the `client_address` the Reputation Registry authorizes (ADR-0002).
 - **`paid` is reachable only through `pay`**, which requires a `Payment`. So every hire in `paid`, `inProgress`, `delivered`, `rated` and, when it failed after payment, `failed`, carries the payment's `TransactionHash`.
 - **Money never moves backwards in the domain:** there is no transition out of `paid` to `cancelled`. A paid task ends in `delivered`/`rated` or in `failed`.
 - **Terminal states are final:** `rated`, `cancelled` and `failed` accept no event.

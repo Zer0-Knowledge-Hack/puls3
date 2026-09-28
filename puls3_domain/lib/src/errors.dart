@@ -139,6 +139,15 @@ final class PaymentDoesNotSettleHire extends DomainError {
       'payment is not for this hire, not to the agent wallet, or not the exact price';
 }
 
+/// The payment was made by an address other than the hire's consumer. The
+/// consumer is the one who hires, pays and rates (ADR-0002 `client_address`).
+final class PaymentNotFromConsumer extends DomainError {
+  const PaymentNotFromConsumer();
+
+  @override
+  String get message => 'a hire must be paid by its own consumer';
+}
+
 /// The feedback is not for this hire, this agent, or from this consumer.
 final class FeedbackDoesNotMatchHire extends DomainError {
   const FeedbackDoesNotMatchHire();

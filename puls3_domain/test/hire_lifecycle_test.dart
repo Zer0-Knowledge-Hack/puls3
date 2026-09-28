@@ -194,6 +194,20 @@ void main() {
       }
     });
 
+    test('pay rejects a payment made by someone other than the consumer', () {
+      final fromStranger = Payment(
+        transaction: txHash,
+        hireId: HireId(7),
+        payer: stranger,
+        payee: agentWallet,
+        amount: price,
+      );
+      expect(
+        () => newHire().pay(fromStranger, agentWallet: agentWallet),
+        throwsA(isA<PaymentNotFromConsumer>()),
+      );
+    });
+
     test('a rejected payment leaves the hire requested', () {
       final hire = newHire();
       expect(
@@ -208,6 +222,19 @@ void main() {
   group('fail', () {
     test('records the reason', () {
       expect(inState(HireStatus.failed).failureReason, 'crash');
+    });
+
+    test('rejects a blank reason', () {
+      expect(
+        () => inState(HireStatus.inProgress).fail(reason: '   '),
+        throwsA(
+          isA<InvalidHire>().having(
+            (e) => e.problem,
+            'problem',
+            HireProblem.failureReasonEmpty,
+          ),
+        ),
+      );
     });
 
     test('rejects an empty reason', () {
