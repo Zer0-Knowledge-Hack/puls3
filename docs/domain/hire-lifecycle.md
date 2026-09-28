@@ -56,6 +56,6 @@ Any other event in any state throws `InvalidHireTransition(from, event)`. That i
 
 ## Open questions
 
-1. **Timeouts:** who calls `fail` when an agent never answers, and after how long. Out of scope here (automatic cancellation and timeouts, #10); the runtime (#20) will decide.
+1. **Timeouts:** who calls `fail` when an agent never answers, and after how long. Timeouts and automatic cancellation are out of scope for #10; the agent runtime (#20) decides them.
 2. **Unpaid hires that are never paid:** whether the server cancels `requested` hires after some time, and when.
 3. **Refunds on `failed`:** out of the MVP. If they are added, `failed` gains a transition such as `refund`.
