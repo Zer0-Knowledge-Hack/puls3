@@ -90,7 +90,15 @@ flowchart TD
 
 ## F4. Create (register) an agent
 
-The Studio form fields map 1:1 to the manifest (ADR-0004). Deploy steps follow ADR-0004 and ADR-0003. Test runs and drafts are detailed in #36.
+The Studio form fields map 1:1 to the manifest (ADR-0004): name, description, skills, model, system prompt, input (type and maximum characters), output (type and maximum characters), and price. Deploy steps follow ADR-0004 and ADR-0003. Test runs and drafts are detailed in #36.
+
+**Registration URI.** The server gives every Studio draft its own registration URI (the URL of the agent's public registration file, ADR-0004), built from a server-generated draft id. Before the builder signs `register_full`, the server calls `agent_id_by_uri` on the Identity Registry:
+
+- **Not registered:** continue with `register_full`.
+- **Registered by this builder:** an earlier attempt already landed (for example, the app lost the confirmation). The deploy **resumes** with that `agent_id` at step 7; nothing is registered twice.
+- **Registered by another address:** the server issues a **new draft id and URI**, rebuilds the transaction, and the builder signs it.
+
+Retrying with an unchanged URI therefore never repeats a failing `register_full`.
 
 ```mermaid
 flowchart TD
@@ -100,10 +108,14 @@ flowchart TD
   C --> D{"Wallet connected?"}
   D -- No --> D1["F1 connect wallet, then resume"]
   D -- Yes --> E["Server stores the version and creates the agent wallet"]
-  E --> F["Builder signs register_full"]
+  E --> P{"Registration URI already registered?"}
+  P -- "By this builder" --> H
+  P -- "By another address" --> P1["Server issues a new draft URI"]
+  P1 --> F
+  P -- No --> F["Builder signs register_full"]
   F --> G{"Signed and confirmed?"}
   G -- "Rejected" --> G1["Deploy paused at this step, Retry"]
-  G -- "Tx failed or URI taken" --> G2["Error with reason, Retry"]
+  G -- "Tx failed" --> G2["Error with reason, Retry"]
   G -- Yes --> H["Builder signs the wallet authorization for set_agent_wallet"]
   H --> I{"Confirmed?"}
   I -- No --> I1["Deploy paused at this step, Retry"]
@@ -112,13 +124,14 @@ flowchart TD
 
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
-| 1 | `S07-studio` | Fills in name, description, skills, model, system prompt, price | Validates as they type (domain rules I6–I11, ADR-0004 limits) | Invalid field: inline error; **Deploy** disabled |
+| 1 | `S07-studio` | Fills in name, description, skills, model, system prompt, input (type, max characters), output (type, max characters) and price | Validates as they type: skills (I6, I9, I10), name (I7), description (I8), price as whole USDC stroops (I2) and greater than zero (I11), input ≤ 8,000 and output ≤ 16,000 characters (ADR-0004) | Invalid field: inline error; **Deploy** disabled |
 | 2 | `S07-studio` | Taps **Test run** (optional) | Runs the draft once, no payment, no on-chain write (#36) | Daily test quota used: "Quota resets at …" |
 | 3 | `S07-studio` | Taps **Deploy** | Opens `S08-deploy-sheet` with the steps listed | No wallet: F1 first, then resumes here |
 | 4 | `S08-deploy-sheet` | — | Server stores the manifest version, its salted hash, and creates the agent's wallet (testnet custody, ADR-0003) | Server error: step marked failed, **Retry** |
-| 5 | `S08-deploy-sheet` (wallet popup) | Signs `register_full` | Sends it and waits for confirmation; reads the new `agent_id` from the `Registered` event | Rejects: step paused, **Retry**. `UriAlreadyRegistered` or tx failed: reason shown, **Retry** |
-| 6 | `S08-deploy-sheet` (wallet popup) | Signs the authorization entry for `set_agent_wallet` (`signAuthEntry`) | Server submits it with the agent account as source and waits for confirmation | Rejects or fails: step paused, **Retry** from this step (the agent stays registered) |
-| 7 | `S08-deploy-sheet` | — | Publishes the registration file and activates the agent. Shows **View agent** (S03) and **View on explorer** | — |
+| 5 | `S08-deploy-sheet` | — | Server checks the draft's registration URI with `agent_id_by_uri` (see **Registration URI** above) | Already registered by this builder: resume at step 7 with that `agent_id`. Registered by another address: new draft URI, then step 6 |
+| 6 | `S08-deploy-sheet` (wallet popup) | Signs `register_full` | Sends it and waits for confirmation; reads the new `agent_id` from the `Registered` event | Rejects: step paused, **Retry**. Tx failed: reason shown, **Retry**. `UriAlreadyRegistered` (another deploy took the URI between step 5 and now): back to step 5, which resumes or issues a new URI |
+| 7 | `S08-deploy-sheet` (wallet popup) | Signs the authorization entry for `set_agent_wallet` (`signAuthEntry`) | Server submits it with the agent account as source and waits for confirmation | Rejects or fails: step paused, **Retry** from this step (the agent stays registered) |
+| 8 | `S08-deploy-sheet` | — | Publishes the registration file and activates the agent. Shows **View agent** (S03) and **View on explorer** | — |
 
 ## F5. Hire and pay an agent
 
@@ -149,7 +162,7 @@ flowchart TD
 | 3 | `S04-hire-sheet` | Taps **Confirm and pay** | Server creates the hire (hire id, price and manifest version fixed) and returns the payment: USDC contract, the agent's muxed address, amount | Server error: "Could not create the hire", **Retry** |
 | 4 | `S04-hire-sheet` (wallet popup) | Signs the USDC transfer | Submits it; shows **Paying…** | Rejects: "Payment cancelled", hire stays unpaid, back to review. Tx fails (fees, balance changed): reason shown, **Retry** |
 | 5 | `S04-hire-sheet` | — | Server verifies: success, sent by the USDC contract, to the agent's wallet, exact amount, this hire's id, hash not used before. Shows **Verifying payment…** | Not visible yet: keeps checking. A check fails: "Payment does not match this hire", shows the tx link, hire stays unpaid |
-| 6 | `S04-hire-sheet` | — | Payment confirmed: shows the tx hash with an explorer link, and the hire moves to running | — |
+| 6 | `S04-hire-sheet` | — | Payment confirmed: shows the tx hash with an explorer link, and the hire moves to running. In the background, the server (the configured feedback authorizer) submits `authorize_feedback` for this hire (see F7) | Authorization tx fails: the server retries it; F7 step 2 checks it again before rating |
 
 ## F6. Track a hire and see its result
 
@@ -175,14 +188,19 @@ flowchart TD
 
 ## F7. Rate an agent (P1)
 
-Feedback rules come from the domain (I16, I17) and ADR-0002: a feedback entry needs the authorization the server records for a verified paid hire, and each hire can be rated once.
+Feedback rules come from the domain (I16, I17) and ADR-0002. The Reputation Registry accepts `give_feedback` only for a hire that the **configured feedback authorizer** (our server) registered first with `authorize_feedback(hire_id, agent_id, client_address)`, after verifying the payment in F5. `hire_id` is a 32-byte id the server derives from the hire record and its payment transaction. `give_feedback` must be signed by that same `client_address` (the address that paid), and it consumes the authorization, so each hire is rated once.
 
 ```mermaid
 flowchart TD
   A["S06: Rate"] --> B["S10 rate sheet: score 1 to 5, optional comment"]
   B --> C{"Hire delivered and not rated yet?"}
   C -- No --> C1["Rate button hidden or already rated message"]
-  C -- Yes --> D["Wallet asks to sign the feedback"]
+  C -- Yes --> K{"Connected wallet is the address that paid?"}
+  K -- No --> K1["Switch to the paying wallet"]
+  K -- Yes --> Z{"Authorizer registered this hire with authorize_feedback?"}
+  Z -- No --> Z1["Server submits authorize_feedback and waits for confirmation"]
+  Z1 --> D
+  Z -- Yes --> D["Wallet asks to sign the feedback"]
   D --> E{"Signed and accepted?"}
   E -- "Rejected" --> E1["Rating not sent, stay on S10"]
   E -- "Not authorized or already rated" --> E2["Reason shown, back to S06"]
@@ -192,10 +210,11 @@ flowchart TD
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
 | 1 | `S06-hire-detail` | Taps **Rate** | Opens `S10-rate-sheet` | Hire not delivered, or already rated: **Rate** hidden, or "You already rated this hire" |
-| 2 | `S10-rate-sheet` | Picks a score and writes an optional comment | Validates: score 1–5, comment ≤ 500 characters | Comment too long: inline error, **Send** disabled |
-| 3 | `S10-rate-sheet` (wallet popup) | Signs the feedback | Submits `give_feedback` for this hire | Rejects: "Rating not sent", stay on S10 |
-| 4 | `S10-rate-sheet` | — | Waits for confirmation | `HireNotAuthorized` or `HireAuthorizationConsumed`: reason shown, back to S06 |
-| 5 | `S06-hire-detail` | — | Status **Rated**; the new score counts in the agent's rating on S03 | — |
+| 2 | `S10-rate-sheet` | — | Checks that the connected wallet is the address that paid, and that the server's `authorize_feedback` for this hire is confirmed on-chain. If it is missing (the background call from F5 failed), the server, as the configured authorizer, submits `authorize_feedback(hire_id, agent_id, client_address)` now and waits | Another wallet connected: "Rate with the wallet that paid". Authorization cannot be recorded: "Rating unavailable right now", **Retry**; **Send** stays disabled until it is confirmed |
+| 3 | `S10-rate-sheet` | Picks a score and writes an optional comment | Validates: score 1–5, comment ≤ 500 characters | Comment too long: inline error, **Send** disabled |
+| 4 | `S10-rate-sheet` (wallet popup) | Signs the feedback | Submits `give_feedback` with this `hire_id`; the contract checks and consumes the authorization in the same call | Rejects: "Rating not sent", stay on S10 |
+| 5 | `S10-rate-sheet` | — | Waits for confirmation | `HireAuthorizationConsumed`: "You already rated this hire", back to S06. `HireNotAuthorized` (should not happen after step 2): back to step 2 |
+| 6 | `S06-hire-detail` | — | Status **Rated**; the new score counts in the agent's rating on S03 | — |
 
 ---
 
