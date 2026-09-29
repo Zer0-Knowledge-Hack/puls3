@@ -7,7 +7,8 @@ This guide is for the team. It covers how to set up your machine, run the projec
 - [3. How we work](#3-how-we-work)
 - [4. Code conventions](#4-code-conventions)
 - [5. Security rules](#5-security-rules)
-- [6. Troubleshooting](#6-troubleshooting)
+- [6. Continuous integration](#6-continuous-integration)
+- [7. Troubleshooting](#7-troubleshooting)
 
 ---
 
@@ -127,11 +128,21 @@ Always commit the generated code. CI and reviewers check that `serverpod generat
 ### 2.5 Checks to run before opening a PR
 
 ```bash
-# App
-cd puls3_flutter && flutter analyze && flutter test
+# Domain
+cd puls3_domain && dart analyze --fatal-infos && dart test
 
-# Server (same checks CI runs)
-cd puls3_server && dart analyze --fatal-infos && dart format --set-exit-if-changed .
+# Server (requires the test services from `docker compose up -d`)
+cd puls3_server && dart analyze --fatal-infos && dart test
+serverpod generate && git diff --exit-code -- ../puls3_server ../puls3_client
+
+# App
+cd puls3_flutter && flutter analyze --fatal-infos && flutter test
+flutter build web --release
+
+# Contracts
+cd contracts && cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings && cargo test
+stellar contract build
 ```
 
 ---
@@ -239,7 +250,45 @@ The repo is **public**. Anything you push can be seen and copied.
 
 ---
 
-## 6. Troubleshooting
+## 6. Continuous integration
+
+GitHub Actions runs only the checks affected by a change, except **Secrets**,
+which scans every pull request and every push to `main`.
+
+| CI component | Paths | Commands |
+|---|---|---|
+| Domain | `puls3_domain/` and workspace manifests | `dart analyze --fatal-infos`, `dart test` |
+| Server | server, generated client, domain, and workspace manifests | `dart analyze --fatal-infos`, `dart test`, reproducible `serverpod generate` |
+| App | Flutter app, generated client, and workspace manifests | `flutter analyze --fatal-infos`, `flutter test`, `flutter build web --release` |
+| Contracts | `contracts/` | format, Clippy, tests, and `stellar contract build` |
+| Secrets | all changes | Gitleaks CLI 8.30.1 with the repository's Stellar seed rule |
+
+The Dart/Flutter and Rust dependency caches are restored automatically. The
+server job provides PostgreSQL and Redis service containers and creates an
+ephemeral test-only `passwords.yaml`; no repository secret is required.
+
+### Required `main` branch protection (repository admin)
+
+An administrator must configure a ruleset for `main` with:
+
+- pull requests required before merging;
+- at least one approval from someone other than the author;
+- required status checks: `CI / gate` and `Secrets / scan`;
+- branches required to be up to date before merging;
+- direct pushes and force pushes blocked; and
+- administrators included, unless an emergency bypass policy is documented.
+
+The CI workflow always runs. It detects the changed paths, skips unrelated
+component jobs, and exposes one stable `CI / gate` check. The gate fails if path
+detection or any applicable component fails; skipped unrelated jobs are valid.
+
+The acceptance tests that prove path filtering, merge blocking, secret
+detection, and warm-cache duration require temporary remote pull requests and
+repository-admin access. They cannot be proven by local commands alone.
+
+---
+
+## 7. Troubleshooting
 
 | Problem | Fix |
 |---|---|

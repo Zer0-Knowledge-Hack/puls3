@@ -1,0 +1,10 @@
+title = "puls3 secret detection"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "stellar-secret-seed"
+description = "Stellar secret seed"
+regex = '''S[A-Z2-7]{55}'''
+keywords = ["S"]
