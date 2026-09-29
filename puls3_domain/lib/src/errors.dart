@@ -1,3 +1,5 @@
+import 'hire_status.dart';
+
 /// Every error the domain raises. Each subclass names the rule that was
 /// broken, so callers react to the type instead of parsing a message.
 sealed class DomainError implements Exception {
@@ -97,7 +99,11 @@ final class InvalidAgent extends DomainError {
   };
 }
 
-enum HireProblem { priceNotPositive, manifestVersionBelowOne }
+enum HireProblem {
+  priceNotPositive,
+  manifestVersionBelowOne,
+  failureReasonEmpty,
+}
 
 final class InvalidHire extends DomainError {
   const InvalidHire(this.problem);
@@ -109,7 +115,46 @@ final class InvalidHire extends DomainError {
     HireProblem.priceNotPositive => 'hire price must be greater than zero',
     HireProblem.manifestVersionBelowOne =>
       'manifest version must be at least 1',
+    HireProblem.failureReasonEmpty => 'a failed hire needs a reason',
   };
+}
+
+/// An event that the hire lifecycle does not allow in the current state.
+final class InvalidHireTransition extends DomainError {
+  const InvalidHireTransition(this.from, this.event);
+
+  final HireStatus from;
+  final HireEvent event;
+
+  @override
+  String get message => 'a ${from.name} hire cannot ${event.name}';
+}
+
+/// The payment does not pay this hire in full (ADR-0003).
+final class PaymentDoesNotSettleHire extends DomainError {
+  const PaymentDoesNotSettleHire();
+
+  @override
+  String get message =>
+      'payment is not for this hire, not to the agent wallet, or not the exact price';
+}
+
+/// The payment was made by an address other than the hire's consumer. The
+/// consumer is the one who hires, pays and rates (ADR-0002 `client_address`).
+final class PaymentNotFromConsumer extends DomainError {
+  const PaymentNotFromConsumer();
+
+  @override
+  String get message => 'a hire must be paid by its own consumer';
+}
+
+/// The feedback is not for this hire, this agent, or from this consumer.
+final class FeedbackDoesNotMatchHire extends DomainError {
+  const FeedbackDoesNotMatchHire();
+
+  @override
+  String get message =>
+      'feedback must be for this hire and agent, from its consumer';
 }
 
 final class InvalidPayment extends DomainError {

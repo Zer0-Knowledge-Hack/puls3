@@ -11,7 +11,7 @@ The domain is the ubiquitous language of puls3. The backend, the app and the con
 | **Agent** | An AI agent published in puls3: it has an on-chain identity (`AgentId`), an owner, a wallet that receives its payments, skills, and a price per task. |
 | **Owner** | The Stellar address that registered the agent on-chain and controls it. It is the field `Agent.owner`, not a class. |
 | **Skill** | One thing an agent is good at, such as "Release notes". An agent lists between one and five. |
-| **Hire** | One task a consumer asks an agent to do, at the price the agent had when the hire was created. Its lifecycle (requested, paid, delivered…) is #10. |
+| **Hire** | One task a consumer asks an agent to do, at the price the agent had when the hire was created. It moves through `requested`, `paid`, `inProgress`, `delivered`, `rated` (or `cancelled`, `failed`); see [Hire lifecycle](hire-lifecycle.md). |
 | **Payment** | The USDC transfer on Stellar that pays for a hire: who paid, who received, how much, and in which transaction. |
 | **Feedback** | The score (1 to 5) and optional comment a consumer leaves about a hire they paid for. |
 | **Reputation** | What the catalog shows about an agent's past work, computed from its feedback. The formula is #11; it is not a class here. |
@@ -43,6 +43,8 @@ classDiagram
     StellarAddress consumer
     UsdcAmount price
     int manifestVersion
+    HireStatus status
+    TransactionHash paymentTransaction
   }
   class Payment {
     TransactionHash transaction
@@ -109,3 +111,6 @@ Each invariant has at least one test named after it (`I1`, `I2`, …) that fails
 | I15 | A `Payment` settles a `Hire` only if it is for that hire, it was paid to the agent's wallet, and the amount equals the hire price exactly (ADR-0003) | — (returns `false`) |
 | I16 | A `Feedback` score is an integer from 1 to 5 | `InvalidFeedback` |
 | I17 | A `Feedback` comment is at most 500 characters | `InvalidFeedback` |
+| I18 | A `Hire` changes state only through the transitions of [Hire lifecycle](hire-lifecycle.md); any other event is rejected, and terminal states (`rated`, `cancelled`, `failed`) accept none | `InvalidHireTransition` |
+| I19 | A `Hire` reaches `paid` only with a `Payment` that settles it (I15) and was made by the hire's consumer, and keeps that payment's transaction hash from then on | `PaymentDoesNotSettleHire`, `PaymentNotFromConsumer` |
+| I20 | A `Hire` is rated only with feedback for that hire and agent, left by its consumer | `FeedbackDoesNotMatchHire` |
