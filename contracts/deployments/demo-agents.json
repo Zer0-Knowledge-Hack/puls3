@@ -1,59 +1,91 @@
 {
   "agents": [
     {
-      "uri": "puls3://demo/payments-agent",
+      "uri": "puls3://demo/agt-001",
       "metadata": [
-        { "key": "name", "value": "Payments Agent" },
-        { "key": "description", "value": "Demo agent that drafts Stellar payment operations for review." },
-        { "key": "category", "value": "payments" }
+        { "key": "id", "value": "agt-001" },
+        { "key": "name", "value": "Ledger Scout" },
+        { "key": "description", "value": "Monitors Stellar accounts and summarizes balance changes, payments and trustline updates in plain English." },
+        { "key": "skills", "value": "On-chain analytics, Monitoring, Summaries" },
+        { "key": "price", "value": "5000000" },
+        { "key": "model", "value": "Claude Sonnet" }
       ]
     },
     {
-      "uri": "puls3://demo/oracle-agent",
+      "uri": "puls3://demo/agt-002",
       "metadata": [
-        { "key": "name", "value": "Oracle Agent" },
-        { "key": "description", "value": "Demo agent that publishes reference price feeds on testnet." },
-        { "key": "category", "value": "data" }
+        { "key": "id", "value": "agt-002" },
+        { "key": "name", "value": "Remit Pilot" },
+        { "key": "description", "value": "Plans cross-border payouts, compares anchor routes and prepares USDC transfers for review." },
+        { "key": "skills", "value": "Payments, Anchors, Compliance" },
+        { "key": "price", "value": "12500000" },
+        { "key": "model", "value": "GPT-4.1" }
       ]
     },
     {
-      "uri": "puls3://demo/escrow-agent",
+      "uri": "puls3://demo/agt-003",
       "metadata": [
-        { "key": "name", "value": "Escrow Agent" },
-        { "key": "description", "value": "Demo agent that coordinates two-party escrow releases." },
-        { "key": "category", "value": "escrow" }
+        { "key": "id", "value": "agt-003" },
+        { "key": "name", "value": "Soroban Auditor" },
+        { "key": "description", "value": "Reviews Soroban smart contracts for common pitfalls and explains findings with suggested fixes." },
+        { "key": "skills", "value": "Smart contracts, Security, Rust" },
+        { "key": "price", "value": "45000000" },
+        { "key": "model", "value": "Claude Opus" }
       ]
     },
     {
-      "uri": "puls3://demo/market-maker",
+      "uri": "puls3://demo/agt-004",
       "metadata": [
-        { "key": "name", "value": "Market Maker" },
-        { "key": "description", "value": "Demo agent that quotes testnet order-book spreads." },
-        { "key": "category", "value": "trading" }
+        { "key": "id", "value": "agt-004" },
+        { "key": "name", "value": "Invoice Clerk" },
+        { "key": "description", "value": "Reads invoices, extracts line items and drafts matching USDC payment requests." },
+        { "key": "skills", "value": "Document parsing, Payments, Accounting" },
+        { "key": "price", "value": "2500000" },
+        { "key": "model", "value": "Claude Haiku" }
       ]
     },
     {
-      "uri": "puls3://demo/identity-verifier",
+      "uri": "puls3://demo/agt-005",
       "metadata": [
-        { "key": "name", "value": "Identity Verifier" },
-        { "key": "description", "value": "Demo agent that checks credential attestations off-chain." },
-        { "key": "category", "value": "identity" }
+        { "key": "id", "value": "agt-005" },
+        { "key": "name", "value": "Market Pulse" },
+        { "key": "description", "value": "Tracks SDEX order books and liquidity pools and delivers a daily market brief." },
+        { "key": "skills", "value": "On-chain analytics, Trading, Summaries" },
+        { "key": "price", "value": "7500000" },
+        { "key": "model", "value": "Gemini 2.5 Pro" }
       ]
     },
     {
-      "uri": "puls3://demo/notifications-agent",
+      "uri": "puls3://demo/agt-006",
       "metadata": [
-        { "key": "name", "value": "Notifications Agent" },
-        { "key": "category", "value": "tooling" }
+        { "key": "id", "value": "agt-006" },
+        { "key": "name", "value": "Copy Forge" },
+        { "key": "description", "value": "Writes landing pages, release notes and social threads in your brand voice." },
+        { "key": "skills", "value": "Copywriting, Marketing, Summaries" },
+        { "key": "price", "value": "3000000" },
+        { "key": "model", "value": "Claude Sonnet" }
       ]
     },
     {
-      "uri": "puls3://demo/analytics-agent",
+      "uri": "puls3://demo/agt-007",
       "metadata": [
-        { "key": "name", "value": "Analytics Agent" },
-        { "key": "description", "value": "Demo agent that summarizes on-chain activity for dashboards." },
-        { "key": "category", "value": "analytics" },
-        { "key": "version", "value": "0.1.0" }
+        { "key": "id", "value": "agt-007" },
+        { "key": "name", "value": "Support Relay" },
+        { "key": "description", "value": "Answers wallet support tickets, triages bugs and escalates with full context." },
+        { "key": "skills", "value": "Customer support, Triage, Monitoring" },
+        { "key": "price", "value": "1000000" },
+        { "key": "model", "value": "GPT-4.1 mini" }
+      ]
+    },
+    {
+      "uri": "puls3://demo/agt-008",
+      "metadata": [
+        { "key": "id", "value": "agt-008" },
+        { "key": "name", "value": "Data Weaver" },
+        { "key": "description", "value": "Cleans CSV exports, joins datasets and returns tidy tables with charts." },
+        { "key": "skills", "value": "Data cleaning, Accounting, Document parsing" },
+        { "key": "price", "value": "6000000" },
+        { "key": "model", "value": "Llama 3.3 70B" }
       ]
     }
   ]

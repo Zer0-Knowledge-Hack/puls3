@@ -24,8 +24,9 @@ if [ -z "$IDENTITY" ]; then
 fi
 
 NETWORK="${STELLAR_NETWORK:-testnet}"
-if [ -z "$NETWORK" ]; then
-  echo "error: STELLAR_NETWORK is set but empty; unset it or set it to 'testnet'." >&2
+if [ "$NETWORK" != "testnet" ]; then
+  echo "error: this script only seeds 'testnet' (got '$NETWORK')." >&2
+  echo "Unset STELLAR_NETWORK or set it to 'testnet'." >&2
   exit 1
 fi
 
@@ -85,6 +86,21 @@ record_contract_id() {
     node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));console.log((d.identity_registry||{}).contract_id||'')" "$1"
   fi
 }
+
+record_network() {
+  if [ "$JSON_RT" = "python" ]; then
+    "$PY" -c "import json,sys;print(json.load(open(sys.argv[1])).get('network',''))" "$1"
+  else
+    node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));console.log(d.network||'')" "$1"
+  fi
+}
+
+RECORD_NETWORK="$(record_network "$RECORD_FILE")"
+if [ "$RECORD_NETWORK" != "testnet" ]; then
+  echo "error: $RECORD_FILE records network '$RECORD_NETWORK', not 'testnet'." >&2
+  echo "Re-run scripts/deploy-testnet.sh to produce a testnet deployment record." >&2
+  exit 1
+fi
 
 CONTRACT_ID="$(record_contract_id "$RECORD_FILE")"
 if [ -z "$CONTRACT_ID" ] || [ "$CONTRACT_ID" = "TO-FILL" ]; then
