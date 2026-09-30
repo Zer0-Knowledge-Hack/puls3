@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Puls3 wallet spike</title>
+  </head>
+  <body>
+    <script type="module">
+      // Wait for the module (including the Freighter API import) to install its
+      // global bridge before Flutter can invoke the JS interop functions.
+      await import('./freighter_bridge.js');
+
+      const bootstrap = document.createElement('script');
+      bootstrap.src = 'flutter_bootstrap.js';
+      document.body.append(bootstrap);
+    </script>
+  </body>
+</html>
