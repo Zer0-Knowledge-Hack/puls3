@@ -1,0 +1,111 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "events": [
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269177344-0000000000",
+        "operationIndex": 0,
+        "transactionIndex": 0,
+        "txHash": "aba640283d1ebc437d20b4c898e893e894a0ab33ed04a6e96b9f4b5738dc33ba",
+        "inSuccessfulContractCall": false,
+        "topic": [
+          "AAAADwAAAANmZWUA",
+          "AAAAEgAAAAAAAAAAK5AeSIUcMkKuqGrVZ0wwblIp4P1mN2GC9HMl+uIATng="
+        ],
+        "value": "AAAACgAAAAAAAAAAAAAAAAAACJg="
+      },
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269177344-0000000001",
+        "operationIndex": 0,
+        "transactionIndex": 0,
+        "txHash": "96e71131851734c416644795d34ec7ad168afaea04eb0f5509b245acb016bcba",
+        "inSuccessfulContractCall": true,
+        "topic": [
+          "AAAADwAAAANmZWUA",
+          "AAAAEgAAAAAAAAAAFyb8c5C+iwtiKYz0X1r7OrGwGopakGnLEwsPJcEH08A="
+        ],
+        "value": "AAAACgAAAAAAAAAAAAAAAAAAAGQ="
+      },
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269177344-0000000002",
+        "operationIndex": 0,
+        "transactionIndex": 0,
+        "txHash": "27768274637d1aee0b9ed4bc4d73790f6ec2bdafa3914b2d2d3b86ecc5a066c0",
+        "inSuccessfulContractCall": true,
+        "topic": [
+          "AAAADwAAAANmZWUA",
+          "AAAAEgAAAAAAAAAAvHMQd5hWTioSc0QU3QveMh03Lxn8iB4fdpRZZBbbYgw="
+        ],
+        "value": "AAAACgAAAAAAAAAAAAAAAAAAASw="
+      },
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269177344-0000000003",
+        "operationIndex": 0,
+        "transactionIndex": 0,
+        "txHash": "820c8a985f219346bd7c5672d33b13b7621d384057098619ef82524501d756b4",
+        "inSuccessfulContractCall": true,
+        "topic": [
+          "AAAADwAAAANmZWUA",
+          "AAAAEgAAAAAAAAAAhB4xRVxiPhw3aZl4MQinZyxfUwggiEUGJ1ckLfb/yc4="
+        ],
+        "value": "AAAACgAAAAAAAAAAAAAAAAAAAGQ="
+      },
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269177344-0000000004",
+        "operationIndex": 0,
+        "transactionIndex": 0,
+        "txHash": "b94d6be02970dde2546ba8a45b7e6eda245b4fdf07460faf959a64e9762c43bf",
+        "inSuccessfulContractCall": true,
+        "topic": [
+          "AAAADwAAAANmZWUA",
+          "AAAAEgAAAAAAAAAAUJtx9eYeezEv6kFp9xs/IAn451PxB2uU9oJcLz46XGw="
+        ],
+        "value": "AAAACgAAAAAAAAAAAAAAAAAJZJU="
+      },
+      {
+        "type": "contract",
+        "ledger": 4953089,
+        "ledgerClosedAt": "2026-09-30T17:23:52Z",
+        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "id": "0021273355269193728-0000000000",
+        "operationIndex": 0,
+        "transactionIndex": 4,
+        "txHash": "820c8a985f219346bd7c5672d33b13b7621d384057098619ef82524501d756b4",
+        "inSuccessfulContractCall": true,
+        "topic": [
+          "AAAADwAAAAh0cmFuc2Zlcg==",
+          "AAAAEgAAAAAAAAAAhB4xRVxiPhw3aZl4MQinZyxfUwggiEUGJ1ckLfb/yc4=",
+          "AAAAEgAAAAAAAAAAQ8eLFu/pCKiD37K3HDx8GBH+GCVgq9sB8SPVuYn6PMk=",
+          "AAAADgAAAAZuYXRpdmUAAA=="
+        ],
+        "value": "AAAAEQAAAAEAAAACAAAADwAAAAZhbW91bnQAAAAAAAoAAAAAAAAAAAAAAAAAmJaAAAAADwAAAAt0b19tdXhlZF9pZAAAAAAFAAAAAAAAAEQ="
+      }
+    ],
+    "cursor": "0021273359564144639-4294967295",
+    "latestLedger": 4953091,
+    "oldestLedger": 4832132,
+    "latestLedgerCloseTime": "1790789042",
+    "oldestLedgerCloseTime": "1790184247"
+  }
+}
