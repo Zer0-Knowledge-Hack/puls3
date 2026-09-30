@@ -2,8 +2,8 @@
 
 ## Evidence status
 
-**Transaction signing and payment evidence are proven live on Testnet.
-Auth-entry signing has only been tested against a fake wallet.**
+**Transaction signing, auth-entry signing, and payment evidence are proven
+live on Testnet (2026-09-30).**
 
 | Boundary | Result |
 |---|---|
@@ -13,7 +13,7 @@ Auth-entry signing has only been tested against a fake wallet.**
 | Account switch without reconnect | Manual; rejected with `WalletAccountChanged` |
 | Live Testnet submission and terminal polling | Passed 2026-09-30 (ledger 4953089) |
 | Unified SAC `transfer` event for a classic payment | Emitted by SDF Testnet RPC; verified |
-| Freighter auth-entry approval | Manual; **not yet tested live** |
+| Freighter auth-entry approval (`ADDRESS_V2`) | Manual; passed 2026-09-30 (ledger 4953815) |
 
 Live payment: 1 XLM from `GCCB4MKFLRRD4HBXNGMXQMIIU5TSYX2TBAQIQRIGE5LSILPW77E44GOZ`
 to `GBB4PCYW57UQRKED36ZLOHB4PQMBD7QYEVQKXWYB6ER5LOMJ7I6MS4MT` with muxed id
@@ -36,6 +36,9 @@ the connected account. Muxed (`M...`) sources are compared by their
 underlying `G...` account. This closes a gap found live: after switching the
 Freighter account and reconnecting, the app previously signed an XDR prepared
 for the other payer.
+
+Envelope XDR that is empty, not base64, truncated, or followed by trailing
+bytes is rejected with `InvalidEnvelope`, also before the prompt.
 
 A signed transaction is accepted only when its body is unchanged and it
 contains a **new**, cryptographically valid signature from that exact account
@@ -88,18 +91,21 @@ expiration against its own intent before submission. Simulation returns
 before handing the entry to the wallet. The wallet signs whatever expiration
 it is given.
 
-**Unverified live:** whether Freighter 6.x accepts and signs an
-`ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS` preimage. Its guide shows
-only the legacy type. If it refuses or signs something else, the Dart
-signature check fails closed.
+**Verified live 2026-09-30:** Freighter 6.x signed an `ADDRESS_V2` entry
+over the `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS` preimage, even
+though its guide shows only the legacy type. Its "Confirm Authorizations"
+popup showed the authorized address. The signed entry verified in Dart and
+the SAC `transfer` it authorized succeeded in
+[`731fdb98…62650e`](https://stellar.expert/explorer/testnet/tx/731fdb98f97db64e48200999ba852ec3136dc3848dfa07c95a9958bfde62650e)
+(ledger 4953815).
 
-**Unverified:** the runtime shape of `signedAuthEntry` returned by the
-Freighter extension. freighter-api 6.0.1 forwards the extension's
+**Not recorded:** the exact runtime shape of `signedAuthEntry` returned by
+the Freighter extension. freighter-api 6.0.1 forwards the extension's
 `postMessage` payload unchanged, so `web/freighter_bridge.js` normalizes a
 base64 string, a `Uint8Array`/`ArrayBuffer`, or a JSON-serialized Node
-`Buffer` (`{type: 'Buffer', data: [...]}`) to base64. Dart then verifies the
-signature, so an unexpected shape fails closed. Live auth-entry approval has
-not been run.
+`Buffer` (`{type: 'Buffer', data: [...]}`) to base64. The live signature
+verified, so it arrived in one of these shapes; which one was not logged.
+Dart verifies the signature, so an unexpected shape fails closed.
 
 ## Automated verification
 
@@ -116,8 +122,9 @@ flutter build web
 The tests cover account switches, wrong networks, source and operation-source
 account binding (including muxed sources), unchanged envelopes,
 pre-existing-only signatures, unrelated signers, modified transaction bodies,
-auth-entry preimage construction and signature verification, malformed XDR,
-failed transactions, mismatched hashes/payment fields, `getEvents` cursor
+auth-entry preimage construction and signature verification, malformed XDR
+(including trailing bytes after a transaction envelope), failed
+transactions, mismatched hashes/payment fields, `getEvents` cursor
 pagination, the recorded live Testnet responses, and that the harness command
 compiles on the Dart VM.
 
@@ -224,6 +231,130 @@ The CDN-pinned Freighter API module is acceptable only for this isolated
 spike. Production must bundle/vendor the exact dependency and enforce CSP and
 supply-chain controls. Flutter mobile requires a separate deep-link or wallet
 adapter.
+
+## Recommended changes for #8 and ADR-0003
+
+These are recommendations only. No production endpoint is implemented here.
+Each one names the section it changes and the spike evidence behind it.
+"Verified" means it was observed on SDF Testnet on 2026-09-30 or covered by
+the spike's tests; anything else is marked **unverified**.
+
+### ADR-0003 ([`docs/adr/0003-payment-rail-and-custody.md`](../adr/0003-payment-rail-and-custody.md))
+
+1. **Decision 1 (rail): allow a classic `payment` to the `M…` address as an
+   equivalent route.** Verified: a classic payment of native XLM to a muxed
+   address emitted the unified SAC `transfer` event with `to_muxed_id` on SDF
+   Testnet RPC (tx `820c8a98…`). It needs no simulation and no auth entry, and
+   Freighter signed the server-prepared envelope unchanged. The Soroban
+   `transfer` invocation also works: Freighter signed its `ADDRESS_V2` auth
+   entry and the transfer succeeded (tx `731fdb98…`). **Unverified:** both
+   routes with USDC. The asset topic would be `USDC:<issuer>` instead of
+   `native`; prove this in #19 before relying on it.
+2. **Decision 3 (verification): state where and how the event is read.**
+   Verified: in `getTransaction`, the `transfer` event is in
+   `TransactionMetaV4.operations[].events`. The transaction-level `events`
+   hold only the fee events. The SAC event has **4 topics**:
+   `["transfer", from, to, asset]`. `to` is the underlying `G…` account and
+   the data is a map `{amount, to_muxed_id}`. A 3-topic parser rejected the
+   real event. One `getTransaction` call is therefore enough, as the ADR
+   intends. **Unverified:** the `xdrFormat: "json"` shape. The spike decoded
+   the base64 XDR with the SDK.
+3. **Decision 3: add a seventh check, "the `from` topic equals the hire's
+   consumer wallet".** The ADR lists six checks without a payer check, while
+   #8 already defines `PaymentNotFromConsumer`. The spike verifier matches
+   `from` and rejects a mismatch (tested).
+4. **Decision 3: if `getEvents` is used as a cross-check, query from the
+   transaction's own ledger and page with the cursor.** Verified: the native
+   SAC produced 27 events in ledger 4953089. One 100-event page from an
+   earlier start ledger missed the transaction, and the fee and transfer
+   events of one transaction are not contiguous. The spike's
+   `collectTransactionEvents` fails closed on RPC errors, missing cursors,
+   and exhausted page budgets.
+5. **Decision 3 / #30: require classic-event emission from the RPC
+   provider.** Verified only for `https://soroban-testnet.stellar.org`. Any
+   other or hosted provider must confirm `EMIT_CLASSIC_EVENTS=true`. Without
+   the event, verification fails closed and the hire cannot be paid.
+6. **Decision 5 (server chain access): do not add `stellar_flutter_sdk` to
+   Serverpod.** Verified: its 3.8.0 `pubspec.yaml` depends on the Flutter
+   SDK, and its barrel imports `package:flutter/services.dart` (`dart:ui`),
+   so `dart run` fails to compile. Importing only its Flutter-free `src/`
+   libraries (`lib/stellar_sdk_vm.dart`) works on the Dart VM inside a
+   Flutter toolchain. This was verified for RPC reads, XDR decoding, and
+   evidence checks. Keep the ADR's plain-HTTP RPC plus `stellar_dart` plan
+   and pin exact SDK versions. **Unverified:** `stellar_dart` itself, and
+   harness submission through `sendTransaction`.
+7. **Decision 6 (`set_agent_wallet` row): specify the auth-entry protocol.**
+   Verified: Testnet is on protocol 29 and simulation returns **only
+   `ADDRESS_V2`** credentials. Legacy opt-out is a no-op from protocol 28.
+   Freighter 6.x signs the `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`
+   preimage and its popup shows the authorized address. The server must:
+   - accept `ADDRESS_V2` when assembling the transaction;
+   - set `signatureExpirationLedger` before sending the entry, because
+     simulation returns `0`;
+   - re-verify address, network, contract, function, arguments, nonce,
+     expiration, and signature before submission.
+
+   `ADDRESS_WITH_DELEGATES` stays unsupported.
+8. **Consequences, #25 row: record the proven wallet-adapter requirements.**
+   Verified for Freighter 6.x on Flutter Web:
+   - signing is bound to the connected account and network;
+   - a transaction or operation source that is not the connected account is
+     rejected before the prompt (muxed-aware);
+   - trailing bytes after a transaction envelope are rejected before the
+     prompt;
+   - the signed envelope must be unchanged and carry a new valid signature.
+
+   Still open in #69: binding fee-bump envelopes before the prompt, and
+   rejecting zero expiration. Production must bundle the Freighter API and
+   enforce CSP. Mobile needs a separate wallet adapter.
+
+### #8 API contract draft ([`docs/architecture/api.md`](../architecture/api.md), provisional)
+
+1. **`StudioEndpoint.prepareWalletAuthorization` /
+   `DeploySession.authorizationEntryXdr`:** document the returned value as a
+   simulated `ADDRESS_V2` `SorobanAuthorizationEntry` for the builder's
+   wallet, with a server-set non-zero `signatureExpirationLedger`. This is
+   based on recommendation 7 above.
+2. **`StudioEndpoint.completeDeploy` errors:** define what
+   `InvalidAuthorizationEntry` covers:
+   - wrong credential type;
+   - address is not the session wallet;
+   - network, contract, function, arguments, or nonce differ from what the
+     server prepared;
+   - expired entry;
+   - signature does not verify over the arm's preimage.
+
+   Alternatively, add a separate `AuthorizationExpired` so Flutter can
+   re-prepare instead of failing.
+3. **F5-4 and product question 2 (who builds and submits):** the verified
+   path is a **server-prepared** unsigned envelope that the wallet signs
+   unchanged. Consider adding `unsignedTransactionXdr` to
+   `PaymentInstruction`, with the consumer as the transaction source.
+   Building the transaction in the client is **unverified** in this spike.
+   Either way, `confirmPayment` must verify on chain, so submission can stay
+   in the app.
+4. **`HireEndpoint.confirmPayment` errors:** map the evidence checks to the
+   existing codes:
+   - asset contract → `WrongAsset`;
+   - `to` topic → `WrongDestination`;
+   - `amount` → `WrongAmount`;
+   - `to_muxed_id` → `WrongHireReference`;
+   - `from` → `PaymentNotFromConsumer`.
+
+   Add a distinct code (e.g. `PaymentEvidenceUnavailable`) for "transaction
+   succeeded but no unified `transfer` event was found". It is not a
+   transient `ChainUnavailable`, and retrying will not fix a provider without
+   classic events (recommendation 5).
+5. **`Payment` model (`models/payment.spy.yaml`):** document that `payee` is
+   the underlying `G…` agent wallet from the `to` topic, not the `M…`
+   address. The hire reference comes from `to_muxed_id` (= `hireId`). This
+   is verified from the live event.
+6. **Flow rows F1-4, F4-7, F5-4:** state that the wallet's pre-prompt
+   rejections are client-only outcomes with no endpoint call:
+   `WrongNetwork`, `WalletAccountChanged`, `PayloadAccountMismatch`,
+   `InvalidEnvelope`, and `UnsupportedAuthCredentials`. The fix for each is
+   to reconnect or re-prepare. **Unverified:** the F1-3 wallet challenge
+   signature (`signMessage`) was not exercised by this spike.
 
 ## Sources verified 2026-09-30
 

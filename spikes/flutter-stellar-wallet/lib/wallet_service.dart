@@ -56,7 +56,7 @@ final class FreighterWallet implements WalletPort {
   Future<String> signTransaction(String transactionXdr) async {
     final session = _requireSession();
     await _assertActiveSession(session);
-    final unsigned = _parse(transactionXdr);
+    final unsigned = _parse(transactionXdr, canonical: true);
     if (unsigned is Transaction) _assertSourceBinding(unsigned, session);
     final signedXdr = await _bridge.signTransaction(
       transactionXdr,
@@ -257,9 +257,16 @@ final class FreighterWallet implements WalletPort {
   WalletSession _requireSession() =>
       _session ?? (throw const WalletUnavailable('Connect Freighter first.'));
 
-  AbstractTransaction _parse(String xdr) {
+  /// Parses an envelope. With [canonical], the input must re-encode to the
+  /// exact same base64 so trailing bytes or non-canonical encodings are
+  /// rejected before the wallet is prompted.
+  AbstractTransaction _parse(String xdr, {bool canonical = false}) {
     try {
-      return AbstractTransaction.fromEnvelopeXdrString(xdr);
+      final parsed = AbstractTransaction.fromEnvelopeXdrString(xdr);
+      if (canonical && parsed.toEnvelopeXdrBase64() != xdr) {
+        throw const FormatException('non-canonical envelope');
+      }
+      return parsed;
     } catch (_) {
       throw const InvalidEnvelope('Transaction envelope XDR is malformed.');
     }

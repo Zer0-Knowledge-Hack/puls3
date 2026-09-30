@@ -245,6 +245,30 @@ void main() {
     );
   });
 
+  test(
+    'rejects malformed transaction envelope XDR without prompting',
+    () async {
+      await wallet.connect();
+      final valid = transaction(walletKey.accountId, '1').toEnvelopeXdrBase64();
+      final validBytes = base64Decode(valid);
+      final malformed = {
+        'empty': '',
+        'whitespace': '   ',
+        'not base64': 'not base64!',
+        'truncated': base64Encode(validBytes.sublist(0, validBytes.length - 8)),
+        'trailing bytes': base64Encode([...validBytes, 0, 0, 0, 0]),
+      };
+      for (final MapEntry(key: name, value: xdr) in malformed.entries) {
+        await expectLater(
+          wallet.signTransaction(xdr),
+          throwsA(isA<InvalidEnvelope>()),
+          reason: name,
+        );
+      }
+      expect(bridge.signTransactionCalls, 0);
+    },
+  );
+
   test('requires wallet connection', () async {
     await expectLater(
       wallet.signTransaction('x'),
