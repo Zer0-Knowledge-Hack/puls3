@@ -1,0 +1,17 @@
+[package]
+name = "escrow"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+# Native tests register the real registry to exercise the cross-contract wallet check.
+identity-registry = { path = "../identity-registry" }
