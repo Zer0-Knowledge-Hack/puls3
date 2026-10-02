@@ -75,3 +75,70 @@ stellar contract init . --name <name>   # from this folder; existing files are n
 ```
 
 Then build, test, format, and lint as above.
+
+## Deploy
+
+Testnet deploy of the Identity Registry (#13) plus demo-agent seed data (#15).
+The Reputation Registry (#14) is not deployed here; `deployments/testnet.json`
+keeps a `reputation_registry: null` slot for it.
+
+### Prerequisites
+
+- A funded testnet identity in the Stellar CLI: `stellar keys generate <identity> --network testnet`
+  (then fund it via the [testnet friendbot](https://developers.stellar.org/docs/tools/testnet-faucet)).
+- Identity/network config from the repo-root `.env.example` (`STELLAR_ACCOUNT`,
+  `STELLAR_NETWORK`, optional `REGISTRY_NAME`/`REGISTRY_SYMBOL`). Keys stay in
+  the Stellar CLI identity store; no secret ever goes into `.env` or `deployments/`.
+
+### Deploy, seed, re-seed
+
+Run both scripts from the repo root:
+
+```bash
+scripts/deploy-testnet.sh <identity>    # builds, deploys, writes deployments/testnet.json
+scripts/seed-demo-agents.sh <identity>  # registers deployments/demo-agents.json
+```
+
+`<identity>` may be omitted when `STELLAR_ACCOUNT` is set. Both scripts fail
+fast with a clear error when the identity, network, or input files are missing.
+
+Re-seeding is safe: the seed script checks `agent_id_by_uri` before each
+register, skips already-registered URIs with a message, and reports
+`total_agents` before/after, so a second run registers nothing new.
+
+#### Seed script options and exit codes
+
+```bash
+scripts/seed-demo-agents.sh --check                      # offline seed validation; no identity or stellar CLI needed
+scripts/seed-demo-agents.sh <identity>                   # register missing agents, report stale metadata
+scripts/seed-demo-agents.sh --sync-metadata <identity>   # also repair stale metadata (agent owner only)
+SEED_FILE=/path/to/seed.json scripts/seed-demo-agents.sh --check   # validate another seed file
+```
+
+| Exit | Meaning |
+|------|---------|
+| 0 | Success; registry matches the seed |
+| 1 | Error, invalid seed, or the caller does not own an agent in `--sync-metadata` mode |
+| 3 | Registered agents have on-chain metadata that differs from the seed and `--sync-metadata` was not given |
+
+Seed schema (`deployments/demo-agents.json`): 6-8 agents, each with a unique
+`uri` and a `metadata` array of `{ key, value }` string pairs. Required keys:
+`id`, `name` (3-48 chars), `description` (10-280 chars), `skills` (a JSON array
+string of 1-5 kebab-case ids, for example `["on-chain-analytics"]`) and
+`priceUsdcStroops` (positive integer string, at most 2^53-1). `model` is
+optional. Distinct keys per agent plus 2 must stay within the contract's
+`MAX_METADATA_KEYS` (100). `--check` and every real run validate all of this
+first and fail fast.
+
+The legacy `price` metadata key is deprecated: the seed rejects it and the
+scripts never write it. The registry has no delete and rejects empty values, so
+an old `price` entry on an already-seeded agent stays on-chain and is ignored.
+
+Skill values are ids (kebab-case slugs). The Flutter mock
+(`puls3_flutter/assets/mock/demo_agents.json`) uses display names such as
+"On-chain analytics", so the app needs an id-to-name mapping when it reads
+on-chain agents.
+
+Inspect a deployed contract at
+`https://stellar.expert/explorer/testnet/contract/<contract-id>`, using the
+`contract_id` from `deployments/testnet.json`.

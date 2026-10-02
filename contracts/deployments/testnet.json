@@ -1,0 +1,16 @@
+{
+  "network": "testnet",
+  "deployed_at_utc": "2026-09-26T03:26:57Z",
+  "deployer": "GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R",
+  "soroban_sdk": "28",
+  "identity_registry": {
+    "contract_id": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+    "wasm_hash_sha256": "0cf4ff3fea9858693e904275d3248679101044bea84a6ad9f234d1abc4b1bf67",
+    "constructor": {
+      "owner": "GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R",
+      "name": "Puls3 Agent",
+      "symbol": "P3AGENT"
+    }
+  },
+  "reputation_registry": null
+}
