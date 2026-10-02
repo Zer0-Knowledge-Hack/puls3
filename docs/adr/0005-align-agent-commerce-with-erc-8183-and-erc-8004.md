@@ -1,8 +1,8 @@
 # ADR-0005: Align agent commerce with ERC-8183 and ERC-8004 on Soroban
 
 - **Status:** Accepted (2026-10-02). D3 (timeout values) is deferred; see [D3](#d3-timeout-values-deferred)
-- **Date:** 2026-09-30 (proposed) · 2026-10-02 (accepted; decisions D1–D10 taken by the product owner on 2026-09-30, D1/D4/D6/D8 refined on 2026-10-02)
-- **Issue:** #55 (escrow contract); no dedicated issue yet
+- **Date:** 2026-09-30 (proposed) · 2026-10-02 (accepted; decisions D1–D10 taken by the product owner on 2026-09-30, D1/D4/D6/D8 refined on 2026-10-02; D1, D2, D4 and D7 refined on 2026-10-02 after the #78 escrow review)
+- **Issue:** #71 (this ADR) · #55 (escrow contract)
 - **Research:** [Spike: agent commerce standards](../spikes/agent-commerce-standards.md)
 - **Amends:** [ADR-0002](0002-agent-registry-on-soroban.md) · [ADR-0003](0003-payment-rail-and-custody.md) (see [What this supersedes or amends](#what-this-supersedes-or-amends))
 - **Related:** [ADR-0001](0001-system-architecture.md) · [hire lifecycle](../domain/hire-lifecycle.md) · #8 API contract (provisional)
@@ -81,12 +81,13 @@ A hire is an ERC-8183 job in a puls3 escrow contract (#55). The consumer is the 
   1. **Primary — client `reject`:** the server detects the failure and the app offers a one-step "reject and refund" to the client, who signs `reject` as evaluator. Immediate, but needs the client present.
   2. **Fallback — expiry + `claim_refund`:** if the client never acts, the server tracker calls the permissionless `claim_refund` once `expired_at` passes. Needs no special permissions; takes as long as the job expiry (D3).
 - **Refund bound.** A refund only ever returns the amount the client funded into that job; no path pays out more than was deposited.
+- **A failed payout never locks funds (pull payment).** A token transfer can fail for reasons outside the escrow: the recipient has no trustline, is frozen or deauthorized, or the issuer claws back. If `complete` or `release` reverted on such a failure, a `submitted` job would have no exit once the approval window closes, because `reject` is closed and `claim_refund` does not apply to `Submitted` (D4). The escrow therefore settles with `try_transfer`: if the payout to the provider (or the fee to the recipient, D7) fails, the job still moves to `Completed` and the amount is recorded as a balance claimable by that recipient, who withdraws it later. The job outcome never depends on the recipient being able to receive at settlement time. Checking at `create_job` or `fund` that the provider can receive the token is a useful complement, not a replacement, because a trustline can be removed afterwards. Refunds to the client keep the plain transfer: the client can always retry `claim_refund` or have the evaluator `reject` once it can receive again.
 
 ### D2. Sequencing
 
-- The escrow contract is on **testnet for Stellar Elite (2026-10-10)**.
+- The escrow contract, **including the optimistic approval window (D4)**, is on **testnet for Stellar Elite (2026-10-10)**. The window was moved forward from HackMeridian on 2026-10-02 because the D4 invariant needs it from the first version (#78).
 - The escrow is on the **main hire path in the Serverpod demo (2026-10-14)**. ADR-0003's direct rail is not kept as a demo exception.
-- The **remaining pieces land by HackMeridian (2026-10-25)**, including the optimistic approval window (D4) and the drop-in Reputation Registry (#14, D5).
+- The **remaining pieces land by HackMeridian (2026-10-25)**, including the app's approval countdown (D4) and the drop-in Reputation Registry (#14, D5).
 - **Consequences:** the contract is built and audited for scope against a 10-day window; D7, D8 and D10 keep its surface small for that reason.
 
 ### D3. Timeout values (deferred)
@@ -106,12 +107,12 @@ Peers publish examples only (1 h, 65 min, SLA-bound), not defaults ([spike §3](
 
 - The evaluator is the **client (consumer) by default**; the client can `complete` or `reject`.
 - **Silence past an approval window is implicit approval** (BNB APEX optimistic model), so funds do not stay locked when a consumer never returns.
-- **Client-only evaluation ships for Stellar Elite; the auto-approval window lands by HackMeridian.** The window length is part of D3.
+- **The auto-approval window ships with the first escrow version for Stellar Elite** (D2, #78): `release` is permissionless once the window has passed. The window length is part of D3.
 - No puls3-operated evaluator: the escrow stays trustless. Third-party evaluators remain possible through the `evaluator` address.
 - **Invariant: auto-approval precedes expiry.** ERC-8183 allows `claim_refund` from `Submitted` once `expired_at` passes. If the approval window could end after `expired_at`, a client could stay silent on a `submitted` job, let it expire and reclaim the funds while keeping the output, with no on-chain `reject` recorded. The escrow (#55) must therefore guarantee that a submitted job is auto-approved (`complete`) before it can expire: silence on a `submitted` job pays the provider. With this invariant, `claim_refund` only refunds jobs the provider never submitted. The D3 values must satisfy it (runtime timeout + approval window < `expired_at`).
 - **Known risk: reject after delivery.** A client can still `reject` a `submitted` job and keep the output. D8 mitigates it: every `reject` is on-chain with its reason hash, and rejects from `submitted` feed client-side reputation, so agents can decline clients with high reject rates. Withholding the full deliverable until `complete` (preview or hash first) is a stronger mitigation, out of MVP scope.
 - **Rationale:** matches the ERC-8183, ACP and Arc default evaluator and APEX's optimistic policy.
-- **Consequences:** the app needs an approve/reject step and, later, an approval countdown. Until the auto-approval window ships (HackMeridian), the Stellar Elite contract must still enforce the invariant, for example by rejecting `claim_refund` on `Submitted` jobs or by setting `expired_at` far enough out.
+- **Consequences:** the app needs an approve/reject step and, by HackMeridian, an approval countdown. The escrow enforces the invariant on-chain: `submit` fails unless the approval window ends before `expired_at`, and `claim_refund` is refused on `Submitted` jobs (a puls3 restriction of ERC-8183, named as such).
 
 ### D5. Own registries, drop-in compatible with Stellar 8004
 
@@ -143,7 +144,7 @@ The Hire state machine (#10, merged) changes as follows (state names decided by 
 - **Rationale:** the domain, the #8 contract and the escrow share one vocabulary; every hire state has an on-chain equivalent, so the server can derive a hire's state from the job.
 - **Edges of the `open` window** (2026-10-02):
   - **No job, no state.** A hire has a status only once `create_job` is confirmed; before that it is a pending preparation, and cancelling it means abandoning the preparation (no on-chain `reject`).
-  - **Unfunded expiry is derived.** An `open` job past `expired_at` is reported as `expired` with no transaction: `fund` reverts after expiry and `claim_refund` applies only to `Funded`/`Submitted`, so the job stays `Open` on chain with no funds held. This is the one derived exception to the 1:1 mirror; the escrow (#55) exposes an `is_expired(job_id)` view so indexers reach the same result.
+  - **Unfunded expiry is derived.** An `open` job past `expired_at` is reported as `expired` with no transaction: `fund` reverts after expiry and `claim_refund` applies only to `Funded` (D4), so the job stays `Open` on chain with no funds held. This is the one derived exception to the 1:1 mirror; the escrow (#55) exposes an `is_expired(job_id)` view so indexers reach the same result.
 - **Consequences:** the #10 follow-up renames `requested`, `paid` and `delivered`, removes `inProgress`, `cancelled`, `failed` and `rated`, and adds the rejected-from state, runtime progress and feedback reference as hire data. The MVP flows ([flows](../blueprints/flows.md), #22/#61) need UI copy updates (status labels, "Cancelled" for a reject from `open`, rating after `completed`).
 
 ### D7. Platform fee in basis points, set to zero
@@ -151,6 +152,7 @@ The Hire state machine (#10, merged) changes as follows (state names decided by 
 - The escrow (#55) includes a **platform fee in basis points** (1 bps = 0.01%; fee = amount × bps ÷ 10,000, rounded down, on 7-decimal USDC units) and a **platform fee recipient**.
 - The fee is charged **only on `complete`**, never on `reject` or expiry refunds.
 - **MVP and testnet value: 0 bps.** Enabling a fee later is a configuration change, not a new contract.
+- **The client bounds the fee.** The fee is snapshotted on the job, and `fund` takes the maximum fee the client accepts (`max_fee_bps`), failing if the current fee is higher. An admin fee change, malicious or front-run, can therefore never take more than the client agreed to. The contract also enforces a hard ceiling below 10,000 bps, so a provider is never paid zero; its value is fixed in #55.
 - **Rationale:** keeps the business model open without a redeploy or migration (APEX pattern). Peer fee percentages were not found in the sources and are not cited.
 
 ### D8. No disputes in the MVP
@@ -201,12 +203,12 @@ ADR-0002 and ADR-0003 are not edited in place; this ADR amends them as follows, 
 
 | Work | Issue | Decision |
 |---|---|---|
-| Change the Hire domain lifecycle: rename states, remove `inProgress`, `cancelled`, `failed`, `rated`; add rejected-from state, runtime progress and feedback reference as data; update tests | Follow-up to #10 | D6, D8 |
-| Update MVP flows UI copy to the new states (status labels, "Cancelled" for a reject from `open`) | Follow-up to #22/#61 | D6 |
+| Change the Hire domain lifecycle: rename states, remove `inProgress`, `cancelled`, `failed`, `rated`; add rejected-from state, runtime progress and feedback reference as data; update tests | #73 | D6, D8 |
+| Update MVP flows UI copy to the new states (status labels, "Cancelled" for a reject from `open`) | #76 | D6 |
 | Redesign the Reputation Registry as a Stellar 8004 drop-in, without the paid-hire gate | #14 | D5 |
-| Review the Identity Registry for drop-in gaps | #13 (closed) | D5 |
-| Fix the escrow contract in ERC-8183 shape (interface, fee in bps, empty hook only) | #55 | D1, D4, D7, D8, D10 |
-| Amend ADR-0002 (registries) and ADR-0003 (rail, verification, signers) | New | D1, D5 |
+| Review the Identity Registry for drop-in gaps | #74 | D5 |
+| Fix the escrow contract in ERC-8183 shape (interface, fee in bps with a client bound, empty hook only, pull payment on failed payouts) | #55 | D1, D4, D7, D8, D10 |
+| Amend ADR-0002 (registries) and ADR-0003 (rail, verification, signers) | #75 | D1, D5 |
 | Adjust the #8 API contract to the escrow flow | #8 | D1, D4, D6 |
 
 ### Impact by issue
@@ -218,7 +220,7 @@ ADR-0002 and ADR-0003 are not edited in place; this ADR amends them as follows, 
 | **#8** API contract | Hire states follow D6; runtime progress (`queued`/`running`/`failed`) is a separate field for F6 polling; payment, verification, refund states, evaluator actions and outcome codes change; relay and polling decisions stay |
 | **#22/#61** MVP flows | UI copy follows D6: status labels from the new states, "Cancelled" for a reject from `open`, rating offered after `completed`, runtime progress shown while `funded` |
 | **#19** Hire and pay endpoint | Prepares `create_job` and `fund`; verifies by job state; drives refunds |
-| **#20** Agent runtime | Calls `submit` on delivery; runtime timeout must end before `expired_at` (value deferred, D3); auto-approval window by HackMeridian (D4) |
+| **#20** Agent runtime | Calls `submit` on delivery; runtime timeout must end before `expired_at` (value deferred, D3); the auto-approval window ships with the escrow (D2, D4) |
 | **#14, #21, #11** Reputation | Drop-in with Stellar 8004; readers filter feedback by clients with completed escrow jobs; rejects from `submitted`, with their reason hashes, feed client-side reputation (D8) |
 | **#13, #15, #17** Identity, deploy, catalog | Drop-in review against Stellar 8004 (D5); escrow contract deployed and indexed |
 | **#25, #28, #69** Wallet and hire UI | Auth-entry signing for escrow calls; evaluator approve/reject step, later an approval countdown; refund status; no retry flow (D9) |
