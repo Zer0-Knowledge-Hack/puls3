@@ -141,6 +141,9 @@ The Hire state machine (#10, merged) changes as follows (state names decided by 
   - `cancelled` is removed: a pre-payment cancel is ERC-8183 `Open → Rejected` by the client, so the state is `rejected`. The hire records the **state it was rejected from**, and the UI labels a reject from `open` as **"Cancelled"**.
   - `rated` leaves the lifecycle: a rating is separate ERC-8004 feedback, and the hire keeps it as data (for example, a feedback reference).
 - **Rationale:** the domain, the #8 contract and the escrow share one vocabulary; every hire state has an on-chain equivalent, so the server can derive a hire's state from the job.
+- **Edges of the `open` window** (2026-10-02):
+  - **No job, no state.** A hire has a status only once `create_job` is confirmed; before that it is a pending preparation, and cancelling it means abandoning the preparation (no on-chain `reject`).
+  - **Unfunded expiry is derived.** An `open` job past `expired_at` is reported as `expired` with no transaction: `fund` reverts after expiry and `claim_refund` applies only to `Funded`/`Submitted`, so the job stays `Open` on chain with no funds held. This is the one derived exception to the 1:1 mirror; the escrow (#55) exposes an `is_expired(job_id)` view so indexers reach the same result.
 - **Consequences:** the #10 follow-up renames `requested`, `paid` and `delivered`, removes `inProgress`, `cancelled`, `failed` and `rated`, and adds the rejected-from state, runtime progress and feedback reference as hire data. The MVP flows ([flows](../blueprints/flows.md), #22/#61) need UI copy updates (status labels, "Cancelled" for a reject from `open`, rating after `completed`).
 
 ### D7. Platform fee in basis points, set to zero
