@@ -14,7 +14,13 @@ use soroban_sdk::{
 };
 
 /// TTL bump config: extend to TTL_BUMP when fewer than TTL_THRESHOLD ledgers remain.
+///
+/// `TTL_BUMP` is about 60 days at 5-second ledgers. It is unrelated to `max_expiry`: a
+/// job whose lifetime exceeds the TTL is archived unless someone keeps it alive with
+/// the permissionless `extend_ttl(job_id)` (or restores it afterwards). No cap ties the
+/// two values together; `max_expiry` only bounds `expired_at - now` at `create_job`.
 pub const TTL_THRESHOLD: u32 = 518_400;
+/// See [`TTL_THRESHOLD`].
 pub const TTL_BUMP: u32 = 1_036_800;
 
 /// Maximum job description length in bytes.
@@ -55,6 +61,10 @@ pub enum EscrowError {
     RegistryNotSet = 112,
     DescriptionTooLong = 113,
     ArithmeticOverflow = 114,
+    /// `fund`: the fee about to be snapshotted is above the `max_fee_bps` of the client.
+    FeeExceedsMax = 115,
+    /// `withdraw`: the caller has no claimable balance for that token.
+    NothingToWithdraw = 116,
 }
 
 #[contracttype]
@@ -100,6 +110,8 @@ pub enum DataKey {
     JobCount,
     Job(u64),
     AllowedToken(Address),
+    /// Pull-payment balance owed to `(recipient, token)` after a failed payout.
+    Claimable(Address, Address),
 }
 
 #[contractevent]
@@ -178,6 +190,28 @@ pub struct JobCompleted {
     pub auto_released: bool,
 }
 
+/// A payout transfer failed (for example no trustline), so the amount was credited to
+/// the claimable balance of the recipient instead. The funds stay in the contract.
+#[contractevent]
+#[derive(Clone)]
+pub struct PayoutDeferred {
+    #[topic]
+    pub job_id: u64,
+    pub recipient: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
+/// A recipient pulled their claimable balance with `withdraw`.
+#[contractevent]
+#[derive(Clone)]
+pub struct PayoutWithdrawn {
+    #[topic]
+    pub recipient: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
 #[contractevent]
 #[derive(Clone)]
 pub struct FeeConfigUpdated {
@@ -218,6 +252,10 @@ pub struct EscrowContract;
 #[contractimpl]
 impl EscrowContract {
     /// `max_expiry` and `approval_window` are deployment parameters, never defaults.
+    ///
+    /// `max_expiry` bounds `expired_at - now` and is independent of the persistent
+    /// storage TTL (`TTL_BUMP`, about 60 days): a job that outlives the TTL needs
+    /// `extend_ttl(job_id)` calls or a restore.
     pub fn __constructor(
         e: &Env,
         admin: Address,
@@ -289,6 +327,8 @@ impl EscrowContract {
     }
 
     /// Admin only. Bounds `expired_at - now` at `create_job`; existing jobs are unchanged.
+    /// It is not tied to the storage TTL (`TTL_BUMP`, about 60 days): a longer job must
+    /// be kept alive with the permissionless `extend_ttl(job_id)`, or restored.
     pub fn set_max_expiry(e: &Env, caller: Address, max_expiry: u64) -> Result<(), EscrowError> {
         require_admin(e, &caller)?;
         let approval_window = Self::approval_window(e);
@@ -418,11 +458,14 @@ impl EscrowContract {
     }
 
     /// Client only. Pulls exactly `budget` from the client and snapshots `fee_bps`.
+    /// `max_fee_bps` protects the client: if the current fee is above it the call fails
+    /// with `FeeExceedsMax`, so a fee change made after `create_job` cannot be imposed.
     pub fn fund(
         e: &Env,
         caller: Address,
         job_id: u64,
         expected_budget: i128,
+        max_fee_bps: u32,
     ) -> Result<(), EscrowError> {
         caller.require_auth();
         let mut job = load_job(e, job_id)?;
@@ -438,8 +481,12 @@ impl EscrowContract {
         if expected_budget != job.budget {
             return Err(EscrowError::BudgetMismatch);
         }
+        let fee_bps = Self::fee_bps(e);
+        if fee_bps > max_fee_bps {
+            return Err(EscrowError::FeeExceedsMax);
+        }
         require_token_allowed(e, &job.token)?;
-        job.fee_bps = Self::fee_bps(e);
+        job.fee_bps = fee_bps;
         job.state = JobState::Funded;
         save_job(e, job_id, &job);
         TokenClient::new(e, &job.token).transfer(
@@ -498,6 +545,8 @@ impl EscrowContract {
     }
 
     /// Evaluator only. Pays `budget - fee` to the provider and `fee` to the treasury.
+    /// A payout whose transfer fails is credited as claimable (see `withdraw`); the job
+    /// is `Completed` either way.
     pub fn complete(
         e: &Env,
         caller: Address,
@@ -516,6 +565,7 @@ impl EscrowContract {
     }
 
     /// Anyone, no authorization. Pays the provider once `approval_deadline` has passed.
+    /// Failed payouts become claimable balances exactly as in `complete`.
     pub fn release(e: &Env, job_id: u64) -> Result<(), EscrowError> {
         let job = load_job(e, job_id)?;
         if job.state != JobState::Submitted {
@@ -580,6 +630,8 @@ impl EscrowContract {
     }
 
     /// Anyone, no authorization. Refunds a `Funded` job at or after `expired_at`.
+    /// Deliberately `Funded` only: a `Submitted` job is never refundable, so a silent
+    /// client cannot wait out `expired_at` and keep the deliverable (ADR-0005 D4).
     pub fn claim_refund(e: &Env, job_id: u64) -> Result<(), EscrowError> {
         let mut job = load_job(e, job_id)?;
         if job.state != JobState::Funded {
@@ -599,6 +651,37 @@ impl EscrowContract {
         .publish(e);
         extend_instance(e);
         Ok(())
+    }
+
+    /// Pull payment. The caller withdraws their own claimable balance of `token`. The
+    /// balance is cleared before the transfer, and a failing transfer reverts the whole
+    /// call. The token allow-list is deliberately not consulted: funds must always be
+    /// able to leave.
+    pub fn withdraw(e: &Env, caller: Address, token: Address) -> Result<i128, EscrowError> {
+        caller.require_auth();
+        let key = DataKey::Claimable(caller.clone(), token.clone());
+        let amount: i128 = e.storage().persistent().get(&key).unwrap_or(0);
+        if amount <= 0 {
+            return Err(EscrowError::NothingToWithdraw);
+        }
+        e.storage().persistent().remove(&key);
+        TokenClient::new(e, &token).transfer(&e.current_contract_address(), &caller, &amount);
+        PayoutWithdrawn {
+            recipient: caller,
+            token,
+            amount,
+        }
+        .publish(e);
+        extend_instance(e);
+        Ok(amount)
+    }
+
+    /// Amount `recipient` can pull with `withdraw` for `token`; 0 when none.
+    pub fn claimable(e: &Env, recipient: Address, token: Address) -> i128 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::Claimable(recipient, token))
+            .unwrap_or(0)
     }
 
     pub fn get_job(e: &Env, job_id: u64) -> Result<Job, EscrowError> {
@@ -733,16 +816,19 @@ fn verify_provider(e: &Env, agent_id: u32, provider: &Address) -> Result<(), Esc
     }
 }
 
-/// `budget * fee_bps / 10_000`, rounded down. Overflow is a typed error.
-fn compute_fee(budget: i128, fee_bps: u32) -> Result<i128, EscrowError> {
-    budget
-        .checked_mul(i128::from(fee_bps))
-        .map(|scaled| scaled / i128::from(BPS_DENOMINATOR))
-        .ok_or(EscrowError::ArithmeticOverflow)
+/// `floor(budget * fee_bps / 10_000)` without an intermediate product that can
+/// overflow: `(budget / D) * bps + (budget % D) * bps / D`. Exact for `bps <= D`, and
+/// the result never exceeds `budget`.
+fn compute_fee(budget: i128, fee_bps: u32) -> i128 {
+    let denominator = i128::from(BPS_DENOMINATOR);
+    let bps = i128::from(fee_bps);
+    (budget / denominator) * bps + (budget % denominator) * bps / denominator
 }
 
-/// Shared by `complete` and `release`. The fee is computed before any write, so an
-/// overflow leaves the job `Submitted`; state is written before the transfers.
+/// Shared by `complete` and `release`. State is written before any transfer. Each
+/// payout (provider, treasury) is attempted independently; a failed one is credited as
+/// a claimable balance, so settlement cannot get stuck on a recipient that cannot
+/// receive the token.
 fn settle(
     e: &Env,
     job_id: u64,
@@ -750,7 +836,7 @@ fn settle(
     reason: BytesN<32>,
     auto_released: bool,
 ) -> Result<(), EscrowError> {
-    let fee = compute_fee(job.budget, job.fee_bps)?;
+    let fee = compute_fee(job.budget, job.fee_bps);
     let payout = job.budget - fee;
     let treasury = if fee > 0 {
         Some(EscrowContract::treasury(e).ok_or(EscrowError::TreasuryNotSet)?)
@@ -759,13 +845,11 @@ fn settle(
     };
     job.state = JobState::Completed;
     save_job(e, job_id, &job);
-    let token = TokenClient::new(e, &job.token);
-    let escrow = e.current_contract_address();
     if payout > 0 {
-        token.transfer(&escrow, &job.provider, &payout);
+        pay_or_defer(e, job_id, &job.token, &job.provider, payout)?;
     }
     if let Some(treasury) = treasury {
-        token.transfer(&escrow, &treasury, &fee);
+        pay_or_defer(e, job_id, &job.token, &treasury, fee)?;
     }
     JobCompleted {
         job_id,
@@ -777,6 +861,37 @@ fn settle(
     }
     .publish(e);
     extend_instance(e);
+    Ok(())
+}
+
+/// Pays `recipient` from the escrow. Both failure layers of the token call (host error
+/// and contract error) fall back to a claimable credit and a `PayoutDeferred` event.
+fn pay_or_defer(
+    e: &Env,
+    job_id: u64,
+    token: &Address,
+    recipient: &Address,
+    amount: i128,
+) -> Result<(), EscrowError> {
+    let sent =
+        TokenClient::new(e, token).try_transfer(&e.current_contract_address(), recipient, &amount);
+    if matches!(sent, Ok(Ok(()))) {
+        return Ok(());
+    }
+    let key = DataKey::Claimable(recipient.clone(), token.clone());
+    let current: i128 = e.storage().persistent().get(&key).unwrap_or(0);
+    let credited = current
+        .checked_add(amount)
+        .ok_or(EscrowError::ArithmeticOverflow)?;
+    e.storage().persistent().set(&key, &credited);
+    extend_persistent(e, &key);
+    PayoutDeferred {
+        job_id,
+        recipient: recipient.clone(),
+        token: token.clone(),
+        amount,
+    }
+    .publish(e);
     Ok(())
 }
 

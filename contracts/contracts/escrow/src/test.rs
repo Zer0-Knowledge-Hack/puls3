@@ -50,6 +50,8 @@ const APPROVAL_WINDOW: u64 = 3_600;
 /// 7-decimal token units: 1.0 token.
 const BUDGET: i128 = 10_000_000;
 const CLIENT_FUNDS: i128 = 50_000_000;
+/// `max_fee_bps` that never blocks `fund`: the contract caps `fee_bps` at 10_000.
+const MAX_FEE: u32 = 10_000;
 
 struct Ctx {
     env: Env,
@@ -346,11 +348,13 @@ fn error_codes_are_stable_and_distinct() {
         EscrowError::RegistryNotSet as u32,
         EscrowError::DescriptionTooLong as u32,
         EscrowError::ArithmeticOverflow as u32,
+        EscrowError::FeeExceedsMax as u32,
+        EscrowError::NothingToWithdraw as u32,
     ];
     assert_eq!(erc_shaped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     assert_eq!(
         puls3,
-        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
+        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116]
     );
 }
 
@@ -709,7 +713,7 @@ fn payee_is_frozen_after_a_registry_wallet_change() {
 
 impl Ctx {
     fn fund(&self, job_id: u64) {
-        self.escrow().fund(&self.client, &job_id, &BUDGET);
+        self.escrow().fund(&self.client, &job_id, &BUDGET, &MAX_FEE);
     }
 
     /// Creates and funds a job; the contract then holds `BUDGET`.
@@ -745,7 +749,7 @@ fn setup_with_fee(fee_bps: u32) -> (Ctx, Address) {
 fn fund_pulls_the_budget_and_emits_job_funded() {
     let ctx = setup();
     let id = ctx.create(NOW + 1_000);
-    ctx.escrow().fund(&ctx.client, &id, &BUDGET);
+    ctx.escrow().fund(&ctx.client, &id, &BUDGET, &MAX_FEE);
     let events = ctx.job_events();
     assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS - BUDGET);
     assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
@@ -788,11 +792,11 @@ fn only_the_client_can_fund() {
     let id = ctx.create(NOW + 1_000);
     let outsider = Address::generate(&ctx.env);
     assert_eq!(
-        err(ctx.escrow().try_fund(&outsider, &id, &BUDGET)),
+        err(ctx.escrow().try_fund(&outsider, &id, &BUDGET, &MAX_FEE)),
         EscrowError::NotClient
     );
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.provider, &id, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.provider, &id, &BUDGET, &MAX_FEE)),
         EscrowError::NotClient
     );
     assert_eq!(ctx.balance(&ctx.escrow_id), 0);
@@ -805,7 +809,7 @@ fn fund_rejects_a_budget_mismatch() {
     let id = ctx.create(NOW + 1_000);
     for wrong in [BUDGET - 1, BUDGET + 1, 0] {
         assert_eq!(
-            err(ctx.escrow().try_fund(&ctx.client, &id, &wrong)),
+            err(ctx.escrow().try_fund(&ctx.client, &id, &wrong, &MAX_FEE)),
             EscrowError::BudgetMismatch
         );
     }
@@ -823,7 +827,7 @@ fn fund_after_expiry_is_refused() {
     let late = ctx.create(expired_at + 500);
     ctx.set_time(expired_at + 500);
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &late, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.client, &late, &BUDGET, &MAX_FEE)),
         EscrowError::JobExpired
     );
     assert_eq!(ctx.escrow().get_job(&late).state, JobState::Open);
@@ -835,7 +839,7 @@ fn fund_twice_is_an_invalid_state() {
     let ctx = setup();
     let id = ctx.funded(NOW + 1_000);
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &MAX_FEE)),
         EscrowError::InvalidState
     );
     assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
@@ -856,7 +860,10 @@ fn fund_fails_cleanly_on_insufficient_balance() {
         &ctx.token,
         &too_much,
     );
-    assert!(ctx.escrow().try_fund(&ctx.client, &id, &too_much).is_err());
+    assert!(ctx
+        .escrow()
+        .try_fund(&ctx.client, &id, &too_much, &MAX_FEE)
+        .is_err());
     assert!(ctx.job_events().events().is_empty());
     assert_eq!(ctx.escrow().get_job(&id).state, JobState::Open);
     assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
@@ -869,7 +876,7 @@ fn fund_requires_the_token_to_still_be_allow_listed() {
     ctx.escrow()
         .set_token_allowed(&ctx.admin, &ctx.token, &false);
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &MAX_FEE)),
         EscrowError::TokenNotAllowed
     );
     assert_eq!(ctx.balance(&ctx.escrow_id), 0);
@@ -879,7 +886,7 @@ fn fund_requires_the_token_to_still_be_allow_listed() {
 fn fund_unknown_job_is_not_found() {
     let ctx = setup();
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &7, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.client, &7, &BUDGET, &MAX_FEE)),
         EscrowError::JobNotFound
     );
 }
@@ -997,7 +1004,7 @@ fn reject_is_final_for_terminal_jobs() {
         EscrowError::InvalidState
     );
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET)),
+        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &MAX_FEE)),
         EscrowError::InvalidState
     );
     assert_eq!(
@@ -1146,7 +1153,9 @@ fn failed_transitions_emit_no_event() {
     );
     assert!(ctx.job_events().events().is_empty());
     assert_eq!(
-        err(ctx.escrow().try_fund(&ctx.client, &id, &(BUDGET + 1))),
+        err(ctx
+            .escrow()
+            .try_fund(&ctx.client, &id, &(BUDGET + 1), &MAX_FEE)),
         EscrowError::BudgetMismatch
     );
     assert!(ctx.job_events().events().is_empty());
@@ -1299,31 +1308,76 @@ fn a_job_too_late_to_submit_stays_refundable() {
 
 #[test]
 fn fee_rounds_down() {
-    assert_eq!(compute_fee(999, 250), Ok(24));
-    assert_eq!(compute_fee(39, 250), Ok(0));
-    assert_eq!(compute_fee(10_000_000, 250), Ok(250_000));
-    assert_eq!(compute_fee(10_000_000, 0), Ok(0));
+    assert_eq!(compute_fee(999, 250), 24);
+    assert_eq!(compute_fee(39, 250), 0);
+    assert_eq!(compute_fee(10_000_000, 250), 250_000);
+    assert_eq!(compute_fee(10_000_000, 0), 0);
 }
 
 #[test]
 fn fee_at_maximum_bps_takes_the_whole_budget() {
-    assert_eq!(compute_fee(10_000_000, 10_000), Ok(10_000_000));
-    assert_eq!(compute_fee(1, 10_000), Ok(1));
+    assert_eq!(compute_fee(10_000_000, 10_000), 10_000_000);
+    assert_eq!(compute_fee(1, 10_000), 1);
 }
 
 #[test]
-fn fee_overflow_is_a_typed_error() {
+fn fee_never_overflows_and_is_exact_at_the_largest_budget() {
+    let max = i128::MAX;
+    assert_eq!(compute_fee(max, 0), 0);
+    assert_eq!(compute_fee(max, 1), 17014118346046923173168730371588410);
+    assert_eq!(compute_fee(max, 250), 4253529586511730793292182592897102643);
     assert_eq!(
-        compute_fee(i128::MAX, 10_000),
-        Err(EscrowError::ArithmeticOverflow)
+        compute_fee(max, 5_000),
+        85070591730234615865843651857942052863
     );
-    assert_eq!(compute_fee(i128::MAX, 0), Ok(0));
+    assert_eq!(
+        compute_fee(max, 9_999),
+        170124169342123184808514134985512517316
+    );
+    assert_eq!(compute_fee(max, 10_000), max);
+}
+
+#[test]
+fn fee_equals_floor_of_budget_times_bps_over_10_000() {
+    let budgets = [
+        0,
+        1,
+        2,
+        39,
+        999,
+        9_999,
+        10_000,
+        10_001,
+        19_999,
+        123_456_789,
+        10_000_000,
+        i128::from(u64::MAX),
+        i128::MAX / 10_000,
+        i128::MAX / 10_000 - 1,
+    ];
+    for budget in budgets {
+        for bps in 0..=BPS_DENOMINATOR {
+            let naive = budget * i128::from(bps) / i128::from(BPS_DENOMINATOR);
+            let fee = compute_fee(budget, bps);
+            assert_eq!(fee, naive, "budget {budget} bps {bps}");
+            assert!(fee <= budget);
+        }
+    }
 }
 
 #[test]
 fn payout_plus_fee_always_equals_the_budget() {
-    for (budget, bps) in [(999, 250), (39, 250), (10_000_000, 1), (7, 10_000), (1, 0)] {
-        let fee = compute_fee(budget, bps).unwrap();
+    for (budget, bps) in [
+        (999, 250),
+        (39, 250),
+        (10_000_000, 1),
+        (7, 10_000),
+        (1, 0),
+        (i128::MAX, 1),
+        (i128::MAX, 9_999),
+        (i128::MAX, 10_000),
+    ] {
+        let fee = compute_fee(budget, bps);
         assert!(fee <= budget);
         assert_eq!((budget - fee) + fee, budget);
     }
@@ -1392,28 +1446,36 @@ fn complete_at_maximum_bps_skips_the_zero_provider_transfer() {
 }
 
 #[test]
-fn complete_overflow_keeps_the_job_submitted() {
-    let (ctx, _treasury) = setup_with_fee(10_000);
-    StellarAssetClient::new(&ctx.env, &ctx.token).mint(&ctx.client, &(i128::MAX - CLIENT_FUNDS));
-    let id = ctx.escrow().create_job(
-        &ctx.client,
-        &ctx.provider,
-        &ctx.client,
-        &LATE_EXPIRY,
-        &ctx.desc("huge"),
-        &None,
-        &ctx.agent_id,
-        &ctx.token,
-        &i128::MAX,
-    );
-    ctx.escrow().fund(&ctx.client, &id, &i128::MAX);
-    ctx.submit(id);
-    assert_eq!(
-        err(ctx.escrow().try_complete(&ctx.client, &id, &ctx.hash(1))),
-        EscrowError::ArithmeticOverflow
-    );
-    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Submitted);
-    assert_eq!(ctx.balance(&ctx.escrow_id), i128::MAX);
+fn the_largest_budget_settles_for_several_fee_rates() {
+    for (bps, fee) in [
+        (0u32, 0i128),
+        (1, 17014118346046923173168730371588410),
+        (250, 4253529586511730793292182592897102643),
+        (5_000, 85070591730234615865843651857942052863),
+        (10_000, i128::MAX),
+    ] {
+        let (ctx, treasury) = setup_with_fee(bps);
+        StellarAssetClient::new(&ctx.env, &ctx.token)
+            .mint(&ctx.client, &(i128::MAX - CLIENT_FUNDS));
+        let id = ctx.escrow().create_job(
+            &ctx.client,
+            &ctx.provider,
+            &ctx.client,
+            &LATE_EXPIRY,
+            &ctx.desc("huge"),
+            &None,
+            &ctx.agent_id,
+            &ctx.token,
+            &i128::MAX,
+        );
+        ctx.escrow().fund(&ctx.client, &id, &i128::MAX, &MAX_FEE);
+        ctx.submit(id);
+        ctx.escrow().complete(&ctx.client, &id, &ctx.hash(1));
+        assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
+        assert_eq!(ctx.balance(&treasury), fee, "bps {bps}");
+        assert_eq!(ctx.balance(&ctx.provider), i128::MAX - fee, "bps {bps}");
+        assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+    }
 }
 
 #[test]
@@ -1617,7 +1679,7 @@ fn rejected_is_final_for_every_function() {
     ctx.escrow().reject(&ctx.client, &id, &ctx.hash(1));
     let e = ctx.escrow();
     assert_eq!(
-        err(e.try_fund(&ctx.client, &id, &BUDGET)),
+        err(e.try_fund(&ctx.client, &id, &BUDGET, &MAX_FEE)),
         EscrowError::InvalidState
     );
     assert_eq!(
@@ -2020,7 +2082,7 @@ fn fund_needs_the_client_auth_including_the_token_transfer() {
         args: (&ctx.client, &ctx.escrow_id, &BUDGET).into_val(&ctx.env),
         sub_invokes: &[],
     };
-    let fund_args = (&ctx.client, &id, &BUDGET).into_val(&ctx.env);
+    let fund_args = (&ctx.client, &id, &BUDGET, &MAX_FEE).into_val(&ctx.env);
     // Authorizing only the escrow call is not enough: the transfer is unauthorized.
     ctx.env.mock_auths(&[MockAuth {
         address: &ctx.client,
@@ -2031,7 +2093,10 @@ fn fund_needs_the_client_auth_including_the_token_transfer() {
             sub_invokes: &[],
         },
     }]);
-    assert!(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET).is_err());
+    assert!(ctx
+        .escrow()
+        .try_fund(&ctx.client, &id, &BUDGET, &MAX_FEE)
+        .is_err());
     assert_eq!(ctx.balance(&ctx.escrow_id), 0);
     // With the transfer sub-invocation authorized the call succeeds.
     ctx.env.mock_auths(&[MockAuth {
@@ -2039,11 +2104,11 @@ fn fund_needs_the_client_auth_including_the_token_transfer() {
         invoke: &MockAuthInvoke {
             contract: &ctx.escrow_id,
             fn_name: "fund",
-            args: (&ctx.client, &id, &BUDGET).into_val(&ctx.env),
+            args: (&ctx.client, &id, &BUDGET, &MAX_FEE).into_val(&ctx.env),
             sub_invokes: &[transfer],
         },
     }]);
-    ctx.escrow().fund(&ctx.client, &id, &BUDGET);
+    ctx.escrow().fund(&ctx.client, &id, &BUDGET, &MAX_FEE);
     assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
     assert_eq!(ctx.escrow().get_job(&id).state, JobState::Funded);
 }
@@ -2175,8 +2240,562 @@ fn contract_exports_exactly_the_specified_functions() {
         "approval_window",
         "version",
         "extend_ttl",
+        "withdraw",
+        "claimable",
     ];
     expected.sort_unstable();
     // No dispute, arbiter, pause, split, set_budget, set_provider, sweep or upgrade entry point.
     assert_eq!(exported, expected);
+}
+
+// ===========================================================================
+// Review fixes: pull payment, fee cap at fund, fee-free refunds, TTL
+// ===========================================================================
+
+/// Test-only token whose `transfer` fails for blocked recipients, standing in for a
+/// Stellar asset whose holder has no trustline or is frozen. Mode 1 fails with a host
+/// panic, mode 2 with a typed contract error; 0 unblocks.
+#[contracttype]
+#[derive(Clone)]
+enum MockKey {
+    Balance(Address),
+    Blocked(Address),
+}
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+enum MockError {
+    Blocked = 1,
+}
+
+#[contract]
+struct MockToken;
+
+#[contractimpl]
+impl MockToken {
+    pub fn mint(e: Env, to: Address, amount: i128) {
+        let key = MockKey::Balance(to);
+        let current: i128 = e.storage().instance().get(&key).unwrap_or(0);
+        e.storage().instance().set(&key, &(current + amount));
+    }
+
+    pub fn set_blocked(e: Env, who: Address, mode: u32) {
+        e.storage().instance().set(&MockKey::Blocked(who), &mode);
+    }
+
+    pub fn balance(e: Env, id: Address) -> i128 {
+        e.storage()
+            .instance()
+            .get(&MockKey::Balance(id))
+            .unwrap_or(0)
+    }
+
+    pub fn transfer(e: Env, from: Address, to: Address, amount: i128) {
+        from.require_auth();
+        let mode: u32 = e
+            .storage()
+            .instance()
+            .get(&MockKey::Blocked(to.clone()))
+            .unwrap_or(0);
+        match mode {
+            1 => panic!("no trustline"),
+            2 => panic_with_error!(&e, MockError::Blocked),
+            _ => {}
+        }
+        let from_balance = Self::balance(e.clone(), from.clone());
+        assert!(from_balance >= amount, "insufficient balance");
+        e.storage()
+            .instance()
+            .set(&MockKey::Balance(from), &(from_balance - amount));
+        let to_balance = Self::balance(e.clone(), to.clone());
+        e.storage()
+            .instance()
+            .set(&MockKey::Balance(to), &(to_balance + amount));
+    }
+}
+
+impl Ctx {
+    fn mock(&self) -> MockTokenClient<'_> {
+        MockTokenClient::new(&self.env, &self.token)
+    }
+
+    fn claimable(&self, who: &Address) -> i128 {
+        self.escrow().claimable(who, &self.token)
+    }
+}
+
+/// Like `setup_with_fee`, but the job token is the failing mock token.
+fn setup_mock(fee_bps: u32) -> (Ctx, Address) {
+    let (ctx, treasury) = setup_with_fee(fee_bps);
+    let token = ctx.env.register(MockToken, ());
+    let ctx = Ctx { token, ..ctx };
+    ctx.mock().mint(&ctx.client, &CLIENT_FUNDS);
+    ctx.escrow()
+        .set_token_allowed(&ctx.admin, &ctx.token, &true);
+    (ctx, treasury)
+}
+
+fn deferred(
+    ctx: &Ctx,
+    job_id: u64,
+    recipient: &Address,
+    amount: i128,
+) -> soroban_sdk::xdr::ContractEvent {
+    PayoutDeferred {
+        job_id,
+        recipient: recipient.clone(),
+        token: ctx.token.clone(),
+        amount,
+    }
+    .to_xdr(&ctx.env, &ctx.escrow_id)
+}
+
+fn completed(
+    ctx: &Ctx,
+    job_id: u64,
+    payout: i128,
+    fee: i128,
+    reason: BytesN<32>,
+    auto: bool,
+) -> soroban_sdk::xdr::ContractEvent {
+    JobCompleted {
+        job_id,
+        evaluator: ctx.client.clone(),
+        reason,
+        payout,
+        fee,
+        auto_released: auto,
+    }
+    .to_xdr(&ctx.env, &ctx.escrow_id)
+}
+
+// ---------------------------------------------------------------------------
+// Pull payment: provider payout
+// ---------------------------------------------------------------------------
+
+#[test]
+fn complete_defers_the_payout_when_the_provider_cannot_receive() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    let events = ctx.job_events();
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
+    assert_eq!(ctx.balance(&ctx.provider), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    assert_eq!(
+        events,
+        [
+            deferred(&ctx, id, &ctx.provider, BUDGET),
+            completed(&ctx, id, BUDGET, 0, ctx.hash(5), false),
+        ]
+    );
+}
+
+#[test]
+fn release_defers_the_payout_when_the_provider_cannot_receive() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.set_time(DEADLINE);
+    ctx.escrow().release(&id);
+    let events = ctx.job_events();
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
+    assert_eq!(ctx.balance(&ctx.provider), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    assert_eq!(
+        events,
+        [
+            deferred(&ctx, id, &ctx.provider, BUDGET),
+            completed(&ctx, id, BUDGET, 0, ctx.hash(0), true),
+        ]
+    );
+}
+
+#[test]
+fn both_failure_layers_fall_back_to_the_claimable_balance() {
+    for mode in [1u32, 2] {
+        let (ctx, _treasury) = setup_mock(0);
+        let id = ctx.submitted(LATE_EXPIRY);
+        ctx.mock().set_blocked(&ctx.provider, &mode);
+        ctx.escrow().complete(&ctx.client, &id, &ctx.hash(1));
+        assert_eq!(
+            ctx.escrow().get_job(&id).state,
+            JobState::Completed,
+            "mode {mode}"
+        );
+        assert_eq!(ctx.claimable(&ctx.provider), BUDGET, "mode {mode}");
+    }
+}
+
+#[test]
+fn a_working_payout_is_never_deferred() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    let events = ctx.job_events();
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET);
+    assert_eq!(ctx.claimable(&ctx.provider), 0);
+    assert_eq!(events, [completed(&ctx, id, BUDGET, 0, ctx.hash(5), false)]);
+}
+
+#[test]
+fn withdraw_pays_the_deferred_amount_once_the_provider_can_receive() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    let paid = ctx.escrow().withdraw(&ctx.provider, &ctx.token);
+    let events = ctx.job_events();
+    assert_eq!(paid, BUDGET);
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+    assert_eq!(ctx.claimable(&ctx.provider), 0);
+    assert_eq!(
+        events,
+        [PayoutWithdrawn {
+            recipient: ctx.provider.clone(),
+            token: ctx.token.clone(),
+            amount: BUDGET,
+        }
+        .to_xdr(&ctx.env, &ctx.escrow_id)]
+    );
+}
+
+#[test]
+fn withdraw_twice_is_refused() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    ctx.escrow().withdraw(&ctx.provider, &ctx.token);
+    assert_eq!(
+        err(ctx.escrow().try_withdraw(&ctx.provider, &ctx.token)),
+        EscrowError::NothingToWithdraw
+    );
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET);
+}
+
+#[test]
+fn withdraw_without_a_balance_is_refused() {
+    let (ctx, _treasury) = setup_mock(0);
+    let stranger = Address::generate(&ctx.env);
+    assert_eq!(ctx.claimable(&stranger), 0);
+    assert_eq!(
+        err(ctx.escrow().try_withdraw(&stranger, &ctx.token)),
+        EscrowError::NothingToWithdraw
+    );
+}
+
+#[test]
+fn a_failing_withdraw_reverts_and_the_balance_stays_claimable() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    assert!(ctx
+        .escrow()
+        .try_withdraw(&ctx.provider, &ctx.token)
+        .is_err());
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    assert_eq!(ctx.escrow().withdraw(&ctx.provider, &ctx.token), BUDGET);
+}
+
+#[test]
+fn withdraw_needs_the_callers_signature() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    ctx.env.mock_auths(&[]);
+    assert!(ctx
+        .escrow()
+        .try_withdraw(&ctx.provider, &ctx.token)
+        .is_err());
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    assert_eq!(ctx.balance(&ctx.provider), 0);
+}
+
+#[test]
+fn nobody_can_withdraw_for_another_recipient() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    // Any other caller only touches their own (empty) balance.
+    assert_eq!(
+        err(ctx.escrow().try_withdraw(&ctx.client, &ctx.token)),
+        EscrowError::NothingToWithdraw
+    );
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+}
+
+#[test]
+fn withdraw_works_after_the_token_leaves_the_allow_list() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    ctx.escrow()
+        .set_token_allowed(&ctx.admin, &ctx.token, &false);
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    assert_eq!(ctx.escrow().withdraw(&ctx.provider, &ctx.token), BUDGET);
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET);
+}
+
+#[test]
+fn deferred_payouts_accumulate_per_recipient_and_token() {
+    let (ctx, _treasury) = setup_mock(0);
+    let first = ctx.submitted(LATE_EXPIRY);
+    let second = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &first, &ctx.hash(1));
+    ctx.escrow().complete(&ctx.client, &second, &ctx.hash(1));
+    assert_eq!(ctx.claimable(&ctx.provider), 2 * BUDGET);
+    let other_token = Address::generate(&ctx.env);
+    assert_eq!(ctx.escrow().claimable(&ctx.provider, &other_token), 0);
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    assert_eq!(ctx.escrow().withdraw(&ctx.provider, &ctx.token), 2 * BUDGET);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+#[test]
+fn a_claimable_entry_is_bumped_and_kept_alive() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    let key = DataKey::Claimable(ctx.provider.clone(), ctx.token.clone());
+    let ttl = ctx.env.as_contract(&ctx.escrow_id, || {
+        ctx.env.storage().persistent().get_ttl(&key)
+    });
+    assert_eq!(ttl, TTL_BUMP);
+}
+
+// ---------------------------------------------------------------------------
+// Pull payment: treasury fee
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_failing_treasury_transfer_still_pays_the_provider() {
+    let (ctx, treasury) = setup_mock(250);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&treasury, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    let events = ctx.job_events();
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
+    assert_eq!(ctx.balance(&ctx.provider), 9_750_000);
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.claimable(&treasury), 250_000);
+    assert_eq!(ctx.claimable(&ctx.provider), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 250_000);
+    assert_eq!(
+        ctx.balance(&ctx.provider) + ctx.balance(&treasury) + ctx.balance(&ctx.escrow_id),
+        BUDGET
+    );
+    assert_eq!(
+        events,
+        [
+            deferred(&ctx, id, &treasury, 250_000),
+            completed(&ctx, id, 9_750_000, 250_000, ctx.hash(5), false),
+        ]
+    );
+    ctx.mock().set_blocked(&treasury, &0);
+    assert_eq!(ctx.escrow().withdraw(&treasury, &ctx.token), 250_000);
+    assert_eq!(ctx.balance(&treasury), 250_000);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+    assert_eq!(ctx.claimable(&treasury), 0);
+}
+
+#[test]
+fn provider_and_treasury_payouts_are_independent() {
+    let (ctx, treasury) = setup_mock(250);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &2);
+    ctx.mock().set_blocked(&treasury, &1);
+    ctx.set_time(DEADLINE);
+    ctx.escrow().release(&id);
+    let events = ctx.job_events();
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
+    assert_eq!(ctx.claimable(&ctx.provider), 9_750_000);
+    assert_eq!(ctx.claimable(&treasury), 250_000);
+    assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
+    assert_eq!(
+        events,
+        [
+            deferred(&ctx, id, &ctx.provider, 9_750_000),
+            deferred(&ctx, id, &treasury, 250_000),
+            completed(&ctx, id, 9_750_000, 250_000, ctx.hash(0), true),
+        ]
+    );
+}
+
+#[test]
+fn a_failing_provider_transfer_still_pays_the_treasury() {
+    let (ctx, treasury) = setup_mock(250);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    assert_eq!(ctx.balance(&treasury), 250_000);
+    assert_eq!(ctx.claimable(&ctx.provider), 9_750_000);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 9_750_000);
+}
+
+// ---------------------------------------------------------------------------
+// Deferred payouts never open a refund path (ADR-0005 D4)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_client_cannot_reclaim_a_job_whose_payout_was_deferred() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(NOW + 10_000);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.set_time(DEADLINE);
+    ctx.escrow().release(&id);
+    ctx.set_time(NOW + 10_000 + 1);
+    assert_eq!(
+        err(ctx.escrow().try_claim_refund(&id)),
+        EscrowError::InvalidState
+    );
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS - BUDGET);
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+}
+
+#[test]
+fn the_client_cannot_reclaim_a_submitted_job_past_expiry() {
+    let ctx = setup();
+    let expired_at = NOW + 10_000;
+    let id = ctx.submitted(expired_at);
+    ctx.set_time(expired_at + 1);
+    assert_eq!(
+        err(ctx.escrow().try_claim_refund(&id)),
+        EscrowError::InvalidState
+    );
+    assert_eq!(ctx.balance(&ctx.escrow_id), BUDGET);
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Submitted);
+}
+
+// ---------------------------------------------------------------------------
+// fund: max_fee_bps guard
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fund_accepts_a_fee_at_or_below_the_clients_maximum() {
+    let (ctx, _treasury) = setup_with_fee(250);
+    for (max, expected_id) in [(250u32, 1u64), (251, 2), (10_000, 3)] {
+        let id = ctx.create(NOW + 1_000);
+        assert_eq!(id, expected_id);
+        ctx.escrow().fund(&ctx.client, &id, &BUDGET, &max);
+        assert_eq!(ctx.escrow().get_job(&id).state, JobState::Funded);
+        assert_eq!(ctx.escrow().get_job(&id).fee_bps, 250);
+    }
+}
+
+#[test]
+fn fund_rejects_a_fee_above_the_clients_maximum() {
+    let (ctx, _treasury) = setup_with_fee(250);
+    let id = ctx.create(NOW + 1_000);
+    for max in [0u32, 100, 249] {
+        assert_eq!(
+            err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &max)),
+            EscrowError::FeeExceedsMax,
+            "max {max}"
+        );
+    }
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Open);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+}
+
+#[test]
+fn a_fee_raised_before_fund_cannot_divert_the_budget() {
+    let (ctx, treasury) = setup_with_fee(0);
+    let id = ctx.create(NOW + 1_000);
+    ctx.escrow().set_fee_bps(&ctx.admin, &10_000);
+    assert_eq!(
+        err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &0)),
+        EscrowError::FeeExceedsMax
+    );
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+}
+
+#[test]
+fn zero_maximum_accepts_a_zero_fee() {
+    let ctx = setup();
+    let id = ctx.create(NOW + 1_000);
+    ctx.escrow().fund(&ctx.client, &id, &BUDGET, &0);
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Funded);
+    assert_eq!(ctx.escrow().get_job(&id).fee_bps, 0);
+}
+
+// ---------------------------------------------------------------------------
+// D7: the fee is charged only on completion
+// ---------------------------------------------------------------------------
+
+#[test]
+fn claim_refund_returns_the_full_budget_even_with_a_fee() {
+    let (ctx, treasury) = setup_with_fee(250);
+    let expired_at = NOW + 1_000;
+    let id = ctx.funded(expired_at);
+    ctx.set_time(expired_at);
+    ctx.escrow().claim_refund(&id);
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.balance(&ctx.provider), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+#[test]
+fn rejecting_a_funded_job_refunds_in_full_even_with_a_fee() {
+    let (ctx, treasury) = setup_with_fee(250);
+    let id = ctx.funded(LATE_EXPIRY);
+    ctx.escrow().reject(&ctx.client, &id, &ctx.hash(1));
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+#[test]
+fn rejecting_a_submitted_job_leaves_the_contract_empty_even_with_a_fee() {
+    let (ctx, treasury) = setup_with_fee(250);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.escrow().reject(&ctx.client, &id, &ctx.hash(1));
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+#[test]
+fn cancelling_an_open_job_moves_no_funds_even_with_a_fee() {
+    let (ctx, treasury) = setup_with_fee(250);
+    let id = ctx.create(LATE_EXPIRY);
+    ctx.escrow().reject(&ctx.client, &id, &ctx.hash(1));
+    assert_eq!(ctx.balance(&ctx.client), CLIENT_FUNDS);
+    assert_eq!(ctx.balance(&treasury), 0);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+// ---------------------------------------------------------------------------
+// TTL: extend_ttl keeps a long-lived job alive
+// ---------------------------------------------------------------------------
+
+#[test]
+fn extend_ttl_keeps_a_long_funded_job_alive() {
+    let ctx = setup();
+    let id = ctx.funded(LATE_EXPIRY);
+    age_ledger(&ctx);
+    assert!(job_ttl(&ctx, id) < TTL_THRESHOLD);
+    ctx.escrow().extend_ttl(&id);
+    assert_eq!(job_ttl(&ctx, id), TTL_BUMP);
+    assert_eq!(ctx.escrow().get_job(&id).state, JobState::Funded);
 }
