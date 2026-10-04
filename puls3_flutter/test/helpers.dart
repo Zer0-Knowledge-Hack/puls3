@@ -30,11 +30,14 @@ const testAgents = [
 ];
 
 /// Pumps the full app at [location] on a desktop-sized surface.
+///
+/// [repository] defaults to an in-memory catalog of [testAgents].
 Future<void> pumpApp(
   WidgetTester tester, {
   String location = '/',
   Size size = const Size(1440, 1000),
   Future<String>? healthCheck,
+  AgentRepository repository = const InMemoryAgentRepository(testAgents),
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = size;
@@ -43,7 +46,7 @@ Future<void> pumpApp(
 
   await tester.pumpWidget(
     Puls3App(
-      repository: const InMemoryAgentRepository(testAgents),
+      repository: repository,
       wallet: MockWallet(),
       initialLocation: location,
       healthCheck: healthCheck,
