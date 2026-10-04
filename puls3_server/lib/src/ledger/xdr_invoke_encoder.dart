@@ -15,6 +15,9 @@ sealed class ScArg {
   /// An `SCV_U64` argument.
   const factory ScArg.u64(int value) = _U64;
 
+  /// An `SCV_STRING` argument, sent as UTF-8.
+  const factory ScArg.string(String value) = _String;
+
   void _write(_XdrWriter out);
 }
 
@@ -40,6 +43,17 @@ final class _U64 extends ScArg {
     ..int64(value);
 }
 
+final class _String extends ScArg {
+  const _String(this.value) : super._();
+
+  final String value;
+
+  @override
+  void _write(_XdrWriter out) => out
+    ..uint32(_scvString)
+    ..string(value);
+}
+
 // XDR discriminants, from Stellar-transaction.x and Stellar-contract.x.
 const _envelopeTypeTx = 2;
 const _keyTypeEd25519 = 0;
@@ -50,6 +64,7 @@ const _hostFunctionInvokeContract = 0;
 const _scAddressContract = 1;
 const _scvU32 = 3;
 const _scvU64 = 5;
+const _scvString = 14;
 
 /// An unsigned `TransactionEnvelope` (base64 XDR) that invokes [function] on
 /// [contract].

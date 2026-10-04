@@ -179,6 +179,100 @@ void main() {
     });
   });
 
+  group('totalAgents', () {
+    test('returns the recorded count and sends the right call', () async {
+      final h = _ledgerAnswering(_fixture('simulate_total_agents.json'));
+
+      expect(await h.ledger.totalAgents(), 15);
+
+      expect(h.requests, hasLength(1));
+      final params = h.requests.single['params']! as Map<String, Object?>;
+      expect(
+        params['transaction'],
+        encodeInvokeEnvelope(
+          source: _config.simulationSource,
+          fee: 100,
+          sequence: 0,
+          contract: _config.identityRegistry,
+          function: 'total_agents',
+          args: const [],
+        ),
+      );
+    });
+
+    test('returns 0 for an empty registry', () async {
+      final h = _ledgerAnswering(
+        _withResultKey('simulate_total_agents.json', 'results', [
+          {
+            'returnValueJson': {'u32': 0},
+          },
+        ]),
+      );
+
+      expect(await h.ledger.totalAgents(), 0);
+    });
+
+    test('a value that is not an integer is unavailable', () {
+      final h = _ledgerAnswering(_fixture('simulate_agent_exists_true.json'));
+
+      expect(() => h.ledger.totalAgents(), _throwsUnavailable);
+    });
+
+    test('HTTP 503 is unavailable', () {
+      final h = _ledgerAnswering({'error': 'down'}, status: 503);
+
+      expect(() => h.ledger.totalAgents(), _throwsUnavailable);
+    });
+  });
+
+  group('agentMetadata', () {
+    test('returns the recorded bytes and sends the key as a string', () async {
+      final h = _ledgerAnswering(
+        _fixture('simulate_get_metadata_present.json'),
+      );
+
+      final value = await h.ledger.agentMetadata(AgentId(7), 'name');
+
+      expect(utf8.decode(value!), 'Ledger Scout');
+      final params = h.requests.single['params']! as Map<String, Object?>;
+      expect(
+        params['transaction'],
+        encodeInvokeEnvelope(
+          source: _config.simulationSource,
+          fee: 100,
+          sequence: 0,
+          contract: _config.identityRegistry,
+          function: 'get_metadata',
+          args: [const ScArg.u32(7), const ScArg.string('name')],
+        ),
+      );
+    });
+
+    test('a void result is null', () async {
+      final h = _ledgerAnswering(_fixture('simulate_get_metadata_void.json'));
+
+      expect(await h.ledger.agentMetadata(AgentId(0), 'id'), isNull);
+    });
+
+    test('a value that is not bytes is unavailable', () {
+      final h = _ledgerAnswering(_fixture('simulate_agent_uri_present.json'));
+
+      expect(
+        () => h.ledger.agentMetadata(AgentId(7), 'name'),
+        _throwsUnavailable,
+      );
+    });
+
+    test('HTTP 503 is unavailable', () {
+      final h = _ledgerAnswering({'error': 'down'}, status: 503);
+
+      expect(
+        () => h.ledger.agentMetadata(AgentId(7), 'name'),
+        _throwsUnavailable,
+      );
+    });
+  });
+
   group('failures', () {
     test('a JSON-RPC error is unavailable', () {
       final h = _ledgerAnswering({
