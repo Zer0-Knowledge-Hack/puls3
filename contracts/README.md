@@ -5,15 +5,18 @@ Soroban smart contracts for puls3, as one Cargo workspace. The registries are de
 ```text
 contracts/
 ├── Cargo.toml              # workspace: shared soroban-sdk version and release profile
+├── deployments/
+│   ├── testnet.json        # deployed contract IDs, wasm hashes, tx hashes (no secrets)
+│   └── demo-agents.json    # seed data: the 8 current demo agents
 └── contracts/
+    ├── identity-registry/  # Agent Identity Registry (#13)
+    ├── escrow/             # Agent escrow and payment: create_job -> fund -> submit -> complete
     └── placeholder/        # sample contract so CI has something to build and test (#29)
-        ├── Cargo.toml
-        └── src/
-            ├── lib.rs
-            └── test.rs
 ```
 
-Each contract is a crate under `contracts/<name>/` that takes `soroban-sdk` from the workspace. The Identity Registry (#13) goes in `contracts/identity-registry/` and the Reputation Registry (#14) in `contracts/reputation-registry/`.
+Each contract is a crate under `contracts/<name>/` that takes `soroban-sdk` from the workspace. The Reputation Registry (#14) has no crate yet and is not deployed.
+
+Deploy and seed scripts live in [`../scripts/`](../scripts/): `deploy-testnet.sh` (registry), `deploy-escrow-testnet.sh` (escrow, USDC allow-list, test job, direct payment) and `seed-demo-agents.sh`. How to verify what they deployed: [`../docs/verification/onchain.md`](../docs/verification/onchain.md).
 
 ## Versions
 
@@ -78,8 +81,9 @@ Then build, test, format, and lint as above.
 
 ## Deploy
 
-Testnet deploy of the Identity Registry (#13) plus demo-agent seed data (#15).
-The Reputation Registry (#14) is not deployed here; `deployments/testnet.json`
+Testnet deploy of the Identity Registry (#13), demo-agent seed data (#15) and the
+Agent Escrow contract (see [Escrow deploy](#escrow-deploy)).
+The Reputation Registry (#14) is not deployed; `deployments/testnet.json`
 keeps a `reputation_registry: null` slot for it.
 
 ### Prerequisites
@@ -138,6 +142,31 @@ Skill values are ids (kebab-case slugs). The Flutter mock
 (`puls3_flutter/assets/mock/demo_agents.json`) uses display names such as
 "On-chain analytics", so the app needs an id-to-name mapping when it reads
 on-chain agents.
+
+### Escrow deploy
+
+The Agent Escrow contract is deployed with its own script, after the registry
+exists in `deployments/testnet.json`:
+
+```bash
+scripts/deploy-escrow-testnet.sh <identity>                 # build, deploy, allow-list Circle testnet USDC
+CLIENT_ACCOUNT=<client-identity> TEST_JOB_EXPIRY_SECONDS=<86401..2592000> \
+  scripts/deploy-escrow-testnet.sh --test-job <identity>    # create_job -> fund -> submit -> complete
+CLIENT_ACCOUNT=<client-identity> DIRECT_PAYMENT_HIRE_ID=<id> \
+  scripts/deploy-escrow-testnet.sh --direct-payment <identity>   # SAC payment to a muxed address
+scripts/deploy-escrow-testnet.sh --redeploy <identity>      # force a new deploy, for example after a testnet reset
+```
+
+The constructor values are fixed: `fee_bps` 0, `approval_window` 86400 s,
+`max_expiry` 2592000 s, no treasury. A re-run skips the deploy when the recorded
+escrow still answers. Results are merged into the `escrow` and `direct_payment`
+slots of `deployments/testnet.json`; the seed script also binds each agent wallet
+(`AGENT_WALLET_ACCOUNT`, default: the owner identity). Identities are Stellar CLI
+identity names; no secret is stored in the repository.
+
+**TTL.** Escrow state is persistent and has a TTL of about 60 days. Call
+`extend_ttl(job_id)` on the escrow contract before it lapses to keep a job
+readable. Testnet resets invalidate all recorded IDs; redeploy and re-record.
 
 Inspect a deployed contract at
 `https://stellar.expert/explorer/testnet/contract/<contract-id>`, using the
