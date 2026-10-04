@@ -12,5 +12,57 @@
       "symbol": "P3AGENT"
     }
   },
-  "reputation_registry": null
+  "reputation_registry": null,
+  "escrow": {
+    "contract_id": "CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2",
+    "wasm_hash_sha256": "15f98ea5e667da8af4a2bda3cc7e55232e7aa7ca03032d0e1572043a6c76e12e",
+    "deploy_tx": "04a98f919fdd59cdbe3bd10b8bdaa09fcafe8cbedba8e4a9a7a8e533a4737a73",
+    "deployed_at_utc": "2026-10-04T19:22:13Z",
+    "constructor": {
+      "admin": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY",
+      "identity_registry": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+      "treasury": null,
+      "fee_bps": 0,
+      "max_expiry": 2592000,
+      "approval_window": 86400
+    },
+    "allowed_tokens": [
+      {
+        "asset": "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+        "sac_id": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+        "tx": "d2de45534c0bd56e5759ce57c4c8380ed3e7eccfe4d03f3821b9e165df679cf9"
+      }
+    ],
+    "test_job": {
+      "job_id": 3,
+      "agent_id": 7,
+      "agent_uri": "puls3://demo/agt-001",
+      "budget": "5000000",
+      "state": "Completed",
+      "client": "GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H",
+      "provider": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY",
+      "expired_at": 1791747914,
+      "description": "puls3 testnet evidence job",
+      "deliverable_text": "puls3 testnet evidence deliverable",
+      "deliverable_sha256": "179090692d43733fb69b57dca35e077a5af50ad0a37138b76c3e050027bc0665",
+      "reason_text": "puls3 testnet evidence approval",
+      "reason_sha256": "2e15dea8c223c8d0abb27717972b7e88b8d7968d846652e275e39ab5bf0f88bc",
+      "txs": {
+        "create_job": "3baba1832b5a1d44330068acd41d5b09fb8e15faab1ba914829c0a0a62d054fb",
+        "fund": "43cd3e8455cafdc08d62a644b8f9dd9174994644b2bdd3e57eaa6893aa5c2437",
+        "submit": "1ffc2c1603afc5a83ba263f5c35579e4bcd379fe261f1e598ca8c204579ffd74",
+        "complete": "ee6dfb528145c0e8d8e2d4420d47598d94c3d6698f2a60125d032e909a8e50c4"
+      }
+    }
+  },
+  "direct_payment": {
+    "tx": "652a575b5d85814c19a4fed0f7d21f40acb35a399c4008d450877ee83e8b31ab",
+    "asset": "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+    "sac_id": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+    "from": "GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H",
+    "to": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY",
+    "to_muxed": "MAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIAAAAAAAAAAABCW5Q",
+    "hire_id": 8,
+    "amount": "5000000"
+  }
 }
