@@ -1,0 +1,61 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "error": "HostError: Error(Contract, #1)\n\nEvent log (newest first):\n   0: [Diagnostic Event] contract:CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2, topics:[error, Error(Contract, #1)], data:\"escalating Ok(ScErrorType::Contract) frame-exit to Err\"\n   1: [Diagnostic Event] topics:[fn_call, CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2, get_job], data:999\n",
+    "eventsJson": [
+      {
+        "in_successful_contract_call": false,
+        "event": {
+          "ext": "v0",
+          "contract_id": null,
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_call"
+                },
+                {
+                  "bytes": "623f83ecba1acfae245097b8b1518768c5994d38098c7133fb2a1087f1ec2bc9"
+                },
+                {
+                  "symbol": "get_job"
+                }
+              ],
+              "data": {
+                "u64": "999"
+              }
+            }
+          }
+        }
+      },
+      {
+        "in_successful_contract_call": false,
+        "event": {
+          "ext": "v0",
+          "contract_id": "CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2",
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "error"
+                },
+                {
+                  "error": {
+                    "contract": 1
+                  }
+                }
+              ],
+              "data": {
+                "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "latestLedger": 5024571
+  }
+}
