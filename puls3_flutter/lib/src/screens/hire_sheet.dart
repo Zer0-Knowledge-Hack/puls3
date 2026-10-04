@@ -28,20 +28,37 @@ class HireSheet extends StatefulWidget {
 class _HireSheetState extends State<HireSheet> {
   HirePhase _phase = HirePhase.review;
   String? _txHash;
+  String? _errorMessage;
 
   Future<void> _confirm() async {
     final wallet = AppScope.of(context).wallet;
-    setState(() => _phase = HirePhase.signing);
-    // Mock payload: a real adapter would build a USDC payment XDR here.
-    final hash = await wallet.signTransaction(
-      'mock-usdc-payment:${widget.agent.stellarAddress}:'
-      '${widget.agent.priceUsdcStroops}',
-    );
-    if (!mounted) return;
     setState(() {
-      _txHash = hash;
-      _phase = HirePhase.confirmed;
+      _phase = HirePhase.signing;
+      _errorMessage = null;
     });
+
+    try {
+      if (wallet.address == null) {
+        await wallet.connect();
+      }
+      final hash = await wallet.signTransaction(
+        'mock-usdc-payment:${widget.agent.stellarAddress}:'
+        '${widget.agent.priceUsdcStroops}',
+      );
+      if (!mounted) return;
+      setState(() {
+        _txHash = hash;
+        _phase = HirePhase.confirmed;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _phase = HirePhase.error;
+        _errorMessage = e is Exception
+            ? e.toString().replaceFirst('Exception: ', '')
+            : 'Payment could not be completed';
+      });
+    }
   }
 
   void _backToMarketplace() {
@@ -68,7 +85,9 @@ class _HireSheetState extends State<HireSheet> {
             priceUsdcStroops: widget.agent.priceUsdcStroops,
             destinationAddress: widget.agent.stellarAddress,
             txHash: _txHash,
+            errorMessage: _errorMessage,
             onConfirm: _confirm,
+            onRetry: _confirm,
             onBackToMarketplace: _backToMarketplace,
           ),
         ),
