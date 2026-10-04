@@ -24,7 +24,15 @@ class AgentEndpoint extends Endpoint {
 
   /// The service in use. The first call builds the default one from the
   /// `PULS3_STELLAR_*` environment and keeps it for the life of the process.
-  static AgentCatalogService get _instance => _service ??= _defaultService();
+  static AgentCatalogService get _instance =>
+      _service ??= (_defaultBuilder ?? buildDefaultService)();
+
+  static AgentCatalogService Function()? _defaultBuilder;
+
+  /// Replaces how the lazy default is built, for tests. `null` restores it.
+  @visibleForTesting
+  static set defaultServiceBuilder(AgentCatalogService Function()? builder) =>
+      _defaultBuilder = builder;
 
   /// Replaces the service, for tests. `null` restores the lazy default.
   @visibleForTesting
@@ -36,10 +44,19 @@ class AgentEndpoint extends Endpoint {
   /// The agent with the metadata id [id], or `null` when there is none.
   Future<AgentSummary?> get(Session session, String id) => _instance.get(id);
 
-  static AgentCatalogService _defaultService() {
-    final config = StellarConfig.fromEnvironment(Platform.environment);
+  /// Builds the default service from the `PULS3_STELLAR_*` [environment]
+  /// (the process environment when omitted) and [httpClient] (a new client
+  /// when omitted).
+  @visibleForTesting
+  static AgentCatalogService buildDefaultService({
+    Map<String, String>? environment,
+    http.Client? httpClient,
+  }) {
+    final config = StellarConfig.fromEnvironment(
+      environment ?? Platform.environment,
+    );
     final rpc = SorobanRpcClient(
-      httpClient: http.Client(),
+      httpClient: httpClient ?? http.Client(),
       url: config.rpcUrl,
       timeout: _rpcTimeout,
     );

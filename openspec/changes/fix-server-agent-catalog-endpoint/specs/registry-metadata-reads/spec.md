@@ -30,13 +30,13 @@ Read-only registry queries for the agent count and per-agent metadata values, pl
 
 ### Requirement: Registry agentMetadata
 
-`SorobanLedger.agentMetadata(AgentId, key)` MUST call the registry `get_metadata` function through simulation with the agent id and the key as a string argument. It MUST return the stored string value, or `null` when the contract returns `void` (missing key or unknown agent).
+`SorobanLedger.agentMetadata(AgentId, key)` MUST call the registry `get_metadata` function through simulation with the agent id and the key as a string argument. It MUST return the stored value as raw bytes (`Uint8List`, the contract's `Option<Bytes>`), or `null` when the contract returns `void` (missing key or unknown agent). Decoding the bytes to text belongs to the catalog service.
 
 #### Scenario: Metadata present
 
-- GIVEN the registry simulation returns the string `Alpha` for agent 7 and key `name`
+- GIVEN the registry simulation returns the bytes of `Alpha` for agent 7 and key `name`
 - WHEN `agentMetadata` is called with that agent and key
-- THEN it returns `Alpha`
+- THEN it returns those bytes (UTF-8 `Alpha`)
 
 #### Scenario: Metadata missing
 

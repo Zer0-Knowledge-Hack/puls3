@@ -168,7 +168,7 @@ The service MUST read per-agent data in parallel with a bounded concurrency of a
 
 ### Requirement: Lazy default wiring with test override
 
-The endpoint MUST lazily build a default service from `StellarConfig.fromEnvironment`, an `http.Client` and an 8 second RPC timeout, on first use. It MUST expose a `@visibleForTesting` override to inject a service. The catalog service MUST depend only on a narrow `RegistryReader` interface (`totalAgents`, `agentUri`, `agentMetadata`, `agentWallet`) implemented by `SorobanLedger`, so it is testable without network, PostgreSQL or Redis.
+The endpoint MUST lazily build a default service from `StellarConfig.fromEnvironment`, an `http.Client` and an 8 second RPC timeout, on first use. It MUST expose a `@visibleForTesting` override to inject a service. The catalog service MUST depend only on a narrow `RegistryReader` interface (`totalAgents`, `agentMetadata`, `agentWallet`) implemented by `SorobanLedger`, so it is testable without network, PostgreSQL or Redis.
 
 #### Scenario: Default built on first use
 
