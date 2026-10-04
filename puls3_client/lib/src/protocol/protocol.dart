@@ -12,12 +12,17 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'greetings/greeting.dart' as _i2;
-import 'health/backend_health.dart' as _i3;
+import 'agent/agent_catalog_unavailable.dart' as _i2;
+import 'agent/agent_summary.dart' as _i3;
+import 'greetings/greeting.dart' as _i4;
+import 'health/backend_health.dart' as _i5;
+import 'package:puls3_client/src/protocol/agent/agent_summary.dart' as _i6;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
-    as _i4;
+    as _i7;
 import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
-    as _i5;
+    as _i8;
+export 'agent/agent_catalog_unavailable.dart';
+export 'agent/agent_summary.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
 export 'client.dart';
@@ -56,31 +61,55 @@ class Protocol extends _i1.SerializationManager {
       }
     }
 
-    if (t == _i2.Greeting) {
-      return _i2.Greeting.fromJson(data) as T;
+    if (t == _i2.AgentCatalogUnavailable) {
+      return _i2.AgentCatalogUnavailable.fromJson(data) as T;
     }
-    if (t == _i3.BackendHealth) {
-      return _i3.BackendHealth.fromJson(data) as T;
+    if (t == _i3.AgentSummary) {
+      return _i3.AgentSummary.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i2.Greeting?>()) {
-      return (data != null ? _i2.Greeting.fromJson(data) : null) as T;
+    if (t == _i4.Greeting) {
+      return _i4.Greeting.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i3.BackendHealth?>()) {
-      return (data != null ? _i3.BackendHealth.fromJson(data) : null) as T;
+    if (t == _i5.BackendHealth) {
+      return _i5.BackendHealth.fromJson(data) as T;
+    }
+    if (t == _i1.getType<_i2.AgentCatalogUnavailable?>()) {
+      return (data != null ? _i2.AgentCatalogUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i3.AgentSummary?>()) {
+      return (data != null ? _i3.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i4.Greeting?>()) {
+      return (data != null ? _i4.Greeting.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i5.BackendHealth?>()) {
+      return (data != null ? _i5.BackendHealth.fromJson(data) : null) as T;
+    }
+    if (t == List<String>) {
+      return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_i6.AgentSummary>) {
+      return (data as List)
+              .map((e) => deserialize<_i6.AgentSummary>(e))
+              .toList()
+          as T;
     }
     try {
-      return _i4.Protocol().deserialize<T>(data, t);
+      return _i7.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     try {
-      return _i5.Protocol().deserialize<T>(data, t);
+      return _i8.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     return super.deserialize<T>(data, t);
   }
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i2.Greeting => 'Greeting',
-      _i3.BackendHealth => 'BackendHealth',
+      _i2.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
+      _i3.AgentSummary => 'AgentSummary',
+      _i4.Greeting => 'Greeting',
+      _i5.BackendHealth => 'BackendHealth',
       _ => null,
     };
   }
@@ -95,16 +124,20 @@ class Protocol extends _i1.SerializationManager {
     }
 
     switch (data) {
-      case _i2.Greeting():
+      case _i2.AgentCatalogUnavailable():
+        return 'AgentCatalogUnavailable';
+      case _i3.AgentSummary():
+        return 'AgentSummary';
+      case _i4.Greeting():
         return 'Greeting';
-      case _i3.BackendHealth():
+      case _i5.BackendHealth():
         return 'BackendHealth';
     }
-    className = _i4.Protocol().getClassNameForObject(data);
+    className = _i7.Protocol().getClassNameForObject(data);
     if (className != null) {
       return 'serverpod_auth_idp.$className';
     }
-    className = _i5.Protocol().getClassNameForObject(data);
+    className = _i8.Protocol().getClassNameForObject(data);
     if (className != null) {
       return 'serverpod_auth_core.$className';
     }
@@ -117,19 +150,25 @@ class Protocol extends _i1.SerializationManager {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'AgentCatalogUnavailable') {
+      return deserialize<_i2.AgentCatalogUnavailable>(data['data']);
+    }
+    if (dataClassName == 'AgentSummary') {
+      return deserialize<_i3.AgentSummary>(data['data']);
+    }
     if (dataClassName == 'Greeting') {
-      return deserialize<_i2.Greeting>(data['data']);
+      return deserialize<_i4.Greeting>(data['data']);
     }
     if (dataClassName == 'BackendHealth') {
-      return deserialize<_i3.BackendHealth>(data['data']);
+      return deserialize<_i5.BackendHealth>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
-      return _i4.Protocol().deserializeByClassName(data);
+      return _i7.Protocol().deserializeByClassName(data);
     }
     if (dataClassName.startsWith('serverpod_auth_core.')) {
       data['className'] = dataClassName.substring(20);
-      return _i5.Protocol().deserializeByClassName(data);
+      return _i8.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
@@ -144,10 +183,10 @@ class Protocol extends _i1.SerializationManager {
       return null;
     }
     try {
-      return _i4.Protocol().mapRecordToJson(record);
+      return _i7.Protocol().mapRecordToJson(record);
     } catch (_) {}
     try {
-      return _i5.Protocol().mapRecordToJson(record);
+      return _i8.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }

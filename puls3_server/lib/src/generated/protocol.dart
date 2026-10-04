@@ -17,8 +17,13 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
     as _i3;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _i4;
-import 'greetings/greeting.dart' as _i5;
-import 'health/backend_health.dart' as _i6;
+import 'agent/agent_catalog_unavailable.dart' as _i5;
+import 'agent/agent_summary.dart' as _i6;
+import 'greetings/greeting.dart' as _i7;
+import 'health/backend_health.dart' as _i8;
+import 'package:puls3_server/src/generated/agent/agent_summary.dart' as _i9;
+export 'agent/agent_catalog_unavailable.dart';
+export 'agent/agent_summary.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
 
@@ -62,17 +67,39 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
 
-    if (t == _i5.Greeting) {
-      return _i5.Greeting.fromJson(data) as T;
+    if (t == _i5.AgentCatalogUnavailable) {
+      return _i5.AgentCatalogUnavailable.fromJson(data) as T;
     }
-    if (t == _i6.BackendHealth) {
-      return _i6.BackendHealth.fromJson(data) as T;
+    if (t == _i6.AgentSummary) {
+      return _i6.AgentSummary.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i5.Greeting?>()) {
-      return (data != null ? _i5.Greeting.fromJson(data) : null) as T;
+    if (t == _i7.Greeting) {
+      return _i7.Greeting.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i6.BackendHealth?>()) {
-      return (data != null ? _i6.BackendHealth.fromJson(data) : null) as T;
+    if (t == _i8.BackendHealth) {
+      return _i8.BackendHealth.fromJson(data) as T;
+    }
+    if (t == _i1.getType<_i5.AgentCatalogUnavailable?>()) {
+      return (data != null ? _i5.AgentCatalogUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i6.AgentSummary?>()) {
+      return (data != null ? _i6.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i7.Greeting?>()) {
+      return (data != null ? _i7.Greeting.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i8.BackendHealth?>()) {
+      return (data != null ? _i8.BackendHealth.fromJson(data) : null) as T;
+    }
+    if (t == List<String>) {
+      return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_i9.AgentSummary>) {
+      return (data as List)
+              .map((e) => deserialize<_i9.AgentSummary>(e))
+              .toList()
+          as T;
     }
     try {
       return _i3.Protocol().deserialize<T>(data, t);
@@ -88,8 +115,10 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i5.Greeting => 'Greeting',
-      _i6.BackendHealth => 'BackendHealth',
+      _i5.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
+      _i6.AgentSummary => 'AgentSummary',
+      _i7.Greeting => 'Greeting',
+      _i8.BackendHealth => 'BackendHealth',
       _ => null,
     };
   }
@@ -104,9 +133,13 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i5.Greeting():
+      case _i5.AgentCatalogUnavailable():
+        return 'AgentCatalogUnavailable';
+      case _i6.AgentSummary():
+        return 'AgentSummary';
+      case _i7.Greeting():
         return 'Greeting';
-      case _i6.BackendHealth():
+      case _i8.BackendHealth():
         return 'BackendHealth';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -130,11 +163,17 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'AgentCatalogUnavailable') {
+      return deserialize<_i5.AgentCatalogUnavailable>(data['data']);
+    }
+    if (dataClassName == 'AgentSummary') {
+      return deserialize<_i6.AgentSummary>(data['data']);
+    }
     if (dataClassName == 'Greeting') {
-      return deserialize<_i5.Greeting>(data['data']);
+      return deserialize<_i7.Greeting>(data['data']);
     }
     if (dataClassName == 'BackendHealth') {
-      return deserialize<_i6.BackendHealth>(data['data']);
+      return deserialize<_i8.BackendHealth>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
