@@ -25,8 +25,10 @@ pub const TTL_BUMP: u32 = 1_036_800;
 
 /// Maximum job description length in bytes.
 pub const MAX_DESCRIPTION_LEN: u32 = 256;
-/// Basis-point denominator and the highest accepted `fee_bps`.
+/// Basis-point denominator (used in `compute_fee`).
 pub const BPS_DENOMINATOR: u32 = 10_000;
+/// Hard fee ceiling: at most 10% (1,000 bps) to protect providers.
+pub const MAX_FEE_BPS: u32 = 1_000;
 
 const CONTRACT_VERSION: &str = "0.1.0";
 
@@ -757,9 +759,9 @@ impl EscrowContract {
     }
 }
 
-/// `fee_bps <= 10_000`, and a non-zero fee needs a treasury.
+/// `fee_bps <= MAX_FEE_BPS`, and a non-zero fee needs a treasury.
 fn validate_fee(fee_bps: u32, has_treasury: bool) -> Result<(), EscrowError> {
-    if fee_bps > BPS_DENOMINATOR {
+    if fee_bps > MAX_FEE_BPS {
         return Err(EscrowError::InvalidFeeBps);
     }
     if fee_bps > 0 && !has_treasury {
