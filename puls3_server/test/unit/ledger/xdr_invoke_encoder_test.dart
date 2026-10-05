@@ -102,6 +102,69 @@ void main() {
       );
     });
 
+    group('ScArg.string', () {
+      /// The hex of the bytes after the function name: one `ScArg.string`
+      /// argument followed by auth, extension and signatures.
+      String argument(String value) {
+        final hex = _hex(
+          encodeInvokeEnvelope(
+            source: _source,
+            fee: 100,
+            sequence: 0,
+            contract: _registry,
+            function: 'get_metadata',
+            args: [ScArg.string(value)],
+          ),
+        );
+        // Skip the function name (length word + 12 bytes) and the arg count.
+        final start = hex.indexOf(_registryKey) + 64 + 8 + 24 + 8;
+        return hex.substring(start, hex.length - 3 * 8);
+      }
+
+      test('writes discriminant 14, the byte length and no padding', () {
+        expect(
+          argument('name'),
+          ['0000000e', '00000004', '6e616d65'].join(),
+        );
+      });
+
+      test('pads a 2-byte string with 2 zero bytes', () {
+        expect(argument('id'), ['0000000e', '00000002', '69640000'].join());
+      });
+
+      test('writes only discriminant and length for an empty string', () {
+        expect(argument(''), ['0000000e', '00000000'].join());
+      });
+
+      test('counts UTF-8 bytes, not characters, and pads to 4', () {
+        // "é" is 2 bytes (c3a9); "añ" is 3 bytes plus 1 padding byte.
+        expect(argument('é'), ['0000000e', '00000002', 'c3a90000'].join());
+        expect(argument('añ'), ['0000000e', '00000003', '61c3b100'].join());
+      });
+
+      test('equals the base64 that stellar contract invoke wrote', () {
+        final golden =
+            jsonDecode(
+                  File(
+                    'test/unit/ledger/fixtures/'
+                    'envelope_get_metadata_7_name.json',
+                  ).readAsStringSync(),
+                )
+                as Map<String, Object?>;
+
+        final envelope = encodeInvokeEnvelope(
+          source: _source,
+          fee: golden['fee']! as int,
+          sequence: int.parse(golden['sequence']! as String),
+          contract: _registry,
+          function: 'get_metadata',
+          args: [const ScArg.u32(7), ScArg.string('name')],
+        );
+
+        expect(envelope, golden['base64']);
+      });
+    });
+
     test('encodes a sequence above 2^32 as a big-endian int64', () {
       final envelope = encodeInvokeEnvelope(
         source: _source,

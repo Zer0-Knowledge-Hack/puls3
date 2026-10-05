@@ -17,8 +17,11 @@
 /// hash. Verify a payment soon after it is made, or keep the verified result.
 library;
 
+import 'dart:typed_data';
+
 import 'package:puls3_domain/puls3_domain.dart';
 
+import '../agent/registry_reader.dart';
 import 'escrow_job.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
@@ -45,7 +48,7 @@ final _contractError = RegExp(r'Error\(Contract, #(\d+)\)');
 /// Contract reads are simulations of unsigned envelopes. A result of `null`
 /// means the chain says "not there"; an infrastructure problem or a response
 /// the adapter cannot read is a [LedgerException] instead.
-final class SorobanLedger implements LedgerPort {
+final class SorobanLedger implements LedgerPort, RegistryReader {
   SorobanLedger(this._rpc, this._config);
 
   final SorobanRpcClient _rpc;
@@ -67,6 +70,24 @@ final class SorobanLedger implements LedgerPort {
       absentErrors: const {_registryUriNotSet},
     );
     return value == null ? null : readOptional(value, readString);
+  }
+
+  /// Registry `total_agents`: how many agents were ever registered.
+  @override
+  Future<int> totalAgents() async =>
+      readU32(await _read(_config.identityRegistry, 'total_agents', const []));
+
+  /// Registry `get_metadata`, or `null` when the agent has no value for [key].
+  ///
+  /// The contract returns `Option<Bytes>` and never fails for an absent key or
+  /// an unknown agent. [key] is sent as an ScVal string.
+  @override
+  Future<Uint8List?> agentMetadata(AgentId id, String key) async {
+    final value = await _read(_config.identityRegistry, 'get_metadata', [
+      ScArg.u32(id.value),
+      ScArg.string(key),
+    ]);
+    return readOptional(value, readBytes);
   }
 
   @override

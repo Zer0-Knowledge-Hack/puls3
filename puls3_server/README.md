@@ -1,8 +1,35 @@
 # puls3 Serverpod backend
 
 Serverpod **3.4.13**, pinned on **2026-09-26**. The backend currently exposes a
-minimal `health` endpoint so the Flutter app can verify the generated client,
-server, and shared workspace are connected.
+`health` endpoint so the Flutter app can verify the generated client, server,
+and shared workspace are connected, and a read-only `agent` endpoint that serves
+the agent catalog from the on-chain identity registry.
+
+## Agent catalog endpoint
+
+`agent.list` returns every agent with valid metadata (`AgentSummary`: `id`,
+`registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, optional
+`wallet` and `model`). `agent.get(id)` returns the agent with that metadata id,
+for example `agt-001`, or `null` when there is none. There is no rating: the
+registry does not store one.
+
+The registry has no list function, so the server reads `total_agents` and then
+the metadata of ids `0` to `total - 1` through Soroban RPC simulations (four
+agents at a time). An agent whose metadata is missing or invalid, such as a
+superseded registration, is skipped. The endpoint never signs or submits a
+transaction.
+
+The chain is read from the testnet values unless these variables override
+them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
+`PULS3_STELLAR_USDC_SAC`, `PULS3_STELLAR_IDENTITY_REGISTRY`,
+`PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
+times out after 8 seconds.
+
+The built list is cached in memory for 60 seconds, and concurrent callers share
+one refresh. If a refresh fails because the chain cannot be read, the last list
+is served. With no cached list, `list` and `get` throw the serializable
+`AgentCatalogUnavailable` exception; an outage is never an empty list, and an
+unknown id is never reported as an outage.
 
 ## Prerequisites
 

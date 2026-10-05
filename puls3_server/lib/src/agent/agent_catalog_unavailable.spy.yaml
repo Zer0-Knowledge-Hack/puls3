@@ -1,0 +1,5 @@
+### The agent catalog cannot be read from the chain and no cached copy exists.
+exception: AgentCatalogUnavailable
+fields:
+  ### What went wrong, safe to show to a client.
+  message: String
