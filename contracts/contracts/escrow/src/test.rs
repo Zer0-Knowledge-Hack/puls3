@@ -50,8 +50,8 @@ const APPROVAL_WINDOW: u64 = 3_600;
 /// 7-decimal token units: 1.0 token.
 const BUDGET: i128 = 10_000_000;
 const CLIENT_FUNDS: i128 = 50_000_000;
-/// `max_fee_bps` that never blocks `fund`: the contract caps `fee_bps` at 10_000.
-const MAX_FEE: u32 = 10_000;
+/// `max_fee_bps` that never blocks `fund`: the contract caps `fee_bps` at `MAX_FEE_BPS`.
+const MAX_FEE: u32 = MAX_FEE_BPS;
 
 struct Ctx {
     env: Env,
@@ -249,24 +249,38 @@ fn constructor_stores_different_values_and_treasury() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #109)")]
-fn constructor_rejects_fee_above_10_000() {
+fn constructor_rejects_fee_above_max_fee_bps() {
     let env = Env::default();
     let a = Address::generate(&env);
     env.register(
         EscrowContract,
-        (&a, &a, &Some(a.clone()), &10_001u32, &86_400u64, &3_600u64),
+        (
+            &a,
+            &a,
+            &Some(a.clone()),
+            &(MAX_FEE_BPS + 1),
+            &86_400u64,
+            &3_600u64,
+        ),
     );
 }
 
 #[test]
-fn constructor_accepts_fee_of_exactly_10_000() {
+fn constructor_accepts_fee_at_max_fee_bps() {
     let env = Env::default();
     let a = Address::generate(&env);
     let id = env.register(
         EscrowContract,
-        (&a, &a, &Some(a.clone()), &10_000u32, &86_400u64, &3_600u64),
+        (
+            &a,
+            &a,
+            &Some(a.clone()),
+            &MAX_FEE_BPS,
+            &86_400u64,
+            &3_600u64,
+        ),
     );
-    assert_eq!(EscrowContractClient::new(&env, &id).fee_bps(), 10_000);
+    assert_eq!(EscrowContractClient::new(&env, &id).fee_bps(), MAX_FEE_BPS);
 }
 
 #[test]
@@ -1436,24 +1450,19 @@ fn complete_with_a_fee_splits_between_provider_and_treasury() {
 }
 
 #[test]
-fn complete_at_maximum_bps_skips_the_zero_provider_transfer() {
-    let (ctx, treasury) = setup_with_fee(10_000);
+fn complete_at_max_fee_bps_splits_between_provider_and_treasury() {
+    let (ctx, treasury) = setup_with_fee(MAX_FEE_BPS);
     let id = ctx.submitted(LATE_EXPIRY);
     ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
-    assert_eq!(ctx.balance(&treasury), BUDGET);
-    assert_eq!(ctx.balance(&ctx.provider), 0);
+    let fee = compute_fee(BUDGET, MAX_FEE_BPS);
+    assert_eq!(ctx.balance(&treasury), fee);
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET - fee);
     assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
 }
 
 #[test]
 fn the_largest_budget_settles_for_several_fee_rates() {
-    for (bps, fee) in [
-        (0u32, 0i128),
-        (1, 17014118346046923173168730371588410),
-        (250, 4253529586511730793292182592897102643),
-        (5_000, 85070591730234615865843651857942052863),
-        (10_000, i128::MAX),
-    ] {
+    for bps in [0u32, 1, 250, 500, MAX_FEE_BPS] {
         let (ctx, treasury) = setup_with_fee(bps);
         StellarAssetClient::new(&ctx.env, &ctx.token)
             .mint(&ctx.client, &(i128::MAX - CLIENT_FUNDS));
@@ -1471,6 +1480,7 @@ fn the_largest_budget_settles_for_several_fee_rates() {
         ctx.escrow().fund(&ctx.client, &id, &i128::MAX, &MAX_FEE);
         ctx.submit(id);
         ctx.escrow().complete(&ctx.client, &id, &ctx.hash(1));
+        let fee = compute_fee(i128::MAX, bps);
         assert_eq!(ctx.escrow().get_job(&id).state, JobState::Completed);
         assert_eq!(ctx.balance(&treasury), fee, "bps {bps}");
         assert_eq!(ctx.balance(&ctx.provider), i128::MAX - fee, "bps {bps}");
@@ -1783,15 +1793,15 @@ fn fee_setter_validates_bps_and_treasury() {
         EscrowError::TreasuryNotSet
     );
     assert_eq!(
-        err(e.try_set_fee_bps(&ctx.admin, &10_001)),
+        err(e.try_set_fee_bps(&ctx.admin, &(MAX_FEE_BPS + 1))),
         EscrowError::InvalidFeeBps
     );
     assert_eq!(e.fee_bps(), 0);
     // Zero is always allowed, even without a treasury.
     e.set_fee_bps(&ctx.admin, &0);
     e.set_treasury(&ctx.admin, &Address::generate(&ctx.env));
-    e.set_fee_bps(&ctx.admin, &10_000);
-    assert_eq!(e.fee_bps(), 10_000);
+    e.set_fee_bps(&ctx.admin, &MAX_FEE_BPS);
+    assert_eq!(e.fee_bps(), MAX_FEE_BPS);
 }
 
 #[test]
@@ -2720,7 +2730,7 @@ fn fund_rejects_a_fee_above_the_clients_maximum() {
 fn a_fee_raised_before_fund_cannot_divert_the_budget() {
     let (ctx, treasury) = setup_with_fee(0);
     let id = ctx.create(NOW + 1_000);
-    ctx.escrow().set_fee_bps(&ctx.admin, &10_000);
+    ctx.escrow().set_fee_bps(&ctx.admin, &MAX_FEE_BPS);
     assert_eq!(
         err(ctx.escrow().try_fund(&ctx.client, &id, &BUDGET, &0)),
         EscrowError::FeeExceedsMax

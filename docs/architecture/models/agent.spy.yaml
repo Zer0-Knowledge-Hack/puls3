@@ -1,0 +1,14 @@
+### Draft transport mirror of the domain Agent entity.
+class: Agent
+fields:
+  ### Domain AgentId encoded as an integer.
+  id: int
+  ### Domain StellarAddress encoded as a StrKey string.
+  owner: String
+  ### Domain StellarAddress that receives payments.
+  wallet: String
+  name: String
+  description: String
+  skills: List<Skill>
+  ### Domain UsdcAmount encoded as integer USDC stroops.
+  price: int

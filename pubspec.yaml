@@ -9,4 +9,5 @@ workspace:
   - puls3_client
   - puls3_server
   - puls3_flutter
+  - spikes/flutter-stellar-wallet
 

@@ -82,3 +82,7 @@ In the Serverpod video (under 2 minutes, #4), a judge must see, **with no mock d
 5. The consumer rates the agent, and the rating shows up on the agent's detail page.
 
 If one of these steps is faked, we say so in the video.
+
+
+
+- [Market research](research/latam-b2b-market.md)

@@ -1,0 +1,29 @@
+### Server-prepared payload that the session wallet signs unchanged and
+### returns to the matching `submit…` method (server relay, Decision A).
+class: PreparedTransaction
+fields:
+  ### Opaque id the client echoes back when submitting the signed XDR.
+  preparationId: String
+  ### One of registerFull, setAgentWallet, createJob, fund, complete, reject,
+  ### giveFeedback.
+  purpose: String
+  ### StellarAddress (StrKey) of the session wallet that must sign.
+  signer: String
+  ### Network passphrase the signature must cover.
+  networkPassphrase: String
+  ### Base64 unsigned TransactionEnvelope XDR, with the signer as source.
+  ### Set for every purpose except setAgentWallet.
+  unsignedTransactionXdr: String?
+  ### Base64 SorobanAuthorizationEntry XDR with ADDRESS_V2 credentials for
+  ### the signer. Set for setAgentWallet only.
+  authorizationEntryXdr: String?
+  ### Domain TransactionHash of the prepared envelope, when it is known at
+  ### preparation time (every purpose except setAgentWallet, whose final hash
+  ### also depends on the entry signature; the server fixes the rest of that
+  ### envelope at preparation).
+  transaction: String?
+  ### Server-set, non-zero expiration ledger of the authorization entry.
+  ### Set for setAgentWallet only.
+  signatureExpirationLedger: int?
+  ### After this instant the preparation can no longer be submitted.
+  expiresAt: DateTime

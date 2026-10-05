@@ -6,5 +6,7 @@ useDefault = true
 [[rules]]
 id = "stellar-secret-seed"
 description = "Stellar secret seed"
-regex = '''S[A-Z2-7]{55}'''
+# Word boundaries keep real seeds (standalone or after `=`, quotes, spaces)
+# while ignoring 56-char runs inside base64 XDR, such as zero-padded fixtures.
+regex = '''\bS[A-Z2-7]{55}\b'''
 keywords = ["S"]
