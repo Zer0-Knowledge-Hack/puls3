@@ -21,6 +21,7 @@ final class StoredSubmission {
     required this.sendAttempts,
     required this.createdAt,
     required this.updatedAt,
+    required this.lastCheckedAt,
   });
 
   final int id;
@@ -43,12 +44,18 @@ final class StoredSubmission {
 
   /// End of the envelope time bounds.
   final DateTime validUntil;
+
+  /// Last send of the envelope; paces resends, never the list order.
   final DateTime? lastSentAt;
   final int sendAttempts;
   final DateTime createdAt;
 
-  /// Last state change. Recording a send does not change it.
+  /// Last state change. Recording a send or a check does not change it.
   final DateTime updatedAt;
+
+  /// Last time the tracker looked at this record; [createdAt] until then.
+  /// Orders [ChainSubmissionStore.listSubmitted].
+  final DateTime lastCheckedAt;
 
   /// The client-visible model, with wire-name strings and no server-only
   /// fields.
@@ -106,10 +113,11 @@ abstract interface class ChainSubmissionStore {
   /// The record of [preparationId], or `null`.
   Future<StoredSubmission?> findByPreparation(String preparationId);
 
-  /// Up to [limit] `submitted` records: never-sent records first (oldest
-  /// `updatedAt` first), then the least recently sent. A record goes to the
-  /// back once its envelope is sent again, so more than [limit] stuck
-  /// records cannot starve the others. Ties break on `updatedAt`, then id.
+  /// Up to [limit] `submitted` records, least recently checked first
+  /// (`lastCheckedAt`, then id), read in one query. A record goes to the
+  /// back once [recordCheck] records a check, so more than [limit] records
+  /// that stay `submitted` cannot starve the others. Sends do not change
+  /// the order.
   ///
   /// A row that cannot be read (unknown purpose, or a server-only column
   /// missing) is not returned: it is logged and set to `failed` with
@@ -133,8 +141,15 @@ abstract interface class ChainSubmissionStore {
 
   /// Counts one more send of the envelope at [at] if the record is still
   /// `submitted`. Returns whether it changed: `false` for an unknown [id] or
-  /// a final record. It does not change the state or `updatedAt`.
+  /// a final record. It does not change the state, `updatedAt` or the
+  /// [listSubmitted] order.
   Future<bool> recordSend(int id, DateTime at);
+
+  /// Sets `lastCheckedAt` to [at] if the record is still `submitted`, which
+  /// moves it to the back of [listSubmitted]. Returns whether it changed:
+  /// `false` for an unknown [id] or a final record. It does not change the
+  /// state, `updatedAt` or the send fields.
+  Future<bool> recordCheck(int id, DateTime at);
 }
 
 /// Shared argument check of [ChainSubmissionStore.insertSubmitted].

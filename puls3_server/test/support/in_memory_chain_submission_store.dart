@@ -48,6 +48,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
       sendAttempts: 0,
       createdAt: now,
       updatedAt: now,
+      lastCheckedAt: now,
     );
     _rows[stored.id] = stored;
     return stored;
@@ -92,6 +93,14 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     return true;
   }
 
+  @override
+  Future<bool> recordCheck(int id, DateTime at) async {
+    final row = _rows[id];
+    if (row == null || row.state != SubmissionState.submitted) return false;
+    _rows[id] = _copy(row, lastCheckedAt: at.toUtc());
+    return true;
+  }
+
   bool _transition(int id, SubmissionState state, String? errorCode) {
     final row = _rows[id];
     if (row == null || row.state != SubmissionState.submitted) return false;
@@ -111,6 +120,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     DateTime? updatedAt,
     DateTime? lastSentAt,
     int? sendAttempts,
+    DateTime? lastCheckedAt,
   }) => StoredSubmission(
     id: row.id,
     preparationId: row.preparationId,
@@ -126,20 +136,13 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     sendAttempts: sendAttempts ?? row.sendAttempts,
     createdAt: row.createdAt,
     updatedAt: updatedAt ?? row.updatedAt,
+    lastCheckedAt: lastCheckedAt ?? row.lastCheckedAt,
   );
 }
 
-/// The order of [ChainSubmissionStore.listSubmitted]: never sent first, then
-/// least recently sent, then `updatedAt`, then id.
+/// The order of [ChainSubmissionStore.listSubmitted]: least recently
+/// checked first, then id.
 int _listOrder(StoredSubmission a, StoredSubmission b) {
-  final aSent = a.lastSentAt;
-  final bSent = b.lastSentAt;
-  if (aSent == null && bSent != null) return -1;
-  if (aSent != null && bSent == null) return 1;
-  if (aSent != null && bSent != null) {
-    final bySend = aSent.compareTo(bSent);
-    if (bySend != 0) return bySend;
-  }
-  final byUpdate = a.updatedAt.compareTo(b.updatedAt);
-  return byUpdate != 0 ? byUpdate : a.id.compareTo(b.id);
+  final byCheck = a.lastCheckedAt.compareTo(b.lastCheckedAt);
+  return byCheck != 0 ? byCheck : a.id.compareTo(b.id);
 }

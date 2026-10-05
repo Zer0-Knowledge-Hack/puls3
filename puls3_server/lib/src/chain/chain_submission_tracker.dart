@@ -80,8 +80,10 @@ final class TrackerPassSummary {
 /// the server clock.
 ///
 /// A record whose chain read or resend fails, or whose effect or store
-/// update throws, stays `submitted` and is retried on the next pass; the
-/// rest of the batch continues. Final states are only set through the
+/// update throws, stays `submitted` and is retried on a later pass; the
+/// rest of the batch continues. Every record a pass leaves `submitted`, for
+/// any reason, gets [ChainSubmissionStore.recordCheck], so it moves behind
+/// the records not yet looked at. Final states are only set through the
 /// store's conditional transitions, so concurrent trackers are safe.
 final class ChainSubmissionTracker {
   ChainSubmissionTracker({
@@ -116,8 +118,9 @@ final class ChainSubmissionTracker {
     final batch = await store.listSubmitted(limit: _batchLimit);
     summary.listed = batch.length;
     for (final submission in batch) {
+      var settled = false;
       try {
-        await _track(store, submission, summary);
+        settled = await _track(store, submission, summary);
       } on LedgerException catch (e) {
         summary.unavailable++;
         _log(
@@ -131,36 +134,65 @@ final class ChainSubmissionTracker {
           'Tracking submission ${submission.id} failed: $e',
         );
       }
+      if (!settled) await _recordCheck(store, submission, summary);
     }
     return summary;
   }
 
-  Future<void> _track(
+  /// Moves a record that stays `submitted` to the back of the store's list,
+  /// so records that never settle cannot starve the others. A failure is
+  /// counted and logged like any other per-record error.
+  Future<void> _recordCheck(
+    ChainSubmissionStore store,
+    StoredSubmission submission,
+    TrackerPassSummary summary,
+  ) async {
+    try {
+      await store.recordCheck(submission.id, _now().toUtc());
+    } catch (e) {
+      summary.errors++;
+      _log(
+        ChainLogLevel.error,
+        'Recording the check of submission ${submission.id} failed: $e',
+      );
+    }
+  }
+
+  /// Returns whether the record reached a final state, here or through a
+  /// concurrent tracker (the transitions are conditional).
+  Future<bool> _track(
     ChainSubmissionStore store,
     StoredSubmission submission,
     TrackerPassSummary summary,
   ) async {
     if (_untrackedPurposes.contains(submission.purpose)) {
       _untracked(submission, summary);
-      return;
+      return false;
     }
     final lookup = await _ledger.lookup(submission.transactionHash);
-    switch (lookup.status) {
-      case TransactionStatus.notFound:
-        await _notFound(store, submission, lookup, summary);
-      case TransactionStatus.failed:
-        await _fail(
-          store,
-          submission,
-          SubmissionOutcomeCode.transactionFailed,
-          summary,
-        );
-      case TransactionStatus.success:
-        await _succeeded(store, submission, lookup, summary);
-    }
+    return switch (lookup.status) {
+      TransactionStatus.notFound => _notFound(
+        store,
+        submission,
+        lookup,
+        summary,
+      ),
+      TransactionStatus.failed => _fail(
+        store,
+        submission,
+        SubmissionOutcomeCode.transactionFailed,
+        summary,
+      ),
+      TransactionStatus.success => _succeeded(
+        store,
+        submission,
+        lookup,
+        summary,
+      ),
+    };
   }
 
-  Future<void> _notFound(
+  Future<bool> _notFound(
     ChainSubmissionStore store,
     StoredSubmission submission,
     TransactionLookup lookup,
@@ -169,18 +201,17 @@ final class ChainSubmissionTracker {
     final now = _now().toUtc();
     final chainNow = lookup.latestLedgerCloseTime ?? now;
     if (chainNow.isAfter(submission.validUntil)) {
-      await _fail(
+      return _fail(
         store,
         submission,
         SubmissionOutcomeCode.preparationExpired,
         summary,
       );
-      return;
     }
     final lastSentAt = submission.lastSentAt;
     if (lastSentAt != null && now.difference(lastSentAt) < _resendAfter) {
       summary.waiting++;
-      return;
+      return false;
     }
     final SendTransactionResult result;
     try {
@@ -190,13 +221,12 @@ final class ChainSubmissionTracker {
         ChainLogLevel.warning,
         'The node rejected the envelope of submission ${submission.id}: $e',
       );
-      await _fail(
+      return _fail(
         store,
         submission,
         SubmissionOutcomeCode.submissionRejected,
         summary,
       );
-      return;
     }
     await store.recordSend(submission.id, now);
     summary.resent++;
@@ -208,9 +238,10 @@ final class ChainSubmissionTracker {
         'bounds pass',
       );
     }
+    return false;
   }
 
-  Future<void> _succeeded(
+  Future<bool> _succeeded(
     ChainSubmissionStore store,
     StoredSubmission submission,
     TransactionLookup lookup,
@@ -230,11 +261,11 @@ final class ChainSubmissionTracker {
             : await _effects.onFunded(submission, event);
       default:
         _untracked(submission, summary);
-        return;
+        return false;
     }
     switch (result) {
       case null:
-        await _fail(
+        return _fail(
           store,
           submission,
           SubmissionOutcomeCode.jobEvidenceUnavailable,
@@ -242,23 +273,27 @@ final class ChainSubmissionTracker {
         );
       case EffectOk():
         if (await store.markConfirmed(submission.id)) summary.confirmed++;
+        return true;
       case EffectFailed(:final code, :final field):
         _log(
           ChainLogLevel.warning,
           'The effect of submission ${submission.id} failed: $code'
           '${field == null ? '' : ' ($field)'}',
         );
-        await _fail(store, submission, code, summary);
+        return _fail(store, submission, code, summary);
     }
   }
 
-  Future<void> _fail(
+  /// Always settles the record: `markFailed` either sets `failed` or finds
+  /// it already final.
+  Future<bool> _fail(
     ChainSubmissionStore store,
     StoredSubmission submission,
     String code,
     TrackerPassSummary summary,
   ) async {
     if (await store.markFailed(submission.id, code)) summary.failed++;
+    return true;
   }
 
   void _untracked(StoredSubmission submission, TrackerPassSummary summary) {

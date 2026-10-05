@@ -129,6 +129,12 @@ class Protocol extends _i1.SerializationManagerServer {
           isNullable: true,
           dartType: 'DateTime?',
         ),
+        _i2.ColumnDefinition(
+          name: 'lastCheckedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
@@ -181,7 +187,11 @@ class Protocol extends _i1.SerializationManagerServer {
             ),
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
-              definition: 'updatedAt',
+              definition: 'lastCheckedAt',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
             ),
           ],
           type: 'btree',

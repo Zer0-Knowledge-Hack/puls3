@@ -48,12 +48,15 @@ TransactionLookup _success({
 );
 
 /// Delegates to an in-memory store but throws from the transitions while
-/// [failTransitions] is set.
+/// [failTransitions] is set, and from [recordCheck] while [failChecks] is
+/// set. Records the ids [recordCheck] was called with.
 final class _FlakyStore implements ChainSubmissionStore {
-  _FlakyStore(this._inner);
+  _FlakyStore(this._inner, {this.failTransitions = true});
 
   final ChainSubmissionStore _inner;
-  bool failTransitions = true;
+  bool failTransitions;
+  bool failChecks = false;
+  final checked = <int>[];
 
   @override
   Future<StoredSubmission> insertSubmitted({
@@ -93,6 +96,14 @@ final class _FlakyStore implements ChainSubmissionStore {
 
   @override
   Future<bool> recordSend(int id, DateTime at) => _inner.recordSend(id, at);
+
+  @override
+  Future<bool> recordCheck(int id, DateTime at) {
+    checked.add(id);
+    return failChecks
+        ? throw StateError('db down')
+        : _inner.recordCheck(id, at);
+  }
 }
 
 void main() {
@@ -466,6 +477,101 @@ void main() {
 
     expect(first.errors, 1);
     await expectState(s, SubmissionState.confirmed);
+  });
+
+  group('recordCheck', () {
+    test('is called for every record left submitted, at the pass '
+        'time', () async {
+      final flaky = _FlakyStore(store, failTransitions: false);
+      final untracked = await submit(SubmissionPurpose.release);
+      final successDefault = await submit(SubmissionPurpose.complete);
+      final resent = await submit(SubmissionPurpose.fund);
+      final waiting = await submit(SubmissionPurpose.fund);
+      await flaky.recordSend(waiting.id, now);
+      final unavailable = await submit(SubmissionPurpose.fund);
+      final throwing = await submit(SubmissionPurpose.createJob);
+      ledger.lookups[successDefault.transactionHash] = _success();
+      ledger.lookups[unavailable.transactionHash] = const LedgerUnavailable(
+        'down',
+      );
+      ledger.lookups[throwing.transactionHash] = _success(
+        jobCreated: _jobCreated,
+      );
+      effects.error = StateError('hire table locked');
+      now = now.add(const Duration(seconds: 1));
+
+      await tracker.pass(flaky);
+
+      expect(flaky.checked, [
+        untracked.id,
+        successDefault.id,
+        resent.id,
+        waiting.id,
+        unavailable.id,
+        throwing.id,
+      ]);
+      for (final s in [
+        untracked,
+        successDefault,
+        resent,
+        waiting,
+        unavailable,
+        throwing,
+      ]) {
+        expect((await reload(s)).lastCheckedAt, now);
+      }
+    });
+
+    test('is not called for records that reached a final state', () async {
+      final flaky = _FlakyStore(store, failTransitions: false);
+      final confirmed = await submit(SubmissionPurpose.fund);
+      final failed = await submit(SubmissionPurpose.fund);
+      final expired = await submit(
+        SubmissionPurpose.fund,
+        validUntil: _start.subtract(const Duration(seconds: 1)),
+      );
+      ledger.lookups[confirmed.transactionHash] = _success(
+        jobFunded: _jobFunded,
+      );
+      ledger.lookups[failed.transactionHash] = TransactionLookup(
+        status: TransactionStatus.failed,
+        latestLedgerCloseTime: _start,
+      );
+
+      final summary = await tracker.pass(flaky);
+
+      expect(summary.confirmed, 1);
+      expect(summary.failed, 2);
+      expect(flaky.checked, isEmpty);
+      await expectState(
+        expired,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.preparationExpired,
+      );
+    });
+
+    test('a recordCheck that throws is counted and the pass goes on', () async {
+      final flaky = _FlakyStore(store, failTransitions: false)
+        ..failChecks = true;
+      final first = await submit(SubmissionPurpose.release);
+      final second = await submit(SubmissionPurpose.fund);
+      ledger.lookups[second.transactionHash] = _success(jobFunded: _jobFunded);
+      final third = await submit(SubmissionPurpose.complete);
+      ledger.lookups[third.transactionHash] = _success();
+
+      final summary = await tracker.pass(flaky);
+
+      expect(summary.listed, 3);
+      expect(summary.errors, 2);
+      expect(summary.confirmed, 1);
+      expect(flaky.checked, [first.id, third.id]);
+      expect(
+        logged,
+        contains(
+          allOf(startsWith('error'), contains('submission ${third.id}')),
+        ),
+      );
+    });
   });
 
   test('a pass handles at most batchLimit records', () async {

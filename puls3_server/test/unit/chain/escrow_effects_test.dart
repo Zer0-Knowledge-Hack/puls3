@@ -24,6 +24,7 @@ StoredSubmission _submission(SubmissionPurpose purpose) => StoredSubmission(
   sendAttempts: 0,
   createdAt: _at,
   updatedAt: _at,
+  lastCheckedAt: _at,
 );
 
 void main() {

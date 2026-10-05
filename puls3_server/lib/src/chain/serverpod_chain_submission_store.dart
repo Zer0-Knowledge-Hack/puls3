@@ -50,6 +50,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
           validUntil: validUntil.toUtc(),
           sendAttempts: 0,
           createdAt: now,
+          lastCheckedAt: now,
         ),
       );
       return _stored(row);
@@ -74,32 +75,17 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) async {
     checkListLimit(limit);
-    // Serverpod cannot order NULLS FIRST, so never-sent rows are a first
-    // query and sent rows fill the rest of the batch.
-    final neverSent = await ChainSubmission.db.find(
+    // One query on chain_submission_state_idx, so a batch never repeats a
+    // row. The migration backfills lastCheckedAt from createdAt and inserts
+    // always set it, so no submitted row sorts as NULL.
+    final rows = await ChainSubmission.db.find(
       _session,
-      where: (t) =>
-          t.state.equals(SubmissionState.submitted.wireName) &
-          t.lastSentAt.equals(null),
-      orderByList: (t) => [Order(column: t.updatedAt), Order(column: t.id)],
+      where: (t) => t.state.equals(SubmissionState.submitted.wireName),
+      orderByList: (t) => [Order(column: t.lastCheckedAt), Order(column: t.id)],
       limit: limit,
     );
-    final sent = neverSent.length >= limit
-        ? const <ChainSubmission>[]
-        : await ChainSubmission.db.find(
-            _session,
-            where: (t) =>
-                t.state.equals(SubmissionState.submitted.wireName) &
-                t.lastSentAt.notEquals(null),
-            orderByList: (t) => [
-              Order(column: t.lastSentAt),
-              Order(column: t.updatedAt),
-              Order(column: t.id),
-            ],
-            limit: limit - neverSent.length,
-          );
     final listed = <StoredSubmission>[];
-    for (final row in [...neverSent, ...sent]) {
+    for (final row in rows) {
       final stored = _tryStored(row);
       if (stored != null) {
         listed.add(stored);
@@ -143,6 +129,17 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
         );
         return true;
       });
+
+  @override
+  Future<bool> recordCheck(int id, DateTime at) async {
+    final updated = await ChainSubmission.db.updateWhere(
+      _session,
+      columnValues: (t) => [t.lastCheckedAt(at.toUtc())],
+      where: (t) =>
+          t.id.equals(id) & t.state.equals(SubmissionState.submitted.wireName),
+    );
+    return updated.isNotEmpty;
+  }
 
   /// One conditional `UPDATE … WHERE state = 'submitted'`, so a final state
   /// is never overwritten.
@@ -216,6 +213,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       sendAttempts: row.sendAttempts ?? 0,
       createdAt: createdAt,
       updatedAt: row.updatedAt,
+      lastCheckedAt: row.lastCheckedAt ?? createdAt,
     );
   }
 }

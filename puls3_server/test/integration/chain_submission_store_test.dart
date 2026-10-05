@@ -1,3 +1,4 @@
+import 'package:puls3_server/src/chain/chain_submission_store.dart';
 import 'package:puls3_server/src/chain/serverpod_chain_submission_store.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
@@ -60,7 +61,72 @@ void main() {
       }
       expect((await store.listSubmitted()).map((s) => s.id), [valid.id]);
     });
+
+    test('listSubmitted reads a row without lastCheckedAt as checked at '
+        'its creation', () async {
+      final session = sessionBuilder.build();
+      final store = ServerpodChainSubmissionStore(session, now: () => _at);
+      await ChainSubmission.db.insertRow(session, _row('e' * 64));
+
+      final listed = await store.listSubmitted();
+
+      expect(listed.single.lastCheckedAt, _at);
+    });
   });
+
+  // Concurrent calls need real transactions, so this group commits and
+  // deletes its own rows.
+  withServerpod(
+    'Given records sent while a batch is listed',
+    (sessionBuilder, _) {
+      final hashes = [for (var i = 0; i < 20; i++) '$i'.padLeft(64, 'f')];
+
+      tearDown(() async {
+        await ChainSubmission.db.deleteWhere(
+          sessionBuilder.build(),
+          where: (t) => t.transaction.inSet(hashes.toSet()),
+        );
+      });
+
+      test('a record appears at most once in one batch (REL-002)', () async {
+        final store = ServerpodChainSubmissionStore(
+          sessionBuilder.build(),
+          now: () => _at,
+        );
+        final other = ServerpodChainSubmissionStore(
+          sessionBuilder.build(),
+          now: () => _at,
+        );
+        final stored = [
+          for (final hash in hashes)
+            await store.insertSubmitted(
+              purpose: SubmissionPurpose.fund,
+              transactionHash: hash,
+              signedEnvelopeXdr: 'AAAAAgAAAAA=',
+              validUntil: _at.add(const Duration(minutes: 5)),
+              preparationId: 'prep-$hash',
+            ),
+        ];
+        for (final s in stored.take(10)) {
+          await store.recordSend(s.id, _at);
+        }
+
+        for (var round = 0; round < 5; round++) {
+          final results = await Future.wait([
+            store.listSubmitted(limit: hashes.length),
+            for (final s in stored)
+              other.recordSend(s.id, _at.add(Duration(seconds: round + 1))),
+          ]);
+          final ids = (results.first as List<StoredSubmission>)
+              .map((s) => s.id)
+              .where(stored.map((s) => s.id).toSet().contains)
+              .toList();
+          expect(ids.toSet(), hasLength(ids.length));
+        }
+      });
+    },
+    rollbackDatabase: RollbackDatabase.disabled,
+  );
 
   // Concurrent calls need real transactions, so this group commits and
   // deletes its own row.
