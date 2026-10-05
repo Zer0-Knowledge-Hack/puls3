@@ -1,0 +1,35 @@
+### Stable, safe error transported by every puls3 Serverpod endpoint.
+#
+# Code catalog (docs/architecture/api.md, "Typed error transport").
+# The same values are used for ChainSubmission.errorCode.
+#
+# Session and shared: WalletMismatch, InternalError
+# Authentication: InvalidStellarAddress, ChallengeRateLimited,
+#   ChallengeNotFound, ChallengeExpired, ChallengeConsumed,
+#   InvalidWalletSignature, AuthenticationUnavailable
+# Configuration and catalog: ConfigurationUnavailable, CatalogUnavailable,
+#   InvalidAgentId, AgentNotFound, ChainDataUnavailable
+# Studio and deploy: InvalidManifest, DraftNotFound, DraftNotOwned,
+#   DraftVersionConflict, InputTooLong, TestQuotaExceeded, RuntimeUnavailable,
+#   AgentExecutionFailed, AgentWalletCreationFailed, AgentWalletUnavailable,
+#   RegistrationNotConfirmed, RegistrationUriConflict,
+#   InvalidAuthorizationEntry, AuthorizationExpired, PublicationFailed
+# Relay and chain: PreparationNotFound, PreparationExpired,
+#   InvalidSignedEnvelope, EnvelopeMismatch, InvalidTransactionSignature,
+#   SubmissionRejected, SubmissionInProgress, TransactionFailed,
+#   ChainUnavailable
+# Hire and escrow: InvalidHireId, HireNotFound, HireNotOwned, AgentInactive,
+#   InvalidHire, InvalidHireTransition, IdempotencyKeyReused,
+#   PersistenceUnavailable, PaymentAlreadySubmitted, InvalidRejectReason,
+#   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed
+# Feedback: HireNotCompleted, HireAlreadyRated, InvalidFeedback
+exception: Puls3ApiException
+fields:
+  ### Machine-readable code from the catalog above.
+  code: String
+  ### Optional display-safe message. Clients branch on code, not this text.
+  message: String?
+  ### Optional display-safe structured context, such as field, reason, status,
+  ### retryAfterSeconds or expectedNetwork. Never secrets, signed payloads,
+  ### raw provider errors or traces.
+  details: Map<String, String>?

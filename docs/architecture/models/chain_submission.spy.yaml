@@ -1,0 +1,22 @@
+### Durable server-side record of one relay or server-signed submission.
+### Polled through the resource that owns it (Decision B); a later stream
+### emits the same shape.
+class: ChainSubmission
+fields:
+  ### The PreparedTransaction this submission came from. Null for
+  ### server-signed purposes (submit, release, claimRefund).
+  preparationId: String?
+  ### One of registerFull, setAgentWallet, createJob, fund, complete, reject,
+  ### giveFeedback (wallet-signed), or submit, release, claimRefund
+  ### (server-signed).
+  purpose: String
+  ### Domain TransactionHash of the one envelope this record ever sends,
+  ### persisted before it is submitted.
+  transaction: String
+  ### One of submitted, confirmed, failed.
+  state: String
+  ### Puls3ApiException code when state is failed, for example JobMismatch.
+  ### Chain outcomes are reported here, never thrown by submit methods.
+  errorCode: String?
+  explorerUrl: String?
+  updatedAt: DateTime
