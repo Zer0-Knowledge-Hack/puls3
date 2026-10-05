@@ -2,7 +2,7 @@
 
 - **Issue:** #8 · **Status:** Draft contract · **Sources:** [MVP flows](../blueprints/flows.md), [domain model](../domain/model.md), [hire lifecycle](../domain/hire-lifecycle.md), [ADR-0001](../adr/0001-system-architecture.md), [ADR-0002](../adr/0002-agent-registry-on-soroban.md), [ADR-0003](../adr/0003-payment-rail-and-custody.md), [ADR-0004](../adr/0004-agent-manifest-and-deployment.md), [ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) (#71), Flutter–Stellar wallet spike (#68, `docs/spikes/flutter-stellar-wallet.md`, section "Recommended changes for #8 and ADR-0003")
 
-> **Aligned with ADR-0005 (2026-10-02).** A hire is an ERC-8183 escrow job. Changed: contract rule 3, the scalar mapping, the hire rows of the endpoint table, the lifecycle error rule, asynchronous outcome codes, server-signed escrow calls (new), [hire escrow states](#hire-escrow-states) (was "Hire payment states"), [funding verification](#funding-verification) (was "Payment verification mapping"), feedback (the `authorize_feedback` flow is removed, D5), response shapes, the polling contract, F5–F7 traceability, and the open questions. Decisions A and B and the relay rules are unchanged. Expiry, runtime-timeout and approval-window values are deferred (ADR-0005 D3) and come from server configuration.
+> **Aligned with ADR-0005 (2026-10-02).** A hire is an ERC-8183 escrow job. Changed: contract rule 3, the scalar mapping, the hire rows of the endpoint table, the lifecycle error rule, asynchronous outcome codes, server-signed escrow calls (new), [hire escrow states](#hire-escrow-states) (was "Hire payment states"), [funding verification](#funding-verification) (was "Payment verification mapping"), feedback (the `authorize_feedback` flow is removed, D5), response shapes, the polling contract, F5–F7 traceability, and the open questions. Decisions A and B and the relay rules are unchanged. Expiry, runtime-timeout and approval-window values are deferred (ADR-0005 D3) and come from server configuration. Aligned with the escrow on main (#78, #94): no `setBudget`, approval window and `release`, `is_expired`, `fund` parameters.
 
 This is the boundary between the Flutter app and Serverpod for the MVP. The app connects wallets and asks the user to sign what the server prepared. The server owns persistence, transaction preparation, relay submission, chain reads, escrow job verification, deploy orchestration, and agent execution. Endpoint implementations remain in issues #17–#21 and #35.
 
@@ -10,7 +10,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 1. IDs and USDC amounts cross the wire as `int`; USDC values are always stroops, never `double`.
 2. Stellar addresses and transaction hashes cross as validated `String` values. XDR crosses as base64 `String`.
-3. The server never signs on behalf of a user. It signs only with keys it custodies (agent accounts, ADR-0003 as amended by ADR-0005) and submits permissionless calls such as `claim_refund`.
+3. The server never signs on behalf of a user. It signs only with keys it custodies (agent accounts, ADR-0003 as amended by ADR-0005) and submits permissionless calls such as `claim_refund` and `release`.
 4. **Server relay (Decision A).** Every user-signed transaction or authorization entry is prepared by the server, signed unchanged by the wallet, and returned to a Serverpod `submit…` method. The app never builds or submits a Stellar transaction itself.
 5. **Idempotency.** A retry uses the same resource id (`draftId`, `hireId`), the same `requestId` for `createHire`, and, for submissions, the same `preparationId` and signed XDR. Mutating methods return the current resource for a repeated input instead of applying it twice.
 6. **Chain outcomes are data, not errors.** Chain work in progress and its final result are reported through response fields (`ChainSubmission.state` and `errorCode`, `DeploySession.state` and `failureCode`). Exceptions are reserved for requests the server rejects before taking ownership of chain work.
@@ -63,7 +63,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 **Lifecycle error rule.** Hire methods report a wrong hire state with one code per family, so clients can branch on it:
 
-- Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` and `prepareFund` need `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted`.
+- Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` and `prepareFund` need `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted` before `approvalDeadline`.
 - Feedback methods raise `HireNotCompleted` when the hire is not `completed`, and `HireAlreadyRated` when the hire already has a `feedbackReference`. `HireAlreadyRated` is the only "already rated" code, synchronous or asynchronous.
 
 ### Asynchronous outcome codes
@@ -76,7 +76,7 @@ Once a `submit…` call has accepted a submission, every later outcome is data: 
 | `setAgentWallet` | `StudioEndpoint.getDeploySession` (`DeploySession.walletAuthorization`) | `TransactionFailed`, `SubmissionRejected`, `AuthorizationExpired` |
 | `createJob`, `complete`, `reject` | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `TransactionFailed`, `SubmissionRejected`, `PreparationExpired` |
 | `fund` | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `TransactionFailed`, `JobMismatch`, `JobEvidenceUnavailable`, `SubmissionRejected`, `PreparationExpired` |
-| `setBudget`, `submit`, `claimRefund` (server-signed) | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `EscrowCallFailed` |
+| `submit`, `release`, `claimRefund` (server-signed) | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `EscrowCallFailed` |
 | `giveFeedback` | `HireEndpoint.getHire` (`HireDetail.feedbackSubmission`) | `TransactionFailed`, `HireAlreadyRated`, `SubmissionRejected`, `PreparationExpired` |
 
 A superseded preparation is rejected synchronously by the `submit…` call as `PreparationExpired` (`details.reason: superseded`). It never becomes an asynchronous outcome, because a new preparation cannot be issued while a submission is `submitted`.
@@ -117,13 +117,13 @@ The server submits three escrow calls itself, tracked like relay submissions on 
 
 | Purpose | Signer | Trigger |
 |---|---|---|
-| `setBudget` | Agent account (provider), custodied key | Right after `create_job` is confirmed; sets the budget to `Hire.price` |
 | `submit` | Agent account (provider), custodied key | When the runtime delivers; carries the hash of the result |
+| `release` | Relay account (permissionless) | When a `submitted` job passes `approval_deadline` without an evaluation; the hire becomes `completed` |
 | `claimRefund` | Relay account (permissionless) | When a `funded` job passes `expired_at` (runtime-failure fallback, ADR-0005 D1) |
 
 A failed attempt is retried automatically with a bounded number of attempts; the exposed record is the current attempt. When the attempts are exhausted, the record is `failed` with `errorCode = EscrowCallFailed`. These calls are never triggered by a read.
 
-**Approval invariant (ADR-0005 D4).** The escrow guarantees that a `submitted` job is auto-approved before it can expire, so `claim_refund` only refunds jobs the agent never submitted. Until the auto-approval window ships (by HackMeridian), the Stellar Elite contract enforces this another way (#55). `HireDetail.approvalDeadline` exposes the window's end for the later countdown; it is null until the window ships, and its length is deferred (D3).
+**Approval invariant (ADR-0005 D4).** The escrow guarantees that a `submitted` job is auto-approved before it can expire, so `claim_refund` only refunds jobs the agent never submitted. `submit` sets the job's `approval_deadline` (submission time plus the approval window) and fails unless it ends before `expired_at`. Once it passes, `reject` is refused and anyone can call `release` to pay the provider; `claim_refund` never applies to `Submitted`. `HireDetail.approvalDeadline` exposes the deadline for the countdown; the window length is deferred (D3).
 
 ### Deploy session
 
@@ -152,7 +152,7 @@ A failed attempt is retried automatically with a bounded number of attempts; the
 
 ### Hire escrow states
 
-**Two client signatures.** `create_job` and `fund` are separate ERC-8183 calls, and a Soroban transaction carries one contract invocation, so the consumer signs twice: `create_job`, then `fund`. Between them the server's `setBudget` sets the budget to the agent's price. A combined call would be a non-standard addition (ADR-0005 D1 conformance rule), and two calls keep the on-chain `Open` state that a pre-payment cancel rejects from (D6). The server sets `expired_at` from configuration when it prepares `create_job` (value deferred, D3).
+**Two client signatures.** `create_job` and `fund` are separate ERC-8183 calls, and a Soroban transaction carries one contract invocation, so the consumer signs twice: `create_job`, then `fund`, with no server step between them. `create_job` already carries the token (USDC SAC) and the budget (`Hire.price`). A combined call would be a non-standard addition (ADR-0005 D1 conformance rule), and two calls keep the on-chain `Open` state that a pre-payment cancel rejects from (D6). The server sets `expired_at` from configuration when it prepares `create_job` (value deferred, D3).
 
 Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escrowSubmission` (the hire's latest escrow submission, any purpose):
 
@@ -160,22 +160,21 @@ Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escro
 |---|---|---|---|
 | none (`null`) | none, or `createJob` `failed` | No job on chain yet: only a pending preparation | `prepareCreateJob`, `submitEscrowCall`. Cancel = abandon the preparation; no transaction |
 | none (`null`) | `createJob` `submitted` | Job being created | Poll `getHire` |
-| `open` | `createJob` `confirmed`, `setBudget` `submitted` | Job created; being priced | Poll `getHire` |
-| `open` | `setBudget` `confirmed`, or `fund` `failed` with `SubmissionRejected`, `PreparationExpired` or `TransactionFailed` | Job priced; unfunded | `prepareFund`, `prepareReject` (cancel), `submitEscrowCall` |
+| `open` | `createJob` `confirmed`, or `fund` `failed` with `SubmissionRejected`, `PreparationExpired` or `TransactionFailed` | Job created and priced; unfunded | `prepareFund`, `prepareReject` (cancel), `submitEscrowCall` |
 | `open` | `fund` `submitted` | Funding in flight | Poll `getHire`. `prepare…` methods raise `SubmissionInProgress` |
 | `open` | `fund` `failed` with `JobMismatch` or `JobEvidenceUnavailable` | The transaction succeeded but the job does not match this hire; funds stay in the escrow | None. `prepareFund` raises `PaymentAlreadySubmitted`. Refund through `claim_refund` after `expired_at` |
 | `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`) | Poll `getHire` |
 | `funded` | — | `runtimeStatus` is `failed` | `prepareReject` (one-step reject and refund). Fallback: the tracker calls `claim_refund` after `expired_at` |
-| `submitted` | `submit` `confirmed` | Delivered; awaiting the client's evaluation; `result` is set | `prepareComplete`, `prepareReject` |
+| `submitted` | `submit` `confirmed` | Delivered; awaiting the client's evaluation; `result` and `approvalDeadline` are set | Before `approvalDeadline`: `prepareComplete`, `prepareReject`. After it: `prepareComplete` until the tracker's `release` lands; poll `getHire` |
 | `expired` (derived) | — | Unfunded job past `expired_at`: on chain it stays `Open`, but `fund` reverts and there is nothing to refund | None. No transaction |
 | `completed`, `rejected`, `expired` | final | Terminal. `rejected` carries `rejectedFrom`; the app labels a reject from `open` as "Cancelled" | Feedback, when `completed` |
 
-**Rejection.** `prepareReject` is the client's ERC-8183 `reject` as evaluator, signed and relayed like any client call. From `open` it is the pre-payment cancel; from `funded` it refunds a failed run; from `submitted` it refunds delivered work, and only these rejects count toward client-side reputation (D8). A reject is final: there are no disputes in the MVP (D8). Preparing a reject supersedes any outstanding `createJob` or `fund` preparation.
+**Rejection.** `prepareReject` is the client's ERC-8183 `reject` as evaluator, signed and relayed like any client call. From `open` it is the pre-payment cancel; from `funded` it refunds a failed run; from `submitted`, only before `approvalDeadline`, it refunds delivered work, and only these rejects count toward client-side reputation (D8). A reject is final: there are no disputes in the MVP (D8). Preparing a reject supersedes any outstanding `createJob` or `fund` preparation.
 
 **Before and after the open window** (product owner, 2026-10-02):
 
 - **No job, no state.** A hire has a status only once `create_job` is confirmed; until then `status` is `null` and the record is a pending preparation. Cancelling it means abandoning the preparation: no on-chain `reject`, no new state.
-- **Unfunded expiry is derived.** An `open` hire past `expired_at` is reported as `expired` with no transaction: ERC-8183 `fund` reverts after expiry and `claim_refund` applies only to `Funded`/`Submitted`, so the job stays `Open` on chain with no funds held. This is the one derived exception to the 1:1 mirror (ADR-0005 D6). The escrow (#55) should expose an `is_expired(job_id)` view so indexers reach the same result.
+- **Unfunded expiry is derived.** An `open` hire past `expired_at` is reported as `expired` with no transaction: ERC-8183 `fund` reverts after expiry and `claim_refund` applies only to `Funded`, so the job stays `Open` on chain with no funds held. This is the one derived exception to the 1:1 mirror (ADR-0005 D6). The escrow's `is_expired(job_id)` view reports the same result, and the server uses it.
 
 **Residual risk.** A signed `fund` envelope that the user broadcasts outside the relay before its time bounds pass can still land after a supersession or reject. The funds are then held by the escrow and return through `claim_refund` after `expired_at`; only funds sent outside the escrow fall under open question P1.
 
@@ -224,15 +223,15 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 
 ### Funding verification
 
-The escrow contract enforces the asset (USDC SAC) and the amount (`fund`'s expected budget), so the tracker no longer checks a SAC transfer to the agent's muxed address. After a `fund` transaction is final it reads the job from the configured escrow contract:
+The escrow contract enforces an allow-listed token and the amount (`fund`'s `expected_budget`), so the tracker no longer checks a SAC transfer to the agent's muxed address. After a `fund` transaction is final it reads the job from the configured escrow contract:
 
 | Evidence | Check | Outcome code on failure |
 |---|---|---|
 | `getTransaction` status | `SUCCESS` | `TransactionFailed` |
 | Job state and funding event | Readable for the hire's job id | `JobEvidenceUnavailable` |
-| Job fields | State `Funded`; client and evaluator = `Hire.consumer`; provider = agent wallet; budget = `Hire.price`; `expired_at` as prepared; job id bound to no other hire | `JobMismatch` (`details.field`) |
+| Job fields | State `Funded`; client and evaluator = `Hire.consumer` (the escrow will reject evaluator = provider once #95 lands); provider = agent wallet; token = USDC SAC; budget = `Hire.price`; `expired_at` as prepared; job id bound to no other hire | `JobMismatch` (`details.field`) |
 
-`JobEvidenceUnavailable` is terminal, not the transient `ChainUnavailable`. Only after every check passes does the server build the domain `Payment` (the `fund` transaction, `payer` = consumer, `payee` = agent wallet, `amount` = budget) and call `Hire.fund`. The platform fee (ADR-0005 D7) is charged by the contract only on `complete`; its value is exposed as `NetworkConfig.platformFeeBps` and is `0` in the MVP.
+`JobEvidenceUnavailable` is terminal, not the transient `ChainUnavailable`. Only after every check passes does the server build the domain `Payment` (the `fund` transaction, `payer` = consumer, `payee` = agent wallet, `amount` = budget) and call `Hire.fund`. The platform fee (ADR-0005 D7) is snapshotted at `fund` (capped by the contract at `MAX_FEE_BPS` = 1000) and charged by the contract only on settlement (`complete` or `release`), never on a refund; its value is exposed as `NetworkConfig.platformFeeBps` and is `0` in the MVP.
 
 ### Feedback
 
@@ -262,10 +261,10 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `DeployResult` | `agent: Agent`, `registrationUri`, `explorerUrl` |
 | `CreateHireResult` | `hire: Hire`, `preparedCreateJob: PreparedTransaction?` |
 | `HireSummary` | `hire: Hire`, `agentName` |
-| `HireDetail` | `hire: Hire`, `agent: Agent`, `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (null until the auto-approval window ships), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
+| `HireDetail` | `hire: Hire`, `agent: Agent`, `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
 | `FeedbackEligibility` | `hireId`, `eligible: bool` |
 
-`PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `setBudget`, `submit`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
+`PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
 
 **`createHire` idempotency.** `requestId` is a client-generated UUID, created once per **Confirm and pay** action and reused on every retry of it. The server keeps it unique per session wallet for the life of the hire:
 
@@ -282,7 +281,7 @@ Any exception raised by a polled method stops polling; the client handles its co
 | What is tracked | Poll | Keep polling while | Stop when |
 |---|---|---|---|
 | Deploy (F4-6 to F4-8) | `StudioEndpoint.getDeploySession(draftId)` | `state` is `registrationSubmitted`, `walletAuthorizationSubmitted`, or `publishing` | `state` is `awaitingRegistrationSignature` or `awaitingWalletAuthorization` (user action needed), `active`, or `failed` |
-| Escrow call (F5-4 to F5-6, evaluation, refund) | `HireEndpoint.getHire(hireId, consumer)` | `escrowSubmission.state` is `submitted`, or `createJob` is `confirmed` and `setBudget` has not started | `escrowSubmission.state` is `confirmed` with no server call pending, or `failed` |
+| Escrow call (F5-4 to F5-6, evaluation, refund) | `HireEndpoint.getHire(hireId, consumer)` | `escrowSubmission.state` is `submitted` | `escrowSubmission.state` is `confirmed` with no server call pending, or `failed` |
 | Hire progress (F6-3) | `HireEndpoint.getHire(hireId, consumer)` | `hire.status` is `funded` and `runtimeStatus` is `queued` or `running` | `hire.status` is `submitted`, `completed`, `rejected`, or `expired`; or `runtimeStatus` is `failed` (offer reject and refund) |
 | Feedback confirmation (F7-5) | `HireEndpoint.getHire(hireId, consumer)` | `feedbackSubmission.state` is `submitted` | `feedbackSubmission.state` is `confirmed` or `failed` |
 
@@ -342,8 +341,8 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 |---|---|
 | F5-1 | Client-only input validation using the limit returned by `CatalogEndpoint.getAgent`. |
 | F5-2 | Client-only wallet balance and trustline check using network configuration; run F1 if disconnected. |
-| F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)` creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, and a server-set `expired_at`. **Retry** reuses the same `requestId`. |
-| F5-4 | Two signatures. The wallet signs `preparedCreateJob`; `submitEscrowCall` relays it. After `create_job` and the server's `setBudget` are confirmed, `prepareFund(hireId)` returns the `fund` envelope; the wallet signs it and `submitEscrowCall` relays it. `WalletRejected` is client-only: the hire stays `open`. After `PreparationExpired` or `SubmissionRejected`, call the same `prepare…` method and sign again. |
+| F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)` creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, a server-set `expired_at`, the USDC SAC as token, and `Hire.price` as budget. **Retry** reuses the same `requestId`. |
+| F5-4 | Two signatures. The wallet signs `preparedCreateJob`; `submitEscrowCall` relays it. Once `create_job` is confirmed, `prepareFund(hireId)` returns the `fund` envelope, with `expected_budget` = `Hire.price` and `max_fee_bps` = `NetworkConfig.platformFeeBps`; the wallet signs it and `submitEscrowCall` relays it. `WalletRejected` is client-only: the hire stays `open`. After `PreparationExpired` or `SubmissionRejected`, call the same `prepare…` method and sign again. |
 | F5-5 | Poll `HireEndpoint.getHire`; `escrowSubmission` (`fund`, `submitted`) shows **Verifying payment…**. `JobMismatch` or `JobEvidenceUnavailable` shows "Payment does not match this hire" with the transaction link; the funds stay in the escrow and return after `expired_at`. |
 | F5-6 | `hire.status: funded`; `paymentExplorerUrl` links the `fund` transaction. The server starts the agent run (`runtimeStatus: queued`). |
 
@@ -354,7 +353,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | F6-1 | Client-only: navigate to `/hires/:id`. |
 | F6-2 | `HireEndpoint.getHire(hireId, consumer)`. |
 | F6-3 | Poll `HireEndpoint.getHire` (Decision B) under the hire-progress stop rule; `runtimeStatus` shows progress. On delivery the server signs `submit` with the agent key and the hire becomes `submitted`. If `runtimeStatus` is `failed`, offer **Reject and refund** (`prepareReject` from `funded`); otherwise the tracker calls `claim_refund` after `expired_at`. |
-| F6-4 | `HireEndpoint.getHire`; result scrolling and copy are client-only. The client approves with `prepareComplete` or rejects with `prepareReject(hireId, reason)`, each signed and relayed through `submitEscrowCall`. |
+| F6-4 | `HireEndpoint.getHire`; result scrolling and copy are client-only. The client approves with `prepareComplete` or rejects with `prepareReject(hireId, reason)`, each signed and relayed through `submitEscrowCall`. Reject is available only before `approvalDeadline`; after it the tracker calls `release`. |
 | F6-5 | `HireEndpoint.listHires(consumer)`; run F1 first when disconnected. |
 
 ### F7 — Rate an agent
@@ -426,7 +425,6 @@ Both decisions were made by the product owner on 2026-09-30. They resolve the tw
 | Item | Owner | Why it matters here |
 |---|---|---|
 | Escrow interface: function signatures, job id type, events, a job read method, how auto-approval and the D4 invariant are enforced | #55 | Preparation, funding verification, and `approvalDeadline` depend on it |
-| `set_budget` signed by the provider (agent key) between `create_job` and `fund` | #55 | ERC-8183 allows client or provider; this contract assumes the provider, so the consumer signs twice, not three times |
 | RPC providers other than SDF Testnet returning contract events and state | #30 | Funding verification reads the job and its event |
 | Server-side submission with `stellar_dart` | #18, #19 | Relay implementation path; the fallback is a TypeScript sidecar. |
 | Wallet challenge signing (`signMessage`) for F1-3 | #25 | Session establishment is not yet proven with Freighter. |

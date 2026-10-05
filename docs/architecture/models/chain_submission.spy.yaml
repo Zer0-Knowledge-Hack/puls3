@@ -4,10 +4,10 @@
 class: ChainSubmission
 fields:
   ### The PreparedTransaction this submission came from. Null for
-  ### server-signed purposes (setBudget, submit, claimRefund).
+  ### server-signed purposes (submit, release, claimRefund).
   preparationId: String?
   ### One of registerFull, setAgentWallet, createJob, fund, complete, reject,
-  ### giveFeedback (wallet-signed), or setBudget, submit, claimRefund
+  ### giveFeedback (wallet-signed), or submit, release, claimRefund
   ### (server-signed).
   purpose: String
   ### Domain TransactionHash of the one envelope this record ever sends,
