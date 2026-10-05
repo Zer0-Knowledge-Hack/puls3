@@ -6,8 +6,56 @@ import 'package:http/http.dart' as http;
 
 import 'ledger_errors.dart';
 
-/// JSON-RPC transport to a Soroban RPC node, limited to the two read methods
-/// the adapter uses. It has no way to submit a transaction.
+/// The `status` of a `sendTransaction` answer.
+enum SendTransactionStatus {
+  /// Accepted for inclusion; poll `getTransaction` for the final result.
+  pending,
+
+  /// The node already has this transaction.
+  duplicate,
+
+  /// The node did not take the transaction now; the same envelope may be
+  /// sent again later.
+  tryAgainLater,
+
+  /// Rejected; [SendTransactionResult.errorResultXdr] says why.
+  error,
+}
+
+/// A typed `sendTransaction` answer. It says whether the node took the
+/// envelope, not whether the transaction succeeded.
+final class SendTransactionResult {
+  const SendTransactionResult({
+    required this.status,
+    required this.hash,
+    this.latestLedger,
+    this.latestLedgerCloseTime,
+    this.errorResultXdr,
+  });
+
+  final SendTransactionStatus status;
+
+  /// The 64-character hex transaction hash.
+  final String hash;
+  final int? latestLedger;
+
+  /// Unix seconds.
+  final int? latestLedgerCloseTime;
+
+  /// The base64 XDR `TransactionResult` of an [SendTransactionStatus.error].
+  final String? errorResultXdr;
+}
+
+const _sendStatuses = {
+  'PENDING': SendTransactionStatus.pending,
+  'DUPLICATE': SendTransactionStatus.duplicate,
+  'TRY_AGAIN_LATER': SendTransactionStatus.tryAgainLater,
+  'ERROR': SendTransactionStatus.error,
+};
+
+/// JSON-RPC transport to a Soroban RPC node: the two read methods the adapter
+/// uses, plus `sendTransaction` for envelopes the server already signed and
+/// persisted. It never signs.
 ///
 /// Every failure to obtain a well-formed `result` object is a
 /// [LedgerUnavailable]: an unreachable node must never look like "not found".
@@ -37,6 +85,31 @@ final class SorobanRpcClient {
   /// `result`, which has `status` `NOT_FOUND` for an unknown or expired hash.
   Future<Map<String, Object?>> getTransaction(String hash) =>
       _call('getTransaction', {'hash': hash, 'xdrFormat': 'json'});
+
+  /// `sendTransaction` for a signed envelope in base64 XDR. A transport
+  /// failure or an answer without a known `status` and a `hash` is a
+  /// [LedgerUnavailable]: the caller cannot know whether the node took it.
+  Future<SendTransactionResult> sendTransaction(String envelopeXdr) async {
+    const method = 'sendTransaction';
+    final result = await _call(method, {'transaction': envelopeXdr});
+    final status = _sendStatuses[result['status']];
+    final hash = result['hash'];
+    if (status == null || hash is! String) {
+      throw LedgerUnavailable('$method answered no known status and hash');
+    }
+    final latestLedger = result['latestLedger'];
+    final closeTime = result['latestLedgerCloseTime'];
+    final errorResult = result['errorResultXdr'];
+    return SendTransactionResult(
+      status: status,
+      hash: hash,
+      latestLedger: latestLedger is int ? latestLedger : null,
+      latestLedgerCloseTime: closeTime is String
+          ? int.tryParse(closeTime)
+          : (closeTime is int ? closeTime : null),
+      errorResultXdr: errorResult is String ? errorResult : null,
+    );
+  }
 
   Future<Map<String, Object?>> _call(
     String method,

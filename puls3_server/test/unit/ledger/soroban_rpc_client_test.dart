@@ -11,6 +11,8 @@ import 'package:test/test.dart';
 final _rpcUrl = Uri.parse('https://rpc.example.test');
 const _timeout = Duration(milliseconds: 50);
 final _throwsUnavailable = throwsA(isA<LedgerUnavailable>());
+const _sentHash =
+    '7e1b2f3c4d5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0';
 
 Map<String, Object?> _fixture(String name) =>
     jsonDecode(File('test/unit/ledger/fixtures/$name').readAsStringSync())
@@ -71,22 +73,88 @@ void main() {
       expect(result['status'], 'SUCCESS');
     });
 
-    test('only the two read methods exist, never sendTransaction', () async {
-      final methods = <String>[];
-      final client = _client(
-        MockClient((request) async {
-          methods.add(
-            (jsonDecode(request.body) as Map<String, Object?>)['method']!
-                as String,
-          );
-          return _json(_fixture('get_transaction_not_found.json'));
-        }),
+    test(
+      'sendTransaction posts the signed envelope without xdrFormat',
+      () async {
+        late Map<String, Object?> body;
+        final client = _client(
+          MockClient((request) async {
+            body = jsonDecode(request.body) as Map<String, Object?>;
+            return _json(_fixture('send_transaction_pending.json'));
+          }),
+        );
+
+        await client.sendTransaction('AAAA');
+
+        expect(body['method'], 'sendTransaction');
+        expect(body['params'], {'transaction': 'AAAA'});
+      },
+    );
+  });
+
+  group('sendTransaction result', () {
+    Future<SendTransactionResult> send(String fixture) => _client(
+      MockClient((_) async => _json(_fixture(fixture))),
+    ).sendTransaction('AAAA');
+
+    Future<SendTransactionResult> sendResult(Map<String, Object?> result) =>
+        _client(
+          MockClient(
+            (_) async => _json({'jsonrpc': '2.0', 'id': 1, 'result': result}),
+          ),
+        ).sendTransaction('AAAA');
+
+    test('PENDING carries the hash and the latest ledger', () async {
+      final result = await send('send_transaction_pending.json');
+
+      expect(result.status, SendTransactionStatus.pending);
+      expect(result.hash, _sentHash);
+      expect(result.latestLedger, 5024571);
+      expect(result.latestLedgerCloseTime, 1791146442);
+      expect(result.errorResultXdr, isNull);
+    });
+
+    test('DUPLICATE', () async {
+      final result = await send('send_transaction_duplicate.json');
+
+      expect(result.status, SendTransactionStatus.duplicate);
+      expect(result.hash, _sentHash);
+    });
+
+    test('TRY_AGAIN_LATER', () async {
+      final result = await send('send_transaction_try_again_later.json');
+
+      expect(result.status, SendTransactionStatus.tryAgainLater);
+      expect(result.hash, _sentHash);
+    });
+
+    test('ERROR carries the base64 TransactionResult', () async {
+      final result = await send('send_transaction_error.json');
+
+      expect(result.status, SendTransactionStatus.error);
+      expect(result.hash, _sentHash);
+      expect(result.errorResultXdr, 'AAAAAAAAAGT////7AAAAAA==');
+    });
+
+    test('ledger fields are optional', () async {
+      final result = await sendResult({'status': 'PENDING', 'hash': _sentHash});
+
+      expect(result.latestLedger, isNull);
+      expect(result.latestLedgerCloseTime, isNull);
+      expect(result.errorResultXdr, isNull);
+    });
+
+    test('an unknown status or a missing hash is LedgerUnavailable', () {
+      expect(
+        () => sendResult({'status': 'SUCCESS', 'hash': _sentHash}),
+        _throwsUnavailable,
       );
-
-      await client.simulateTransaction('AAAA');
-      await client.getTransaction('00' * 32);
-
-      expect(methods, ['simulateTransaction', 'getTransaction']);
+      expect(() => sendResult({'hash': _sentHash}), _throwsUnavailable);
+      expect(() => sendResult({'status': 'PENDING'}), _throwsUnavailable);
+      expect(
+        () => sendResult({'status': 'PENDING', 'hash': 7}),
+        _throwsUnavailable,
+      );
     });
   });
 
@@ -98,6 +166,7 @@ void main() {
 
       expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
       expect(() => client.getTransaction('00' * 32), _throwsUnavailable);
+      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
     });
 
     test('HTTP 4xx', () {
@@ -125,6 +194,7 @@ void main() {
       );
 
       expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
+      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
     });
 
     test('an http client exception', () {
@@ -147,6 +217,7 @@ void main() {
       );
 
       expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
+      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
     });
 
     test('a body that is not JSON', () {
