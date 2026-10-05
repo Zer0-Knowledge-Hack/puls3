@@ -1,0 +1,44 @@
+### Durable server-side record of one relay or server-signed submission.
+### Polled through the resource that owns it; the client sees only the
+### fields without `scope=serverOnly`. Serverpod requires serverOnly fields to
+### be nullable; ChainSubmissionStore always sets them.
+class: ChainSubmission
+table: chain_submission
+fields:
+  ### The PreparedTransaction this submission came from. Null for
+  ### server-signed purposes (submit, release, claimRefund).
+  preparationId: String?
+  ### One of registerFull, setAgentWallet, createJob, fund, complete, reject,
+  ### giveFeedback (wallet-signed), or submit, release, claimRefund
+  ### (server-signed).
+  purpose: String
+  ### Domain TransactionHash of the one envelope this record ever sends,
+  ### persisted before it is submitted.
+  transaction: String
+  ### One of submitted, confirmed, failed.
+  state: String
+  ### Puls3ApiException code when state is failed, for example JobMismatch.
+  ### Chain outcomes are reported here, never thrown by submit methods.
+  errorCode: String?
+  explorerUrl: String?
+  updatedAt: DateTime
+  ### The hire this submission belongs to, when it has one.
+  hireId: int?, scope=serverOnly
+  ### The signed envelope in base64 XDR; resent unchanged when needed.
+  signedEnvelopeXdr: String?, scope=serverOnly
+  ### End of the envelope time bounds; after it the submission is expired.
+  validUntil: DateTime?, scope=serverOnly
+  lastSentAt: DateTime?, scope=serverOnly
+  sendAttempts: int?, default=0, scope=serverOnly
+  createdAt: DateTime?, scope=serverOnly
+indexes:
+  chain_submission_preparation_idx:
+    fields: preparationId
+    unique: true
+  chain_submission_transaction_idx:
+    fields: transaction
+    unique: true
+  chain_submission_state_idx:
+    fields: state, updatedAt
+  chain_submission_hire_idx:
+    fields: hireId
