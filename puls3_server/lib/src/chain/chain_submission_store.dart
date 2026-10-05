@@ -90,7 +90,9 @@ abstract interface class ChainSubmissionStore {
   /// Persists a `submitted` record before its envelope is sent.
   ///
   /// Throws [ChainSubmissionConflict] when [preparationId] or
-  /// [transactionHash] already has a record.
+  /// [transactionHash] already has a record, and [ArgumentError] when
+  /// [preparationId] does not fit [purpose]: wallet-signed purposes need
+  /// one, server-signed purposes never have one.
   Future<StoredSubmission> insertSubmitted({
     required SubmissionPurpose purpose,
     required String transactionHash,
@@ -104,7 +106,16 @@ abstract interface class ChainSubmissionStore {
   /// The record of [preparationId], or `null`.
   Future<StoredSubmission?> findByPreparation(String preparationId);
 
-  /// Up to [limit] `submitted` records, least recently updated first.
+  /// Up to [limit] `submitted` records: never-sent records first (oldest
+  /// `updatedAt` first), then the least recently sent. A record goes to the
+  /// back once its envelope is sent again, so more than [limit] stuck
+  /// records cannot starve the others. Ties break on `updatedAt`, then id.
+  ///
+  /// A row that cannot be read (unknown purpose, or a server-only column
+  /// missing) is not returned: it is logged and set to `failed` with
+  /// [SubmissionOutcomeCode.escrowCallFailed], so it never blocks the batch
+  /// again. The result may therefore hold fewer than [limit] records while
+  /// more remain.
   ///
   /// Throws [ArgumentError] when [limit] is below 1.
   Future<List<StoredSubmission>> listSubmitted({int limit = 100});
@@ -115,11 +126,36 @@ abstract interface class ChainSubmissionStore {
 
   /// Sets `failed` with [code] if the record is still `submitted`. Returns
   /// whether it changed.
+  ///
+  /// Throws [ArgumentError] unless [SubmissionOutcomeCode.isKnown] accepts
+  /// [code].
   Future<bool> markFailed(int id, String code);
 
-  /// Counts one more send of the envelope at [at]. Returns `false` for an
-  /// unknown [id]. It does not change the state or `updatedAt`.
+  /// Counts one more send of the envelope at [at] if the record is still
+  /// `submitted`. Returns whether it changed: `false` for an unknown [id] or
+  /// a final record. It does not change the state or `updatedAt`.
   Future<bool> recordSend(int id, DateTime at);
+}
+
+/// Shared argument check of [ChainSubmissionStore.insertSubmitted].
+void checkPreparation(SubmissionPurpose purpose, String? preparationId) {
+  if (purpose.isServerSigned && preparationId != null) {
+    throw ArgumentError.value(
+      preparationId,
+      'preparationId',
+      'must be null for the server-signed purpose ${purpose.wireName}',
+    );
+  }
+  if (!purpose.isServerSigned && preparationId == null) {
+    throw ArgumentError.notNull('preparationId');
+  }
+}
+
+/// Shared argument check of [ChainSubmissionStore.markFailed].
+void checkOutcomeCode(String code) {
+  if (!SubmissionOutcomeCode.isKnown(code)) {
+    throw ArgumentError.value(code, 'code', 'is not a known outcome code');
+  }
 }
 
 /// Shared argument check of [ChainSubmissionStore.listSubmitted].

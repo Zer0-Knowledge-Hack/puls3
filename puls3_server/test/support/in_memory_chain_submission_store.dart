@@ -24,6 +24,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     int? hireId,
     String? explorerUrl,
   }) async {
+    checkPreparation(purpose, preparationId);
     if (preparationId != null &&
         _rows.values.any((r) => r.preparationId == preparationId)) {
       throw const ChainSubmissionConflict(ChainSubmissionIndex.preparationId);
@@ -65,10 +66,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     checkListLimit(limit);
     final submitted =
         _rows.values.where((r) => r.state == SubmissionState.submitted).toList()
-          ..sort((a, b) {
-            final byUpdate = a.updatedAt.compareTo(b.updatedAt);
-            return byUpdate != 0 ? byUpdate : a.id.compareTo(b.id);
-          });
+          ..sort(_listOrder);
     return submitted.take(limit).toList();
   }
 
@@ -77,13 +75,15 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
       _transition(id, SubmissionState.confirmed, null);
 
   @override
-  Future<bool> markFailed(int id, String code) async =>
-      _transition(id, SubmissionState.failed, code);
+  Future<bool> markFailed(int id, String code) async {
+    checkOutcomeCode(code);
+    return _transition(id, SubmissionState.failed, code);
+  }
 
   @override
   Future<bool> recordSend(int id, DateTime at) async {
     final row = _rows[id];
-    if (row == null) return false;
+    if (row == null || row.state != SubmissionState.submitted) return false;
     _rows[id] = _copy(
       row,
       lastSentAt: at.toUtc(),
@@ -127,4 +127,19 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     createdAt: row.createdAt,
     updatedAt: updatedAt ?? row.updatedAt,
   );
+}
+
+/// The order of [ChainSubmissionStore.listSubmitted]: never sent first, then
+/// least recently sent, then `updatedAt`, then id.
+int _listOrder(StoredSubmission a, StoredSubmission b) {
+  final aSent = a.lastSentAt;
+  final bSent = b.lastSentAt;
+  if (aSent == null && bSent != null) return -1;
+  if (aSent != null && bSent == null) return 1;
+  if (aSent != null && bSent != null) {
+    final bySend = aSent.compareTo(bSent);
+    if (bySend != 0) return bySend;
+  }
+  final byUpdate = a.updatedAt.compareTo(b.updatedAt);
+  return byUpdate != 0 ? byUpdate : a.id.compareTo(b.id);
 }

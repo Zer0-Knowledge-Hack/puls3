@@ -231,6 +231,94 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(() => repo.listSubmitted(limit: 0), throwsArgumentError);
   });
 
+  test('listSubmitted lists never-sent records first, then the least '
+      'recently sent', () async {
+    create();
+    final a = await insert(preparationId: 'prep-1', transactionHash: _txA);
+    final b = await insert(preparationId: 'prep-2', transactionHash: _txB);
+    final c = await insert(preparationId: 'prep-3', transactionHash: _txC);
+    await repo.recordSend(a.id, clock.add(const Duration(seconds: 2)));
+    await repo.recordSend(b.id, clock.add(const Duration(seconds: 1)));
+
+    final listed = await repo.listSubmitted();
+
+    expect(listed.map((s) => s.id), [c.id, b.id, a.id]);
+  });
+
+  test('listSubmitted does not starve a record behind more than limit '
+      'stuck ones', () async {
+    create();
+    final a = await insert(preparationId: 'prep-1', transactionHash: _txA);
+    final b = await insert(preparationId: 'prep-2', transactionHash: _txB);
+    final c = await insert(preparationId: 'prep-3', transactionHash: _txC);
+    for (final s in [a, b, c]) {
+      await repo.recordSend(s.id, clock);
+    }
+
+    final first = await repo.listSubmitted(limit: 2);
+    for (final s in first) {
+      await repo.recordSend(s.id, clock.add(const Duration(minutes: 1)));
+    }
+    final second = await repo.listSubmitted(limit: 2);
+
+    expect(first.map((s) => s.id), [a.id, b.id]);
+    expect(second.map((s) => s.id), [c.id, a.id]);
+  });
+
+  test('recordSend changes only a submitted record', () async {
+    create();
+    final stored = await insert();
+    await repo.markConfirmed(stored.id);
+
+    expect(await repo.recordSend(stored.id, clock), isFalse);
+
+    final unchanged = (await repo.findByPreparation('prep-1'))!;
+    expect(unchanged.sendAttempts, 0);
+    expect(unchanged.lastSentAt, isNull);
+  });
+
+  test('insertSubmitted requires a preparation for wallet-signed '
+      'purposes', () async {
+    create();
+
+    for (final purpose in SubmissionPurpose.values.where(
+      (p) => !p.isServerSigned,
+    )) {
+      expect(
+        () => insert(preparationId: null, purpose: purpose),
+        throwsArgumentError,
+        reason: purpose.wireName,
+      );
+    }
+    expect(await repo.listSubmitted(), isEmpty);
+  });
+
+  test('insertSubmitted rejects a preparation for server-signed '
+      'purposes', () async {
+    create();
+
+    for (final purpose in SubmissionPurpose.values.where(
+      (p) => p.isServerSigned,
+    )) {
+      expect(
+        () => insert(preparationId: 'prep-x', purpose: purpose),
+        throwsArgumentError,
+        reason: purpose.wireName,
+      );
+    }
+    expect(await repo.listSubmitted(), isEmpty);
+  });
+
+  test('markFailed rejects an unknown outcome code', () async {
+    create();
+    final stored = await insert();
+
+    expect(() => repo.markFailed(stored.id, 'Oops'), throwsArgumentError);
+
+    final unchanged = (await repo.findByPreparation('prep-1'))!;
+    expect(unchanged.state, SubmissionState.submitted);
+  });
+
   test('toProtocol exposes the client fields with wire names', () async {
     create();
     final stored = await insert();

@@ -33,6 +33,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
     int? hireId,
     String? explorerUrl,
   }) async {
+    checkPreparation(purpose, preparationId);
     final now = _now().toUtc();
     try {
       final row = await ChainSubmission.db.insertRow(
@@ -73,13 +74,40 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) async {
     checkListLimit(limit);
-    final rows = await ChainSubmission.db.find(
+    // Serverpod cannot order NULLS FIRST, so never-sent rows are a first
+    // query and sent rows fill the rest of the batch.
+    final neverSent = await ChainSubmission.db.find(
       _session,
-      where: (t) => t.state.equals(SubmissionState.submitted.wireName),
+      where: (t) =>
+          t.state.equals(SubmissionState.submitted.wireName) &
+          t.lastSentAt.equals(null),
       orderByList: (t) => [Order(column: t.updatedAt), Order(column: t.id)],
       limit: limit,
     );
-    return rows.map(_stored).toList();
+    final sent = neverSent.length >= limit
+        ? const <ChainSubmission>[]
+        : await ChainSubmission.db.find(
+            _session,
+            where: (t) =>
+                t.state.equals(SubmissionState.submitted.wireName) &
+                t.lastSentAt.notEquals(null),
+            orderByList: (t) => [
+              Order(column: t.lastSentAt),
+              Order(column: t.updatedAt),
+              Order(column: t.id),
+            ],
+            limit: limit - neverSent.length,
+          );
+    final listed = <StoredSubmission>[];
+    for (final row in [...neverSent, ...sent]) {
+      final stored = _tryStored(row);
+      if (stored != null) {
+        listed.add(stored);
+      } else {
+        await _failUnreadable(row.id!);
+      }
+    }
+    return listed;
   }
 
   @override
@@ -87,8 +115,10 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       _transition(id, SubmissionState.confirmed, null);
 
   @override
-  Future<bool> markFailed(int id, String code) =>
-      _transition(id, SubmissionState.failed, code);
+  Future<bool> markFailed(int id, String code) async {
+    checkOutcomeCode(code);
+    return _transition(id, SubmissionState.failed, code);
+  }
 
   @override
   Future<bool> recordSend(int id, DateTime at) =>
@@ -99,7 +129,9 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
           transaction: transaction,
           lockMode: LockMode.forUpdate,
         );
-        if (row == null) return false;
+        if (row == null || row.state != SubmissionState.submitted.wireName) {
+          return false;
+        }
         await ChainSubmission.db.updateById(
           _session,
           id,
@@ -132,10 +164,31 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
     return updated.isNotEmpty;
   }
 
+  /// Logs an unreadable `submitted` row and fails it, so it leaves the
+  /// tracker's batch (see [listSubmitted]).
+  Future<void> _failUnreadable(int id) async {
+    _session.log(
+      'chain_submission $id is unreadable; marking it failed with '
+      '${SubmissionOutcomeCode.escrowCallFailed}',
+      level: LogLevel.warning,
+    );
+    await _transition(
+      id,
+      SubmissionState.failed,
+      SubmissionOutcomeCode.escrowCallFailed,
+    );
+  }
+
+  /// Maps a row to its typed form, or throws [StateError] for a corrupt row
+  /// (see [_tryStored]).
+  StoredSubmission _stored(ChainSubmission row) =>
+      _tryStored(row) ??
+      (throw StateError('chain_submission ${row.id} is incomplete'));
+
   /// Maps a row to its typed form. A row with an unknown purpose or state,
-  /// or without a server-only column this store always writes, is
-  /// corrupt and throws [StateError].
-  StoredSubmission _stored(ChainSubmission row) {
+  /// or without a server-only column this store always writes, is corrupt
+  /// and maps to `null`.
+  StoredSubmission? _tryStored(ChainSubmission row) {
     final purpose = SubmissionPurpose.tryParse(row.purpose);
     final state = SubmissionState.tryParse(row.state);
     final envelope = row.signedEnvelopeXdr;
@@ -146,7 +199,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
         envelope == null ||
         validUntil == null ||
         createdAt == null) {
-      throw StateError('chain_submission ${row.id} is incomplete');
+      return null;
     }
     return StoredSubmission(
       id: row.id!,
