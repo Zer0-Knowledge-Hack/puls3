@@ -1,0 +1,9 @@
+### Draft transport mirror of the domain Skill entity.
+class: Skill
+fields:
+  ### Kebab-case skill identifier.
+  id: String
+  ### Human-readable name, 1 to 48 characters.
+  name: String
+  description: String
+  tags: List<String>

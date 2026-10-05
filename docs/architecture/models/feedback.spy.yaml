@@ -1,0 +1,11 @@
+### Draft transport mirror of the domain Feedback entity.
+class: Feedback
+fields:
+  ### Domain HireId encoded as an integer.
+  hireId: int
+  ### Domain AgentId encoded as an integer.
+  agentId: int
+  ### Domain StellarAddress encoded as a StrKey string.
+  client: String
+  score: int
+  comment: String
