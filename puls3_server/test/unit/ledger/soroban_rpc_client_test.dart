@@ -205,18 +205,35 @@ void main() {
       expect(() => client.getTransaction('00' * 32), _throwsUnavailable);
     });
 
-    test('a JSON-RPC error object on a 200 response', () {
+    test('a JSON-RPC server error keeps its code and message', () {
       final client = _client(
         MockClient(
           (_) async => _json({
             'jsonrpc': '2.0',
             'id': 1,
-            'error': {'code': -32602, 'message': 'invalid params'},
+            'error': {'code': -32603, 'message': 'internal error'},
           }),
         ),
       );
 
-      expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
+      final throwsServerError = throwsA(
+        isA<LedgerUnavailable>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('-32603'), contains('internal error')),
+        ),
+      );
+      expect(() => client.simulateTransaction('AAAA'), throwsServerError);
+      expect(() => client.sendTransaction('AAAA'), throwsServerError);
+    });
+
+    test('a JSON-RPC error without a numeric code', () {
+      final client = _client(
+        MockClient(
+          (_) async => _json({'jsonrpc': '2.0', 'id': 1, 'error': 'boom'}),
+        ),
+      );
+
       expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
     });
 
@@ -237,5 +254,29 @@ void main() {
       expect(() => client.getTransaction('00' * 32), _throwsUnavailable);
       expect(() => listClient.getTransaction('00' * 32), _throwsUnavailable);
     });
+  });
+
+  group('a JSON-RPC rejection of the request is RpcRequestRejected', () {
+    for (final code in [-32600, -32602]) {
+      test('code $code', () {
+        final client = _client(
+          MockClient(
+            (_) async => _json({
+              'jsonrpc': '2.0',
+              'id': 1,
+              'error': {'code': code, 'message': 'invalid transaction'},
+            }),
+          ),
+        );
+
+        final throwsRejected = throwsA(
+          isA<RpcRequestRejected>()
+              .having((e) => e.code, 'code', code)
+              .having((e) => e.rpcMessage, 'rpcMessage', 'invalid transaction'),
+        );
+        expect(() => client.sendTransaction('AAAA'), throwsRejected);
+        expect(() => client.getTransaction('00' * 32), throwsRejected);
+      });
+    }
   });
 }

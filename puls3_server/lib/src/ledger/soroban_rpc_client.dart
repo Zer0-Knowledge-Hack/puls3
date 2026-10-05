@@ -58,7 +58,11 @@ const _sendStatuses = {
 /// persisted. It never signs.
 ///
 /// Every failure to obtain a well-formed `result` object is a
-/// [LedgerUnavailable]: an unreachable node must never look like "not found".
+/// [LedgerException]: an unreachable node must never look like "not found".
+/// A JSON-RPC `invalid request` or `invalid params` error is a
+/// [RpcRequestRejected] (the node refused this request); every other
+/// failure, including other JSON-RPC errors, is a [LedgerUnavailable]. Both
+/// keep the JSON-RPC code and message in their text.
 final class SorobanRpcClient {
   /// [timeout] has no default: the composition root chooses it.
   SorobanRpcClient({
@@ -89,6 +93,9 @@ final class SorobanRpcClient {
   /// `sendTransaction` for a signed envelope in base64 XDR. A transport
   /// failure or an answer without a known `status` and a `hash` is a
   /// [LedgerUnavailable]: the caller cannot know whether the node took it.
+  /// A [RpcRequestRejected] means the node refused the envelope itself, so
+  /// sending it again cannot succeed. Status `ERROR` is a result, not an
+  /// exception.
   Future<SendTransactionResult> sendTransaction(String envelopeXdr) async {
     const method = 'sendTransaction';
     final result = await _call(method, {'transaction': envelopeXdr});
@@ -153,7 +160,7 @@ final class SorobanRpcClient {
       throw LedgerUnavailable('$method answered JSON that is not an object');
     }
     if (decoded.containsKey('error')) {
-      throw LedgerUnavailable('$method answered a JSON-RPC error');
+      throw _rpcError(method, decoded['error']);
     }
     final result = decoded['result'];
     if (result is! Map<String, Object?>) {
@@ -161,4 +168,22 @@ final class SorobanRpcClient {
     }
     return result;
   }
+
+  /// A JSON-RPC `error` object as an exception that keeps its code and
+  /// message. Only `invalid request` and `invalid params` say the request
+  /// itself was refused; every other code may pass on a retry.
+  LedgerException _rpcError(String method, Object? error) {
+    final code = error is Map ? error['code'] : null;
+    final rpcMessage = error is Map ? '${error['message'] ?? ''}' : '';
+    if (code is! int) {
+      return LedgerUnavailable('$method answered a malformed JSON-RPC error');
+    }
+    final description = '$method answered JSON-RPC error $code: $rpcMessage';
+    return _rejectedRequestCodes.contains(code)
+        ? RpcRequestRejected(code, rpcMessage, description)
+        : LedgerUnavailable(description);
+  }
 }
+
+/// JSON-RPC `invalid request` and `invalid params`.
+const _rejectedRequestCodes = {-32600, -32602};
