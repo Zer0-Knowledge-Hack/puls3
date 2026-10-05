@@ -98,8 +98,13 @@ STUB_DIR="$WORK/bin"
 mkdir -p "$STUB_DIR"
 cat >"$STUB_DIR/stellar" <<STUBEOF
 #!/usr/bin/env bash
-# Fake stellar CLI. Env: STUB_OWNER, STUB_DRIFT ("<agent-id>:<key>" or empty), STUB_STATE, STUB_CALLS.
-if [ "\$1" = "keys" ]; then echo "GCALLER"; exit 0; fi
+# Fake stellar CLI. Env: STUB_OWNER, STUB_DRIFT ("<agent-id>:<key>" or empty), STUB_STATE, STUB_CALLS,
+# STUB_WALLET (registry wallet of every agent, "null" for none), STUB_UNSEEDED (a seed URI not yet registered),
+# STUB_FAIL_BIND (non-empty makes set_agent_wallet fail).
+if [ "\$1" = "keys" ]; then
+  if [ "\$3" = "other-wallet" ]; then echo "GOTHERWALLET"; else echo "GCALLER"; fi
+  exit 0
+fi
 shift
 while [ "\$1" != "--" ] && [ \$# -gt 0 ]; do shift; done
 shift
@@ -108,7 +113,18 @@ arg() { local want="\$1"; shift; while [ \$# -gt 0 ]; do if [ "\$1" = "\$want" ]
 echo "\$fn \$*" >>"\$STUB_CALLS"
 case "\$fn" in
   total_agents) echo 8 ;;
-  agent_id_by_uri) u="\$(arg --agent-uri "\$@")"; echo "\$((10#\${u##*-}))" ;;
+  agent_id_by_uri)
+    u="\$(arg --agent-uri "\$@")"
+    if [ -n "\${STUB_UNSEEDED:-}" ] && [ "\$u" = "\$STUB_UNSEEDED" ]; then echo null; else echo "\$((10#\${u##*-}))"; fi ;;
+  register_full)
+    u="\$(arg --agent-uri "\$@")"
+    echo "https://stellar.expert/explorer/testnet/tx/\$(printf '%064x' 4096)" >&2
+    echo "\$((10#\${u##*-}))" ;;
+  get_agent_wallet)
+    if [ "\${STUB_WALLET:-GCALLER}" = "null" ]; then echo null; else echo "\"\${STUB_WALLET:-GCALLER}\""; fi ;;
+  set_agent_wallet)
+    [ -z "\${STUB_FAIL_BIND:-}" ] || { echo "error: simulated bind failure" >&2; exit 1; }
+    echo "https://stellar.expert/explorer/testnet/tx/\$(printf '%064x' 255)" >&2 ;;
   owner_of) echo "\"\$STUB_OWNER\"" ;;
   get_metadata)
     id="\$(arg --agent-id "\$@")"; key="\$(arg --key "\$@")"
@@ -154,6 +170,32 @@ if [ "$code" -eq 0 ] && ! grep -q '^set_metadata' "$WORK/calls"; then ok "idempo
 
 expect_exit "--sync-metadata as non-owner exits 1" 1 run_seed GSOMEONEELSE "1:name" --sync-metadata
 if grep -q '^set_metadata' "$WORK/calls"; then bad "non-owner never writes" "set_metadata called"; else ok "non-owner never writes"; fi
+
+echo "# agent wallet binding (D4)"
+wallet_calls() { grep -c '^set_agent_wallet' "$WORK/calls"; }
+
+expect_exit "wallet already bound to the owner exits 0" 0 run_seed GCALLER ""
+if [ "$(wallet_calls)" -eq 0 ]; then ok "bound wallet never calls set_agent_wallet"; else bad "bound wallet never calls set_agent_wallet" "$(wallet_calls) calls"; fi
+case "$LAST_OUT" in *"wallet: agent 1 already bound"*) ok "bound wallet is reported" ;; *) bad "bound wallet is reported" "$LAST_OUT" ;; esac
+
+STUB_WALLET=null expect_exit "missing wallet exits 0" 0 run_seed GCALLER ""
+if [ "$(wallet_calls)" -eq 8 ]; then ok "missing wallet binds all 8 agents"; else bad "missing wallet binds all 8 agents" "$(wallet_calls) calls"; fi
+if grep -q '^set_agent_wallet --caller GCALLER --agent-id 8 --new-wallet GCALLER' "$WORK/calls"; then ok "bind passes caller, agent id and wallet"; else bad "bind arguments" "$(grep '^set_agent_wallet' "$WORK/calls" | tail -1)"; fi
+case "$LAST_OUT" in *"wallet: agent 1 bound to GCALLER"*"$(printf '%064x' 255)"*) ok "bind logs agent id and tx hash" ;; *) bad "bind logs agent id and tx hash" "$LAST_OUT" ;; esac
+
+STUB_WALLET=GSOMEONEELSE expect_exit "different wallet exits 0" 0 run_seed GCALLER ""
+if [ "$(wallet_calls)" -eq 8 ]; then ok "different wallet is rebound for all 8 agents"; else bad "different wallet is rebound" "$(wallet_calls) calls"; fi
+
+AGENT_WALLET_ACCOUNT=other-wallet expect_exit "separate target wallet exits 0" 0 run_seed GCALLER ""
+if [ "$(wallet_calls)" -eq 8 ] && grep -q -- '--new-wallet GOTHERWALLET' "$WORK/calls"; then ok "AGENT_WALLET_ACCOUNT selects the target wallet"; else bad "AGENT_WALLET_ACCOUNT target" "$(wallet_calls) calls"; fi
+
+STUB_UNSEEDED="puls3://demo/agt-008" expect_exit "newly registered agent exits 0" 0 run_seed GCALLER ""
+case "$LAST_OUT" in *"registered: 'puls3://demo/agt-008' -> agent 8"*) ok "unseeded agent is registered" ;; *) bad "unseeded agent is registered" "$LAST_OUT" ;; esac
+if grep -q '^get_agent_wallet --agent-id 8' "$WORK/calls"; then ok "wallet is checked after registering"; else bad "wallet is checked after registering" "no get_agent_wallet for 8"; fi
+case "$LAST_OUT" in *"$(printf '%064x' 4096)"*) ok "registration logs its tx hash" ;; *) bad "registration logs its tx hash" "$LAST_OUT" ;; esac
+
+STUB_WALLET=null STUB_FAIL_BIND=1 expect_exit "bind failure exits 1" 1 run_seed GCALLER ""
+case "$LAST_OUT" in *"binding wallet"*) ok "bind failure names the step" ;; *) bad "bind failure names the step" "$LAST_OUT" ;; esac
 
 echo
 echo "passed: $PASS, failed: $FAIL"

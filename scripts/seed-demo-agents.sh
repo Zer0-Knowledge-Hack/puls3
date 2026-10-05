@@ -14,7 +14,15 @@
 #   --sync-metadata  Repair registered agents whose on-chain metadata drifted from
 #                    the seed file (owner only). Without it, drift is only reported.
 #
+# Every agent's registry wallet is checked after registration or skip and bound with
+# set_agent_wallet when it is missing or different (escrow create_job requires
+# provider == registry wallet). The target wallet is the Stellar CLI identity named by
+# $AGENT_WALLET_ACCOUNT, defaulting to the owner identity. A separate wallet needs a
+# second signature on set_agent_wallet that is not confirmed for stellar-cli 28.0.0, so
+# the default keeps wallet == owner (one signer).
+#
 # Env: SEED_FILE overrides the seed file (used by tests).
+#      AGENT_WALLET_ACCOUNT selects the wallet identity (default: the owner identity).
 #
 # Exit codes: 0 ok; 1 error, invalid seed, or caller is not the agent owner;
 #             3 stale on-chain metadata found and --sync-metadata was not given.
@@ -295,6 +303,13 @@ if [ -z "$CALLER" ]; then
   exit 1
 fi
 
+WALLET_IDENTITY="${AGENT_WALLET_ACCOUNT:-$IDENTITY}"
+TARGET_WALLET="$(stellar keys address "$WALLET_IDENTITY" 2>/dev/null || true)"
+if [ -z "$TARGET_WALLET" ]; then
+  echo "error: wallet identity '$WALLET_IDENTITY' does not exist or has no address." >&2
+  exit 1
+fi
+
 invoke() {
   stellar contract invoke \
     --id "$CONTRACT_ID" \
@@ -310,6 +325,26 @@ trap 'rm -f "$ERR_LOG" "$STALE_LOG"' EXIT
 
 # Strips quotes and whitespace from a CLI result; Bytes come back as a quoted hex string.
 clean() { printf '%s' "$1" | tr -d '"[:space:]'; }
+
+# Prints the 64-hex transaction hash found in CLI log file $1, or nothing.
+tx_hash_of() { grep -oE '(tx/|[Tt]ransaction hash is )[0-9a-f]{64}' "$1" | head -n 1 | grep -oE '[0-9a-f]{64}' || true; }
+
+# Makes the registry wallet of agent $1 equal TARGET_WALLET: no call when already bound,
+# otherwise set_agent_wallet (owner only) and the transaction hash is logged.
+ensure_wallet() {
+  local agent_id="$1" current hash
+  current="$(clean "$(invoke get_agent_wallet --agent-id "$agent_id" || true)")"
+  if [ "$current" = "$TARGET_WALLET" ]; then
+    echo "wallet: agent $agent_id already bound to $TARGET_WALLET"
+    return 0
+  fi
+  invoke set_agent_wallet --caller "$CALLER" --agent-id "$agent_id" --new-wallet "$TARGET_WALLET" >/dev/null 2>"$ERR_LOG" || {
+    echo "error: binding wallet of agent $agent_id failed: $(cat "$ERR_LOG")" >&2
+    exit 1
+  }
+  hash="$(tx_hash_of "$ERR_LOG")"
+  echo "wallet: agent $agent_id bound to $TARGET_WALLET tx ${hash:-unknown}"
+}
 
 # Compares on-chain metadata of agent $1 (seed URI $2) with the seed. Drift is logged to
 # STALE_LOG; with --sync-metadata it is repaired instead (owner only, else exit 1).
@@ -349,6 +384,7 @@ seed_uris "$SEED_FILE" | tr -d '\r' | while IFS= read -r URI; do
   if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
     echo "skip: '$URI' already registered as agent $EXISTING"
     reconcile_agent "$(clean "$EXISTING")" "$URI"
+    ensure_wallet "$(clean "$EXISTING")"
     continue
   fi
   METADATA="$(seed_metadata "$SEED_FILE" "$URI")"
@@ -369,7 +405,9 @@ seed_uris "$SEED_FILE" | tr -d '\r' | while IFS= read -r URI; do
       exit 1
     }
   fi
-  echo "registered: '$URI' -> agent $(echo "$OUTPUT" | tr -d '[:space:]')"
+  NEW_ID="$(echo "$OUTPUT" | tr -d '[:space:]')"
+  echo "registered: '$URI' -> agent $NEW_ID tx $(tx_hash_of "$ERR_LOG")"
+  ensure_wallet "$NEW_ID"
 done
 
 AFTER="$(invoke total_agents)"
@@ -379,4 +417,4 @@ if [ -s "$STALE_LOG" ]; then
   echo "Re-run with --sync-metadata as the agent owner to repair it." >&2
   exit 3
 fi
-echo "Done. Re-run this script any time; already-registered URIs are skipped."
+echo "Done. Re-run this script any time; already-registered URIs are skipped and bound wallets are left alone."
