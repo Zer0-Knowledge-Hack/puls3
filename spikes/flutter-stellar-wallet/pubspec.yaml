@@ -1,0 +1,16 @@
+name: flutter_stellar_wallet_spike
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ^3.8.0
+resolution: workspace
+dependencies:
+  flutter:
+    sdk: flutter
+  stellar_flutter_sdk: 3.8.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

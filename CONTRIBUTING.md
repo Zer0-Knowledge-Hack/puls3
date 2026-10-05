@@ -17,7 +17,7 @@ This guide is for the team. It covers how to set up your machine, run the projec
 Use **these exact versions**. CI uses them too, and mismatches cause dependency errors.
 
 | Tool | Version | Needed for |
-|---|---|---|
+| --- | --- | --- |
 | Flutter (includes Dart) | **3.41.4** (Dart 3.11.1) | Everything |
 | Serverpod CLI | **3.4.13** | Backend code generation |
 | Docker Desktop | Latest | Local Postgres + Redis for the backend |
@@ -28,14 +28,16 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 
 ### 1.1 Flutter and Dart
 
-1. Follow the official guide for your OS: https://docs.flutter.dev/get-started/install. Choose the **web** target.
+1. Follow the official guide for your OS: <https://docs.flutter.dev/get-started/install>. Choose the **web** target.
 2. Switch to the pinned version:
+
    ```bash
    cd <your-flutter-folder>
    git fetch --tags
    git checkout 3.41.4
    flutter --version   # must say Flutter 3.41.4 and Dart 3.11.1
    ```
+
 3. Check your setup: `flutter doctor`. For this project you only need **Chrome (web)** to be ✓.
 
 ### 1.2 Serverpod CLI
@@ -48,7 +50,7 @@ serverpod version
 If `serverpod` is not found, add the pub cache `bin` folder to your `PATH`:
 
 | OS | Folder |
-|---|---|
+| --- | --- |
 | Windows | `%LOCALAPPDATA%\Pub\Cache\bin` |
 | macOS / Linux | `$HOME/.pub-cache/bin` |
 
@@ -56,7 +58,7 @@ If `serverpod` is not found, add the pub cache `bin` folder to your `PATH`:
 
 ### 1.3 Docker
 
-Install Docker Desktop (https://www.docker.com/products/docker-desktop) and make sure it is running: `docker --version`.
+Install Docker Desktop (<https://www.docker.com/products/docker-desktop>) and make sure it is running: `docker --version`.
 
 ---
 
@@ -93,23 +95,29 @@ Use a port other than 8080, because the backend uses 8080.
 ### 2.3 Run the backend
 
 1. **Generate your local secrets (first time only):**
+
    ```bash
    ./scripts/setup-local-secrets.sh
    ```
+
    This creates `puls3_server/.env` and `puls3_server/config/passwords.yaml` with random values that are only valid on your machine. Both files are git-ignored. On Windows, run it from **Git Bash**.
 2. **Start Postgres and Redis:**
+
    ```bash
    cd puls3_server
    docker compose up --build --detach
    ```
+
 3. **Start the server:**
+
    ```bash
    dart bin/main.dart --apply-migrations
    ```
+
 4. **Stop everything when you are done:** press `Ctrl+C` to stop the server, then run `docker compose stop`.
 
 | Service | Local port |
-|---|---|
+| --- | --- |
 | API server | 8080 |
 | Serverpod Insights | 8081 |
 | Web server | 8082 |
@@ -204,7 +212,7 @@ Keep commits small and focused. Keep tests and docs in the same commit as the co
 This table follows [ADR-0001](docs/adr/0001-system-architecture.md#3-repo-layout).
 
 | Area label | Folder |
-|---|---|
+| --- | --- |
 | `area: docs` | `docs/`, `assets/`, `design/` |
 | `area: architecture` | `docs/adr/`, `docs/architecture/`, `docs/spikes/`, `spikes/` |
 | `area: blueprints` | `docs/blueprints/` |
@@ -256,7 +264,7 @@ GitHub Actions runs only the checks affected by a change, except **Secrets**,
 which scans every pull request and every push to `main`.
 
 | CI component | Paths | Commands |
-|---|---|---|
+| --- | --- | --- |
 | Domain | `puls3_domain/` and workspace manifests | `dart analyze --fatal-infos`, `dart test` |
 | Server | server, generated client, domain, and workspace manifests | `dart analyze --fatal-infos`, `dart test`, reproducible `serverpod generate` |
 | App | Flutter app, generated client, and workspace manifests | `flutter analyze --fatal-infos`, `flutter test`, `flutter build web --release` |
@@ -291,7 +299,7 @@ repository-admin access. They cannot be proven by local commands alone.
 ## 7. Troubleshooting
 
 | Problem | Fix |
-|---|---|
+| --- | --- |
 | `version solving failed` / `requires SDK version ^3.10` | Your Flutter is not 3.41.4. See [1.1](#11-flutter-and-dart). |
 | `serverpod: command not found` | Add the pub cache `bin` folder to your `PATH` ([1.2](#12-serverpod-cli)). |
 | `set it in puls3_server/.env` when running Docker | Run `./scripts/setup-local-secrets.sh` first. |
