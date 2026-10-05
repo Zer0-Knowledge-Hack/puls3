@@ -1,0 +1,61 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "error": "HostError: Error(Contract, #2)\n\nEvent log (newest first):\n   0: [Diagnostic Event] contract:CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ, topics:[error, Error(Contract, #2)], data:\"escalating Ok(ScErrorType::Contract) frame-exit to Err\"\n   1: [Diagnostic Event] topics:[fn_call, CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ, agent_uri], data:99999\n",
+    "eventsJson": [
+      {
+        "in_successful_contract_call": false,
+        "event": {
+          "ext": "v0",
+          "contract_id": null,
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_call"
+                },
+                {
+                  "bytes": "fb0cb946886bbe8bb21cfcf37e5fd5cc6e04f000b4befb0b68523a2f8b1b2772"
+                },
+                {
+                  "symbol": "agent_uri"
+                }
+              ],
+              "data": {
+                "u32": 99999
+              }
+            }
+          }
+        }
+      },
+      {
+        "in_successful_contract_call": false,
+        "event": {
+          "ext": "v0",
+          "contract_id": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "error"
+                },
+                {
+                  "error": {
+                    "contract": 2
+                  }
+                }
+              ],
+              "data": {
+                "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "latestLedger": 5024571
+  }
+}
