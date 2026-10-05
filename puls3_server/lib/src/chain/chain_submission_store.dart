@@ -1,0 +1,130 @@
+import '../generated/protocol.dart';
+import 'submission_values.dart';
+
+/// A persisted `chain_submission` row with typed purpose and state.
+///
+/// Every field is set: the store writes the server-only columns on
+/// insert even though the generated model declares them nullable.
+final class StoredSubmission {
+  const StoredSubmission({
+    required this.id,
+    required this.preparationId,
+    required this.purpose,
+    required this.transactionHash,
+    required this.state,
+    required this.errorCode,
+    required this.explorerUrl,
+    required this.hireId,
+    required this.signedEnvelopeXdr,
+    required this.validUntil,
+    required this.lastSentAt,
+    required this.sendAttempts,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final int id;
+
+  /// Null for server-signed purposes.
+  final String? preparationId;
+  final SubmissionPurpose purpose;
+
+  /// 64-character hex hash of [signedEnvelopeXdr].
+  final String transactionHash;
+  final SubmissionState state;
+
+  /// Set only when [state] is [SubmissionState.failed].
+  final String? errorCode;
+  final String? explorerUrl;
+  final int? hireId;
+
+  /// Base64 XDR; the only envelope this record ever sends.
+  final String signedEnvelopeXdr;
+
+  /// End of the envelope time bounds.
+  final DateTime validUntil;
+  final DateTime? lastSentAt;
+  final int sendAttempts;
+  final DateTime createdAt;
+
+  /// Last state change. Recording a send does not change it.
+  final DateTime updatedAt;
+
+  /// The client-visible model, with wire-name strings and no server-only
+  /// fields.
+  ChainSubmission toProtocol() => ChainSubmission(
+    id: id,
+    preparationId: preparationId,
+    purpose: purpose.wireName,
+    transaction: transactionHash,
+    state: state.wireName,
+    errorCode: errorCode,
+    explorerUrl: explorerUrl,
+    updatedAt: updatedAt,
+  );
+}
+
+/// The unique index a rejected insert collided with.
+enum ChainSubmissionIndex { preparationId, transaction }
+
+/// An insert collided with an existing record: each preparation and each
+/// transaction has at most one submission.
+final class ChainSubmissionConflict implements Exception {
+  const ChainSubmissionConflict(this.index);
+
+  final ChainSubmissionIndex index;
+
+  @override
+  String toString() => 'ChainSubmissionConflict: ${index.name}';
+}
+
+/// Durable store of chain submissions (api.md relay steps 4 and 5).
+///
+/// Named "store" because Serverpod already generates a
+/// `ChainSubmissionRepository` (the `ChainSubmission.db` accessor).
+///
+/// State only moves from `submitted` to `confirmed` or `failed`; both
+/// transitions are conditional, so concurrent trackers cannot overwrite a
+/// final state.
+abstract interface class ChainSubmissionStore {
+  /// Persists a `submitted` record before its envelope is sent.
+  ///
+  /// Throws [ChainSubmissionConflict] when [preparationId] or
+  /// [transactionHash] already has a record.
+  Future<StoredSubmission> insertSubmitted({
+    required SubmissionPurpose purpose,
+    required String transactionHash,
+    required String signedEnvelopeXdr,
+    required DateTime validUntil,
+    String? preparationId,
+    int? hireId,
+    String? explorerUrl,
+  });
+
+  /// The record of [preparationId], or `null`.
+  Future<StoredSubmission?> findByPreparation(String preparationId);
+
+  /// Up to [limit] `submitted` records, least recently updated first.
+  ///
+  /// Throws [ArgumentError] when [limit] is below 1.
+  Future<List<StoredSubmission>> listSubmitted({int limit = 100});
+
+  /// Sets `confirmed` if the record is still `submitted`. Returns whether
+  /// it changed.
+  Future<bool> markConfirmed(int id);
+
+  /// Sets `failed` with [code] if the record is still `submitted`. Returns
+  /// whether it changed.
+  Future<bool> markFailed(int id, String code);
+
+  /// Counts one more send of the envelope at [at]. Returns `false` for an
+  /// unknown [id]. It does not change the state or `updatedAt`.
+  Future<bool> recordSend(int id, DateTime at);
+}
+
+/// Shared argument check of [ChainSubmissionStore.listSubmitted].
+void checkListLimit(int limit) {
+  if (limit < 1) {
+    throw ArgumentError.value(limit, 'limit', 'must be at least 1');
+  }
+}
