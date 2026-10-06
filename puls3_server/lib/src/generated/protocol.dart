@@ -22,12 +22,26 @@ import 'agent/agent_summary.dart' as _i6;
 import 'chain/chain_submission.dart' as _i7;
 import 'greetings/greeting.dart' as _i8;
 import 'health/backend_health.dart' as _i9;
-import 'package:puls3_server/src/generated/agent/agent_summary.dart' as _i10;
+import 'hire/agent_unavailable.dart' as _i10;
+import 'hire/hire.dart' as _i11;
+import 'hire/hire_configuration_missing.dart' as _i12;
+import 'hire/hire_ledger_unavailable.dart' as _i13;
+import 'hire/hire_payment.dart' as _i14;
+import 'hire/hire_request_invalid.dart' as _i15;
+import 'hire/hire_view.dart' as _i16;
+import 'package:puls3_server/src/generated/agent/agent_summary.dart' as _i17;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
 export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
+export 'hire/agent_unavailable.dart';
+export 'hire/hire.dart';
+export 'hire/hire_configuration_missing.dart';
+export 'hire/hire_ledger_unavailable.dart';
+export 'hire/hire_payment.dart';
+export 'hire/hire_request_invalid.dart';
+export 'hire/hire_view.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
   Protocol._();
@@ -214,6 +228,175 @@ class Protocol extends _i1.SerializationManagerServer {
       ],
       managed: true,
     ),
+    _i2.TableDefinition(
+      name: 'hire',
+      dartName: 'HireRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'hire_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'consumer',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'agentId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'price',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'manifestVersion',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'expiredAt',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'hire_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'hire_payment',
+      dartName: 'HirePaymentRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'hire_payment_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'hireId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'transactionHash',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'jobId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'payer',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'payee',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'amount',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'hire_payment_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'hire_id',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'hireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'transaction_hash',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'transactionHash',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'job_id',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'jobId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     ..._i3.Protocol.targetTableDefinitions,
     ..._i4.Protocol.targetTableDefinitions,
     ..._i2.Protocol.targetTableDefinitions,
@@ -261,6 +444,27 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i9.BackendHealth) {
       return _i9.BackendHealth.fromJson(data) as T;
     }
+    if (t == _i10.AgentUnavailable) {
+      return _i10.AgentUnavailable.fromJson(data) as T;
+    }
+    if (t == _i11.HireRecord) {
+      return _i11.HireRecord.fromJson(data) as T;
+    }
+    if (t == _i12.HireConfigurationMissing) {
+      return _i12.HireConfigurationMissing.fromJson(data) as T;
+    }
+    if (t == _i13.HireLedgerUnavailable) {
+      return _i13.HireLedgerUnavailable.fromJson(data) as T;
+    }
+    if (t == _i14.HirePaymentRecord) {
+      return _i14.HirePaymentRecord.fromJson(data) as T;
+    }
+    if (t == _i15.HireRequestInvalid) {
+      return _i15.HireRequestInvalid.fromJson(data) as T;
+    }
+    if (t == _i16.HireView) {
+      return _i16.HireView.fromJson(data) as T;
+    }
     if (t == _i1.getType<_i5.AgentCatalogUnavailable?>()) {
       return (data != null ? _i5.AgentCatalogUnavailable.fromJson(data) : null)
           as T;
@@ -277,12 +481,38 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i9.BackendHealth?>()) {
       return (data != null ? _i9.BackendHealth.fromJson(data) : null) as T;
     }
+    if (t == _i1.getType<_i10.AgentUnavailable?>()) {
+      return (data != null ? _i10.AgentUnavailable.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i11.HireRecord?>()) {
+      return (data != null ? _i11.HireRecord.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i12.HireConfigurationMissing?>()) {
+      return (data != null
+              ? _i12.HireConfigurationMissing.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _i1.getType<_i13.HireLedgerUnavailable?>()) {
+      return (data != null ? _i13.HireLedgerUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i14.HirePaymentRecord?>()) {
+      return (data != null ? _i14.HirePaymentRecord.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i15.HireRequestInvalid?>()) {
+      return (data != null ? _i15.HireRequestInvalid.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i16.HireView?>()) {
+      return (data != null ? _i16.HireView.fromJson(data) : null) as T;
+    }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i10.AgentSummary>) {
+    if (t == List<_i17.AgentSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i10.AgentSummary>(e))
+              .map((e) => deserialize<_i17.AgentSummary>(e))
               .toList()
           as T;
     }
@@ -305,6 +535,13 @@ class Protocol extends _i1.SerializationManagerServer {
       _i7.ChainSubmission => 'ChainSubmission',
       _i8.Greeting => 'Greeting',
       _i9.BackendHealth => 'BackendHealth',
+      _i10.AgentUnavailable => 'AgentUnavailable',
+      _i11.HireRecord => 'HireRecord',
+      _i12.HireConfigurationMissing => 'HireConfigurationMissing',
+      _i13.HireLedgerUnavailable => 'HireLedgerUnavailable',
+      _i14.HirePaymentRecord => 'HirePaymentRecord',
+      _i15.HireRequestInvalid => 'HireRequestInvalid',
+      _i16.HireView => 'HireView',
       _ => null,
     };
   }
@@ -329,6 +566,20 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'Greeting';
       case _i9.BackendHealth():
         return 'BackendHealth';
+      case _i10.AgentUnavailable():
+        return 'AgentUnavailable';
+      case _i11.HireRecord():
+        return 'HireRecord';
+      case _i12.HireConfigurationMissing():
+        return 'HireConfigurationMissing';
+      case _i13.HireLedgerUnavailable():
+        return 'HireLedgerUnavailable';
+      case _i14.HirePaymentRecord():
+        return 'HirePaymentRecord';
+      case _i15.HireRequestInvalid():
+        return 'HireRequestInvalid';
+      case _i16.HireView():
+        return 'HireView';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -365,6 +616,27 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     if (dataClassName == 'BackendHealth') {
       return deserialize<_i9.BackendHealth>(data['data']);
+    }
+    if (dataClassName == 'AgentUnavailable') {
+      return deserialize<_i10.AgentUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HireRecord') {
+      return deserialize<_i11.HireRecord>(data['data']);
+    }
+    if (dataClassName == 'HireConfigurationMissing') {
+      return deserialize<_i12.HireConfigurationMissing>(data['data']);
+    }
+    if (dataClassName == 'HireLedgerUnavailable') {
+      return deserialize<_i13.HireLedgerUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HirePaymentRecord') {
+      return deserialize<_i14.HirePaymentRecord>(data['data']);
+    }
+    if (dataClassName == 'HireRequestInvalid') {
+      return deserialize<_i15.HireRequestInvalid>(data['data']);
+    }
+    if (dataClassName == 'HireView') {
+      return deserialize<_i16.HireView>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -404,6 +676,10 @@ class Protocol extends _i1.SerializationManagerServer {
     switch (t) {
       case _i7.ChainSubmission:
         return _i7.ChainSubmission.t;
+      case _i11.HireRecord:
+        return _i11.HireRecord.t;
+      case _i14.HirePaymentRecord:
+        return _i14.HirePaymentRecord.t;
     }
     return null;
   }

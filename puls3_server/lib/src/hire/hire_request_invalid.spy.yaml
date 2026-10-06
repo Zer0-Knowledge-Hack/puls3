@@ -1,0 +1,3 @@
+exception: HireRequestInvalid
+fields:
+  message: String
