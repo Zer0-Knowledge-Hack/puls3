@@ -675,6 +675,37 @@ fn client_cannot_be_the_provider() {
 }
 
 #[test]
+fn evaluator_is_provider_has_code_117() {
+    assert_eq!(EscrowError::EvaluatorIsProvider as u32, 117);
+}
+
+#[test]
+fn evaluator_cannot_be_the_provider() {
+    let ctx = setup();
+    let r = ctx.escrow().try_create_job(
+        &ctx.client,
+        &ctx.provider,
+        &ctx.provider,
+        &(NOW + 100),
+        &ctx.desc("job"),
+        &None,
+        &ctx.agent_id,
+        &ctx.token,
+        &BUDGET,
+    );
+    assert_eq!(err(r), EscrowError::EvaluatorIsProvider);
+    assert_eq!(ctx.escrow().job_count(), 0);
+    assert!(ctx.job_events().events().is_empty());
+}
+
+#[test]
+fn evaluator_equal_to_client_is_accepted() {
+    let ctx = setup();
+    let id = ctx.create(NOW + 100);
+    assert_eq!(ctx.escrow().get_job(&id).evaluator, ctx.client);
+}
+
+#[test]
 fn create_job_requires_client_authorization() {
     let ctx = setup();
     ctx.env.mock_auths(&[]);
@@ -2193,6 +2224,60 @@ fn extend_ttl_for_an_unknown_job_only_bumps_the_instance() {
     assert_eq!(instance_ttl(&ctx), TTL_BUMP);
 }
 
+fn claimable_ttl(ctx: &Ctx, recipient: &Address, token: &Address) -> u32 {
+    let key = DataKey::Claimable(recipient.clone(), token.clone());
+    ctx.env.as_contract(&ctx.escrow_id, || {
+        ctx.env.storage().persistent().get_ttl(&key)
+    })
+}
+
+#[test]
+fn extend_claimable_ttl_restores_a_decayed_entry() {
+    let (ctx, _treasury) = setup_mock(0);
+    let id = ctx.submitted(LATE_EXPIRY);
+    ctx.mock().set_blocked(&ctx.provider, &1);
+    ctx.escrow().complete(&ctx.client, &id, &ctx.hash(5));
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    age_ledger(&ctx);
+    assert!(claimable_ttl(&ctx, &ctx.provider, &ctx.token) < TTL_THRESHOLD);
+    let caller = Address::generate(&ctx.env);
+    let (escrow_before, provider_before, caller_before) = (
+        ctx.balance(&ctx.escrow_id),
+        ctx.balance(&ctx.provider),
+        ctx.balance(&caller),
+    );
+    ctx.env.mock_auths(&[]);
+    ctx.escrow().extend_claimable_ttl(&ctx.provider, &ctx.token);
+    assert_eq!(claimable_ttl(&ctx, &ctx.provider, &ctx.token), TTL_BUMP);
+    assert_eq!(instance_ttl(&ctx), TTL_BUMP);
+    assert_eq!(ctx.claimable(&ctx.provider), BUDGET);
+    assert_eq!(ctx.balance(&ctx.escrow_id), escrow_before);
+    assert_eq!(ctx.balance(&ctx.provider), provider_before);
+    assert_eq!(ctx.balance(&caller), caller_before);
+    assert!(ctx.job_events().events().is_empty());
+    ctx.env.mock_all_auths();
+    ctx.mock().set_blocked(&ctx.provider, &0);
+    assert_eq!(ctx.escrow().withdraw(&ctx.provider, &ctx.token), BUDGET);
+    assert_eq!(ctx.balance(&ctx.provider), BUDGET);
+}
+
+#[test]
+fn extend_claimable_ttl_for_an_unknown_entry_only_bumps_the_instance() {
+    let ctx = setup();
+    age_ledger(&ctx);
+    assert!(instance_ttl(&ctx) < TTL_THRESHOLD);
+    let recipient = Address::generate(&ctx.env);
+    let token = Address::generate(&ctx.env);
+    ctx.escrow().extend_claimable_ttl(&recipient, &token);
+    assert_eq!(instance_ttl(&ctx), TTL_BUMP);
+    let key = DataKey::Claimable(recipient.clone(), token.clone());
+    let exists = ctx
+        .env
+        .as_contract(&ctx.escrow_id, || ctx.env.storage().persistent().has(&key));
+    assert!(!exists);
+    assert_eq!(ctx.escrow().claimable(&recipient, &token), 0);
+}
+
 #[test]
 fn allow_list_entries_are_bumped_when_they_are_used() {
     let ctx = setup();
@@ -2252,6 +2337,7 @@ fn contract_exports_exactly_the_specified_functions() {
         "extend_ttl",
         "withdraw",
         "claimable",
+        "extend_claimable_ttl",
     ];
     expected.sort_unstable();
     // No dispute, arbiter, pause, split, set_budget, set_provider, sweep or upgrade entry point.

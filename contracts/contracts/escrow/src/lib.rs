@@ -67,6 +67,8 @@ pub enum EscrowError {
     FeeExceedsMax = 115,
     /// `withdraw`: the caller has no claimable balance for that token.
     NothingToWithdraw = 116,
+    /// `create_job`: the evaluator is the provider (a provider cannot approve its own work).
+    EvaluatorIsProvider = 117,
 }
 
 #[contracttype]
@@ -426,6 +428,9 @@ impl EscrowContract {
         if caller == provider {
             return Err(EscrowError::ClientIsProvider);
         }
+        if evaluator == provider {
+            return Err(EscrowError::EvaluatorIsProvider);
+        }
         verify_provider(e, agent_id, &provider)?;
         let job_id = next_job_id(e);
         let job = Job {
@@ -753,6 +758,16 @@ impl EscrowContract {
     pub fn extend_ttl(e: &Env, job_id: u64) {
         extend_instance(e);
         let key = DataKey::Job(job_id);
+        if e.storage().persistent().has(&key) {
+            extend_persistent(e, &key);
+        }
+    }
+
+    /// Anyone can call it. Keeps the instance and a deferred payout entry alive. It does
+    /// nothing to the entry when it is absent, and never credits or moves funds.
+    pub fn extend_claimable_ttl(e: &Env, recipient: Address, token: Address) {
+        extend_instance(e);
+        let key = DataKey::Claimable(recipient, token);
         if e.storage().persistent().has(&key) {
             extend_persistent(e, &key);
         }

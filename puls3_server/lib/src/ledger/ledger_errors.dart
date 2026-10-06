@@ -26,3 +26,18 @@ final class LedgerContractError extends LedgerException {
   /// The `Error(Contract, #code)` number.
   final int code;
 }
+
+/// The node answered and refused the request itself: a JSON-RPC
+/// `invalid request` (-32600) or `invalid params` (-32602) error, for
+/// example a `sendTransaction` envelope it cannot decode. Sending the same
+/// request again gives the same answer, unlike a [LedgerUnavailable].
+final class RpcRequestRejected extends LedgerException {
+  const RpcRequestRejected(this.code, this.rpcMessage, String message)
+    : super(message);
+
+  /// The JSON-RPC error code.
+  final int code;
+
+  /// The JSON-RPC error message, as the node sent it.
+  final String rpcMessage;
+}
