@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  puls3: Stellar/Soroban agent marketplace. Polyglot monorepo, no workspace-wide test command.
+  Dart pub workspace (root pubspec.yaml): puls3_domain (pure Dart), puls3_client + puls3_server (Serverpod 3.4.13), puls3_flutter (Flutter app).
+  contracts/: Rust Soroban workspace (soroban-sdk 28, members contracts/*: identity-registry, placeholder).
+  CI: .github/workflows/ci.yml, per-component jobs (flutter 3.41.4, rust 1.98.1, stellar-cli 28.0.0).
+  Conventions: conventional commits, no AI attribution; artifacts in English.
+
+strict_tdd: false
+strict_tdd_reason: >-
+  No explicit workspace-level test command covers every project (CI runs per-component).
+  Per-project runners exist (see testing). Set strict_tdd: true only after a workspace-wide
+  test target is defined.
+
+projects:
+  - path: puls3_domain
+    stack: Dart (pure)
+    test: "cd puls3_domain && dart test"
+    analyze: "dart analyze --fatal-infos"
+  - path: puls3_server
+    stack: Dart / Serverpod 3.4.13
+    test: "cd puls3_server && dart test"
+    notes: integration tests tagged `integration`, need Postgres (9090) + Redis (9091) and config/passwords.yaml
+    analyze: "dart analyze --fatal-infos"
+  - path: puls3_client
+    stack: Dart / Serverpod client (generated)
+    test: null
+  - path: puls3_flutter
+    stack: Flutter
+    test: "cd puls3_flutter && flutter test"
+    analyze: "flutter analyze --fatal-infos"
+  - path: contracts
+    stack: Rust / Soroban
+    test: "cd contracts && cargo test"
+    analyze: "cargo clippy --all-targets -- -D warnings"
+    format: "cargo fmt --all -- --check"
+
+testing:
+  coverage: none configured
+  layers:
+    unit: [dart test, flutter test, cargo test]
+    integration: puls3_server/test/integration (serverpod_test)
+    e2e: none
+
+rules:
+  proposal:
+    - Include rollback plan and affected components (domain, server, client, app, contracts).
+  tasks:
+    - Keep each work unit within the 400 changed-line review budget.
+  apply:
+    - Run the owning project's test command; regenerate Serverpod code when protocol files change.
+  verify:
+    - Run analyze plus test for each affected component, mirroring CI.
