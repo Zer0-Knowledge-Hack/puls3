@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import '../deploy/deploy_gateway.dart';
 import '../domain/stellar_format.dart';
 import 'agent_catalog.dart';
+import 'notification_center.dart';
+import 'profile_controller.dart';
 import 'wallet_controller.dart';
 
 /// Exposes app-wide dependencies to containers (screens). Presentational
@@ -14,6 +16,8 @@ class AppScope extends InheritedWidget {
     required this.wallet,
     required this.ids,
     required this.deployGateway,
+    required this.notifications,
+    required this.profile,
     required super.child,
   });
 
@@ -21,6 +25,8 @@ class AppScope extends InheritedWidget {
   final WalletController wallet;
   final FakeLedgerIds ids;
   final DeployGateway deployGateway;
+  final NotificationCenter notifications;
+  final ProfileController profile;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
@@ -33,5 +39,7 @@ class AppScope extends InheritedWidget {
       catalog != oldWidget.catalog ||
       wallet != oldWidget.wallet ||
       ids != oldWidget.ids ||
-      deployGateway != oldWidget.deployGateway;
+      deployGateway != oldWidget.deployGateway ||
+      notifications != oldWidget.notifications ||
+      profile != oldWidget.profile;
 }

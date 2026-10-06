@@ -68,3 +68,10 @@ Future<void> advance(WidgetTester tester, Duration duration) async {
     elapsed += step;
   }
 }
+
+/// [text] inside the marketplace results list (not the "Top rated"
+/// carousel, which repeats some agents).
+Finder inResults(String text) => find.descendant(
+  of: find.byKey(const ValueKey('market-results')),
+  matching: find.text(text),
+);

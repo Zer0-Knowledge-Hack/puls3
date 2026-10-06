@@ -26,6 +26,11 @@ class WalletController extends ChangeNotifier {
     }
   }
 
+  Future<void> disconnect() async {
+    await _wallet.disconnect();
+    notifyListeners();
+  }
+
   Future<String> signTransaction(String unsignedXdr) async {
     final hash = await _wallet.signTransaction(unsignedXdr);
     notifyListeners();

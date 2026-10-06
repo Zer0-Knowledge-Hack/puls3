@@ -121,10 +121,17 @@ abstract final class Puls3Fonts {
 /// h2 36, h3 24, body 16, caption 13, data 13. The guide pairs h1 and h2 with
 /// compact sizes of 44 and 28.
 abstract final class Puls3Text {
+  /// Phone type scale (set by the app root below 640 px wide): an app-like
+  /// 14 px body and 18-28 px titles instead of the desktop brand sizes.
+  static bool compact = false;
+
+  static double _size(double desktop, double phone) =>
+      compact ? phone : desktop;
+
   // Display: Unbounded.
   static TextStyle get display => Puls3Fonts.display(
-    const TextStyle(
-      fontSize: 72,
+    TextStyle(
+      fontSize: _size(72, 34),
       height: 1.02,
       fontWeight: FontWeight.w700,
       letterSpacing: -1.5,
@@ -133,8 +140,8 @@ abstract final class Puls3Text {
   );
 
   static TextStyle get h1 => Puls3Fonts.display(
-    const TextStyle(
-      fontSize: 56,
+    TextStyle(
+      fontSize: _size(56, 28),
       height: 1.05,
       fontWeight: FontWeight.w700,
       letterSpacing: -1,
@@ -142,22 +149,22 @@ abstract final class Puls3Text {
     ),
   );
 
-  static TextStyle get h1Compact => h1.copyWith(fontSize: 44);
+  static TextStyle get h1Compact => h1.copyWith(fontSize: _size(44, 26));
 
   static TextStyle get h2 => Puls3Fonts.display(
-    const TextStyle(
-      fontSize: 36,
+    TextStyle(
+      fontSize: _size(36, 22),
       height: 1.1,
       fontWeight: FontWeight.w500,
       color: Puls3Colors.text,
     ),
   );
 
-  static TextStyle get h2Compact => h2.copyWith(fontSize: 28);
+  static TextStyle get h2Compact => h2.copyWith(fontSize: _size(28, 20));
 
   static TextStyle get h3 => Puls3Fonts.display(
-    const TextStyle(
-      fontSize: 24,
+    TextStyle(
+      fontSize: _size(24, 18),
       height: 1.2,
       fontWeight: FontWeight.w500,
       color: Puls3Colors.text,
@@ -166,24 +173,24 @@ abstract final class Puls3Text {
 
   // UI: Manrope.
   static TextStyle get title => Puls3Fonts.ui(
-    const TextStyle(
-      fontSize: 17,
+    TextStyle(
+      fontSize: _size(17, 15),
       fontWeight: FontWeight.w700,
       color: Puls3Colors.text,
     ),
   );
 
   static TextStyle get lead => Puls3Fonts.ui(
-    const TextStyle(
-      fontSize: 18,
+    TextStyle(
+      fontSize: _size(18, 14),
       height: 1.5,
       color: Puls3Colors.muted,
     ),
   );
 
   static TextStyle get body => Puls3Fonts.ui(
-    const TextStyle(
-      fontSize: 16,
+    TextStyle(
+      fontSize: _size(16, 14),
       height: 1.5,
       color: Puls3Colors.text,
     ),
@@ -192,31 +199,31 @@ abstract final class Puls3Text {
   static TextStyle get bodyMuted => body.copyWith(color: Puls3Colors.muted);
 
   static TextStyle get caption => Puls3Fonts.ui(
-    const TextStyle(
-      fontSize: 13,
+    TextStyle(
+      fontSize: _size(13, 12),
       fontWeight: FontWeight.w600,
       color: Puls3Colors.text,
     ),
   );
 
   static TextStyle get button => Puls3Fonts.ui(
-    const TextStyle(
-      fontSize: 15,
+    TextStyle(
+      fontSize: _size(15, 14),
       fontWeight: FontWeight.w700,
     ),
   );
 
   // Data: JetBrains Mono.
   static TextStyle get data => Puls3Fonts.data(
-    const TextStyle(
-      fontSize: 13,
+    TextStyle(
+      fontSize: _size(13, 12),
       color: Puls3Colors.text,
     ),
   );
 
   static TextStyle get dataLg => Puls3Fonts.data(
-    const TextStyle(
-      fontSize: 20,
+    TextStyle(
+      fontSize: _size(20, 16),
       fontWeight: FontWeight.w500,
       color: Puls3Colors.text,
     ),
@@ -224,8 +231,8 @@ abstract final class Puls3Text {
 
   /// Section eyebrow, e.g. "03 · PRIMARY LOGO" in the guide.
   static TextStyle get eyebrow => Puls3Fonts.data(
-    const TextStyle(
-      fontSize: 12,
+    TextStyle(
+      fontSize: _size(12, 11),
       fontWeight: FontWeight.w500,
       letterSpacing: 1.4,
       color: Puls3Colors.muted,
@@ -234,24 +241,24 @@ abstract final class Puls3Text {
 
   // Accent: Doto. Big numbers, stats and status labels only.
   static TextStyle get accentXl => Puls3Fonts.accent(
-    const TextStyle(
-      fontSize: 64,
+    TextStyle(
+      fontSize: _size(64, 36),
       height: 1,
       color: Puls3Colors.accent,
     ),
   );
 
   static TextStyle get accentLg => Puls3Fonts.accent(
-    const TextStyle(
-      fontSize: 40,
+    TextStyle(
+      fontSize: _size(40, 26),
       height: 1,
       color: Puls3Colors.accent,
     ),
   );
 
   static TextStyle get accentMd => Puls3Fonts.accent(
-    const TextStyle(
-      fontSize: 24,
+    TextStyle(
+      fontSize: _size(24, 18),
       height: 1.1,
       letterSpacing: 1,
       color: Puls3Colors.accent,
@@ -292,6 +299,8 @@ abstract final class Puls3Theme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      // Phones: tighter buttons, chips and tiles; tap targets stay 48 px.
+      visualDensity: Puls3Text.compact ? VisualDensity.compact : null,
       colorScheme: scheme,
       scaffoldBackgroundColor: Puls3Colors.background,
       canvasColor: Puls3Colors.background,
@@ -307,10 +316,17 @@ abstract final class Puls3Theme {
           color: Puls3Colors.accent,
         ),
         errorStyle: Puls3Text.caption.copyWith(color: Puls3Colors.accent),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: Puls3Spacing.md,
-          vertical: Puls3Spacing.md,
-        ),
+        // Phones: denser fields, about 44 px tall instead of 56.
+        isDense: Puls3Text.compact,
+        contentPadding: Puls3Text.compact
+            ? const EdgeInsets.symmetric(
+                horizontal: Puls3Spacing.sm,
+                vertical: Puls3Spacing.sm,
+              )
+            : const EdgeInsets.symmetric(
+                horizontal: Puls3Spacing.md,
+                vertical: Puls3Spacing.md,
+              ),
         border: border(Puls3Colors.hairline),
         enabledBorder: border(Puls3Colors.hairline),
         focusedBorder: border(Puls3Colors.accent),

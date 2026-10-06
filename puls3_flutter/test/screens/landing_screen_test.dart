@@ -25,7 +25,7 @@ void main() {
     await tester.tap(find.text('Explore Marketplace'));
     await advance(tester, const Duration(milliseconds: 800));
 
-    expect(find.text('SHOWING 2 OF 2'), findsOneWidget);
+    expect(find.text('All agents'), findsOneWidget);
     expect(find.text('The agent hub on Stellar.'), findsNothing);
   });
 

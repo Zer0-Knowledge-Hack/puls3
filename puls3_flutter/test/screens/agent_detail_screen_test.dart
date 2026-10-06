@@ -32,7 +32,7 @@ void main() {
 
     await tester.tap(find.text('Back to Marketplace'));
     await advance(tester, const Duration(milliseconds: 600));
-    expect(find.text('Soroban Auditor'), findsOneWidget);
+    expect(inResults('Soroban Auditor'), findsOneWidget);
   });
 
   testWidgets('Agent detail lays out on a phone', (tester) async {

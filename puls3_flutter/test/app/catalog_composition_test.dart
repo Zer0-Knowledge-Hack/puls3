@@ -38,7 +38,7 @@ void main() {
 
     expect(find.text('Chain Atlas'), findsOneWidget);
     expect(find.text('On-chain analytics'), findsWidgets);
-    expect(find.text('Ledger Scout'), findsNothing);
+    expect(inResults('Ledger Scout'), findsNothing);
   });
 
   testWidgets('a failing server shows the fallback catalog', (tester) async {
@@ -48,8 +48,8 @@ void main() {
       repository: compose(() async => throw StateError('server down')),
     );
 
-    expect(find.text('Ledger Scout'), findsOneWidget);
-    expect(find.text('Soroban Auditor'), findsOneWidget);
+    expect(inResults('Ledger Scout'), findsOneWidget);
+    expect(inResults('Soroban Auditor'), findsOneWidget);
   });
 
   testWidgets('an empty server catalog shows an empty market', (tester) async {
@@ -59,7 +59,7 @@ void main() {
       repository: compose(() async => []),
     );
 
-    expect(find.text('No agents match your filters.'), findsOneWidget);
-    expect(find.text('Ledger Scout'), findsNothing);
+    expect(find.text('No agents found'), findsOneWidget);
+    expect(inResults('Ledger Scout'), findsNothing);
   });
 }

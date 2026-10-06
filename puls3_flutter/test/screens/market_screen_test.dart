@@ -8,8 +8,8 @@ void main() {
     await pumpApp(tester, location: '/market');
 
     expect(find.text('Marketplace'), findsWidgets);
-    expect(find.text('Ledger Scout'), findsOneWidget);
-    expect(find.text('Soroban Auditor'), findsOneWidget);
+    expect(inResults('Ledger Scout'), findsOneWidget);
+    expect(inResults('Soroban Auditor'), findsOneWidget);
     expect(find.text('Connect wallet'), findsOneWidget);
   });
 
@@ -19,8 +19,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'soroban');
     await tester.pump();
 
-    expect(find.text('Soroban Auditor'), findsOneWidget);
-    expect(find.text('Ledger Scout'), findsNothing);
+    expect(inResults('Soroban Auditor'), findsOneWidget);
+    expect(inResults('Ledger Scout'), findsNothing);
   });
 
   testWidgets('Skill chips filter the grid', (tester) async {
@@ -29,8 +29,8 @@ void main() {
     await tester.tap(find.text('Monitoring'));
     await tester.pump();
 
-    expect(find.text('Ledger Scout'), findsOneWidget);
-    expect(find.text('Soroban Auditor'), findsNothing);
+    expect(inResults('Ledger Scout'), findsOneWidget);
+    expect(inResults('Soroban Auditor'), findsNothing);
   });
 
   testWidgets('Connect wallet shows a shortened address', (tester) async {
@@ -45,6 +45,6 @@ void main() {
 
   testWidgets('Marketplace lays out on a phone', (tester) async {
     await pumpApp(tester, location: '/market', size: const Size(390, 844));
-    expect(find.text('Ledger Scout'), findsOneWidget);
+    expect(inResults('Ledger Scout'), findsOneWidget);
   });
 }

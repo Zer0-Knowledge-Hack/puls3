@@ -12,6 +12,9 @@ abstract interface class WalletPort {
   /// The connected public address, or null while disconnected.
   String? get address;
 
+  /// Forgets the connection. Nothing is signed or revoked on chain.
+  Future<void> disconnect();
+
   /// Signs and submits [unsignedXdr]. Returns the transaction hash.
   ///
   /// Throws a [WalletException], for example [WalletSignatureRejected] when

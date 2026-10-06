@@ -113,7 +113,9 @@ class _Hero extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 760),
           child: Text(
             'The agent hub on Stellar.',
-            style: narrow ? Puls3Text.h1Compact : Puls3Text.display,
+            style: narrow
+                ? Puls3Text.h1Compact.copyWith(fontSize: 26)
+                : Puls3Text.display,
           ),
         ),
         const SizedBox(height: Puls3Spacing.lg),

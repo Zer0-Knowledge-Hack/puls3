@@ -27,10 +27,14 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final filled = variant == PrimaryButtonVariant.filled;
     final foreground = filled ? Puls3Colors.onAccent : Puls3Colors.text;
+    // Phones: 44 px keeps a comfortable touch target without bulky buttons.
+    final compact = MediaQuery.sizeOf(context).width < 640;
     final style = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(0, 52)),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: Puls3Spacing.lg),
+      minimumSize: WidgetStatePropertyAll(Size(0, compact ? 44 : 52)),
+      padding: WidgetStatePropertyAll(
+        EdgeInsets.symmetric(
+          horizontal: compact ? Puls3Spacing.md : Puls3Spacing.lg,
+        ),
       ),
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: Puls3Radius.pillAll),
@@ -73,7 +77,7 @@ class PrimaryButton extends StatelessWidget {
               ),
             )
           else if (icon != null)
-            Icon(icon, size: 18),
+            Icon(icon, size: compact ? 16 : 18),
           if (isLoading || icon != null) const SizedBox(width: Puls3Spacing.xs),
           Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
         ],

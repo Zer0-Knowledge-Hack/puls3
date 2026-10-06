@@ -72,10 +72,9 @@ void main() {
     expect(find.text('Agent deployed'), findsOneWidget);
   });
 
-  // From 360 px. At 320 px the existing top bar (logo, links and wallet
-  // chip) does not fit before any deploy; that layout is outside #27. The
-  // deploy flow alone is checked from 320 px in
-  // test/deploy/deploy_flow_test.dart.
+  // From 360 px. At 320 px the top bar itself does not fit (logo, links and
+  // wallet chip), before any deploy; that layout is outside #27. The deploy
+  // flow alone is checked from 320 px in test/deploy/deploy_flow_test.dart.
   for (final size in const [Size(360, 800), Size(390, 844), Size(414, 896)]) {
     testWidgets(
       'The deploy sheet fits a ${size.width.toInt()} px phone from start to live',
