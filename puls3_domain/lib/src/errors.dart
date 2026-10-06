@@ -115,7 +115,7 @@ final class InvalidHire extends DomainError {
     HireProblem.priceNotPositive => 'hire price must be greater than zero',
     HireProblem.manifestVersionBelowOne =>
       'manifest version must be at least 1',
-    HireProblem.failureReasonEmpty => 'a failed hire needs a reason',
+    HireProblem.failureReasonEmpty => 'a failed run needs a reason',
   };
 }
 
@@ -146,6 +146,39 @@ final class PaymentNotFromConsumer extends DomainError {
 
   @override
   String get message => 'a hire must be paid by its own consumer';
+}
+
+/// A runtime progress update that the hire's state does not allow. Runtime
+/// progress moves only while the hire is `funded`: `queued` → `running`, and
+/// `queued` or `running` → `failed`.
+final class InvalidRuntimeTransition extends DomainError {
+  const InvalidRuntimeTransition(this.status, this.runtimeStatus);
+
+  final HireStatus status;
+  final RuntimeStatus? runtimeStatus;
+
+  @override
+  String get message =>
+      'cannot update the run of a ${status.name} hire '
+      '(run: ${runtimeStatus?.name ?? 'none'})';
+}
+
+/// Feedback can only be recorded on a `completed` hire (ADR-0005 D5, D6).
+final class HireNotCompleted extends DomainError {
+  const HireNotCompleted(this.status);
+
+  final HireStatus status;
+
+  @override
+  String get message => 'a ${status.name} hire cannot be rated';
+}
+
+/// The hire already has a feedback reference.
+final class HireAlreadyRated extends DomainError {
+  const HireAlreadyRated();
+
+  @override
+  String get message => 'a hire is rated at most once';
 }
 
 /// The feedback is not for this hire, this agent, or from this consumer.

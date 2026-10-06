@@ -11,9 +11,9 @@ The domain is the ubiquitous language of puls3. The backend, the app and the con
 | **Agent** | An AI agent published in puls3: it has an on-chain identity (`AgentId`), an owner, a wallet that receives its payments, skills, and a price per task. |
 | **Owner** | The Stellar address that registered the agent on-chain and controls it. It is the field `Agent.owner`, not a class. |
 | **Skill** | One thing an agent is good at, such as "Release notes". An agent lists between one and five. |
-| **Hire** | One task a consumer asks an agent to do, at the price the agent had when the hire was created. It moves through `requested`, `paid`, `inProgress`, `delivered`, `rated` (or `cancelled`, `failed`); see [Hire lifecycle](hire-lifecycle.md). |
+| **Hire** | One task a consumer asks an agent to do, at the price the agent had when the hire was created. It is an ERC-8183 escrow job and moves through the same states: `open`, `funded`, `submitted`, then `completed`, `rejected` or `expired` ([ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D6); see [Hire lifecycle](hire-lifecycle.md). Runtime progress and feedback are data on the hire, not states. |
 | **Payment** | The USDC transfer on Stellar that pays for a hire: who paid, who received, how much, and in which transaction. |
-| **Feedback** | The score (1 to 5) and optional comment a consumer leaves about a hire they paid for. |
+| **Feedback** | The score (1 to 5) and optional comment a consumer leaves about a hire they paid for. The hire keeps a reference to it once it is confirmed on-chain. |
 | **Reputation** | What the catalog shows about an agent's past work, computed from its feedback. The formula is #11; it is not a class here. |
 
 Value objects: `StellarAddress` (a `G…` account or `C…` contract address), `UsdcAmount` (USDC in stroops, an integer), `AgentId` (the on-chain agent id), `HireId`, `TransactionHash`.
@@ -45,6 +45,10 @@ classDiagram
     int manifestVersion
     HireStatus status
     TransactionHash paymentTransaction
+    RuntimeStatus runtimeStatus
+    String failureReason
+    HireStatus rejectedFrom
+    TransactionHash feedbackReference
   }
   class Payment {
     TransactionHash transaction
@@ -111,6 +115,8 @@ Each invariant has at least one test named after it (`I1`, `I2`, …) that fails
 | I15 | A `Payment` settles a `Hire` only if it is for that hire, it was paid to the agent's wallet, and the amount equals the hire price exactly (ADR-0003) | — (returns `false`) |
 | I16 | A `Feedback` score is an integer from 1 to 5 | `InvalidFeedback` |
 | I17 | A `Feedback` comment is at most 500 characters | `InvalidFeedback` |
-| I18 | A `Hire` changes state only through the transitions of [Hire lifecycle](hire-lifecycle.md); any other event is rejected, and terminal states (`rated`, `cancelled`, `failed`) accept none | `InvalidHireTransition` |
-| I19 | A `Hire` reaches `paid` only with a `Payment` that settles it (I15) and was made by the hire's consumer, and keeps that payment's transaction hash from then on | `PaymentDoesNotSettleHire`, `PaymentNotFromConsumer` |
-| I20 | A `Hire` is rated only with feedback for that hire and agent, left by its consumer | `FeedbackDoesNotMatchHire` |
+| I18 | A `Hire` changes state only through the transitions of [Hire lifecycle](hire-lifecycle.md), which mirror ERC-8183; any other event is rejected, and terminal states (`completed`, `rejected`, `expired`) accept none | `InvalidHireTransition` |
+| I19 | A `Hire` reaches `funded` only with a `Payment` that settles it (I15) and was made by the hire's consumer, and keeps that payment's transaction hash from then on | `PaymentDoesNotSettleHire`, `PaymentNotFromConsumer` |
+| I20 | A `Hire` records feedback only when it is `completed`, at most once, and only for that hire and agent, left by its consumer. Its status does not change | `HireNotCompleted`, `HireAlreadyRated`, `FeedbackDoesNotMatchHire` |
+| I21 | Runtime progress moves only while the hire is `funded`: `queued` (set by `fund`) → `running`, and `queued` or `running` → `failed` with a non-blank reason | `InvalidRuntimeTransition`, `InvalidHire` |
+| I22 | A `rejected` hire records the state it was rejected from (`open`, `funded` or `submitted`) | — |
