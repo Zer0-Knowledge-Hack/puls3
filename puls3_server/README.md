@@ -1,8 +1,54 @@
 # puls3 Serverpod backend
 
 Serverpod **3.4.13**, pinned on **2026-09-26**. The backend currently exposes a
-minimal `health` endpoint so the Flutter app can verify the generated client,
-server, and shared workspace are connected.
+`health` endpoint so the Flutter app can verify the generated client, server,
+and shared workspace are connected, and a read-only `agent` endpoint that serves
+the agent catalog from the on-chain identity registry.
+
+## Agent catalog endpoint
+
+`agent.list` returns every agent with valid metadata (`AgentSummary`: `id`,
+`registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, optional
+`wallet` and `model`). `agent.get(id)` returns the agent with that metadata id,
+for example `agt-001`, or `null` when there is none. There is no rating: the
+registry does not store one.
+
+The registry has no list function, so the server reads `total_agents` and then
+the metadata of ids `0` to `total - 1` through Soroban RPC simulations (four
+agents at a time). An agent whose metadata is missing or invalid, such as a
+superseded registration, is skipped. The endpoint never signs or submits a
+transaction.
+
+The chain is read from the testnet values unless these variables override
+them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
+`PULS3_STELLAR_USDC_SAC`, `PULS3_STELLAR_IDENTITY_REGISTRY`,
+`PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
+times out after 8 seconds.
+
+The built list is cached in memory for 60 seconds, and concurrent callers share
+one refresh. If a refresh fails because the chain cannot be read, the last list
+is served. With no cached list, `list` and `get` throw the serializable
+`AgentCatalogUnavailable` exception; an outage is never an empty list, and an
+unknown id is never reported as an outage.
+
+## Chain submission tracker
+
+A background loop drives relayed `ChainSubmission` records from `submitted`
+to `confirmed` or `failed` (relay step 5 in `docs/architecture/api.md`). Each
+pass polls `getTransaction` for up to 100 records, resends the persisted
+envelope at most every 30 seconds while the transaction is not found, fails
+it as `PreparationExpired` once the chain time passes its time bounds, and
+confirms `createJob` and `fund` from their escrow events. The domain effects
+on the hire are a no-op until the hire lifecycle lands (#96).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_TRACKER_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_TRACKER_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
+
+It is off by default so tests, CI and existing deployments do not poll the
+chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
+writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
 ## Prerequisites
 

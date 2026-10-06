@@ -1,0 +1,90 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "transactionDataJson": {
+      "ext": "v0",
+      "resources": {
+        "footprint": {
+          "read_only": [
+            {
+              "contract_data": {
+                "contract": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+                "key": "ledger_key_contract_instance",
+                "durability": "persistent"
+              }
+            },
+            {
+              "contract_code": {
+                "hash": "0cf4ff3fea9858693e904275d3248679101044bea84a6ad9f234d1abc4b1bf67"
+              }
+            }
+          ],
+          "read_write": []
+        },
+        "instructions": 554729,
+        "disk_read_bytes": 0,
+        "write_bytes": 0
+      },
+      "resource_fee": "12752"
+    },
+    "eventsJson": [
+      {
+        "in_successful_contract_call": true,
+        "event": {
+          "ext": "v0",
+          "contract_id": null,
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_call"
+                },
+                {
+                  "bytes": "fb0cb946886bbe8bb21cfcf37e5fd5cc6e04f000b4befb0b68523a2f8b1b2772"
+                },
+                {
+                  "symbol": "total_agents"
+                }
+              ],
+              "data": "void"
+            }
+          }
+        }
+      },
+      {
+        "in_successful_contract_call": true,
+        "event": {
+          "ext": "v0",
+          "contract_id": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_return"
+                },
+                {
+                  "symbol": "total_agents"
+                }
+              ],
+              "data": {
+                "u32": 15
+              }
+            }
+          }
+        }
+      }
+    ],
+    "minResourceFee": "12752",
+    "results": [
+      {
+        "returnValueJson": {
+          "u32": 15
+        }
+      }
+    ],
+    "latestLedger": 5024908
+  }
+}

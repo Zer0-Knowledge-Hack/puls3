@@ -6,6 +6,8 @@ import 'package:puls3_client/puls3_client.dart';
 
 import 'src/app.dart';
 import 'src/data/agent_repository.dart';
+import 'src/data/fallback_agent_repository.dart';
+import 'src/data/server_agent_repository.dart';
 import 'src/wallet/mock_wallet.dart';
 
 /// Starts the demo shell and verifies the generated Serverpod client connection.
@@ -20,7 +22,12 @@ Future<void> main() async {
 
   runApp(
     Puls3App(
-      repository: AssetAgentRepository(),
+      // Server catalog first; the bundled demo catalog covers an unreachable
+      // or slow server.
+      repository: FallbackAgentRepository(
+        ServerAgentRepository(() => client.agent.list()),
+        AssetAgentRepository(),
+      ),
       wallet: MockWallet(),
       healthCheck: client.health.check().then((health) => health.version),
     ),

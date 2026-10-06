@@ -13,6 +13,8 @@ dependencies:
   puls3_domain:
     path: ../puls3_domain
   serverpod: 3.4.13
+  http: ^1.6.0
+  meta: ^1.17.0
   serverpod_auth_idp_server: 3.4.13
 
 dev_dependencies:

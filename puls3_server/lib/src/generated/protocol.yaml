@@ -1,3 +1,6 @@
+agent:
+  - list:
+  - get:
 emailIdp:
   - login:
   - startRegistration:

@@ -1,0 +1,108 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "transactionDataJson": {
+      "ext": "v0",
+      "resources": {
+        "footprint": {
+          "read_only": [
+            {
+              "contract_data": {
+                "contract": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Owner"
+                    },
+                    {
+                      "u32": 99999
+                    }
+                  ]
+                },
+                "durability": "persistent"
+              }
+            },
+            {
+              "contract_data": {
+                "contract": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+                "key": "ledger_key_contract_instance",
+                "durability": "persistent"
+              }
+            },
+            {
+              "contract_code": {
+                "hash": "0cf4ff3fea9858693e904275d3248679101044bea84a6ad9f234d1abc4b1bf67"
+              }
+            }
+          ],
+          "read_write": []
+        },
+        "instructions": 569118,
+        "disk_read_bytes": 0,
+        "write_bytes": 0
+      },
+      "resource_fee": "13146"
+    },
+    "eventsJson": [
+      {
+        "in_successful_contract_call": true,
+        "event": {
+          "ext": "v0",
+          "contract_id": null,
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_call"
+                },
+                {
+                  "bytes": "fb0cb946886bbe8bb21cfcf37e5fd5cc6e04f000b4befb0b68523a2f8b1b2772"
+                },
+                {
+                  "symbol": "agent_exists"
+                }
+              ],
+              "data": {
+                "u32": 99999
+              }
+            }
+          }
+        }
+      },
+      {
+        "in_successful_contract_call": true,
+        "event": {
+          "ext": "v0",
+          "contract_id": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+          "type": "diagnostic",
+          "body": {
+            "v0": {
+              "topics": [
+                {
+                  "symbol": "fn_return"
+                },
+                {
+                  "symbol": "agent_exists"
+                }
+              ],
+              "data": {
+                "bool": false
+              }
+            }
+          }
+        }
+      }
+    ],
+    "minResourceFee": "13146",
+    "results": [
+      {
+        "returnValueJson": {
+          "bool": false
+        }
+      }
+    ],
+    "latestLedger": 5024570
+  }
+}

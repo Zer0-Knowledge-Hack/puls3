@@ -1,0 +1,18 @@
+{
+  "command": "stellar contract invoke --id CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ --source-account <identity of GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY> --network testnet --send=no --build-only -- get_metadata --agent_id 7 --key '\"name\"'",
+  "recordedOn": "2026-10-04",
+  "source": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY",
+  "contract": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ",
+  "function": "get_metadata",
+  "args": [
+    {
+      "u32": 7
+    },
+    {
+      "string": "name"
+    }
+  ],
+  "fee": 100,
+  "sequence": "20920643964895254",
+  "base64": "AAAAAgAAAAALTFem3IKkPAUdQKzU2GpxvAmO0ofnXnTSsCQRk2bkxAAAAGQASlM3AAAAFgAAAAAAAAAAAAAAAQAAAAAAAAAYAAAAAAAAAAH7DLlGiGu+i7Ic/PN+X9XMbgTwALS++wtoUjovixsncgAAAAxnZXRfbWV0YWRhdGEAAAACAAAAAwAAAAcAAAAOAAAABG5hbWUAAAAAAAAAAAAAAAA="
+}
