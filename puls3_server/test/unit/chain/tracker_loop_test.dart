@@ -84,6 +84,7 @@ void main() {
 
     TrackerLoop loop() => TrackerLoop(
       interval: const Duration(seconds: 5),
+      passTimeout: const Duration(minutes: 1),
       runPass: () async {
         passes++;
         await gate?.future;
@@ -137,6 +138,7 @@ void main() {
       var calls = 0;
       final l = TrackerLoop(
         interval: const Duration(seconds: 5),
+        passTimeout: const Duration(minutes: 1),
         runPass: () async {
           calls++;
           if (calls == 1) throw StateError('database down');
@@ -159,6 +161,37 @@ void main() {
       expect(
         logged,
         contains(allOf(startsWith('error'), contains('database down'))),
+      );
+    });
+
+    test('a hung pass times out, is logged and a later tick runs a new '
+        'pass', () async {
+      var calls = 0;
+      final l = TrackerLoop(
+        interval: const Duration(seconds: 5),
+        passTimeout: const Duration(milliseconds: 20),
+        runPass: () {
+          calls++;
+          return calls == 1 ? Completer<void>().future : Future.value();
+        },
+        log: (level, message) => logged.add('${level.name}: $message'),
+        periodic: (interval, callback) {
+          final timer = _ManualTimer(interval, callback);
+          timers.add(timer);
+          return timer;
+        },
+      )..start();
+
+      timers.single.fire();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      timers.single.fire();
+      await pumpEventQueue();
+
+      expect(calls, 2);
+      expect(l.isRunning, isTrue);
+      expect(
+        logged,
+        contains(allOf(startsWith('error'), contains('timed out'))),
       );
     });
 

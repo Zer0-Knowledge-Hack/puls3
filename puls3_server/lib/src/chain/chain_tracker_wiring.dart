@@ -14,6 +14,11 @@ import 'tracker_loop.dart';
 
 const _rpcTimeout = Duration(seconds: 8);
 
+/// Longest a pass may run before the loop gives up on it. A full batch of
+/// RPC calls normally takes seconds; this only catches a hung pass, such as
+/// a stuck database call.
+const _passTimeout = Duration(minutes: 5);
+
 /// Starts the chain submission tracker when [env] enables it (see
 /// [TrackerLoopConfig]) and returns its loop, or returns `null`.
 ///
@@ -37,6 +42,7 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   );
   final loop = TrackerLoop(
     interval: config.interval,
+    passTimeout: _passTimeout,
     log: log,
     runPass: () async {
       final session = await pod.createSession();

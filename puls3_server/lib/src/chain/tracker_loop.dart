@@ -50,20 +50,23 @@ typedef PeriodicTimerFactory =
     Timer Function(Duration interval, void Function(Timer) callback);
 
 /// Runs [runPass] every interval, never two at a time: a tick that finds
-/// a pass still running is skipped. A pass that throws is logged and the
-/// loop goes on.
+/// a pass still running is skipped. A pass that throws, or runs longer than
+/// the pass timeout, is logged and the loop goes on.
 final class TrackerLoop {
   TrackerLoop({
     required Duration interval,
+    required Duration passTimeout,
     required Future<void> Function() runPass,
     required ChainLog log,
     PeriodicTimerFactory periodic = Timer.periodic,
   }) : _interval = interval,
+       _passTimeout = passTimeout,
        _runPass = runPass,
        _log = log,
        _periodic = periodic;
 
   final Duration _interval;
+  final Duration _passTimeout;
   final Future<void> Function() _runPass;
   final ChainLog _log;
   final PeriodicTimerFactory _periodic;
@@ -93,7 +96,15 @@ final class TrackerLoop {
 
   Future<void> _guardedPass() async {
     try {
-      await _runPass();
+      // A timeout does not cancel the pass: it is abandoned and may still
+      // run next to later passes. That is safe because store transitions
+      // only change a record that is still `submitted`.
+      await _runPass().timeout(_passTimeout);
+    } on TimeoutException {
+      _log(
+        ChainLogLevel.error,
+        'Tracker pass timed out after ${_passTimeout.inSeconds}s',
+      );
     } catch (e) {
       _log(ChainLogLevel.error, 'Tracker pass failed: $e');
     }
