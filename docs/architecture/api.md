@@ -252,7 +252,7 @@ The escrow contract enforces an allow-listed token and the amount (`fund`'s `exp
 |---|---|---|
 | `getTransaction` status | `SUCCESS` | `TransactionFailed` |
 | Job state and funding event | Readable for the hire's job id | `JobEvidenceUnavailable` |
-| Job fields | State `Funded`; client and evaluator = `Hire.consumer` (the escrow will reject evaluator = provider once #95 lands); provider = agent wallet; token = USDC SAC; budget = `Hire.price`; `expired_at` as prepared; job id bound to no other hire | `JobMismatch` (`details.field`) |
+| Job fields | State `Funded`; client and evaluator = `Hire.consumer` (the escrow rejects evaluator = provider with `EvaluatorIsProvider`); provider = agent wallet; token = USDC SAC; budget = `Hire.price`; `expired_at` as prepared; job id bound to no other hire | `JobMismatch` (`details.field`) |
 
 `JobEvidenceUnavailable` is terminal, not the transient `ChainUnavailable`. Only after every check passes does the server build the domain `Payment` (the `fund` transaction, `payer` = consumer, `payee` = agent wallet, `amount` = budget) and call `Hire.fund`. The platform fee (ADR-0005 D7) is snapshotted at `fund` (capped by the contract at `MAX_FEE_BPS` = 1000) and charged by the contract only on settlement (`complete` or `release`), never on a refund; its value is exposed as `NetworkConfig.platformFeeBps` and is `0` in the MVP.
 
