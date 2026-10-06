@@ -13,6 +13,7 @@ import '../ui/atoms/rating_badge.dart';
 import '../ui/atoms/section_label.dart';
 import '../ui/atoms/skill_chip.dart';
 import '../ui/molecules/screen_header.dart';
+import '../ui/organisms/reviews_section.dart';
 import '../ui/organisms/site_footer.dart';
 import 'hire_sheet.dart';
 
@@ -136,6 +137,10 @@ class _AgentDetailBody extends StatelessWidget {
           runSpacing: Puls3Spacing.xs,
           children: [for (final s in agent.skills) SkillChip(label: s)],
         ),
+        SizedBox(height: compact ? Puls3Spacing.lg : Puls3Spacing.xl),
+        const SectionLabel('Ratings & reviews'),
+        const SizedBox(height: Puls3Spacing.sm),
+        _AgentReviews(agent: agent),
       ],
     );
 
@@ -266,6 +271,43 @@ class _HireBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Reviews of [agent] from the review store, with rating unlocked after a
+/// paid hire.
+class _AgentReviews extends StatelessWidget {
+  const _AgentReviews({required this.agent});
+
+  final Agent agent;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final reviews = scope.reviews;
+    return ListenableBuilder(
+      listenable: reviews,
+      builder: (context, _) => ReviewsSection(
+        summary: reviews.summaryFor(agent.id),
+        reviews: reviews.forAgent(agent.id),
+        onRate: reviews.canRate(agent.id)
+            ? () => showRateSheet(
+                context,
+                agentName: agent.name,
+                onSubmit: (rating, comment) => reviews.add(
+                  agentId: agent.id,
+                  author:
+                      scope.profile
+                          .profileFor(scope.wallet.address)
+                          ?.displayName ??
+                      'You',
+                  rating: rating,
+                  comment: comment,
+                ),
+              )
+            : null,
       ),
     );
   }

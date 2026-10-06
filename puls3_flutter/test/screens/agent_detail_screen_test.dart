@@ -22,6 +22,9 @@ void main() {
 
     await tester.tap(find.text('Hire'));
     await advance(tester, const Duration(milliseconds: 500));
+    // No wallet yet: the sheet asks to connect before paying.
+    await tester.tap(find.text('Connect wallet to pay'));
+    await advance(tester, const Duration(milliseconds: 700));
     expect(find.text('Confirm & sign'), findsOneWidget);
 
     await tester.tap(find.text('Confirm & sign'));

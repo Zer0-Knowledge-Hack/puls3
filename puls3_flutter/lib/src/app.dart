@@ -16,6 +16,7 @@ import 'state/agent_catalog.dart';
 import 'state/app_scope.dart';
 import 'state/notification_center.dart';
 import 'state/profile_controller.dart';
+import 'state/review_store.dart';
 import 'state/wallet_controller.dart';
 import 'theme/puls3_theme.dart';
 import 'wallet/wallet_port.dart';
@@ -92,6 +93,7 @@ class _Puls3AppState extends State<Puls3App> {
       widget.deployGateway ?? FakeDeployGateway(ids: _ids);
   final NotificationCenter _notifications = NotificationCenter();
   final ProfileController _profile = ProfileController();
+  final ReviewStore _reviews = ReviewStore();
 
   @override
   void dispose() {
@@ -100,6 +102,7 @@ class _Puls3AppState extends State<Puls3App> {
     _wallet.dispose();
     _notifications.dispose();
     _profile.dispose();
+    _reviews.dispose();
     super.dispose();
   }
 
@@ -114,6 +117,7 @@ class _Puls3AppState extends State<Puls3App> {
       deployGateway: _deployGateway,
       notifications: _notifications,
       profile: _profile,
+      reviews: _reviews,
       child: MaterialApp.router(
         title: 'puls3: the agent hub on Stellar',
         debugShowCheckedModeBanner: false,

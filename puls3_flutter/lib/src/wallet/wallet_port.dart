@@ -45,3 +45,8 @@ final class WalletUnavailable extends WalletException {
 final class WalletWrongNetwork extends WalletException {
   const WalletWrongNetwork();
 }
+
+/// The account cannot cover the payment plus the network fee.
+final class WalletInsufficientFunds extends WalletException {
+  const WalletInsufficientFunds();
+}
