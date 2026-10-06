@@ -182,7 +182,8 @@ if [ "$XLM_ONLY" -eq 0 ]; then
   stellar contract asset deploy --asset "$ASSET" --source-account "$ISSUER_ID" \
     --network "$NETWORK" >"$LOG" 2>&1 || true
   SAC="$(stellar contract id asset --asset "$ASSET" --network "$NETWORK" 2>/dev/null || true)"
-  echo "asset $ASSET (SAC ${SAC:-unknown}), $AMOUNT stroops per account"
+  [ -n "$SAC" ] || SAC=unknown
+  echo "asset $ASSET (SAC $SAC), $AMOUNT stroops per account"
 fi
 
 for i in "${!ADDRESSES[@]}"; do
