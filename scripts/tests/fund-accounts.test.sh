@@ -32,6 +32,7 @@ cat >"$STUB_DIR/stellar" <<STUBEOF
 # Fake stellar CLI. State lives in \$STUB_STATE_DIR, every call is appended to \$STUB_CALLS.
 # Env knobs: STUB_NO_ISSUER (issuer identity does not exist until generated),
 #   STUB_FAIL_STEP (change-trust | payment | generate), STUB_NOHASH_STEP (same steps),
+#   STUB_ASSET_DEPLOY (exists | fail: how \`contract asset deploy\` fails),
 #   STUB_TX_STYLE (signing: print "Signing transaction: <hash>" like stellar-cli 28.1).
 next_hash() {
   local n=0
@@ -67,7 +68,15 @@ case "\$1 \$2" in
       payment) write_hash payment ;;
       *) echo "stub: unexpected tx \$3" >&2; exit 9 ;;
     esac ;;
-  "contract asset") echo "CTESTSAC" ;;
+  "contract asset")
+    case "\${STUB_ASSET_DEPLOY:-}" in
+      exists) # stellar-cli 28.1 text when the SAC is already deployed
+        echo "❌ error: transaction simulation failed: HostError: Error(Storage, ExistingValue)" >&2
+        echo '   0: [Diagnostic Event] topics:[error, Error(Storage, ExistingValue)], data:["contract already exists", Bytes(00)]' >&2
+        exit 1 ;;
+      fail) echo "❌ error: Networking or low-level protocol error: simulated" >&2; exit 1 ;;
+      *) echo "CTESTSAC" ;;
+    esac ;;
   "contract id") echo "CTESTSAC" ;;
   *) echo "stub: unexpected call \$*" >&2; exit 9 ;;
 esac
@@ -213,6 +222,16 @@ fresh_env
 expect_exit "stellar-cli 28.1 output (signing hash only) exits 0" 0 env STUB_TX_STYLE=signing bash "$SCRIPT" alice
 expect_out "trustline hash from the signing line" "trust $KEY_ALICE tx $H2"
 expect_out "payment hash from the signing line" "usdc  $KEY_ALICE tx $H3"
+fresh_env
+expect_exit "SAC already deployed is tolerated" 0 env STUB_ASSET_DEPLOY=exists bash "$SCRIPT" alice
+expect_out "existing SAC still reported" "(SAC CTESTSAC)"
+expect_call "payment sent with an existing SAC" "tx new payment --source-account puls3-test-usdc-issuer --destination $KEY_ALICE"
+fresh_env
+expect_exit "SAC deploy failure exits 1" 1 env STUB_ASSET_DEPLOY=fail bash "$SCRIPT" alice
+expect_out "SAC deploy failure shows the CLI log" "low-level protocol error: simulated"
+expect_out_not "no SAC claimed after a failed deploy" "(SAC "
+expect_no_call "no XLM after a failed SAC deploy" "curl"
+expect_no_call "no payment after a failed SAC deploy" "tx new payment"
 fresh_env
 expect_exit "custom asset and amount exit 0" 0 env TEST_USDC_ISSUER_ACCOUNT=my-issuer TEST_USDC_CODE=TUSDC TEST_USDC_AMOUNT=5000000 bash "$SCRIPT" alice
 expect_call "custom issuer and code" "tx new payment --source-account my-issuer --destination $KEY_ALICE --asset TUSDC:$KEY_ISSUER --amount 5000000"

@@ -190,11 +190,20 @@ fund_asset() {
 }
 
 if [ "$XLM_ONLY" -eq 0 ]; then
-  # The SAC lets Soroban contracts move the asset. Deploying it again fails harmlessly.
-  stellar contract asset deploy --asset "$ASSET" --source-account "$ISSUER_ID" \
-    --network "$NETWORK" >"$LOG" 2>&1 || true
-  SAC="$(stellar contract id asset --asset "$ASSET" --network "$NETWORK" 2>/dev/null || true)"
-  [ -n "$SAC" ] || SAC=unknown
+  # The SAC lets Soroban contracts move the asset. Only "already deployed" is fine:
+  # stellar-cli 28.x reports it as Error(Storage, ExistingValue) / "contract already exists".
+  if ! stellar contract asset deploy --asset "$ASSET" --source-account "$ISSUER_ID" \
+    --network "$NETWORK" >"$LOG" 2>&1 &&
+    ! grep -qE 'ExistingValue|contract already exists' "$LOG"; then
+    echo "error: could not deploy the Stellar Asset Contract for $ASSET." >&2
+    cat "$LOG" >&2
+    exit 1
+  fi
+  if ! SAC="$(stellar contract id asset --asset "$ASSET" --network "$NETWORK" 2>"$LOG")" || [ -z "$SAC" ]; then
+    echo "error: could not derive the SAC id of $ASSET." >&2
+    cat "$LOG" >&2
+    exit 1
+  fi
   echo "asset $ASSET (SAC $SAC), $AMOUNT stroops per account"
 fi
 
