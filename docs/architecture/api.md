@@ -2,7 +2,7 @@
 
 - **Issue:** #8 · **Status:** Draft contract · **Sources:** [MVP flows](../blueprints/flows.md), [domain model](../domain/model.md), [hire lifecycle](../domain/hire-lifecycle.md), [ADR-0001](../adr/0001-system-architecture.md), [ADR-0002](../adr/0002-agent-registry-on-soroban.md), [ADR-0003](../adr/0003-payment-rail-and-custody.md), [ADR-0004](../adr/0004-agent-manifest-and-deployment.md), [ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) (#71), Flutter–Stellar wallet spike (#68, `docs/spikes/flutter-stellar-wallet.md`, section "Recommended changes for #8 and ADR-0003")
 
-> **Aligned with ADR-0005 (2026-10-02).** A hire is an ERC-8183 escrow job. Changed: contract rule 3, the scalar mapping, the hire rows of the endpoint table, the lifecycle error rule, asynchronous outcome codes, server-signed escrow calls (new), [hire escrow states](#hire-escrow-states) (was "Hire payment states"), [funding verification](#funding-verification) (was "Payment verification mapping"), feedback (the `authorize_feedback` flow is removed, D5), response shapes, the polling contract, F5–F7 traceability, and the open questions. Decisions A and B and the relay rules are unchanged. Expiry, runtime-timeout and approval-window values are deferred (ADR-0005 D3) and come from server configuration. Aligned with the escrow on main (#78, #94): no `setBudget`, approval window and `release`, `is_expired`, `fund` parameters.
+> **Aligned with ADR-0005 (2026-10-02).** A hire is an ERC-8183 escrow job. Changed: contract rule 3, the scalar mapping, the hire rows of the endpoint table, the lifecycle error rule, asynchronous outcome codes, server-signed escrow calls (new), [hire escrow states](#hire-escrow-states) (was "Hire payment states"), [funding verification](#funding-verification) (was "Payment verification mapping"), feedback (the `authorize_feedback` flow is removed, D5), response shapes, the polling contract, F5–F7 traceability, and the open questions. Decisions A and B and the relay rules are unchanged. Expiry, runtime-timeout and approval-window values are deferred (ADR-0005 D3) and come from server configuration. Aligned with the escrow on main (#78, #94): no `setBudget`, approval window and `release`, `is_expired`, `fund` parameters. Catalog aligned with the AgentEndpoint implementation (#88, #98).
 
 This is the boundary between the Flutter app and Serverpod for the MVP. The app connects wallets and asks the user to sign what the server prepared. The server owns persistence, transaction preparation, relay submission, chain reads, escrow job verification, deploy orchestration, and agent execution. Endpoint implementations remain in issues #17–#21 and #35.
 
@@ -38,8 +38,8 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 | `AuthEndpoint` | `createChallenge` | `wallet: String` | `WalletChallenge` | No | `InvalidStellarAddress`, `ChallengeRateLimited`, `AuthenticationUnavailable` |
 | `AuthEndpoint` | `verifyChallenge` | `challengeId: String`, `wallet: String`, `signature: String` | `AuthSuccess` | No | `InvalidStellarAddress`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
 | `ConfigEndpoint` | `getNetworkConfig` | — | `NetworkConfig` | No | `ConfigurationUnavailable` |
-| `CatalogEndpoint` | `listAgents` | — | `List<AgentSummary>` | No | `CatalogUnavailable` |
-| `CatalogEndpoint` | `getAgent` | `agentId: int` | `AgentDetail` | No | `InvalidAgentId`, `AgentNotFound`, `ChainDataUnavailable` |
+| `AgentEndpoint` | `list` | — | `List<AgentSummary>` | No | `AgentCatalogUnavailable` (typed exception, see [Agent catalog](#agent-catalog)) |
+| `AgentEndpoint` | `get` | `id: String` (metadata id, for example `agt-001`) | `AgentSummary?` (`null` for an unknown id) | No | `AgentCatalogUnavailable` (typed exception) |
 | `StudioEndpoint` | `saveDraft` | `draft: AgentManifestDraft` | `StudioDraft` | Yes | `InvalidManifest`, `DraftNotOwned`, `DraftVersionConflict` |
 | `StudioEndpoint` | `testRun` | `draftId: int`, `input: String` | `TestRunResult` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed` |
 | `StudioEndpoint` | `prepareDeploy` | `draftId: int`, `builder: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidStellarAddress`, `WalletMismatch`, `InvalidManifest`, `AgentWalletCreationFailed`, `SubmissionInProgress`, `ChainUnavailable` |
@@ -65,6 +65,27 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 - Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` and `prepareFund` need `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted` before `approvalDeadline`.
 - Feedback methods raise `HireNotCompleted` when the hire is not `completed`, and `HireAlreadyRated` when the hire already has a `feedbackReference`. `HireAlreadyRated` is the only "already rated" code, synchronous or asynchronous.
+
+### Agent catalog
+
+`AgentEndpoint` (#88) is registered as `agent`, so Flutter calls `client.agent.list()` and `client.agent.get(id)`. Both are public (no `requireLogin`) and read the Identity Registry through a cache with a 60-second TTL.
+
+- **Two identifiers.** [`AgentSummary`](models/agent_summary.spy.yaml) carries `id: String`, the metadata id (for example `agt-001`), and `registryId: int`, the on-chain Identity Registry agent id (`u32`, the domain `AgentId`). `get` takes the metadata `id`. `HireEndpoint.createHire(agentId, …)`, `Hire.agentId`, and the escrow use the on-chain id, so the app passes `AgentSummary.registryId` as `agentId`. When orphaned registrations repeat a metadata id, the catalog serves only the newest one (highest `registryId`).
+- **Ordering and skipping.** `list` returns every agent with valid metadata, ordered by `registryId`. An agent whose required metadata (`id`, `name`, `description`, `skills`, `priceUsdcStroops`) is missing or invalid is skipped, not reported as an error.
+- **Outage.** When the chain cannot be read, the last catalog built is served as is, with no freshness flag. Only when nothing is cached do `list` and `get` raise [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) (`message: String`). An outage is never reported as an empty list or `null`.
+- **Typed exception, not `Puls3ApiException`.** The catalog is the one exception to contract rule 7: it raises the typed Serverpod exception `AgentCatalogUnavailable`, not a `Puls3ApiException` code. An unknown metadata id is `null`, not `AgentNotFound`. The catalog codes `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, and `ChainDataUnavailable` are not raised by the catalog; `InvalidAgentId` and `AgentNotFound` remain in use by `createHire`.
+- **Field names.** `AgentSummary` uses `priceUsdcStroops` (USDC stroops, at most 2^53 − 1) for the domain `price`, and `skills` holds kebab-case skill ids only (1 to 5, in stored order).
+
+**Planned fields (not served in the MVP).** The earlier draft's `AgentSummary { agent: Agent, … }` and `AgentDetail` are not implemented. These fields stay planned:
+
+| Field | Earlier shape | Target issue |
+|---|---|---|
+| `rating`, `paidHireCount` | `AgentSummary`, `AgentDetail` | #21 (reputation in catalog) |
+| `active` | `AgentSummary`, `AgentDetail` | #18 (register flow activates the agent) |
+| `owner` | [`Agent`](models/agent.spy.yaml) | #17 (catalog with on-chain indexing) |
+| Structured skills (`name`, `description`, `tags`) | [`Skill`](models/skill.spy.yaml) | #35 (manifest from Agent Studio) |
+| `registrationUri`, `explorerUrl`, `chainDataFresh` | `AgentDetail` | #17 |
+| Hire input limit (`inputMaxChars`) | Read by F5-1 from the agent detail | #35 |
 
 ### Asynchronous outcome codes
 
@@ -221,6 +242,8 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed` |
 | Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback` |
 
+`AgentEndpoint` does not use these error codes yet: it raises the typed `AgentCatalogUnavailable` and returns `null` for an unknown id, so `CatalogUnavailable` and `ChainDataUnavailable` are currently unused (see [Agent catalog](#agent-catalog)).
+
 ### Funding verification
 
 The escrow contract enforces an allow-listed token and the amount (`fund`'s `expected_budget`), so the tracker no longer checks a SAC transfer to the agent's muxed address. After a `fund` transaction is final it reads the job from the configured escrow contract:
@@ -244,14 +267,13 @@ ADR-0005 D5 removes the server's `authorize_feedback` step: the Reputation Regis
 
 ### Response shapes not copied from the domain
 
-The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domain entities. `PreparedTransaction` and `ChainSubmission` have draft models because every relay flow shares them. Other endpoint-specific projections add only transport and orchestration data:
+The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domain entities; `Agent` and `Skill` are planned and not served in the MVP (see [Agent catalog](#agent-catalog)). [`AgentSummary`](models/agent_summary.spy.yaml) and [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) copy the models of #88 exactly. `PreparedTransaction` and `ChainSubmission` have draft models because every relay flow shares them. Other endpoint-specific projections add only transport and orchestration data:
 
 | Type | Required fields |
 |---|---|
 | `WalletChallenge` | `challengeId`, `wallet`, `payload`, `expiresAt` |
 | `NetworkConfig` | `network`, `rpcUrl`, `networkPassphrase`, `usdcContractId`, `escrowContractId`, `platformFeeBps`, `identityRegistryContractId`, `reputationRegistryContractId`, `explorerBaseUrl` |
-| `AgentSummary` | `agent: Agent`, `rating: double?`, `paidHireCount: int`, `active: bool` |
-| `AgentDetail` | `agent: Agent`, `rating: double?`, `paidHireCount: int`, `active: bool`, `registrationUri: String`, `explorerUrl: String`, `chainDataFresh: bool` |
+| [`AgentSummary`](models/agent_summary.spy.yaml) | `id: String`, `registryId: int`, `name: String`, `description: String`, `skills: List<String>`, `priceUsdcStroops: int`, `wallet: String?`, `model: String?` |
 | `AgentManifestDraft` | ADR-0004 fields: `version`, `name`, `description`, `skills`, `model`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price` |
 | `StudioDraft` | `draftId`, `manifest`, `revision`, `deployState` |
 | `TestRunResult` | `output`, `remainingDailyRuns` |
@@ -261,7 +283,7 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `DeployResult` | `agent: Agent`, `registrationUri`, `explorerUrl` |
 | `CreateHireResult` | `hire: Hire`, `preparedCreateJob: PreparedTransaction?` |
 | `HireSummary` | `hire: Hire`, `agentName` |
-| `HireDetail` | `hire: Hire`, `agent: Agent`, `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
+| `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
 | `FeedbackEligibility` | `hireId`, `eligible: bool` |
 
 `PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
@@ -306,19 +328,19 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F2-1 | Client-only: navigate to `/market`. |
-| F2-2 | `CatalogEndpoint.listAgents`. |
+| F2-2 | `AgentEndpoint.list`. `AgentCatalogUnavailable` shows the catalog error state. |
 | F2-3 | Client-only: filter the returned catalog by name and description. |
 | F2-4 | Client-only: filter the returned catalog by skill ids and render the empty state. |
-| F2-5 | Client-only: navigate to F3 with the selected `agentId`. |
+| F2-5 | Client-only: navigate to F3 with the selected agent's metadata `id`. |
 
 ### F3 — View agent detail
 
 | Step | API mapping |
 |---|---|
-| F3-1 | `CatalogEndpoint.getAgent(agentId)`. |
-| F3-2 | `CatalogEndpoint.getAgent`; `chainDataFresh: false` selects the cached-data warning and disables Hire. |
-| F3-3 | Client-only: open the `explorerUrl` returned by `getAgent`. |
-| F3-4 | Client-only: open F5 when `active` is true; hide Hire otherwise. |
+| F3-1 | `AgentEndpoint.get(id)`; `null` shows the not-found state. |
+| F3-2 | `AgentEndpoint.get`; during an outage the server serves its last cached catalog with no freshness flag, and raises `AgentCatalogUnavailable` only when nothing is cached. The cached-data warning needs `chainDataFresh`, planned in #17. |
+| F3-3 | Client-only: open the agent's explorer link. Planned: `explorerUrl` is not served yet (#17). |
+| F3-4 | Client-only: open F5 with `registryId` as the hire's `agentId`. Planned: `active` is not served yet (#18), so Hire is not hidden by the catalog. |
 
 ### F4 — Create and register an agent
 
@@ -339,9 +361,9 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 
 | Step | API mapping |
 |---|---|
-| F5-1 | Client-only input validation using the limit returned by `CatalogEndpoint.getAgent`. |
+| F5-1 | Client-only input validation. Planned: the input limit is not served by `AgentSummary` yet (#35); `createHire` validates authoritatively (`InputTooLong`). |
 | F5-2 | Client-only wallet balance and trustline check using network configuration; run F1 if disconnected. |
-| F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)` creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, a server-set `expired_at`, the USDC SAC as token, and `Hire.price` as budget. **Retry** reuses the same `requestId`. |
+| F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)`, with `agentId` = `AgentSummary.registryId`, creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, a server-set `expired_at`, the USDC SAC as token, and `Hire.price` as budget. **Retry** reuses the same `requestId`. |
 | F5-4 | Two signatures. The wallet signs `preparedCreateJob`; `submitEscrowCall` relays it. Once `create_job` is confirmed, `prepareFund(hireId)` returns the `fund` envelope, with `expected_budget` = `Hire.price` and `max_fee_bps` = `NetworkConfig.platformFeeBps`; the wallet signs it and `submitEscrowCall` relays it. `WalletRejected` is client-only: the hire stays `open`. After `PreparationExpired` or `SubmissionRejected`, call the same `prepare…` method and sign again. |
 | F5-5 | Poll `HireEndpoint.getHire`; `escrowSubmission` (`fund`, `submitted`) shows **Verifying payment…**. `JobMismatch` or `JobEvidenceUnavailable` shows "Payment does not match this hire" with the transaction link; the funds stay in the escrow and return after `expired_at`. |
 | F5-6 | `hire.status: funded`; `paymentExplorerUrl` links the `fund` transaction. The server starts the agent run (`runtimeStatus: queued`). |
@@ -365,7 +387,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | F7-3 | Client validation mirrors the domain; `FeedbackEndpoint.prepareFeedback(hireId, score, comment)` validates authoritatively (`InvalidFeedback`) and returns the unsigned `give_feedback` envelope with the client as source. |
 | F7-4 | The wallet signs the prepared envelope; `FeedbackEndpoint.submitFeedback(hireId, preparationId, signedTransactionXdr)` verifies, persists, and submits it. `WalletRejected` is client-only: stay on S10. |
 | F7-5 | Poll `HireEndpoint.getHire` until `feedbackSubmission` is final. `HireAlreadyRated` shows "You already rated this hire" and returns to S06. |
-| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `CatalogEndpoint.getAgent` to show the updated rating. |
+| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `AgentEndpoint.get(id)`. Planned: the rating is not served yet (#21). |
 
 ## Ownership and non-goals
 
