@@ -64,6 +64,8 @@ Install Docker Desktop (<https://www.docker.com/products/docker-desktop>) and ma
 
 ## 2. Run the project
 
+The canonical step-by-step path (fresh clone → server and app against testnet) is **[docs/infra/secrets.md → Run against testnet from a fresh clone](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone)**. This section only adds context.
+
 ### 2.1 Clone and install dependencies
 
 ```bash
@@ -76,12 +78,14 @@ The repo is a **Dart pub workspace**. The root `pubspec.yaml` groups `puls3_serv
 
 ### 2.2 Run the app (frontend only)
 
-The app currently uses mock data, so it does not need the backend.
+The app loads the agent catalog from the server and falls back to the bundled demo catalog when the server is unreachable, so it also runs without the backend:
 
 ```bash
 cd puls3_flutter
-flutter run -d chrome
+flutter run -d chrome --dart-define-from-file=../.env
 ```
+
+`../.env` is the root config (`cp .env.example .env`).
 
 To check a production build:
 
@@ -94,27 +98,7 @@ Use a port other than 8080, because the backend uses 8080.
 
 ### 2.3 Run the backend
 
-1. **Generate your local secrets (first time only):**
-
-   ```bash
-   ./scripts/setup-local-secrets.sh
-   ```
-
-   This creates `puls3_server/.env` and `puls3_server/config/passwords.yaml` with random values that are only valid on your machine. Both files are git-ignored. On Windows, run it from **Git Bash**.
-2. **Start Postgres and Redis:**
-
-   ```bash
-   cd puls3_server
-   docker compose up --build --detach
-   ```
-
-3. **Start the server:**
-
-   ```bash
-   dart bin/main.dart --apply-migrations
-   ```
-
-4. **Stop everything when you are done:** press `Ctrl+C` to stop the server, then run `docker compose stop`.
+Follow steps 2, 3 and 5 of the [canonical path](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone): local secrets, root `.env`, then `docker compose up --build --detach`, `set -a; . ../.env; set +a` and `dart bin/main.dart --apply-migrations` from `puls3_server/`. Stop with `Ctrl+C`, then `docker compose stop`.
 
 | Service | Local port |
 | --- | --- |

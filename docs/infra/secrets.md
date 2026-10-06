@@ -2,16 +2,46 @@
 
 The repo is public. **No secret is ever committed**: not in code, not in `.env.example`, not in `contracts/deployments/`. Every secret lives in exactly one of three places: a git-ignored local file, a GitHub Actions secret, or Serverpod Cloud. Everything else (RPC URL, passphrase, contract ids, public keys) is public configuration and lives in [`.env.example`](../../.env.example).
 
-## Quick path
+## Run against testnet from a fresh clone
 
-1. `scripts/setup-local-secrets.sh`: generates `puls3_server/.env` (Docker passwords) and `puls3_server/config/passwords.yaml` (Serverpod passwords) with random local values. Both are git-ignored.
-2. `cp .env.example .env`: public network values and Stellar CLI identity **names**. Testnet values are already filled in.
-3. Create your own testnet identity and fund it: `stellar keys generate <name> --network testnet`, then `scripts/fund-testnet-accounts.sh <name>` (Friendbot XLM plus the scripted test USDC).
-4. Run:
-   - server: `set -a; . ../.env; set +a; dart bin/main.dart` (from `puls3_server/`, Docker services up)
-   - app: `flutter run --dart-define-from-file=../.env` (from `puls3_flutter/`)
+This is the canonical setup path; CONTRIBUTING.md, the root README and `puls3_server/README.md` link here. Run every command from **Git Bash** on Windows. Prerequisites: Flutter, Serverpod CLI 3.4.13 and Docker ([CONTRIBUTING.md §1](../../CONTRIBUTING.md#1-set-up-your-machine)), and the Stellar CLI for step 4 ([contracts/README.md](../../contracts/README.md#prerequisites)).
 
-Switching from testnet to a local network changes only the `PULS3_STELLAR_*` values in `.env`. The app's `PULS3_API_URL` points it at another server.
+Two env files, two jobs:
+
+| File | Holds | Created by |
+|---|---|---|
+| `.env` (repo root) | Public config for the server, the app and the scripts, plus Stellar CLI identity **names**. No secrets | `cp .env.example .env` |
+| `puls3_server/.env` | Local Docker passwords for Postgres and Redis (secrets, local only), read by `docker compose` | `scripts/setup-local-secrets.sh` |
+
+1. **Install the workspace:** `flutter pub get` (repo root).
+2. **Local secrets:** `./scripts/setup-local-secrets.sh`. It creates `puls3_server/.env` and `puls3_server/config/passwords.yaml` with random values. Both are git-ignored.
+3. **Root config:** `cp .env.example .env`. The testnet values are already filled in.
+4. **Your testnet identity** (only for the scripts; the server and app run without it):
+
+   ```bash
+   stellar keys generate <name> --fund --network testnet
+   ./scripts/fund-testnet-accounts.sh <name>   # optional: more XLM and 100 test USDC (PUSDC)
+   ```
+
+   Then set `STELLAR_ACCOUNT=<name>` in `.env`. The same applies to the other identity names (`AGENT_WALLET_ACCOUNT`, `CLIENT_ACCOUNT`) when a script needs them. `.env` holds the name, never the key.
+5. **Backend** (from `puls3_server/`):
+
+   ```bash
+   docker compose up --build --detach
+   set -a; . ../.env; set +a
+   dart bin/main.dart --apply-migrations
+   ```
+
+   The API listens on `http://localhost:8080`. Stop with `Ctrl+C`, then `docker compose stop`.
+6. **App** (from `puls3_flutter/`, in a second terminal):
+
+   ```bash
+   flutter run -d chrome --dart-define-from-file=../.env
+   ```
+
+   The app loads the agent catalog from the server and falls back to the bundled demo catalog when the server is unreachable.
+
+Switching from testnet to a local network changes only the `PULS3_STELLAR_*` values in `.env`. `PULS3_API_URL` points the app at another server. No code changes.
 
 ## Where configuration lives
 

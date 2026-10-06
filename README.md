@@ -184,7 +184,7 @@ Per rules §8.1, this project existed prior to the Stellar Odyssey event. The co
 
 ## Contributing
 
-Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow.
+Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow. To run the server and the app against testnet from a fresh clone, follow **[docs/infra/secrets.md](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone)**.
 
 ## License
 
