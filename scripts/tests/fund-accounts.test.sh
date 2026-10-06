@@ -31,7 +31,8 @@ cat >"$STUB_DIR/stellar" <<STUBEOF
 #!/usr/bin/env bash
 # Fake stellar CLI. State lives in \$STUB_STATE_DIR, every call is appended to \$STUB_CALLS.
 # Env knobs: STUB_NO_ISSUER (issuer identity does not exist until generated),
-#   STUB_FAIL_STEP (change-trust | payment | generate), STUB_NOHASH_STEP (same steps).
+#   STUB_FAIL_STEP (change-trust | payment | generate), STUB_NOHASH_STEP (same steps),
+#   STUB_TX_STYLE (signing: print "Signing transaction: <hash>" like stellar-cli 28.1).
 next_hash() {
   local n=0
   [ ! -f "\$STUB_STATE_DIR/counter" ] || n="\$(cat "\$STUB_STATE_DIR/counter")"
@@ -41,7 +42,10 @@ next_hash() {
 }
 write_hash() {
   if [ "\${STUB_FAIL_STEP:-}" = "\$1" ]; then echo "error: simulated failure in \$1" >&2; exit 1; fi
-  if [ "\${STUB_NOHASH_STEP:-}" != "\$1" ]; then echo "🔗 https://stellar.expert/explorer/testnet/tx/\$(next_hash)" >&2; fi
+  [ "\${STUB_NOHASH_STEP:-}" != "\$1" ] || return 0
+  # stellar-cli 28.1 \`tx new\` prints only the hash it signs; other commands print a link.
+  if [ "\${STUB_TX_STYLE:-}" = "signing" ]; then echo "ℹ️ Signing transaction: \$(next_hash)" >&2
+  else echo "🔗 https://stellar.expert/explorer/testnet/tx/\$(next_hash)" >&2; fi
 }
 echo "\$*" >>"\$STUB_CALLS"
 case "\$1 \$2" in
@@ -193,6 +197,10 @@ expect_out "prints the SAC id" "CTESTSAC"
 expect_out "prints the trustline tx hash" "trust $KEY_ALICE tx $H2"
 expect_out "prints the payment tx hash" "usdc  $KEY_ALICE tx $H3"
 expect_no_call "never reads key material" "^keys \(show\|secret\)"
+fresh_env
+expect_exit "stellar-cli 28.1 output (signing hash only) exits 0" 0 env STUB_TX_STYLE=signing bash "$SCRIPT" alice
+expect_out "trustline hash from the signing line" "trust $KEY_ALICE tx $H2"
+expect_out "payment hash from the signing line" "usdc  $KEY_ALICE tx $H3"
 fresh_env
 expect_exit "custom asset and amount exit 0" 0 env TEST_USDC_ISSUER_ACCOUNT=my-issuer TEST_USDC_CODE=TUSDC TEST_USDC_AMOUNT=5000000 bash "$SCRIPT" alice
 expect_call "custom issuer and code" "tx new payment --source-account my-issuer --destination $KEY_ALICE --asset TUSDC:$KEY_ISSUER --amount 5000000"

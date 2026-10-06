@@ -68,7 +68,13 @@ is_public_key() { [[ "$1" =~ ^G[A-Z2-7]{55}$ ]]; }
 need_stellar() {
   command -v stellar >/dev/null || { echo "error: the Stellar CLI ('stellar') is required." >&2; exit 1; }
 }
-tx_hash_of() { grep -oE '(tx/|[Tt]ransaction hash is )[0-9a-f]{64}' "$1" | head -n 1 | grep -oE '[0-9a-f]{64}' || true; }
+# tx_hash_of <log>: the transaction hash in Stellar CLI output. `tx new` (stellar-cli
+# 28.1) prints only "Signing transaction: <hash>", which is the hash of the submitted
+# transaction; it is trusted only together with the command's exit status.
+tx_hash_of() {
+  grep -oE '(tx/|[Tt]ransaction hash is |Signing transaction: )[0-9a-f]{64}' "$1" |
+    head -n 1 | grep -oE '[0-9a-f]{64}' || true
+}
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
