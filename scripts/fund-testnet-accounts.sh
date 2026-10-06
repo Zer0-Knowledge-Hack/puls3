@@ -128,7 +128,13 @@ FAILED=0
 # fund_xlm <address>: Friendbot creates and funds the account. Already funded is fine.
 fund_xlm() {
   local address="$1" body="$WORK/friendbot" status hash
+  : >"$body" # never re-read the previous account's answer
   status="$(curl -sS -o "$body" -w '%{http_code}' "${FRIENDBOT_URL}?addr=$address" 2>"$LOG" || true)"
+  if [ -z "$status" ] || [ "$status" = "000" ] || [ ! -s "$body" ]; then
+    echo "error: Friendbot failed for $address (HTTP ${status:-000}): no answer." >&2
+    [ ! -s "$LOG" ] || cat "$LOG" >&2
+    return 1
+  fi
   if [ "$status" = "200" ]; then
     hash="$(grep -oE '"hash" *: *"[0-9a-f]{64}"' "$body" | head -n 1 | grep -oE '[0-9a-f]{64}' || true)"
     if [ -n "$hash" ]; then

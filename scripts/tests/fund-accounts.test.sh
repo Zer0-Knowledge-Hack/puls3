@@ -78,7 +78,8 @@ cat >"$STUB_DIR/curl" <<'STUBEOF'
 #!/usr/bin/env bash
 # Fake curl for Friendbot. Writes the body to -o, prints the -w status code.
 # Env knobs: STUB_FRIENDBOT_EXISTING (space-separated addresses already funded),
-#   STUB_FRIENDBOT_DOWN (any value: answer 502).
+#   STUB_FRIENDBOT_DOWN (any value: answer 502),
+#   STUB_FRIENDBOT_TRANSPORT_FAIL (space-separated addresses: no answer, status 000).
 out="" url=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -95,6 +96,10 @@ n=0
 [ ! -f "$STUB_STATE_DIR/counter" ] || n="$(cat "$STUB_STATE_DIR/counter")"
 n=$((n + 1))
 echo "$n" >"$STUB_STATE_DIR/counter"
+case " ${STUB_FRIENDBOT_TRANSPORT_FAIL:-} " in
+  *" $addr "*) # like curl when the host is unreachable: no body, status 000, exit 7
+    echo "curl: (7) Failed to connect" >&2; printf '000'; exit 7 ;;
+esac
 if [ -n "${STUB_FRIENDBOT_DOWN:-}" ]; then
   echo "bad gateway" >"$out"; printf '502'; exit 0
 fi
@@ -185,6 +190,13 @@ expect_out "already funded is reported" "xlm   $KEY_RAW already funded"
 fresh_env
 expect_exit "Friendbot down exits 1" 1 env STUB_FRIENDBOT_DOWN=1 bash "$SCRIPT" --xlm-only "$KEY_RAW"
 expect_out "Friendbot failure names the status" "HTTP 502"
+
+fresh_env
+expect_exit "transport failure after an already-funded account exits 1" 1 env STUB_FRIENDBOT_EXISTING="$KEY_RAW" STUB_FRIENDBOT_TRANSPORT_FAIL="$KEY_ALICE" bash "$SCRIPT" --xlm-only "$KEY_RAW" alice
+expect_out "first account already funded" "xlm   $KEY_RAW already funded"
+expect_out_not "stale body never reused for the second account" "xlm   $KEY_ALICE already funded"
+expect_out "transport failure reported" "Friendbot failed for $KEY_ALICE (HTTP 000)"
+expect_out "only the second account failed" "failed: 1 of 2"
 
 echo "# XLM and test USDC"
 fresh_env
