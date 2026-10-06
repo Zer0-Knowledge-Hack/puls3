@@ -71,11 +71,15 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 onTap: () => onNavigate(link.path),
               ),
             const Spacer(),
-            WalletChip(
-              address: walletAddress,
-              isConnecting: isWalletConnecting,
-              onConnect: onConnectWallet,
-              compact: compact,
+            // Flexible: on narrow phones the chip shrinks instead of pushing
+            // the row past the screen edge (e.g. while "Connecting…").
+            Flexible(
+              child: WalletChip(
+                address: walletAddress,
+                isConnecting: isWalletConnecting,
+                onConnect: onConnectWallet,
+                compact: compact,
+              ),
             ),
           ],
         ),

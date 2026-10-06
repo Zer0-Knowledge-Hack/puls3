@@ -13,14 +13,27 @@ class MockWallet implements WalletPort {
   final Duration connectDelay;
   final Duration signDelay;
 
+  /// While true, every signature request is declined with
+  /// [WalletSignatureRejected], as if the user pressed "Reject".
+  bool rejectSignatures = false;
+
+  /// When set, connection and signature requests fail with it, for example
+  /// [WalletUnavailable] or [WalletWrongNetwork].
+  WalletException? failure;
+
   String? _address;
 
   @override
   String? get address => _address;
 
+  /// Simulates the user switching to another account in the wallet.
+  void switchAccount() => _address = _ids.accountAddress();
+
   @override
   Future<String> connect() async {
     await Future<void>.delayed(connectDelay);
+    final failure = this.failure;
+    if (failure != null) throw failure;
     return _address ??= _ids.accountAddress();
   }
 
@@ -28,6 +41,9 @@ class MockWallet implements WalletPort {
   Future<String> signTransaction(String unsignedXdr) async {
     if (_address == null) await connect();
     await Future<void>.delayed(signDelay);
+    final failure = this.failure;
+    if (failure != null) throw failure;
+    if (rejectSignatures) throw const WalletSignatureRejected();
     return _ids.txHash();
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../deploy/deploy_gateway.dart';
 import '../domain/stellar_format.dart';
 import 'agent_catalog.dart';
 import 'wallet_controller.dart';
@@ -12,12 +13,14 @@ class AppScope extends InheritedWidget {
     required this.catalog,
     required this.wallet,
     required this.ids,
+    required this.deployGateway,
     required super.child,
   });
 
   final AgentCatalog catalog;
   final WalletController wallet;
   final FakeLedgerIds ids;
+  final DeployGateway deployGateway;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
@@ -29,5 +32,6 @@ class AppScope extends InheritedWidget {
   bool updateShouldNotify(AppScope oldWidget) =>
       catalog != oldWidget.catalog ||
       wallet != oldWidget.wallet ||
-      ids != oldWidget.ids;
+      ids != oldWidget.ids ||
+      deployGateway != oldWidget.deployGateway;
 }
