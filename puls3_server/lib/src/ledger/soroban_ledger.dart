@@ -2,7 +2,8 @@
 ///
 /// [SorobanLedger] implements the domain `LedgerPort` and adds registry and
 /// escrow reads. It only calls `simulateTransaction` (unsigned envelopes) and
-/// `getTransaction`; it never signs or submits a transaction.
+/// `getTransaction`; it never signs or submits a transaction. Submission goes
+/// through `SorobanRpcClient.sendTransaction`, outside this read adapter.
 ///
 /// Configuration comes from `PULS3_STELLAR_*` environment variables, see
 /// `StellarConfig.fromEnvironment`: `PULS3_STELLAR_RPC_URL`,
@@ -43,7 +44,8 @@ const _simulationSequence = 0;
 
 final _contractError = RegExp(r'Error\(Contract, #(\d+)\)');
 
-/// Reads the Stellar chain through Soroban RPC. It never signs or submits.
+/// Reads the Stellar chain through Soroban RPC. It never signs or submits,
+/// although the [SorobanRpcClient] it uses can submit.
 ///
 /// Contract reads are simulations of unsigned envelopes. A result of `null`
 /// means the chain says "not there"; an infrastructure problem or a response
