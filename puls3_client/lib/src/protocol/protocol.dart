@@ -14,15 +14,17 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'agent/agent_catalog_unavailable.dart' as _i2;
 import 'agent/agent_summary.dart' as _i3;
-import 'greetings/greeting.dart' as _i4;
-import 'health/backend_health.dart' as _i5;
-import 'package:puls3_client/src/protocol/agent/agent_summary.dart' as _i6;
+import 'chain/chain_submission.dart' as _i4;
+import 'greetings/greeting.dart' as _i5;
+import 'health/backend_health.dart' as _i6;
+import 'package:puls3_client/src/protocol/agent/agent_summary.dart' as _i7;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
-    as _i7;
-import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
     as _i8;
+import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
+    as _i9;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
+export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
 export 'client.dart';
@@ -67,11 +69,14 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i3.AgentSummary) {
       return _i3.AgentSummary.fromJson(data) as T;
     }
-    if (t == _i4.Greeting) {
-      return _i4.Greeting.fromJson(data) as T;
+    if (t == _i4.ChainSubmission) {
+      return _i4.ChainSubmission.fromJson(data) as T;
     }
-    if (t == _i5.BackendHealth) {
-      return _i5.BackendHealth.fromJson(data) as T;
+    if (t == _i5.Greeting) {
+      return _i5.Greeting.fromJson(data) as T;
+    }
+    if (t == _i6.BackendHealth) {
+      return _i6.BackendHealth.fromJson(data) as T;
     }
     if (t == _i1.getType<_i2.AgentCatalogUnavailable?>()) {
       return (data != null ? _i2.AgentCatalogUnavailable.fromJson(data) : null)
@@ -80,26 +85,29 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i3.AgentSummary?>()) {
       return (data != null ? _i3.AgentSummary.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i4.Greeting?>()) {
-      return (data != null ? _i4.Greeting.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i4.ChainSubmission?>()) {
+      return (data != null ? _i4.ChainSubmission.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i5.BackendHealth?>()) {
-      return (data != null ? _i5.BackendHealth.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i5.Greeting?>()) {
+      return (data != null ? _i5.Greeting.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i6.BackendHealth?>()) {
+      return (data != null ? _i6.BackendHealth.fromJson(data) : null) as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i6.AgentSummary>) {
+    if (t == List<_i7.AgentSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i6.AgentSummary>(e))
+              .map((e) => deserialize<_i7.AgentSummary>(e))
               .toList()
           as T;
     }
     try {
-      return _i7.Protocol().deserialize<T>(data, t);
+      return _i8.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     try {
-      return _i8.Protocol().deserialize<T>(data, t);
+      return _i9.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     return super.deserialize<T>(data, t);
   }
@@ -108,8 +116,9 @@ class Protocol extends _i1.SerializationManager {
     return switch (type) {
       _i2.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _i3.AgentSummary => 'AgentSummary',
-      _i4.Greeting => 'Greeting',
-      _i5.BackendHealth => 'BackendHealth',
+      _i4.ChainSubmission => 'ChainSubmission',
+      _i5.Greeting => 'Greeting',
+      _i6.BackendHealth => 'BackendHealth',
       _ => null,
     };
   }
@@ -128,16 +137,18 @@ class Protocol extends _i1.SerializationManager {
         return 'AgentCatalogUnavailable';
       case _i3.AgentSummary():
         return 'AgentSummary';
-      case _i4.Greeting():
+      case _i4.ChainSubmission():
+        return 'ChainSubmission';
+      case _i5.Greeting():
         return 'Greeting';
-      case _i5.BackendHealth():
+      case _i6.BackendHealth():
         return 'BackendHealth';
     }
-    className = _i7.Protocol().getClassNameForObject(data);
+    className = _i8.Protocol().getClassNameForObject(data);
     if (className != null) {
       return 'serverpod_auth_idp.$className';
     }
-    className = _i8.Protocol().getClassNameForObject(data);
+    className = _i9.Protocol().getClassNameForObject(data);
     if (className != null) {
       return 'serverpod_auth_core.$className';
     }
@@ -156,19 +167,22 @@ class Protocol extends _i1.SerializationManager {
     if (dataClassName == 'AgentSummary') {
       return deserialize<_i3.AgentSummary>(data['data']);
     }
+    if (dataClassName == 'ChainSubmission') {
+      return deserialize<_i4.ChainSubmission>(data['data']);
+    }
     if (dataClassName == 'Greeting') {
-      return deserialize<_i4.Greeting>(data['data']);
+      return deserialize<_i5.Greeting>(data['data']);
     }
     if (dataClassName == 'BackendHealth') {
-      return deserialize<_i5.BackendHealth>(data['data']);
+      return deserialize<_i6.BackendHealth>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
-      return _i7.Protocol().deserializeByClassName(data);
+      return _i8.Protocol().deserializeByClassName(data);
     }
     if (dataClassName.startsWith('serverpod_auth_core.')) {
       data['className'] = dataClassName.substring(20);
-      return _i8.Protocol().deserializeByClassName(data);
+      return _i9.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
@@ -183,10 +197,10 @@ class Protocol extends _i1.SerializationManager {
       return null;
     }
     try {
-      return _i7.Protocol().mapRecordToJson(record);
+      return _i8.Protocol().mapRecordToJson(record);
     } catch (_) {}
     try {
-      return _i8.Protocol().mapRecordToJson(record);
+      return _i9.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }
