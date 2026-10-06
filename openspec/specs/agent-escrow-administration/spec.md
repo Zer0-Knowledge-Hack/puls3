@@ -152,10 +152,6 @@ The contract MUST expose `admin()`, `identity_registry()`, `treasury()`, `fee_bp
 ### Requirement: A8. admin events and errors
 Each successful admin change emits one event (`TokenAllowedSet`, `FeeConfigUpdated`, `LimitsUpdated`, `RegistryUpdated`, `AdminChanged`); failed calls emit none. Additional error variants: `NotAdmin`, `InvalidFeeBps`, `TreasuryNotSet`, `InvalidDuration`, `RegistryNotSet`.
 
-#### Scenario: successful admin change emits event
-- **WHEN** an admin function executes successfully
-- **THEN** exactly one corresponding admin event is emitted
-
 ## Open items (not decided; do not hard-code)
 
 1. Values of `max_expiry` and `approval_window` (ADR-0005 D3 deferred). The only constraint: `runtime timeout + approval_window < expired_at`, enforced on-chain as `now + approval_window < expired_at` at `submit`.

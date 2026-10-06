@@ -32,7 +32,7 @@ Submitted --reject (evaluator, before approval_deadline)--> Rejected (full refun
 
 ## Requirements
 
-### R1. create_job
+### Requirement: R1. create_job
 The contract MUST expose `create_job(caller, provider, evaluator, expired_at, description, hook, agent_id, token, budget) -> Result<u64, EscrowError>`. The first six parameters follow ERC-8183 order; `agent_id: u32`, `token: Address`, `budget: i128` are **(puls3 addition)** because puls3 prices are fixed by the manifest and the payee is verified against the identity registry.
 
 - `caller` MUST authorize (`require_auth`) and becomes the `client`.
@@ -103,7 +103,7 @@ The contract MUST expose `create_job(caller, provider, evaluator, expired_at, de
 - WHEN `description` is 257 bytes
 - THEN it fails with `DescriptionTooLong`
 
-### R2. fund
+### Requirement: R2. fund
 The contract MUST expose `fund(caller, job_id, expected_budget, max_fee_bps) -> Result<(), EscrowError>`.
 
 - `caller` MUST authorize and MUST equal the job `client`, else `NotClient`.
@@ -176,7 +176,7 @@ The contract MUST expose `fund(caller, job_id, expected_budget, max_fee_bps) -> 
 - WHEN the client calls `fund` with `max_fee_bps = 0`
 - THEN `fund` succeeds
 
-### R3. submit
+### Requirement: R3. submit
 The contract MUST expose `submit(caller, job_id, deliverable) -> Result<(), EscrowError>`.
 
 - `caller` MUST authorize and MUST equal the stored `provider`, else `NotProvider`.
@@ -207,7 +207,7 @@ The contract MUST expose `submit(caller, job_id, deliverable) -> Result<(), Escr
 - WHEN the provider calls `submit`
 - THEN it fails with `SubmitTooLate` and the job stays `Funded` (refundable after expiry)
 
-### R4. complete
+### Requirement: R4. complete
 The contract MUST expose `complete(caller, job_id, reason) -> Result<(), EscrowError>`.
 
 - `caller` MUST authorize and MUST equal the `evaluator`, else `NotEvaluator`.
@@ -237,7 +237,7 @@ The contract MUST expose `complete(caller, job_id, reason) -> Result<(), EscrowE
 - GIVEN a job created with `evaluator = E != client`
 - THEN only `E` can `complete`; the client calling `complete` fails with `NotEvaluator`
 
-### R5. release (puls3 addition)
+### Requirement: R5. release (puls3 addition)
 The contract MUST expose `release(job_id) -> Result<(), EscrowError>`, callable by anyone and requiring no authorization.
 
 - State MUST be `Submitted`, else `InvalidState`.
@@ -266,7 +266,7 @@ The contract MUST expose `release(job_id) -> Result<(), EscrowError>`, callable 
 - WHEN an unrelated address (not client, provider, evaluator) calls `release`
 - THEN it succeeds and the caller's balance is unchanged
 
-### R6. reject
+### Requirement: R6. reject
 The contract MUST expose `reject(caller, job_id, reason) -> Result<(), EscrowError>`. Reject is final (ADR-0005 D8).
 
 - `caller` MUST authorize.
@@ -307,7 +307,7 @@ The contract MUST expose `reject(caller, job_id, reason) -> Result<(), EscrowErr
 - GIVEN a `Rejected` job
 - THEN `fund`, `submit`, `complete`, `release`, `reject`, `claim_refund` all fail with `InvalidState`
 
-### R7. claim_refund
+### Requirement: R7. claim_refund
 The contract MUST expose `claim_refund(job_id) -> Result<(), EscrowError>`, callable by anyone, requiring no authorization, never pausable and never hookable.
 
 - State MUST be `Funded`, else `InvalidState` (a `Submitted` job MUST fail with `InvalidState`; it settles through `complete`, `release` or `reject`; ADR-0005 D4 invariant). An `Open` job is not refundable (no funds held). `claim_refund` MUST NOT be extended to `Submitted` to rescue a failed payout: the contract cannot tell a failed payout from a client that never called `release`, so that would let a silent client wait for `expired_at`, reclaim the funds and keep the deliverable. Failed payouts are handled by the pull-payment balance (R14).
@@ -355,7 +355,7 @@ The contract MUST expose `claim_refund(job_id) -> Result<(), EscrowError>`, call
 - WHEN `now >= expired_at` and any address calls `claim_refund`
 - THEN it fails with `InvalidState` and the client balance is unchanged
 
-### R8. views
+### Requirement: R8. views
 The contract MUST expose read-only views: `get_job(job_id) -> Result<Job, EscrowError>`, `job_count() -> u64`, and `is_expired(job_id) -> Result<bool, EscrowError>`.
 
 - `is_expired` MUST return true when the state is `Expired`, or when the state is `Open` or `Funded` and `now >= expired_at`; otherwise false. It lets indexers derive the unfunded-expiry result without a transaction (ADR-0005 D6).
@@ -377,7 +377,7 @@ The contract MUST expose read-only views: `get_job(job_id) -> Result<Job, Escrow
 - WHEN any view is called with an unknown id
 - THEN it fails with `JobNotFound`
 
-### R9. settlement and fee math
+### Requirement: R9. settlement and fee math
 All payouts MUST use `token::Client::transfer` from the contract.
 
 - `fee = floor(budget * fee_bps / 10_000)`, computed overflow-free as `(budget / 10_000) * fee_bps + (budget % 10_000) * fee_bps / 10_000`. This is exact for `fee_bps <= 10_000` and can never overflow, so a job cannot get stuck in `Submitted` because of the fee math. `fee_bps` is the snapshot taken at `fund`.
@@ -411,7 +411,7 @@ All payouts MUST use `token::Client::transfer` from the contract.
 #### Scenario: conservation
 - FOR every terminal path, the sum of transfers out equals the budget funded into that job, and the contract token balance attributable to the job is 0
 
-### R10. events
+### Requirement: R10. events
 Every state transition MUST emit exactly one event via `#[contractevent]`; failures MUST emit none.
 
 | Event | Emitted by | Fields |
@@ -435,7 +435,7 @@ Job id MUST be a topic on every job event except `PayoutWithdrawn`, which is job
 - WHEN a call fails with any guard error
 - THEN no escrow event is emitted
 
-### R11. storage and TTL
+### Requirement: R11. storage and TTL
 Jobs live in persistent storage under `DataKey::Job(u64)`. Every write or read-modify touch of a job MUST extend its TTL. Contract-instance TTL MUST be extended on every call that touches instance data. A job record MUST remain readable after reaching a terminal state (until TTL expiry).
 
 The persistent TTL bump (`TTL_BUMP`, about 60 days at 5-second ledgers) is unrelated to `max_expiry`; no cap ties them. A job whose lifetime exceeds the TTL is archived unless kept alive with the permissionless `extend_ttl(job_id)` or restored from archival afterwards. A claimable balance entry is bumped when it is written.
@@ -449,10 +449,10 @@ The persistent TTL bump (`TTL_BUMP`, about 60 days at 5-second ledgers) is unrel
 - WHEN anyone calls `extend_ttl(job_id)`
 - THEN the job TTL is back at `TTL_BUMP` and the job is still readable
 
-### R12. error catalogue
+### Requirement: R12. error catalogue
 Failures MUST be typed `#[contracterror]` values (no panics for domain failures) with stable distinct codes: `JobNotFound`, `InvalidState`, `NotClient`, `NotProvider`, `NotEvaluator`, `InvalidAmount`, `InvalidExpiry`, `JobExpired`, `NotExpired`, `BudgetMismatch`, `TokenNotAllowed`, `HookNotSupported`, `DescriptionTooLong`, `ProviderMismatch`, `AgentWalletNotSet`, `AgentNotFound`, `ClientIsProvider`, `SubmitTooLate`, `ApprovalWindowOpen`, `ApprovalWindowClosed`, `ArithmeticOverflow`, `FeeExceedsMax` (115), `NothingToWithdraw` (116), `RegistryNotSet` (see administration spec). Authorization failures raised by `require_auth` are host auth errors.
 
-### R14. pull payment (failed payouts)
+### Requirement: R14. pull payment (failed payouts)
 The contract MUST NOT let a failing payout transfer (for example a recipient without a trustline, or a frozen holder) trap funds. The contract is not upgradeable, so settlement must always be able to finish.
 
 - In `complete` and `release`, the provider payout and the treasury fee MUST each be sent with `try_transfer`, handling both the host-error and the contract-error layer of the result. On failure the job STILL becomes `Completed`, the amount is added (`checked_add`, `ArithmeticOverflow` on overflow) to the persistent `DataKey::Claimable(recipient, token)` balance with its TTL bumped, the funds stay in the contract, and `PayoutDeferred` is emitted. The two payouts are independent: one failing does not affect the other.
@@ -505,7 +505,7 @@ The contract MUST NOT let a failing payout transfer (for example a recipient wit
 - GIVEN both transfers fail
 - THEN both amounts become claimable, and provider balance + treasury balance + contract balance for the job always equals the budget
 
-### R13. non-goals (testable absences)
+### Requirement: R13. non-goals (testable absences)
 The contract MUST NOT expose any arbiter, dispute, partial-split, pause, `set_provider`, `set_budget`, or hook-execution entry point in this change.
 
 #### Scenario: no dispute surface
