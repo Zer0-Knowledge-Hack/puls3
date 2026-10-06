@@ -8,6 +8,12 @@ import 'sc_val_json.dart';
 /// The state of an escrow job, in the order of the contract's `JobState`.
 enum EscrowJobState { open, funded, submitted, completed, rejected, expired }
 
+/// Reads escrow jobs. Implemented by `SorobanLedger`.
+abstract interface class EscrowJobReader {
+  /// Escrow `get_job`, or `null` when the job does not exist.
+  Future<EscrowJob?> escrowJob(int jobId);
+}
+
 /// An escrow `Job` as the contract stores it. It lives in the server package:
 /// the domain does not model escrow jobs.
 final class EscrowJob {
