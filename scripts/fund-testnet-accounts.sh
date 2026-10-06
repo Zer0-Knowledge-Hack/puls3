@@ -22,6 +22,10 @@
 #   TEST_USDC_CODE            asset code (default PUSDC)
 #   TEST_USDC_AMOUNT          amount per account in stroops, 7 decimals (default 1000000000 = 100.00)
 #
+# Timeouts: Friendbot calls give up after 10 s to connect and 60 s in total; each
+# Stellar CLI call is stopped after 180 s when timeout(1) is available (it is in Git
+# Bash, Linux and Homebrew coreutils), otherwise it runs unbounded.
+#
 # Only identity names and public keys are read: no key material is read, logged or written.
 # Exit codes: 0 every account funded; 1 usage error or any account failed (the others
 # are still attempted, and every tx hash obtained is printed).
@@ -64,6 +68,24 @@ fi
 
 command -v curl >/dev/null || { echo "error: 'curl' is required." >&2; exit 1; }
 
+CURL_CONNECT_TIMEOUT=10
+CURL_MAX_TIME=60
+STELLAR_CALL_TIMEOUT=180
+
+# GNU timeout(1) only: on Windows a bare `timeout` can be the unrelated timeout.exe.
+HAS_TIMEOUT=0
+if timeout --version >/dev/null 2>&1; then HAS_TIMEOUT=1; fi
+
+# stellar_cli <args...>: the Stellar CLI, bounded by timeout(1) when it exists.
+# Exit 124 means the call timed out.
+stellar_cli() {
+  if [ "$HAS_TIMEOUT" -eq 1 ]; then
+    timeout "$STELLAR_CALL_TIMEOUT" stellar "$@"
+  else
+    stellar "$@"
+  fi
+}
+
 is_public_key() { [[ "$1" =~ ^G[A-Z2-7]{55}$ ]]; }
 need_stellar() {
   command -v stellar >/dev/null || { echo "error: the Stellar CLI ('stellar') is required." >&2; exit 1; }
@@ -94,7 +116,7 @@ for account in "${ACCOUNTS[@]}"; do
     exit 1
   fi
   need_stellar
-  if ! address="$(stellar keys address "$account" 2>/dev/null)" || ! is_public_key "$address"; then
+  if ! address="$(stellar_cli keys address "$account" 2>/dev/null)" || ! is_public_key "$address"; then
     echo "error: '$account' is neither a public key nor a Stellar CLI identity (stellar keys ls)." >&2
     exit 1
   fi
@@ -105,10 +127,10 @@ done
 ASSET=""
 if [ "$XLM_ONLY" -eq 0 ]; then
   need_stellar
-  if ! ISSUER="$(stellar keys address "$ISSUER_ID" 2>/dev/null)"; then
+  if ! ISSUER="$(stellar_cli keys address "$ISSUER_ID" 2>/dev/null)"; then
     echo "Creating the test asset issuer identity '$ISSUER_ID' (kept in the Stellar CLI config)."
-    if ! stellar keys generate "$ISSUER_ID" --fund --network "$NETWORK" >"$LOG" 2>&1 ||
-      ! ISSUER="$(stellar keys address "$ISSUER_ID" 2>/dev/null)"; then
+    if ! stellar_cli keys generate "$ISSUER_ID" --fund --network "$NETWORK" >"$LOG" 2>&1 ||
+      ! ISSUER="$(stellar_cli keys address "$ISSUER_ID" 2>/dev/null)"; then
       echo "error: could not create the issuer identity '$ISSUER_ID'." >&2
       cat "$LOG" >&2
       exit 1
@@ -129,7 +151,7 @@ FAILED=0
 fund_xlm() {
   local address="$1" body="$WORK/friendbot" status hash
   : >"$body" # never re-read the previous account's answer
-  status="$(curl -sS -o "$body" -w '%{http_code}' "${FRIENDBOT_URL}?addr=$address" 2>"$LOG" || true)"
+  status="$(curl -sS --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" -o "$body" -w '%{http_code}' "${FRIENDBOT_URL}?addr=$address" 2>"$LOG" || true)"
   if [ -z "$status" ] || [ "$status" = "000" ] || [ ! -s "$body" ]; then
     echo "error: Friendbot failed for $address (HTTP ${status:-000}): no answer." >&2
     [ ! -s "$LOG" ] || cat "$LOG" >&2
@@ -156,9 +178,14 @@ fund_xlm() {
 
 # run_tx <label> <address> <stellar args...>: runs a CLI transaction and prints its hash.
 run_tx() {
-  local label="$1" address="$2" hash
+  local label="$1" address="$2" hash code=0
   shift 2
-  if ! stellar "$@" >"$LOG" 2>&1; then
+  stellar_cli "$@" >"$LOG" 2>&1 || code=$?
+  if [ "$code" -eq 124 ]; then
+    echo "error: $label for $address timed out after ${STELLAR_CALL_TIMEOUT}s." >&2
+    return 1
+  fi
+  if [ "$code" -ne 0 ]; then
     echo "error: $label failed for $address." >&2
     cat "$LOG" >&2
     return 1
@@ -192,14 +219,14 @@ fund_asset() {
 if [ "$XLM_ONLY" -eq 0 ]; then
   # The SAC lets Soroban contracts move the asset. Only "already deployed" is fine:
   # stellar-cli 28.x reports it as Error(Storage, ExistingValue) / "contract already exists".
-  if ! stellar contract asset deploy --asset "$ASSET" --source-account "$ISSUER_ID" \
+  if ! stellar_cli contract asset deploy --asset "$ASSET" --source-account "$ISSUER_ID" \
     --network "$NETWORK" >"$LOG" 2>&1 &&
     ! grep -qE 'ExistingValue|contract already exists' "$LOG"; then
     echo "error: could not deploy the Stellar Asset Contract for $ASSET." >&2
     cat "$LOG" >&2
     exit 1
   fi
-  if ! SAC="$(stellar contract id asset --asset "$ASSET" --network "$NETWORK" 2>"$LOG")" || [ -z "$SAC" ]; then
+  if ! SAC="$(stellar_cli contract id asset --asset "$ASSET" --network "$NETWORK" 2>"$LOG")" || [ -z "$SAC" ]; then
     echo "error: could not derive the SAC id of $ASSET." >&2
     cat "$LOG" >&2
     exit 1

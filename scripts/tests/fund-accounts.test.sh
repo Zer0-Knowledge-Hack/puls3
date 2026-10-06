@@ -89,6 +89,7 @@ cat >"$STUB_DIR/curl" <<'STUBEOF'
 # Env knobs: STUB_FRIENDBOT_EXISTING (space-separated addresses already funded),
 #   STUB_FRIENDBOT_DOWN (any value: answer 502),
 #   STUB_FRIENDBOT_TRANSPORT_FAIL (space-separated addresses: no answer, status 000).
+ALL_ARGS="$*"
 out="" url=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -100,6 +101,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 echo "curl $url" >>"$STUB_CALLS"
+echo "curlargs $ALL_ARGS" >>"$STUB_CALLS"
 addr="${url##*addr=}"
 n=0
 [ ! -f "$STUB_STATE_DIR/counter" ] || n="$(cat "$STUB_STATE_DIR/counter")"
@@ -120,6 +122,18 @@ printf '{\n  "successful": true,\n  "hash": "%064x",\n  "ledger": 1\n}\n' "$n" >
 printf '200'
 STUBEOF
 chmod +x "$STUB_DIR/curl"
+
+# Fake timeout(1): records the limit, then runs the command. STUB_TIMEOUT_EXPIRE=<stellar
+# subcommand word> makes that call time out (exit 124) instead.
+cat >"$STUB_DIR/timeout" <<'STUBEOF'
+#!/usr/bin/env bash
+if [ "$1" = "--version" ]; then [ -z "${STUB_TIMEOUT_NOT_GNU:-}" ] || exit 1; echo "timeout (stub)"; exit 0; fi
+limit="$1"; shift
+echo "timeout $limit $*" >>"$STUB_CALLS"
+if [ -n "${STUB_TIMEOUT_EXPIRE:-}" ] && [[ " $* " == *" $STUB_TIMEOUT_EXPIRE "* ]]; then exit 124; fi
+exec "$@"
+STUBEOF
+chmod +x "$STUB_DIR/timeout"
 
 fresh_env() {
   rm -rf "$WORK/state" "$WORK/calls"
@@ -206,6 +220,23 @@ expect_out "first account already funded" "xlm   $KEY_RAW already funded"
 expect_out_not "stale body never reused for the second account" "xlm   $KEY_ALICE already funded"
 expect_out "transport failure reported" "Friendbot failed for $KEY_ALICE (HTTP 000)"
 expect_out "only the second account failed" "failed: 1 of 2"
+
+echo "# timeouts"
+fresh_env
+expect_exit "xlm run with timeouts exits 0" 0 run_fund --xlm-only "$KEY_RAW"
+expect_call "curl has a connect timeout" "^curlargs .*--connect-timeout 10"
+expect_call "curl has a total timeout" "^curlargs .*--max-time 60"
+fresh_env
+expect_exit "usdc run with timeouts exits 0" 0 run_fund alice
+expect_call "stellar network calls are bounded" "^timeout 180 stellar tx new payment"
+expect_call "SAC deploy is bounded" "^timeout 180 stellar contract asset deploy"
+fresh_env
+expect_exit "a stellar call that times out exits 1" 1 env STUB_TIMEOUT_EXPIRE=payment bash "$SCRIPT" alice
+expect_out "timeout is named" "timed out after 180s"
+fresh_env
+expect_exit "without GNU timeout the run still works" 0 env STUB_TIMEOUT_NOT_GNU=1 bash "$SCRIPT" alice
+expect_no_call "without GNU timeout stellar runs unbounded" "^timeout 180"
+expect_call "without GNU timeout the payment is still sent" "^tx new payment"
 
 echo "# XLM and test USDC"
 fresh_env
