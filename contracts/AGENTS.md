@@ -10,7 +10,7 @@ This is a Stellar smart-contract workspace (Soroban). Each contract is a workspa
 
 Current members: `contracts/identity-registry/` (Agent Identity Registry), `contracts/escrow/` (agent escrow and payment) and `contracts/placeholder/` (sample for CI). Deployed IDs and hashes are in `deployments/testnet.json` (never put secrets there); seed data is `deployments/demo-agents.json`.
 
-Scripts (run from the repo root): `scripts/deploy-testnet.sh` (registry), `scripts/deploy-escrow-testnet.sh` (escrow deploy, USDC allow-list, `--test-job`, `--direct-payment`, `--redeploy`) and `scripts/seed-demo-agents.sh`. Offline tests: `scripts/tests/`. Escrow state has a persistent TTL of about 60 days: `extend_ttl(job_id)` renews it. Verification steps: `docs/verification/onchain.md`.
+Scripts (run from the repo root): `scripts/deploy-testnet.sh` (registry), `scripts/deploy-escrow-testnet.sh` (escrow deploy, USDC allow-list, `--test-job`, `--direct-payment`, `--redeploy`) `scripts/seed-demo-agents.sh` and `scripts/fund-testnet-accounts.sh` (Friendbot XLM plus a scripted test USDC). Offline tests: `scripts/tests/`. Escrow state has a persistent TTL of about 60 days: `extend_ttl(job_id)` renews it. Verification steps: `docs/verification/onchain.md`.
 
 ## Build
 

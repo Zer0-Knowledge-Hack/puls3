@@ -169,7 +169,7 @@ puls3_flutter/   Flutter app (Studio + Marketplace)
 puls3_server/    Serverpod backend
 puls3_client/    Generated client shared by app and server
 contracts/       Soroban workspace: identity-registry, escrow, placeholder; deployments/ holds testnet.json and demo-agents.json
-scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh) and seed (seed-demo-agents.sh) scripts
+scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh), seed (seed-demo-agents.sh) and funding (fund-testnet-accounts.sh) scripts
 spikes/          Payments proof of concept (payments-poc)
 docs/adr/        Architecture decision records
 docs/verification/ How to verify the on-chain evidence (onchain.md)

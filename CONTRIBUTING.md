@@ -253,7 +253,7 @@ The repo is **public**. Anything you push can be seen and copied.
 
 - **Never commit secrets:** Stellar secret seeds (`S…`), API keys, passwords, or `.env` files.
 - Local secrets live in git-ignored files (`puls3_server/.env`, `puls3_server/config/passwords.yaml`). Use `scripts/setup-local-secrets.sh` to create them.
-- Read keys from environment variables, and document every new one in an `.env.example`.
+- Read keys from environment variables, and document every new one in the root `.env.example` (and any new secret in [`docs/infra/secrets.md`](docs/infra/secrets.md)). `bash scripts/tests/env-inventory.test.sh` checks both.
 - If you leak a secret, tell the team right away and rotate it. Deleting the commit is not enough.
 
 ---
