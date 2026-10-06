@@ -1,4 +1,6 @@
 ### Draft transport mirror of the domain Agent entity.
+### Planned: not served in the MVP. The catalog serves AgentSummary
+### (agent_summary.spy.yaml, #88); `owner` and structured `skills` are planned.
 class: Agent
 fields:
   ### Domain AgentId encoded as an integer.

@@ -1,5 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
+import 'contract_events.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
 
@@ -22,49 +23,11 @@ Payment? firstUsdcPayment(
   required StellarAddress usdcSac,
 }) {
   if (tx['status'] != 'SUCCESS') return null;
-  for (final event in _events(tx)) {
+  for (final event in contractEvents(tx)) {
     final payment = _payment(event, transaction, usdcSac);
     if (payment != null) return payment;
   }
   return null;
-}
-
-/// The contract events of [tx], in order.
-///
-/// Reads `events.contractEventsJson`, which the RPC groups per operation, and
-/// flattens it. If that field is missing, walks `events` for any map that
-/// looks like a contract event.
-Iterable<Object?> _events(Map<String, Object?> tx) sync* {
-  final events = tx['events'];
-  if (events is! Map) return;
-  final recorded = events['contractEventsJson'];
-  if (recorded is List) {
-    for (final item in recorded) {
-      if (item is List) {
-        yield* item;
-      } else {
-        yield item;
-      }
-    }
-    return;
-  }
-  yield* _walk(events);
-}
-
-Iterable<Object?> _walk(Object? node) sync* {
-  if (node is Map) {
-    if (node['type'] == 'contract' && node.containsKey('contract_id')) {
-      yield node;
-      return;
-    }
-    for (final child in node.values) {
-      yield* _walk(child);
-    }
-  } else if (node is List) {
-    for (final child in node) {
-      yield* _walk(child);
-    }
-  }
 }
 
 Payment? _payment(

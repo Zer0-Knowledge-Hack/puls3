@@ -1,0 +1,26 @@
+### One agent of the catalog, built from the identity registry metadata.
+class: AgentSummary
+fields:
+  ### The metadata id of the agent, for example agt-001.
+  id: String
+
+  ### The on-chain integer id in the identity registry.
+  registryId: int
+
+  ### The display name.
+  name: String
+
+  ### What the agent does.
+  description: String
+
+  ### The skill ids, in kebab-case.
+  skills: List<String>
+
+  ### The price of one hire in USDC stroops.
+  priceUsdcStroops: int
+
+  ### The Stellar address (G...) that receives payments, when registered.
+  wallet: String?
+
+  ### The model that runs the agent, when the metadata names one.
+  model: String?

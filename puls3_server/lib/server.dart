@@ -4,6 +4,7 @@ import 'package:serverpod/serverpod.dart';
 import 'package:serverpod_auth_idp_server/core.dart';
 import 'package:serverpod_auth_idp_server/providers/email.dart';
 
+import 'src/chain/chain_tracker_wiring.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 import 'src/web/routes/app_config_route.dart';
@@ -75,6 +76,15 @@ void run(List<String> args) async {
 
   // Start the server.
   await pod.start();
+
+  // Track relay submissions until they are final, when
+  // PULS3_TRACKER_ENABLED=true (see README). Serverpod runs shutdown tasks on
+  // SIGINT/SIGTERM after it stops taking requests and before it closes the
+  // database, so the pass in flight can finish.
+  final tracker = startChainTracker(pod, Platform.environment);
+  if (tracker != null) {
+    pod.experimental.shutdownTasks.addTask('chain-tracker', tracker.stop);
+  }
 }
 
 void _sendRegistrationCode(
