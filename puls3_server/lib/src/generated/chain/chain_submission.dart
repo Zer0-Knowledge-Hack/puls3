@@ -34,6 +34,7 @@ abstract class ChainSubmission
     this.lastSentAt,
     int? sendAttempts,
     this.createdAt,
+    this.lastCheckedAt,
   }) : sendAttempts = sendAttempts ?? 0;
 
   factory ChainSubmission({
@@ -51,6 +52,7 @@ abstract class ChainSubmission
     DateTime? lastSentAt,
     int? sendAttempts,
     DateTime? createdAt,
+    DateTime? lastCheckedAt,
   }) = _ChainSubmissionImpl;
 
   factory ChainSubmission.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -77,6 +79,11 @@ abstract class ChainSubmission
       createdAt: jsonSerialization['createdAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      lastCheckedAt: jsonSerialization['lastCheckedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(
+              jsonSerialization['lastCheckedAt'],
+            ),
     );
   }
 
@@ -120,11 +127,16 @@ abstract class ChainSubmission
   /// End of the envelope time bounds; after it the submission is expired.
   DateTime? validUntil;
 
+  /// Last send of the envelope; paces resends, never the tracker order.
   DateTime? lastSentAt;
 
   int? sendAttempts;
 
   DateTime? createdAt;
+
+  /// Last time the tracker looked at a submitted record; createdAt on
+  /// insert. The tracker lists the least recently checked records first.
+  DateTime? lastCheckedAt;
 
   @override
   _i1.Table<int?> get table => t;
@@ -147,6 +159,7 @@ abstract class ChainSubmission
     DateTime? lastSentAt,
     int? sendAttempts,
     DateTime? createdAt,
+    DateTime? lastCheckedAt,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -166,6 +179,7 @@ abstract class ChainSubmission
       if (lastSentAt != null) 'lastSentAt': lastSentAt?.toJson(),
       if (sendAttempts != null) 'sendAttempts': sendAttempts,
       if (createdAt != null) 'createdAt': createdAt?.toJson(),
+      if (lastCheckedAt != null) 'lastCheckedAt': lastCheckedAt?.toJson(),
     };
   }
 
@@ -232,6 +246,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
     DateTime? lastSentAt,
     int? sendAttempts,
     DateTime? createdAt,
+    DateTime? lastCheckedAt,
   }) : super._(
          id: id,
          preparationId: preparationId,
@@ -247,6 +262,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
          lastSentAt: lastSentAt,
          sendAttempts: sendAttempts,
          createdAt: createdAt,
+         lastCheckedAt: lastCheckedAt,
        );
 
   /// Returns a shallow copy of this [ChainSubmission]
@@ -268,6 +284,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
     Object? lastSentAt = _Undefined,
     Object? sendAttempts = _Undefined,
     Object? createdAt = _Undefined,
+    Object? lastCheckedAt = _Undefined,
   }) {
     return ChainSubmission(
       id: id is int? ? id : this.id,
@@ -288,6 +305,9 @@ class _ChainSubmissionImpl extends ChainSubmission {
       lastSentAt: lastSentAt is DateTime? ? lastSentAt : this.lastSentAt,
       sendAttempts: sendAttempts is int? ? sendAttempts : this.sendAttempts,
       createdAt: createdAt is DateTime? ? createdAt : this.createdAt,
+      lastCheckedAt: lastCheckedAt is DateTime?
+          ? lastCheckedAt
+          : this.lastCheckedAt,
     );
   }
 }
@@ -365,6 +385,12 @@ class ChainSubmissionUpdateTable extends _i1.UpdateTable<ChainSubmissionTable> {
         table.createdAt,
         value,
       );
+
+  _i1.ColumnValue<DateTime, DateTime> lastCheckedAt(DateTime? value) =>
+      _i1.ColumnValue(
+        table.lastCheckedAt,
+        value,
+      );
 }
 
 class ChainSubmissionTable extends _i1.Table<int?> {
@@ -424,6 +450,10 @@ class ChainSubmissionTable extends _i1.Table<int?> {
       'createdAt',
       this,
     );
+    lastCheckedAt = _i1.ColumnDateTime(
+      'lastCheckedAt',
+      this,
+    );
   }
 
   late final ChainSubmissionUpdateTable updateTable;
@@ -461,11 +491,16 @@ class ChainSubmissionTable extends _i1.Table<int?> {
   /// End of the envelope time bounds; after it the submission is expired.
   late final _i1.ColumnDateTime validUntil;
 
+  /// Last send of the envelope; paces resends, never the tracker order.
   late final _i1.ColumnDateTime lastSentAt;
 
   late final _i1.ColumnInt sendAttempts;
 
   late final _i1.ColumnDateTime createdAt;
+
+  /// Last time the tracker looked at a submitted record; createdAt on
+  /// insert. The tracker lists the least recently checked records first.
+  late final _i1.ColumnDateTime lastCheckedAt;
 
   @override
   List<_i1.Column> get columns => [
@@ -483,6 +518,7 @@ class ChainSubmissionTable extends _i1.Table<int?> {
     lastSentAt,
     sendAttempts,
     createdAt,
+    lastCheckedAt,
   ];
 }
 

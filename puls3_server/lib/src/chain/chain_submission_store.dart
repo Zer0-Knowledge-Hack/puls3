@@ -21,6 +21,7 @@ final class StoredSubmission {
     required this.sendAttempts,
     required this.createdAt,
     required this.updatedAt,
+    required this.lastCheckedAt,
   });
 
   final int id;
@@ -43,12 +44,18 @@ final class StoredSubmission {
 
   /// End of the envelope time bounds.
   final DateTime validUntil;
+
+  /// Last send of the envelope; paces resends, never the list order.
   final DateTime? lastSentAt;
   final int sendAttempts;
   final DateTime createdAt;
 
-  /// Last state change. Recording a send does not change it.
+  /// Last state change. Recording a send or a check does not change it.
   final DateTime updatedAt;
+
+  /// Last time the tracker looked at this record; [createdAt] until then.
+  /// Orders [ChainSubmissionStore.listSubmitted].
+  final DateTime lastCheckedAt;
 
   /// The client-visible model, with wire-name strings and no server-only
   /// fields.
@@ -90,7 +97,9 @@ abstract interface class ChainSubmissionStore {
   /// Persists a `submitted` record before its envelope is sent.
   ///
   /// Throws [ChainSubmissionConflict] when [preparationId] or
-  /// [transactionHash] already has a record.
+  /// [transactionHash] already has a record, and [ArgumentError] when
+  /// [preparationId] does not fit [purpose]: wallet-signed purposes need
+  /// one, server-signed purposes never have one.
   Future<StoredSubmission> insertSubmitted({
     required SubmissionPurpose purpose,
     required String transactionHash,
@@ -104,7 +113,17 @@ abstract interface class ChainSubmissionStore {
   /// The record of [preparationId], or `null`.
   Future<StoredSubmission?> findByPreparation(String preparationId);
 
-  /// Up to [limit] `submitted` records, least recently updated first.
+  /// Up to [limit] `submitted` records, least recently checked first
+  /// (`lastCheckedAt`, then id), read in one query. A record goes to the
+  /// back once [recordCheck] records a check, so more than [limit] records
+  /// that stay `submitted` cannot starve the others. Sends do not change
+  /// the order.
+  ///
+  /// A row that cannot be read (unknown purpose, or a server-only column
+  /// missing) is not returned: it is logged and set to `failed` with
+  /// [SubmissionOutcomeCode.escrowCallFailed], so it never blocks the batch
+  /// again. The result may therefore hold fewer than [limit] records while
+  /// more remain.
   ///
   /// Throws [ArgumentError] when [limit] is below 1.
   Future<List<StoredSubmission>> listSubmitted({int limit = 100});
@@ -115,12 +134,43 @@ abstract interface class ChainSubmissionStore {
 
   /// Sets `failed` with [code] if the record is still `submitted`. Returns
   /// whether it changed.
+  ///
+  /// Throws [ArgumentError] unless [SubmissionOutcomeCode.isKnown] accepts
+  /// [code].
   Future<bool> markFailed(int id, String code);
 
   /// Counts one more send of the envelope at [at] if the record is still
   /// `submitted`. Returns whether it changed: `false` for an unknown [id] or
-  /// a final record. It does not change the state or `updatedAt`.
+  /// a final record. It does not change the state, `updatedAt` or the
+  /// [listSubmitted] order.
   Future<bool> recordSend(int id, DateTime at);
+
+  /// Sets `lastCheckedAt` to [at] if the record is still `submitted`, which
+  /// moves it to the back of [listSubmitted]. Returns whether it changed:
+  /// `false` for an unknown [id] or a final record. It does not change the
+  /// state, `updatedAt` or the send fields.
+  Future<bool> recordCheck(int id, DateTime at);
+}
+
+/// Shared argument check of [ChainSubmissionStore.insertSubmitted].
+void checkPreparation(SubmissionPurpose purpose, String? preparationId) {
+  if (purpose.isServerSigned && preparationId != null) {
+    throw ArgumentError.value(
+      preparationId,
+      'preparationId',
+      'must be null for the server-signed purpose ${purpose.wireName}',
+    );
+  }
+  if (!purpose.isServerSigned && preparationId == null) {
+    throw ArgumentError.notNull('preparationId');
+  }
+}
+
+/// Shared argument check of [ChainSubmissionStore.markFailed].
+void checkOutcomeCode(String code) {
+  if (!SubmissionOutcomeCode.isKnown(code)) {
+    throw ArgumentError.value(code, 'code', 'is not a known outcome code');
+  }
 }
 
 /// Shared argument check of [ChainSubmissionStore.listSubmitted].

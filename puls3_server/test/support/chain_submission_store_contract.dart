@@ -1,6 +1,11 @@
+import 'package:puls3_server/src/chain/chain_log.dart';
 import 'package:puls3_server/src/chain/chain_submission_store.dart';
+import 'package:puls3_server/src/chain/chain_submission_tracker.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:test/test.dart';
+
+import 'fake_escrow_effects.dart';
+import 'fake_submission_ledger.dart';
 
 /// Builds a store whose clock is [now]. Called inside each test body.
 typedef ChainSubmissionStoreFactory =
@@ -62,6 +67,7 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(stored.sendAttempts, 0);
     expect(stored.createdAt, clock);
     expect(stored.updatedAt, clock);
+    expect(stored.lastCheckedAt, clock);
   });
 
   test('findByPreparation returns the stored record or null', () async {
@@ -186,6 +192,36 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
       isFalse,
     );
     expect(await repo.recordSend(999999, clock), isFalse);
+    expect(await repo.recordCheck(999999, clock), isFalse);
+  });
+
+  test('recordCheck keeps the last check time and nothing else', () async {
+    create();
+    final stored = await insert();
+    final checkedAt = clock.add(const Duration(seconds: 5));
+
+    expect(await repo.recordCheck(stored.id, checkedAt), isTrue);
+
+    final checked = (await repo.findByPreparation('prep-1'))!;
+    expect(checked.lastCheckedAt, checkedAt);
+    expect(checked.state, SubmissionState.submitted);
+    expect(checked.updatedAt, stored.updatedAt);
+    expect(checked.sendAttempts, 0);
+    expect(checked.lastSentAt, isNull);
+  });
+
+  test('recordCheck changes only a submitted record', () async {
+    create();
+    final stored = await insert();
+    await repo.markFailed(stored.id, SubmissionOutcomeCode.transactionFailed);
+
+    expect(
+      await repo.recordCheck(stored.id, clock.add(const Duration(minutes: 1))),
+      isFalse,
+    );
+
+    final unchanged = (await repo.findByPreparation('prep-1'))!;
+    expect(unchanged.lastCheckedAt, stored.lastCheckedAt);
   });
 
   test('recordSend counts attempts and keeps the last send time', () async {
@@ -231,6 +267,84 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(() => repo.listSubmitted(limit: 0), throwsArgumentError);
   });
 
+  test('listSubmitted lists the least recently checked records '
+      'first', () async {
+    create();
+    final a = await insert(preparationId: 'prep-1', transactionHash: _txA);
+    final b = await insert(preparationId: 'prep-2', transactionHash: _txB);
+    final c = await insert(preparationId: 'prep-3', transactionHash: _txC);
+    await repo.recordCheck(a.id, clock.add(const Duration(seconds: 2)));
+    await repo.recordCheck(b.id, clock.add(const Duration(seconds: 1)));
+
+    final listed = await repo.listSubmitted();
+
+    expect(listed.map((s) => s.id), [c.id, b.id, a.id]);
+  });
+
+  test('listSubmitted does not order by sends', () async {
+    create();
+    final a = await insert(preparationId: 'prep-1', transactionHash: _txA);
+    final b = await insert(preparationId: 'prep-2', transactionHash: _txB);
+    await repo.recordSend(a.id, clock.add(const Duration(seconds: 1)));
+
+    final listed = await repo.listSubmitted();
+
+    expect(listed.map((s) => s.id), [a.id, b.id]);
+  });
+
+  test('listSubmitted lists a record behind limit more recently checked '
+      'ones', () async {
+    create();
+    final a = await insert(preparationId: 'prep-1', transactionHash: _txA);
+    clock = clock.add(const Duration(seconds: 1));
+    final b = await insert(preparationId: 'prep-2', transactionHash: _txB);
+    clock = clock.add(const Duration(seconds: 1));
+    final c = await insert(preparationId: 'prep-3', transactionHash: _txC);
+
+    final first = await repo.listSubmitted(limit: 2);
+    for (final s in first) {
+      await repo.recordCheck(s.id, clock.add(const Duration(minutes: 1)));
+    }
+    final second = await repo.listSubmitted(limit: 2);
+
+    expect(first.map((s) => s.id), [a.id, b.id]);
+    expect(second.map((s) => s.id), [c.id, a.id]);
+  });
+
+  test('limit or more untracked records do not starve a fund record '
+      '(REL-001)', () async {
+    create();
+    final release = await insert(
+      preparationId: null,
+      purpose: SubmissionPurpose.release,
+    );
+    final refund = await insert(
+      transactionHash: _txB,
+      preparationId: null,
+      purpose: SubmissionPurpose.claimRefund,
+    );
+    clock = clock.add(const Duration(seconds: 1));
+    final fund = await insert(transactionHash: _txC);
+    final ledger = FakeSubmissionLedger(closeTime: clock);
+    final tracker = ChainSubmissionTracker(
+      ledger: ledger,
+      effects: FakeEscrowEffects(),
+      now: () => clock,
+      batchLimit: 2,
+      log: ignoreChainLog,
+    );
+    clock = clock.add(const Duration(minutes: 1));
+
+    final first = await tracker.pass(repo);
+    final next = await repo.listSubmitted(limit: 2);
+    await tracker.pass(repo);
+
+    expect(first.untracked, 2);
+    expect(next.map((s) => s.id), [fund.id, release.id]);
+    expect(next.map((s) => s.id), isNot(contains(refund.id)));
+    expect(ledger.lookedUp, [fund.transactionHash]);
+  });
+
   test('recordSend changes only a submitted record', () async {
     create();
     final stored = await insert();
@@ -241,6 +355,48 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     final unchanged = (await repo.findByPreparation('prep-1'))!;
     expect(unchanged.sendAttempts, 0);
     expect(unchanged.lastSentAt, isNull);
+  });
+
+  test('insertSubmitted requires a preparation for wallet-signed '
+      'purposes', () async {
+    create();
+
+    for (final purpose in SubmissionPurpose.values.where(
+      (p) => !p.isServerSigned,
+    )) {
+      expect(
+        () => insert(preparationId: null, purpose: purpose),
+        throwsArgumentError,
+        reason: purpose.wireName,
+      );
+    }
+    expect(await repo.listSubmitted(), isEmpty);
+  });
+
+  test('insertSubmitted rejects a preparation for server-signed '
+      'purposes', () async {
+    create();
+
+    for (final purpose in SubmissionPurpose.values.where(
+      (p) => p.isServerSigned,
+    )) {
+      expect(
+        () => insert(preparationId: 'prep-x', purpose: purpose),
+        throwsArgumentError,
+        reason: purpose.wireName,
+      );
+    }
+    expect(await repo.listSubmitted(), isEmpty);
+  });
+
+  test('markFailed rejects an unknown outcome code', () async {
+    create();
+    final stored = await insert();
+
+    expect(() => repo.markFailed(stored.id, 'Oops'), throwsArgumentError);
+
+    final unchanged = (await repo.findByPreparation('prep-1'))!;
+    expect(unchanged.state, SubmissionState.submitted);
   });
 
   test('toProtocol exposes the client fields with wire names', () async {

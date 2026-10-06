@@ -28,9 +28,13 @@ fields:
   signedEnvelopeXdr: String?, scope=serverOnly
   ### End of the envelope time bounds; after it the submission is expired.
   validUntil: DateTime?, scope=serverOnly
+  ### Last send of the envelope; paces resends, never the tracker order.
   lastSentAt: DateTime?, scope=serverOnly
   sendAttempts: int?, default=0, scope=serverOnly
   createdAt: DateTime?, scope=serverOnly
+  ### Last time the tracker looked at a submitted record; createdAt on
+  ### insert. The tracker lists the least recently checked records first.
+  lastCheckedAt: DateTime?, scope=serverOnly
 indexes:
   chain_submission_preparation_idx:
     fields: preparationId
@@ -39,6 +43,6 @@ indexes:
     fields: transaction
     unique: true
   chain_submission_state_idx:
-    fields: state, updatedAt
+    fields: state, lastCheckedAt, id
   chain_submission_hire_idx:
     fields: hireId
