@@ -12,6 +12,7 @@ import '../ui/molecules/agent_card.dart';
 import '../ui/molecules/agent_list_card.dart';
 import '../ui/molecules/screen_header.dart';
 import '../ui/organisms/agent_form.dart';
+import '../ui/organisms/publish_checklist.dart';
 import '../ui/organisms/site_footer.dart';
 import 'deploy_sheet.dart';
 
@@ -65,6 +66,19 @@ class _StudioScreenState extends State<StudioScreen> {
     _price,
   ]);
 
+  bool _policyAccepted = false;
+
+  /// Set by the first deploy attempt: from then on errors show inline.
+  bool _attempted = false;
+
+  Map<AgentDraftField, String> get _errors => AgentDraftRules.validate(
+    name: _name.text,
+    description: _description.text,
+    prompt: _prompt.text,
+    skills: _skills,
+    priceStroops: _priceStroops,
+  );
+
   @override
   void dispose() {
     for (final c in [_name, _description, _prompt, _price, _skillInput]) {
@@ -78,7 +92,11 @@ class _StudioScreenState extends State<StudioScreen> {
   void _addSkill(String raw) {
     final skill = raw.trim();
     setState(() {
-      if (skill.isNotEmpty && !_skills.contains(skill)) _skills.add(skill);
+      if (skill.isNotEmpty &&
+          !_skills.contains(skill) &&
+          _skills.length < AgentDraftRules.skillsMax) {
+        _skills.add(skill);
+      }
       _skillInput.clear();
     });
   }
@@ -86,10 +104,27 @@ class _StudioScreenState extends State<StudioScreen> {
   void _removeSkill(String skill) => setState(() => _skills.remove(skill));
 
   Future<void> _deploy() async {
+    final errors = _errors;
     final price = _priceStroops;
-    if (price == null) return;
+    if (errors.isNotEmpty || !_policyAccepted || price == null) {
+      setState(() => _attempted = true);
+      final missing = errors.length + (_policyAccepted ? 0 : 1);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              missing == 1
+                  ? 'Complete 1 requirement to deploy.'
+                  : 'Complete $missing requirements to deploy.',
+            ),
+          ),
+        );
+      return;
+    }
     final draft = AgentDraft(
-      name: _name.text.trim().isEmpty ? 'Untitled agent' : _name.text.trim(),
+      name: _name.text.trim(),
       description: _description.text.trim(),
       model: _model,
       systemPrompt: _prompt.text,
@@ -122,9 +157,7 @@ class _StudioScreenState extends State<StudioScreen> {
         Expanded(child: scroll),
         ListenableBuilder(
           listenable: _formChanges,
-          builder: (context, _) => _DeployBar(
-            onDeploy: _priceStroops == null ? null : _deploy,
-          ),
+          builder: (context, _) => _DeployBar(onDeploy: _deploy),
         ),
       ],
     );
@@ -132,6 +165,7 @@ class _StudioScreenState extends State<StudioScreen> {
 
   Widget _buildBody(BuildContext context) {
     final price = _priceStroops;
+    final errors = _errors;
     final wide = MediaQuery.sizeOf(context).width >= 960;
 
     final form = AgentForm(
@@ -147,7 +181,7 @@ class _StudioScreenState extends State<StudioScreen> {
       suggestedSkills: _suggestedSkills,
       onAddSkill: _addSkill,
       onRemoveSkill: _removeSkill,
-      priceError: price == null ? 'Enter an amount like 0.50' : null,
+      errors: _attempted ? errors : const {},
     );
 
     final preview = Column(
@@ -167,6 +201,14 @@ class _StudioScreenState extends State<StudioScreen> {
           highlighted: true,
         ),
         const SizedBox(height: Puls3Spacing.md),
+        PublishChecklist(
+          errors: errors,
+          policyAccepted: _policyAccepted,
+          highlightMissing: _attempted,
+          onPolicyChanged: (v) => setState(() => _policyAccepted = v),
+          onReadPolicies: () => showAgentPolicies(context),
+        ),
+        const SizedBox(height: Puls3Spacing.sm),
         Text(
           'On deploy, puls3 creates a Stellar wallet for this agent and '
           'registers its identity on Soroban.',
@@ -178,7 +220,7 @@ class _StudioScreenState extends State<StudioScreen> {
             label: 'Deploy to Stellar',
             icon: Icons.rocket_launch_outlined,
             expand: true,
-            onPressed: price == null ? null : _deploy,
+            onPressed: _deploy,
           ),
         ],
       ],

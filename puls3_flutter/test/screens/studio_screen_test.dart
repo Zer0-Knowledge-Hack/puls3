@@ -37,6 +37,7 @@ void main() {
   ) async {
     await pumpApp(tester, location: '/studio');
 
+    await acceptPolicies(tester);
     await tester.tap(find.text('Deploy to Stellar'));
     await advance(tester, const Duration(milliseconds: 400));
     expect(find.text('Deploy agent'), findsOneWidget);
@@ -62,6 +63,7 @@ void main() {
     final wallet = MockWallet()..rejectSignatures = true;
     await pumpApp(tester, location: '/studio', wallet: wallet);
 
+    await acceptPolicies(tester);
     await tester.tap(find.text('Deploy to Stellar'));
     await advance(tester, const Duration(milliseconds: 2500));
     expect(find.text('Signature rejected'), findsOneWidget);
@@ -82,6 +84,7 @@ void main() {
         await pumpApp(tester, location: '/studio', size: size);
 
         await tester.ensureVisible(find.text('Deploy to Stellar'));
+        await acceptPolicies(tester);
         await tester.tap(find.text('Deploy to Stellar'));
         await advance(tester, const Duration(milliseconds: 1000));
         expect(find.text('Deploy agent'), findsOneWidget);

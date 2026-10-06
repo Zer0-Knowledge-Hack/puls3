@@ -127,6 +127,7 @@ void main() {
 
       await tester.tap(find.text('Create an agent'));
       await tester.pump();
+      await acceptPolicies(tester);
       await tester.tap(find.text('Deploy to Stellar'));
       await advance(tester, const Duration(milliseconds: 5000));
       expect(find.text('Agent deployed'), findsOneWidget);
