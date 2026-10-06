@@ -231,6 +231,18 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(() => repo.listSubmitted(limit: 0), throwsArgumentError);
   });
 
+  test('recordSend changes only a submitted record', () async {
+    create();
+    final stored = await insert();
+    await repo.markConfirmed(stored.id);
+
+    expect(await repo.recordSend(stored.id, clock), isFalse);
+
+    final unchanged = (await repo.findByPreparation('prep-1'))!;
+    expect(unchanged.sendAttempts, 0);
+    expect(unchanged.lastSentAt, isNull);
+  });
+
   test('toProtocol exposes the client fields with wire names', () async {
     create();
     final stored = await insert();

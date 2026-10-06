@@ -117,8 +117,9 @@ abstract interface class ChainSubmissionStore {
   /// whether it changed.
   Future<bool> markFailed(int id, String code);
 
-  /// Counts one more send of the envelope at [at]. Returns `false` for an
-  /// unknown [id]. It does not change the state or `updatedAt`.
+  /// Counts one more send of the envelope at [at] if the record is still
+  /// `submitted`. Returns whether it changed: `false` for an unknown [id] or
+  /// a final record. It does not change the state or `updatedAt`.
   Future<bool> recordSend(int id, DateTime at);
 }
 

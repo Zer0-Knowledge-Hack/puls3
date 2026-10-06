@@ -99,7 +99,9 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
           transaction: transaction,
           lockMode: LockMode.forUpdate,
         );
-        if (row == null) return false;
+        if (row == null || row.state != SubmissionState.submitted.wireName) {
+          return false;
+        }
         await ChainSubmission.db.updateById(
           _session,
           id,

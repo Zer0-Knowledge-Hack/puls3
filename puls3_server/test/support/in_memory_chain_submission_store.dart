@@ -83,7 +83,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   @override
   Future<bool> recordSend(int id, DateTime at) async {
     final row = _rows[id];
-    if (row == null) return false;
+    if (row == null || row.state != SubmissionState.submitted) return false;
     _rows[id] = _copy(
       row,
       lastSentAt: at.toUtc(),
