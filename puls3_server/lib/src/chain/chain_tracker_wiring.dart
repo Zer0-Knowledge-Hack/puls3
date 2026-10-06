@@ -20,7 +20,8 @@ const _rpcTimeout = Duration(seconds: 8);
 const _passTimeout = Duration(minutes: 5);
 
 /// Starts the chain submission tracker when [env] enables it (see
-/// [TrackerLoopConfig]) and returns its loop, or returns `null`.
+/// [TrackerLoopConfig]) and returns its loop, or returns `null`. Stopping
+/// the loop also closes its HTTP client.
 ///
 /// Each pass opens its own session, so a pass never holds a connection
 /// between ticks. Escrow effects are [NoopEscrowEffects] until the hire
@@ -29,8 +30,9 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   final config = TrackerLoopConfig.fromEnvironment(env);
   if (!config.enabled) return null;
   final stellar = StellarConfig.fromEnvironment(env);
+  final httpClient = http.Client();
   final rpc = SorobanRpcClient(
-    httpClient: http.Client(),
+    httpClient: httpClient,
     url: stellar.rpcUrl,
     timeout: _rpcTimeout,
   );
@@ -55,6 +57,7 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
         await session.close();
       }
     },
+    onStop: () async => httpClient.close(),
   )..start();
   log(
     ChainLogLevel.info,

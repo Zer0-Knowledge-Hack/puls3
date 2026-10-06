@@ -215,5 +215,36 @@ void main() {
       await pumpEventQueue();
       expect(passes, 1);
     });
+
+    test('stop runs onStop after the pass in flight, to release what the '
+        'passes use', () async {
+      gate = Completer<void>();
+      final events = <String>[];
+      final l = TrackerLoop(
+        interval: const Duration(seconds: 5),
+        passTimeout: const Duration(minutes: 1),
+        runPass: () async {
+          await gate!.future;
+          events.add('pass done');
+        },
+        log: (level, message) => logged.add('${level.name}: $message'),
+        periodic: (interval, callback) {
+          final timer = _ManualTimer(interval, callback);
+          timers.add(timer);
+          return timer;
+        },
+        onStop: () async => events.add('closed'),
+      )..start();
+      timers.single.fire();
+      await pumpEventQueue();
+
+      final stopping = l.stop();
+      await pumpEventQueue();
+      expect(events, isEmpty);
+
+      gate!.complete();
+      await stopping;
+      expect(events, ['pass done', 'closed']);
+    });
   });
 }

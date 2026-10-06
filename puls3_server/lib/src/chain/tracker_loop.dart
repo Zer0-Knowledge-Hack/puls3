@@ -59,17 +59,20 @@ final class TrackerLoop {
     required Future<void> Function() runPass,
     required ChainLog log,
     PeriodicTimerFactory periodic = Timer.periodic,
+    Future<void> Function()? onStop,
   }) : _interval = interval,
        _passTimeout = passTimeout,
        _runPass = runPass,
        _log = log,
-       _periodic = periodic;
+       _periodic = periodic,
+       _onStop = onStop;
 
   final Duration _interval;
   final Duration _passTimeout;
   final Future<void> Function() _runPass;
   final ChainLog _log;
   final PeriodicTimerFactory _periodic;
+  final Future<void> Function()? _onStop;
 
   Timer? _timer;
   Future<void>? _inFlight;
@@ -81,12 +84,13 @@ final class TrackerLoop {
     _timer ??= _periodic(_interval, (_) => _tick());
   }
 
-  /// Stops scheduling passes and completes when the pass in flight, if
-  /// any, has finished.
+  /// Stops scheduling passes, waits for the pass in flight, if any, to
+  /// finish or time out, then runs `onStop` to release what the passes use.
   Future<void> stop() async {
     _timer?.cancel();
     _timer = null;
     await _inFlight;
+    await _onStop?.call();
   }
 
   void _tick() {
