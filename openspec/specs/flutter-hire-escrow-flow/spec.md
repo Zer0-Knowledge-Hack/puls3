@@ -4,6 +4,8 @@
 
 The Flutter hire flow MUST inform the user of the Soroban Escrow protection, provide direct links to StellarExpert testnet explorer for verification, and handle wallet signing failures gracefully with clear error feedback and retry capability.
 
+> **Status:** the flow is a UI demo until the server relay exists (#96, #97). Signing mock XDR creates no hire and sends no payment, so `HirePhase.confirmed` shows "Demo signature only" with no tx hash and no explorer link, and the requirements below about a confirmation hash and explorer link are superseded. The explorer URL helpers stay for the real flow.
+
 ## ADDED Requirements
 
 ### Requirement: StellarExpert explorer URL generation
