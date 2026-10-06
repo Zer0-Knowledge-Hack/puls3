@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/stellar_explorer.dart';
-import '../../domain/stellar_format.dart';
-import '../../domain/usdc.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/address_badge.dart';
 import '../atoms/price_tag.dart';
 import '../atoms/primary_button.dart';
 import '../molecules/key_value_row.dart';
-import 'success_panel.dart';
 
 enum HirePhase { review, signing, confirmed, error }
 
@@ -24,10 +21,8 @@ class HirePaymentView extends StatelessWidget {
     this.escrowContractAddress = defaultEscrowContractAddress,
     required this.onConfirm,
     required this.onBackToMarketplace,
-    this.txHash,
     this.errorMessage,
     this.onRetry,
-    this.onOpenExplorer,
   });
 
   final HirePhase phase;
@@ -35,16 +30,10 @@ class HirePaymentView extends StatelessWidget {
   final int priceUsdcStroops;
   final String destinationAddress;
   final String escrowContractAddress;
-  final String? txHash;
   final String? errorMessage;
   final VoidCallback onConfirm;
   final VoidCallback onBackToMarketplace;
   final VoidCallback? onRetry;
-  final ValueChanged<String>? onOpenExplorer;
-
-  void _handleOpenExplorer(String url) {
-    onOpenExplorer?.call(url);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +57,7 @@ class HirePaymentView extends StatelessWidget {
         Text('Hire $agentName', style: Puls3Text.h3),
         const SizedBox(height: Puls3Spacing.xs),
         Text(
-          'Funds remain safely locked in the Soroban Escrow contract until work is delivered.',
+          'Demo only: signing here does not move funds. Escrow payments arrive with the server relay.',
           style: Puls3Text.bodyMuted,
         ),
         const SizedBox(height: Puls3Spacing.lg),
@@ -122,40 +111,24 @@ class HirePaymentView extends StatelessWidget {
   }
 
   Widget _buildConfirmed() {
-    final hash = txHash;
-    return SuccessPanel(
+    return Column(
       key: const ValueKey('confirmed'),
-      title: 'Payment confirmed',
-      subtitle: 'Paid ${formatUsdc(priceUsdcStroops)} USDC on Stellar',
-      highlight: Text.rich(
-        TextSpan(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            TextSpan(
-              text: formatUsdc(priceUsdcStroops),
-              style: Puls3Text.accentXl,
-            ),
-            TextSpan(text: ' USDC', style: Puls3Text.dataLg),
+            const Icon(Icons.info_outline, color: Puls3Colors.accent, size: 28),
+            const SizedBox(width: Puls3Spacing.sm),
+            Text('Demo signature only', style: Puls3Text.h3),
           ],
         ),
-        semanticsLabel: '${formatUsdc(priceUsdcStroops)} USDC',
-      ),
-      children: [
-        if (hash != null) ...[
-          KeyValueRow(
-            label: 'Tx hash',
-            value: shortenAddress(hash, head: 10, tail: 10),
-            mono: true,
-          ),
-          const SizedBox(height: Puls3Spacing.xs),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('View on StellarExpert'),
-              onPressed: () => _handleOpenExplorer(stellarExpertTxUrl(hash)),
-            ),
-          ),
-        ],
+        const SizedBox(height: Puls3Spacing.sm),
+        Text(
+          'No payment was sent and no hire was created. Real escrow payments arrive with the server relay.',
+          style: Puls3Text.bodyMuted,
+        ),
+        const SizedBox(height: Puls3Spacing.md),
         KeyValueRow(label: 'Agent', value: agentName),
         const SizedBox(height: Puls3Spacing.lg),
         PrimaryButton(

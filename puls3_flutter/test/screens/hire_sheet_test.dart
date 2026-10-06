@@ -66,7 +66,7 @@ void main() {
   );
 
   group('HireSheet', () {
-    testWidgets('successful confirmation signs and shows confirmed view',
+    testWidgets('successful signing shows the demo result, not a payment',
         (tester) async {
       final wallet = TestWallet(initialAddress: 'GUSER123');
 
@@ -82,8 +82,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Payment confirmed'), findsOneWidget);
-      expect(find.text('View on StellarExpert'), findsOneWidget);
+      expect(find.text('Demo signature only'), findsOneWidget);
+      expect(find.text('Payment confirmed'), findsNothing);
+      expect(find.text('View on StellarExpert'), findsNothing);
     });
 
     testWidgets('failing wallet transitions to error and allows retry',
@@ -110,7 +111,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Payment confirmed'), findsOneWidget);
+      expect(find.text('Demo signature only'), findsOneWidget);
     });
   });
 }

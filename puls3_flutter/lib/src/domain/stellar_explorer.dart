@@ -1,9 +1,12 @@
 /// StellarExpert testnet explorer URL utilities and default contract addresses.
 library;
 
-/// Deployed Escrow contract address on Stellar testnet (PR #84).
-const String defaultEscrowContractAddress =
-    'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2';
+/// Escrow contract address shown in the UI. Defaults to the testnet deployment
+/// (PR #84); override with `--dart-define=PULS3_ESCROW_CONTRACT=<C...>`.
+const String defaultEscrowContractAddress = String.fromEnvironment(
+  'PULS3_ESCROW_CONTRACT',
+  defaultValue: 'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
+);
 
 /// Base URL for StellarExpert on testnet.
 const String stellarExpertTestnetBase =

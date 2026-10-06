@@ -27,7 +27,6 @@ class HireSheet extends StatefulWidget {
 
 class _HireSheetState extends State<HireSheet> {
   HirePhase _phase = HirePhase.review;
-  String? _txHash;
   String? _errorMessage;
 
   Future<void> _confirm() async {
@@ -41,15 +40,14 @@ class _HireSheetState extends State<HireSheet> {
       if (wallet.address == null) {
         await wallet.connect();
       }
-      final hash = await wallet.signTransaction(
+      // Demo signing: nothing is submitted. The real flow calls the server
+      // relay (createHire, prepareFund, submitEscrowCall) once it exists.
+      await wallet.signTransaction(
         'mock-usdc-payment:${widget.agent.stellarAddress}:'
         '${widget.agent.priceUsdcStroops}',
       );
       if (!mounted) return;
-      setState(() {
-        _txHash = hash;
-        _phase = HirePhase.confirmed;
-      });
+      setState(() => _phase = HirePhase.confirmed);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -84,7 +82,6 @@ class _HireSheetState extends State<HireSheet> {
             agentName: widget.agent.name,
             priceUsdcStroops: widget.agent.priceUsdcStroops,
             destinationAddress: widget.agent.stellarAddress,
-            txHash: _txHash,
             errorMessage: _errorMessage,
             onConfirm: _confirm,
             onRetry: _confirm,

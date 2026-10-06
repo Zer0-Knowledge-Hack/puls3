@@ -11,12 +11,10 @@ Widget buildView({
   String destinationAddress =
       'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
   String escrowContractAddress = defaultEscrowContractAddress,
-  String? txHash,
   String? errorMessage,
   VoidCallback? onConfirm,
   VoidCallback? onBackToMarketplace,
   VoidCallback? onRetry,
-  ValueChanged<String>? onOpenExplorer,
 }) {
   return MaterialApp(
     home: Scaffold(
@@ -26,12 +24,10 @@ Widget buildView({
         priceUsdcStroops: priceUsdcStroops,
         destinationAddress: destinationAddress,
         escrowContractAddress: escrowContractAddress,
-        txHash: txHash,
         errorMessage: errorMessage,
         onConfirm: onConfirm ?? () {},
         onBackToMarketplace: onBackToMarketplace ?? () {},
         onRetry: onRetry,
-        onOpenExplorer: onOpenExplorer,
       ),
     ),
   );
@@ -50,10 +46,7 @@ void main() {
       // Finds two AddressBadges: destination and escrow contract
       expect(find.byType(AddressBadge), findsNWidgets(2));
       expect(find.text('Confirm & sign'), findsOneWidget);
-      expect(
-        find.textContaining('Soroban Escrow contract'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Demo only'), findsOneWidget);
     });
 
     testWidgets('signing phase shows signing progress indicator',
@@ -63,31 +56,15 @@ void main() {
       expect(find.text('Signing…'), findsOneWidget);
     });
 
-    testWidgets('confirmed phase renders tx hash and triggers onOpenExplorer',
+    testWidgets('demo phase does not claim a payment or link to the explorer',
         (tester) async {
-      const txHash =
-          '43cd3e8455cafdc08d62a644b8f9dd9174994644b2bdd3e57eaa6893aa5c2437';
-      String? launchedUrl;
+      await tester.pumpWidget(buildView(phase: HirePhase.confirmed));
 
-      await tester.pumpWidget(
-        buildView(
-          phase: HirePhase.confirmed,
-          txHash: txHash,
-          onOpenExplorer: (url) => launchedUrl = url,
-        ),
-      );
-
-      expect(find.text('Payment confirmed'), findsOneWidget);
-      expect(find.text('Tx hash'), findsOneWidget);
-
-      // Verify the explorer button is present and triggers the URL
-      final explorerBtn = find.text('View on StellarExpert');
-      expect(explorerBtn, findsOneWidget);
-
-      await tester.tap(explorerBtn);
-      await tester.pump();
-
-      expect(launchedUrl, stellarExpertTxUrl(txHash));
+      expect(find.text('Demo signature only'), findsOneWidget);
+      expect(find.textContaining('No payment was sent'), findsOneWidget);
+      expect(find.text('Payment confirmed'), findsNothing);
+      expect(find.text('Tx hash'), findsNothing);
+      expect(find.text('View on StellarExpert'), findsNothing);
     });
 
     testWidgets('error phase renders error message and invokes onRetry',
