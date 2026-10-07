@@ -1,0 +1,7 @@
+class: HireView
+fields:
+  hireId: int
+  agentRegistryId: int
+  consumer: String
+  priceStroops: int
+  status: String

@@ -1,0 +1,3 @@
+exception: HireConfigurationMissing
+fields:
+  setting: String
