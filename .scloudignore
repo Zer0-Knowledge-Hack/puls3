@@ -10,8 +10,9 @@
 # Based on the template written by serverpod_cloud_cli 1.0.0.
 
 # Passwords. Serverpod Cloud manages the service passwords (database, redis,
-# serviceSecret) and the serverpod_auth_idp keys. Custom secrets are set with
-# `scloud password set <name> <value>` (see the Deploy section of the README).
+# serviceSecret) and the serverpod_auth_idp keys. Set a custom secret with
+# `scloud password set <name> --from-file <file>`, so the value stays out of
+# the shell history (see "Deploy to Serverpod Cloud" in puls3_server/README.md).
 puls3_server/config/passwords.yaml
 puls3_server/config/google_client_secret.json
 puls3_server/config/firebase_service_account_key.json
