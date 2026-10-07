@@ -23,11 +23,21 @@ import 'agent/agent_summary.dart' as _ipe500bk;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
+import 'hire/agent_unavailable.dart' as _i3db3d86;
+import 'hire/hire_configuration_missing.dart' as _izyyjkbb;
+import 'hire/hire_ledger_unavailable.dart' as _izuscvxu;
+import 'hire/hire_request_invalid.dart' as _i1txwkfs;
+import 'hire/hire_view.dart' as _ivruwodq;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
 export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
+export 'hire/agent_unavailable.dart';
+export 'hire/hire_configuration_missing.dart';
+export 'hire/hire_ledger_unavailable.dart';
+export 'hire/hire_request_invalid.dart';
+export 'hire/hire_view.dart';
 export 'client.dart';
 
 class Protocol extends _isc.SerializationManager {
@@ -79,6 +89,21 @@ class Protocol extends _isc.SerializationManager {
     if (t == _ikpil6ki.BackendHealth) {
       return _ikpil6ki.BackendHealth.fromJson(data) as T;
     }
+    if (t == _i3db3d86.AgentUnavailable) {
+      return _i3db3d86.AgentUnavailable.fromJson(data) as T;
+    }
+    if (t == _izyyjkbb.HireConfigurationMissing) {
+      return _izyyjkbb.HireConfigurationMissing.fromJson(data) as T;
+    }
+    if (t == _izuscvxu.HireLedgerUnavailable) {
+      return _izuscvxu.HireLedgerUnavailable.fromJson(data) as T;
+    }
+    if (t == _i1txwkfs.HireRequestInvalid) {
+      return _i1txwkfs.HireRequestInvalid.fromJson(data) as T;
+    }
+    if (t == _ivruwodq.HireView) {
+      return _ivruwodq.HireView.fromJson(data) as T;
+    }
     if (t == _isc.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
               ? _it6c3ckv.AgentCatalogUnavailable.fromJson(data)
@@ -98,6 +123,29 @@ class Protocol extends _isc.SerializationManager {
     if (t == _isc.getType<_ikpil6ki.BackendHealth?>()) {
       return (data != null ? _ikpil6ki.BackendHealth.fromJson(data) : null)
           as T;
+    }
+    if (t == _isc.getType<_i3db3d86.AgentUnavailable?>()) {
+      return (data != null ? _i3db3d86.AgentUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_izyyjkbb.HireConfigurationMissing?>()) {
+      return (data != null
+              ? _izyyjkbb.HireConfigurationMissing.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _isc.getType<_izuscvxu.HireLedgerUnavailable?>()) {
+      return (data != null
+              ? _izuscvxu.HireLedgerUnavailable.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _isc.getType<_i1txwkfs.HireRequestInvalid?>()) {
+      return (data != null ? _i1txwkfs.HireRequestInvalid.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_ivruwodq.HireView?>()) {
+      return (data != null ? _ivruwodq.HireView.fromJson(data) : null) as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
@@ -124,6 +172,11 @@ class Protocol extends _isc.SerializationManager {
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
+      _i3db3d86.AgentUnavailable => 'AgentUnavailable',
+      _izyyjkbb.HireConfigurationMissing => 'HireConfigurationMissing',
+      _izuscvxu.HireLedgerUnavailable => 'HireLedgerUnavailable',
+      _i1txwkfs.HireRequestInvalid => 'HireRequestInvalid',
+      _ivruwodq.HireView => 'HireView',
       _ => null,
     };
   }
@@ -148,6 +201,16 @@ class Protocol extends _isc.SerializationManager {
         return 'Greeting';
       case _ikpil6ki.BackendHealth():
         return 'BackendHealth';
+      case _i3db3d86.AgentUnavailable():
+        return 'AgentUnavailable';
+      case _izyyjkbb.HireConfigurationMissing():
+        return 'HireConfigurationMissing';
+      case _izuscvxu.HireLedgerUnavailable():
+        return 'HireLedgerUnavailable';
+      case _i1txwkfs.HireRequestInvalid():
+        return 'HireRequestInvalid';
+      case _ivruwodq.HireView():
+        return 'HireView';
     }
     className = _iaic.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -184,6 +247,21 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'BackendHealth') {
       return deserialize<_ikpil6ki.BackendHealth>(data['data']);
+    }
+    if (dataClassName == 'AgentUnavailable') {
+      return deserialize<_i3db3d86.AgentUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HireConfigurationMissing') {
+      return deserialize<_izyyjkbb.HireConfigurationMissing>(data['data']);
+    }
+    if (dataClassName == 'HireLedgerUnavailable') {
+      return deserialize<_izuscvxu.HireLedgerUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HireRequestInvalid') {
+      return deserialize<_i1txwkfs.HireRequestInvalid>(data['data']);
+    }
+    if (dataClassName == 'HireView') {
+      return deserialize<_ivruwodq.HireView>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);

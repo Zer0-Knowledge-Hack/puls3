@@ -24,11 +24,25 @@ import 'agent/agent_summary.dart' as _ipe500bk;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
+import 'hire/agent_unavailable.dart' as _i3db3d86;
+import 'hire/hire.dart' as _ikb6z54u;
+import 'hire/hire_configuration_missing.dart' as _izyyjkbb;
+import 'hire/hire_ledger_unavailable.dart' as _izuscvxu;
+import 'hire/hire_payment.dart' as _i7gyvijy;
+import 'hire/hire_request_invalid.dart' as _i1txwkfs;
+import 'hire/hire_view.dart' as _ivruwodq;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
 export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
+export 'hire/agent_unavailable.dart';
+export 'hire/hire.dart';
+export 'hire/hire_configuration_missing.dart';
+export 'hire/hire_ledger_unavailable.dart';
+export 'hire/hire_payment.dart';
+export 'hire/hire_request_invalid.dart';
+export 'hire/hire_view.dart';
 
 class Protocol extends _is.DatabaseSerializationManager {
   Protocol._();
@@ -202,6 +216,148 @@ class Protocol extends _is.DatabaseSerializationManager {
       ],
       managed: true,
     ),
+    _isp.TableDefinition(
+      name: 'hire',
+      dartName: 'HireRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'consumer',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'price',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'manifestVersion',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'expiredAt',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'hire_payment',
+      dartName: 'HirePaymentRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'hireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'transactionHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'jobId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'payer',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'payee',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'amount',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'hire_id',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'hireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'transaction_hash',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'transactionHash',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'job_id',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'jobId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     ..._iais.Protocol.targetTableDefinitions,
     ..._iacs.Protocol.targetTableDefinitions,
     ..._isp.Protocol.targetTableDefinitions,
@@ -249,6 +405,27 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ikpil6ki.BackendHealth) {
       return _ikpil6ki.BackendHealth.fromJson(data) as T;
     }
+    if (t == _i3db3d86.AgentUnavailable) {
+      return _i3db3d86.AgentUnavailable.fromJson(data) as T;
+    }
+    if (t == _ikb6z54u.HireRecord) {
+      return _ikb6z54u.HireRecord.fromJson(data) as T;
+    }
+    if (t == _izyyjkbb.HireConfigurationMissing) {
+      return _izyyjkbb.HireConfigurationMissing.fromJson(data) as T;
+    }
+    if (t == _izuscvxu.HireLedgerUnavailable) {
+      return _izuscvxu.HireLedgerUnavailable.fromJson(data) as T;
+    }
+    if (t == _i7gyvijy.HirePaymentRecord) {
+      return _i7gyvijy.HirePaymentRecord.fromJson(data) as T;
+    }
+    if (t == _i1txwkfs.HireRequestInvalid) {
+      return _i1txwkfs.HireRequestInvalid.fromJson(data) as T;
+    }
+    if (t == _ivruwodq.HireView) {
+      return _ivruwodq.HireView.fromJson(data) as T;
+    }
     if (t == _is.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
               ? _it6c3ckv.AgentCatalogUnavailable.fromJson(data)
@@ -268,6 +445,36 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _is.getType<_ikpil6ki.BackendHealth?>()) {
       return (data != null ? _ikpil6ki.BackendHealth.fromJson(data) : null)
           as T;
+    }
+    if (t == _is.getType<_i3db3d86.AgentUnavailable?>()) {
+      return (data != null ? _i3db3d86.AgentUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ikb6z54u.HireRecord?>()) {
+      return (data != null ? _ikb6z54u.HireRecord.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_izyyjkbb.HireConfigurationMissing?>()) {
+      return (data != null
+              ? _izyyjkbb.HireConfigurationMissing.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _is.getType<_izuscvxu.HireLedgerUnavailable?>()) {
+      return (data != null
+              ? _izuscvxu.HireLedgerUnavailable.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _is.getType<_i7gyvijy.HirePaymentRecord?>()) {
+      return (data != null ? _i7gyvijy.HirePaymentRecord.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_i1txwkfs.HireRequestInvalid?>()) {
+      return (data != null ? _i1txwkfs.HireRequestInvalid.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ivruwodq.HireView?>()) {
+      return (data != null ? _ivruwodq.HireView.fromJson(data) : null) as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
@@ -297,6 +504,13 @@ class Protocol extends _is.DatabaseSerializationManager {
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
+      _i3db3d86.AgentUnavailable => 'AgentUnavailable',
+      _ikb6z54u.HireRecord => 'HireRecord',
+      _izyyjkbb.HireConfigurationMissing => 'HireConfigurationMissing',
+      _izuscvxu.HireLedgerUnavailable => 'HireLedgerUnavailable',
+      _i7gyvijy.HirePaymentRecord => 'HirePaymentRecord',
+      _i1txwkfs.HireRequestInvalid => 'HireRequestInvalid',
+      _ivruwodq.HireView => 'HireView',
       _ => null,
     };
   }
@@ -321,6 +535,20 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'Greeting';
       case _ikpil6ki.BackendHealth():
         return 'BackendHealth';
+      case _i3db3d86.AgentUnavailable():
+        return 'AgentUnavailable';
+      case _ikb6z54u.HireRecord():
+        return 'HireRecord';
+      case _izyyjkbb.HireConfigurationMissing():
+        return 'HireConfigurationMissing';
+      case _izuscvxu.HireLedgerUnavailable():
+        return 'HireLedgerUnavailable';
+      case _i7gyvijy.HirePaymentRecord():
+        return 'HirePaymentRecord';
+      case _i1txwkfs.HireRequestInvalid():
+        return 'HireRequestInvalid';
+      case _ivruwodq.HireView():
+        return 'HireView';
     }
     className = _iais.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -361,6 +589,27 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'BackendHealth') {
       return deserialize<_ikpil6ki.BackendHealth>(data['data']);
+    }
+    if (dataClassName == 'AgentUnavailable') {
+      return deserialize<_i3db3d86.AgentUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HireRecord') {
+      return deserialize<_ikb6z54u.HireRecord>(data['data']);
+    }
+    if (dataClassName == 'HireConfigurationMissing') {
+      return deserialize<_izyyjkbb.HireConfigurationMissing>(data['data']);
+    }
+    if (dataClassName == 'HireLedgerUnavailable') {
+      return deserialize<_izuscvxu.HireLedgerUnavailable>(data['data']);
+    }
+    if (dataClassName == 'HirePaymentRecord') {
+      return deserialize<_i7gyvijy.HirePaymentRecord>(data['data']);
+    }
+    if (dataClassName == 'HireRequestInvalid') {
+      return deserialize<_i1txwkfs.HireRequestInvalid>(data['data']);
+    }
+    if (dataClassName == 'HireView') {
+      return deserialize<_ivruwodq.HireView>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
@@ -405,6 +654,10 @@ class Protocol extends _is.DatabaseSerializationManager {
     switch (t) {
       case _iz6hnyrm.ChainSubmission:
         return _iz6hnyrm.ChainSubmission.t;
+      case _ikb6z54u.HireRecord:
+        return _ikb6z54u.HireRecord.t;
+      case _i7gyvijy.HirePaymentRecord:
+        return _i7gyvijy.HirePaymentRecord.t;
     }
     return null;
   }

@@ -1,0 +1,20 @@
+class: HirePaymentRecord
+table: hire_payment
+serverOnly: true
+fields:
+  hireId: int
+  transactionHash: String
+  jobId: int
+  payer: String
+  payee: String
+  amount: int
+indexes:
+  hire_id:
+    fields: hireId
+    unique: true
+  transaction_hash:
+    fields: transactionHash
+    unique: true
+  job_id:
+    fields: jobId
+    unique: true

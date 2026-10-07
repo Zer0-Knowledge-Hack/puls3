@@ -13,6 +13,7 @@ import '../ui/molecules/agent_mini_card.dart';
 import '../ui/molecules/built_on_stellar.dart';
 import '../ui/molecules/feature_point.dart';
 import '../ui/organisms/site_footer.dart';
+import '../theme/breakpoints.dart';
 
 /// `/`: hero (brand guide page 14) with the large halftone-3 lockup, an
 /// Unbounded headline, two CTAs and a pulse field in the corner, then the
@@ -23,7 +24,7 @@ class LandingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final narrow = size.width < 700;
+    final narrow = size.width < Puls3Breakpoints.compactHeadline;
     final catalog = AppScope.of(context).catalog;
 
     return Scaffold(

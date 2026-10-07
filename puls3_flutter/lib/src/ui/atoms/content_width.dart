@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
+import '../../theme/breakpoints.dart';
 
 /// Centers content and caps it at the max content width, with side gutters.
 class ContentWidth extends StatelessWidget {
@@ -17,7 +18,8 @@ class ContentWidth extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gutter = MediaQuery.sizeOf(context).width < 600
+    final gutter =
+        MediaQuery.sizeOf(context).width < Puls3Breakpoints.narrowGutter
         ? Puls3Spacing.md
         : Puls3Spacing.xl;
     return Align(

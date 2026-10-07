@@ -6,6 +6,7 @@ library;
 
 export 'src/entities.dart';
 export 'src/errors.dart';
+export 'src/funding.dart';
 export 'src/hire_status.dart';
 export 'src/ports.dart';
 export 'src/stellar_address.dart';

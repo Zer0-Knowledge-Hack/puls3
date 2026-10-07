@@ -38,8 +38,13 @@ to `confirmed` or `failed` (relay step 5 in `docs/architecture/api.md`). Each
 pass polls `getTransaction` for up to 100 records, resends the persisted
 envelope at most every 30 seconds while the transaction is not found, fails
 it as `PreparationExpired` once the chain time passes its time bounds, and
-confirms `createJob` and `fund` from their escrow events. The domain effects
-on the hire are a no-op until the hire lifecycle lands (#96).
+confirms `createJob` and `fund` from their escrow events. After a successful
+`fund` the hire effect (`HireEscrowEffects`) reads the job from the escrow and
+pays the hire only if the job matches it (state `Funded`; client and
+evaluator are the consumer; provider, token, budget and `expired_at` as
+prepared); otherwise the submission fails as `JobMismatch` with the mismatching
+field. Recording the job id after `createJob` is a no-op until the hire
+lifecycle lands (#96).
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -49,6 +54,12 @@ on the hire are a no-op until the hire lifecycle lands (#96).
 It is off by default so tests, CI and existing deployments do not poll the
 chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
 writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
+
+### Hire configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
 
 ## Prerequisites
 

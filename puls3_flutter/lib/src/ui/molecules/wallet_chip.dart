@@ -62,11 +62,15 @@ class WalletChip extends StatelessWidget {
                   color: Puls3Colors.onAccent,
                 ),
               const SizedBox(width: Puls3Spacing.xs),
-              Text(
-                label,
-                style: connected
-                    ? Puls3Text.data
-                    : Puls3Text.caption.copyWith(color: Puls3Colors.onAccent),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: connected
+                      ? Puls3Text.data
+                      : Puls3Text.caption.copyWith(color: Puls3Colors.onAccent),
+                ),
               ),
             ],
           ),
