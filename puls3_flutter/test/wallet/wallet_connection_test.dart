@@ -81,7 +81,7 @@ void main() {
       await tester.tap(find.text('Connect Demo wallet'));
       await advance(tester, const Duration(milliseconds: 700));
       expect(_state('wrong-network'), findsOneWidget);
-      expect(find.text('Switch your wallet to Testnet'), findsOneWidget);
+      expect(find.text('Wrong network'), findsOneWidget);
       // Never shown as connected on the wrong network.
       expect(wallet.address, isNull);
 
@@ -189,7 +189,7 @@ void main() {
         MockWallet(connectDelay: Duration.zero)..rejectConnection = true,
       );
       expect(await controller.tryConnect(), isFalse);
-      expect(controller.status, WalletStatus.error);
+      expect(controller.status, WalletStatus.rejected);
       expect(controller.lastError, isA<WalletSignatureRejected>());
     });
 
@@ -199,6 +199,173 @@ void main() {
           ..walletNetwork = Network.PUBLIC.networkPassphrase,
       );
       expect(controller.connect(), throwsA(isA<WalletWrongNetwork>()));
+    });
+  });
+
+  group('signing (WalletController + MockWallet)', () {
+    const unsignedXdr = 'AAAA-server-prepared-envelope';
+
+    Future<WalletController> connected(MockWallet wallet) async {
+      final controller = WalletController(wallet);
+      expect(await controller.tryConnect(), isTrue);
+      expect(controller.status, WalletStatus.connected);
+      return controller;
+    }
+
+    MockWallet fastWallet() => MockWallet(
+      connectDelay: Duration.zero,
+      signDelay: const Duration(milliseconds: 10),
+    );
+
+    test(
+      'signing, then signed: the XDR reaches the wallet unchanged',
+      () async {
+        final controller = await connected(fastWallet());
+        final signing = controller.signTransaction(unsignedXdr);
+        expect(controller.status, WalletStatus.signing);
+
+        final signed = await signing;
+        // MockWallet marks exactly what it was given.
+        expect(signed, '${MockWallet.signedPrefix}$unsignedXdr');
+        expect(controller.status, WalletStatus.signed);
+      },
+    );
+
+    test('a rejected signature is recoverable', () async {
+      final wallet = fastWallet();
+      final controller = await connected(wallet);
+      wallet.rejectSignatures = true;
+
+      await expectLater(
+        controller.signTransaction(unsignedXdr),
+        throwsA(isA<WalletSignatureRejected>()),
+      );
+      expect(controller.status, WalletStatus.rejected);
+      // Still connected: dismissing returns to the account.
+      expect(await controller.tryConnect(), isTrue);
+      expect(controller.status, WalletStatus.connected);
+    });
+
+    test('a signing error is a typed error state', () async {
+      final wallet = fastWallet();
+      final controller = await connected(wallet);
+      wallet.failure = const WalletUnavailable();
+
+      await expectLater(
+        controller.signTransaction(unsignedXdr),
+        throwsA(isA<WalletUnavailable>()),
+      );
+      expect(controller.status, WalletStatus.error);
+    });
+
+    test('a wrong network blocks signing before any prompt', () async {
+      final wallet = fastWallet();
+      final controller = await connected(wallet);
+      wallet.walletNetwork = Network.PUBLIC.networkPassphrase;
+
+      await expectLater(
+        controller.signTransaction(unsignedXdr),
+        throwsA(isA<WalletWrongNetwork>()),
+      );
+      expect(controller.status, WalletStatus.wrongNetwork);
+      // The session is forgotten: the user must reconnect on Testnet.
+      expect(controller.address, isNull);
+    });
+
+    test('disconnect returns to disconnected', () async {
+      final controller = await connected(fastWallet());
+      await controller.signTransaction(unsignedXdr);
+      await controller.disconnect();
+      expect(controller.status, WalletStatus.disconnected);
+      expect(controller.address, isNull);
+    });
+  });
+
+  group('WalletPanel signing states', () {
+    Future<void> pumpPanel(WidgetTester tester, WalletPanel panel) async {
+      Puls3Fonts.useGoogleFonts = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: Puls3Theme.dark(),
+          home: Scaffold(body: panel),
+        ),
+      );
+    }
+
+    const address = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
+
+    testWidgets('signing waits for the wallet', (tester) async {
+      await pumpPanel(
+        tester,
+        WalletPanel(
+          status: WalletStatus.signing,
+          walletName: 'Freighter',
+          address: address,
+          onConnect: () {},
+          onDisconnect: () {},
+        ),
+      );
+      expect(_state('signing'), findsOneWidget);
+      expect(find.text('Waiting for wallet confirmation…'), findsOneWidget);
+    });
+
+    testWidgets('signed keeps the account and says it was signed', (
+      tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        WalletPanel(
+          status: WalletStatus.signed,
+          walletName: 'Freighter',
+          address: address,
+          onConnect: () {},
+          onDisconnect: () {},
+        ),
+      );
+      expect(_state('signed'), findsOneWidget);
+      expect(find.text('Transaction signed'), findsOneWidget);
+      expect(find.text('Disconnect'), findsOneWidget);
+    });
+
+    testWidgets('a rejected signature says so and offers a retry', (
+      tester,
+    ) async {
+      var retries = 0;
+      await pumpPanel(
+        tester,
+        WalletPanel(
+          status: WalletStatus.rejected,
+          walletName: 'Freighter',
+          address: address,
+          error: const WalletSignatureRejected(),
+          onConnect: () => retries++,
+          onDisconnect: () {},
+        ),
+      );
+      expect(find.text('Signature rejected'), findsOneWidget);
+      expect(
+        find.text(
+          'You rejected the transaction in Freighter. Nothing was sent.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Try again'));
+      expect(retries, 1);
+    });
+
+    testWidgets('any other failure is a recoverable error', (tester) async {
+      await pumpPanel(
+        tester,
+        WalletPanel(
+          status: WalletStatus.error,
+          walletName: 'Freighter',
+          error: const WalletAccountChanged(),
+          onConnect: () {},
+          onDisconnect: () {},
+        ),
+      );
+      expect(find.text('Account changed'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
     });
   });
 }

@@ -40,6 +40,9 @@ class MockWallet implements WalletPort {
   /// [WalletNotInstalled], [WalletUnavailable] or [WalletWrongNetwork].
   WalletException? failure;
 
+  /// The account inside the simulated wallet; it survives a disconnect,
+  /// as in a real wallet.
+  String? _account;
   String? _address;
 
   @override
@@ -52,7 +55,7 @@ class MockWallet implements WalletPort {
   Future<void> disconnect() async => _address = null;
 
   /// Simulates the user switching to another account in the wallet.
-  void switchAccount() => _address = _ids.accountAddress();
+  void switchAccount() => _address = _account = _ids.accountAddress();
 
   @override
   Future<String> connect() async {
@@ -63,7 +66,7 @@ class MockWallet implements WalletPort {
     if (walletNetwork != stellarTestnetPassphrase) {
       throw const WalletWrongNetwork();
     }
-    return _address ??= _ids.accountAddress();
+    return _address = _account ??= _ids.accountAddress();
   }
 
   /// Returns [unsignedXdr] marked as signed: a stand-in for the signed

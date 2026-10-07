@@ -2,17 +2,41 @@ import 'package:flutter/foundation.dart';
 
 import '../wallet/wallet_port.dart';
 
-/// The wallet as the UI sees it.
-enum WalletStatus { disconnected, connecting, connected, error }
+/// The wallet as the UI sees it: one explicit state, never a mix of flags.
+enum WalletStatus {
+  disconnected,
+  connecting,
+  connected,
+
+  /// The wallet is showing a signing prompt.
+  signing,
+
+  /// Connected, and the last transaction was signed.
+  signed,
+
+  /// The user declined the connection or the signature in the wallet.
+  rejected,
+
+  /// The wallet is not on Stellar Testnet; nothing can be signed.
+  wrongNetwork,
+
+  /// Any other failure (not installed, locked, account changed, refused
+  /// payload): see [WalletController.lastError].
+  error,
+}
 
 /// Observable wrapper around a [WalletPort]: the container that owns the
 /// connection state (#25). Presentational widgets get its values through
-/// their constructors.
+/// their constructors. It knows nothing about deploys, hires or escrow.
 class WalletController extends ChangeNotifier {
   WalletController(this._wallet);
 
   final WalletPort _wallet;
-  bool _connecting = false;
+
+  /// [WalletStatus.connecting] or [WalletStatus.signing] while the wallet
+  /// is busy; null otherwise.
+  WalletStatus? _busy;
+  bool _signed = false;
   WalletException? _lastError;
 
   String get walletName => _wallet.name;
@@ -20,16 +44,26 @@ class WalletController extends ChangeNotifier {
   String? get address => _wallet.address;
   String? get network => _wallet.network;
   bool get isConnected => _wallet.address != null;
-  bool get isConnecting => _connecting;
+  bool get isConnecting => _busy == WalletStatus.connecting;
   bool get isOnTestnet => _wallet.network == stellarTestnetPassphrase;
 
-  /// Why the last connection attempt from the UI failed, until the next one.
+  /// Why the last connection or signature failed, until the next attempt.
   WalletException? get lastError => _lastError;
 
   WalletStatus get status {
-    if (_connecting) return WalletStatus.connecting;
-    if (isConnected) return WalletStatus.connected;
-    if (_lastError != null) return WalletStatus.error;
+    final busy = _busy;
+    if (busy != null) return busy;
+    final error = _lastError;
+    if (error != null) {
+      return switch (error) {
+        WalletSignatureRejected() => WalletStatus.rejected,
+        WalletWrongNetwork() => WalletStatus.wrongNetwork,
+        _ => WalletStatus.error,
+      };
+    }
+    if (isConnected) {
+      return _signed ? WalletStatus.signed : WalletStatus.connected;
+    }
     return WalletStatus.disconnected;
   }
 
@@ -39,13 +73,17 @@ class WalletController extends ChangeNotifier {
   Future<String> connect() async {
     final existing = _wallet.address;
     if (existing != null) return existing;
-    _connecting = true;
+    _busy = WalletStatus.connecting;
     _lastError = null;
+    _signed = false;
     notifyListeners();
     try {
       return await _wallet.connect();
+    } on WalletException catch (e) {
+      _lastError = e;
+      rethrow;
     } finally {
-      _connecting = false;
+      _busy = null;
       notifyListeners();
     }
   }
@@ -53,13 +91,12 @@ class WalletController extends ChangeNotifier {
   /// Connects from a button: a failure becomes [lastError] (a recoverable
   /// state), never an unhandled exception. Returns whether it connected.
   Future<bool> tryConnect() async {
-    if (_connecting) return false;
+    if (_busy != null) return false;
+    _lastError = null;
     try {
       await connect();
       return true;
-    } on WalletException catch (e) {
-      _lastError = e;
-      notifyListeners();
+    } on WalletException {
       return false;
     }
   }
@@ -73,17 +110,42 @@ class WalletController extends ChangeNotifier {
   Future<void> disconnect() async {
     await _wallet.disconnect();
     _lastError = null;
+    _signed = false;
     notifyListeners();
   }
 
   /// Signs a server-prepared transaction unchanged; returns the signed XDR.
-  Future<String> signTransaction(String unsignedXdr) async {
-    final signed = await _wallet.signTransaction(unsignedXdr);
-    notifyListeners();
-    return signed;
-  }
+  ///
+  /// Refuses before any prompt when the wallet is not on Testnet. If the
+  /// wallet switched network or account, the session is forgotten so the
+  /// next attempt connects again.
+  Future<String> signTransaction(String unsignedXdr) =>
+      _sign(() => _wallet.signTransaction(unsignedXdr));
 
   /// Signs a Soroban authorization entry; returns the signed entry XDR.
   Future<String> signAuthEntry(String entryXdr) =>
-      _wallet.signAuthEntry(entryXdr);
+      _sign(() => _wallet.signAuthEntry(entryXdr));
+
+  Future<String> _sign(Future<String> Function() sign) async {
+    _lastError = null;
+    _signed = false;
+    try {
+      if (!isConnected) throw const WalletUnavailable();
+      if (!isOnTestnet) throw const WalletWrongNetwork();
+      _busy = WalletStatus.signing;
+      notifyListeners();
+      final signed = await sign();
+      _signed = true;
+      return signed;
+    } on WalletException catch (e) {
+      _lastError = e;
+      if (e is WalletWrongNetwork || e is WalletAccountChanged) {
+        await _wallet.disconnect();
+      }
+      rethrow;
+    } finally {
+      _busy = null;
+      notifyListeners();
+    }
+  }
 }

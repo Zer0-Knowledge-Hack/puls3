@@ -38,16 +38,24 @@ class WalletPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final address = this.address;
     final Widget body = switch (status) {
-      WalletStatus.connected when address != null => _Connected(
+      WalletStatus.connected ||
+      WalletStatus.signed when address != null => _Connected(
         address: address,
         walletName: walletName,
         isOnTestnet: isOnTestnet,
+        signed: status == WalletStatus.signed,
         onDisconnect: onDisconnect,
       ),
       WalletStatus.connecting => _Connecting(walletName: walletName),
+      WalletStatus.signing => _Signing(walletName: walletName),
+      WalletStatus.rejected ||
+      WalletStatus.wrongNetwork ||
       WalletStatus.error => _Error(
         error: error,
         walletName: walletName,
+        // Connected means the failure came from a signature, not a
+        // connection.
+        whileSigning: address != null,
         onRetry: onConnect,
         onInstall: onInstall,
       ),
@@ -176,29 +184,66 @@ class _Connecting extends StatelessWidget {
   }
 }
 
+class _Signing extends StatelessWidget {
+  const _Signing({required this.walletName});
+
+  final String walletName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('wallet-state-signing'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Header(
+          icon: Icons.draw_outlined,
+          title: 'Waiting for wallet confirmation…',
+          message:
+              'Review the transaction in $walletName and approve it. '
+              'puls3 sends it exactly as prepared.',
+          color: Puls3Colors.accent,
+        ),
+        const SizedBox(height: Puls3Spacing.md),
+        const ClipRRect(
+          borderRadius: Puls3Radius.pillAll,
+          child: LinearProgressIndicator(
+            minHeight: 3,
+            color: Puls3Colors.accent,
+            backgroundColor: Puls3Colors.hairline,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Connected extends StatelessWidget {
   const _Connected({
     required this.address,
     required this.walletName,
     required this.isOnTestnet,
     required this.onDisconnect,
+    this.signed = false,
   });
 
   final String address;
   final String walletName;
   final bool isOnTestnet;
+  final bool signed;
   final VoidCallback onDisconnect;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      key: const ValueKey('wallet-state-connected'),
+      key: ValueKey(signed ? 'wallet-state-signed' : 'wallet-state-connected'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Header(
           icon: Icons.check_circle_rounded,
-          title: 'Connected',
-          message: 'Signing with $walletName.',
+          title: signed ? 'Transaction signed' : 'Connected',
+          message: signed
+              ? 'Signed with $walletName. puls3 submits it for you.'
+              : 'Signing with $walletName.',
           color: Puls3Colors.success,
         ),
         const SizedBox(height: Puls3Spacing.md),
@@ -281,17 +326,25 @@ class _Error extends StatelessWidget {
     required this.error,
     required this.walletName,
     required this.onRetry,
+    this.whileSigning = false,
     this.onInstall,
   });
 
   final WalletException? error;
   final String walletName;
+  final bool whileSigning;
   final VoidCallback onRetry;
   final VoidCallback? onInstall;
 
   @override
   Widget build(BuildContext context) {
     final (key, icon, title, message) = switch (error) {
+      WalletSignatureRejected() when whileSigning => (
+        'rejected',
+        Icons.block_rounded,
+        'Signature rejected',
+        'You rejected the transaction in $walletName. Nothing was sent.',
+      ),
       WalletSignatureRejected() => (
         'rejected',
         Icons.block_rounded,
@@ -301,9 +354,22 @@ class _Error extends StatelessWidget {
       WalletWrongNetwork() => (
         'wrong-network',
         Icons.swap_horiz_rounded,
-        'Switch your wallet to Testnet',
-        '$walletName is on another network. Open its settings, choose '
-            'Testnet, then try again.',
+        'Wrong network',
+        'Your wallet is on another network. Switch $walletName to '
+            'Stellar Testnet to continue.',
+      ),
+      WalletAccountChanged() => (
+        'account-changed',
+        Icons.manage_accounts_outlined,
+        'Account changed',
+        'The account in $walletName changed. Connect again to continue.',
+      ),
+      WalletInvalidPayload() => (
+        'invalid-payload',
+        Icons.gpp_bad_outlined,
+        'Transaction refused',
+        'puls3 refused to ask $walletName to sign this transaction. '
+            'Nothing was signed.',
       ),
       WalletNotInstalled() => (
         'not-installed',
@@ -321,7 +387,7 @@ class _Error extends StatelessWidget {
       _ => (
         'failed',
         Icons.error_outline_rounded,
-        'Could not connect',
+        'Wallet connection failed',
         'Something went wrong with $walletName. Try again.',
       ),
     };
