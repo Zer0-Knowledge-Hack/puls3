@@ -95,10 +95,13 @@ final class Agent {
   final UsdcAmount price;
 }
 
-/// One task a consumer asks an agent to do.
+/// One task a consumer asks an agent to do: an ERC-8183 escrow job.
 ///
 /// A hire is immutable: every transition returns a new `Hire` or throws a
-/// typed error. The lifecycle is documented in docs/domain/hire-lifecycle.md.
+/// typed error. Each transition mirrors a confirmed escrow transition (ADR-0005
+/// D6); time rules such as `expired_at` and the approval window are enforced
+/// by the escrow, not here. The lifecycle is documented in
+/// docs/domain/hire-lifecycle.md.
 final class Hire {
   const Hire._({
     required this.id,
@@ -108,10 +111,14 @@ final class Hire {
     required this.manifestVersion,
     required this.status,
     this.paymentTransaction,
+    this.runtimeStatus,
     this.failureReason,
+    this.rejectedFrom,
+    this.feedbackReference,
   });
 
-  /// A new hire. It always starts in [HireStatus.requested].
+  /// A hire whose escrow job was created. It always starts in
+  /// [HireStatus.open].
   factory Hire({
     required HireId id,
     required AgentId agentId,
@@ -131,7 +138,7 @@ final class Hire {
       consumer: consumer,
       price: price,
       manifestVersion: manifestVersion,
-      status: HireStatus.requested,
+      status: HireStatus.open,
     );
   }
 
@@ -147,74 +154,122 @@ final class Hire {
 
   final HireStatus status;
 
-  /// The transaction that paid this hire. Set by [pay], kept afterwards.
+  /// The `fund` transaction. Set by [fund], kept afterwards.
   final TransactionHash? paymentTransaction;
 
-  /// Why the hire failed. Set by [fail].
+  /// The agent runtime's progress. Set to `queued` by [fund]; it moves only
+  /// while the hire is `funded`.
+  final RuntimeStatus? runtimeStatus;
+
+  /// Why the run failed. Set by [failRun].
   final String? failureReason;
 
-  /// `requested` → `paid`, only with a payment that settles this hire and was
+  /// The state the hire was rejected from. Set by [reject]. A reject from
+  /// `open` is a cancel before paying; only rejects from `submitted` count
+  /// against the client (ADR-0005 D8).
+  final HireStatus? rejectedFrom;
+
+  /// The confirmed ERC-8004 feedback transaction. Set by [recordFeedback].
+  final TransactionHash? feedbackReference;
+
+  /// `open` → `funded`, only with a payment that settles this hire and was
   /// made by its consumer, so the one who hires, pays and rates is the same.
-  Hire pay(Payment payment, {required StellarAddress agentWallet}) {
-    _require(HireStatus.requested, HireEvent.pay);
+  /// Queues the run.
+  Hire fund(Payment payment, {required StellarAddress agentWallet}) {
+    _require({HireStatus.open}, HireEvent.fund);
     if (!payment.settles(this, agentWallet: agentWallet)) {
       throw const PaymentDoesNotSettleHire();
     }
     if (payment.payer != consumer) {
       throw const PaymentNotFromConsumer();
     }
-    return _to(HireStatus.paid, paymentTransaction: payment.transaction);
+    return _to(
+      HireStatus.funded,
+      paymentTransaction: payment.transaction,
+      runtimeStatus: RuntimeStatus.queued,
+    );
   }
 
-  /// `requested` → `cancelled`.
-  Hire cancel() {
-    _require(HireStatus.requested, HireEvent.cancel);
-    return _to(HireStatus.cancelled);
+  /// `funded` → `submitted`: the agent delivered.
+  Hire submit() {
+    _require({HireStatus.funded}, HireEvent.submit);
+    return _to(HireStatus.submitted);
   }
 
-  /// `paid` → `inProgress`.
-  Hire start() {
-    _require(HireStatus.paid, HireEvent.start);
-    return _to(HireStatus.inProgress);
+  /// `submitted` → `completed`: the evaluator accepted, or the approval window
+  /// passed and the job was released.
+  Hire complete() {
+    _require({HireStatus.submitted}, HireEvent.complete);
+    return _to(HireStatus.completed);
   }
 
-  /// `inProgress` → `delivered`.
-  Hire deliver() {
-    _require(HireStatus.inProgress, HireEvent.deliver);
-    return _to(HireStatus.delivered);
+  /// `open`, `funded` or `submitted` → `rejected`, recording the state it
+  /// came from.
+  Hire reject() {
+    _require({
+      HireStatus.open,
+      HireStatus.funded,
+      HireStatus.submitted,
+    }, HireEvent.reject);
+    return _to(HireStatus.rejected, rejectedFrom: status);
   }
 
-  /// `paid` or `inProgress` → `failed`, with a non-empty [reason].
-  Hire fail({required String reason}) {
-    if (status != HireStatus.paid && status != HireStatus.inProgress) {
-      throw InvalidHireTransition(status, HireEvent.fail);
+  /// `open` (unfunded job past `expired_at`, derived) or `funded`
+  /// (`claim_refund`) → `expired`. A `submitted` hire cannot expire: it is
+  /// released first (ADR-0005 D4).
+  Hire expire() {
+    _require({HireStatus.open, HireStatus.funded}, HireEvent.expire);
+    return _to(HireStatus.expired);
+  }
+
+  /// Runtime `queued` → `running`. The hire stays `funded`.
+  Hire startRun() {
+    if (status != HireStatus.funded || runtimeStatus != RuntimeStatus.queued) {
+      throw InvalidRuntimeTransition(status, runtimeStatus);
+    }
+    return _to(status, runtimeStatus: RuntimeStatus.running);
+  }
+
+  /// Runtime `queued` or `running` → `failed`, with a non-empty [reason]. The
+  /// hire stays `funded` until the client rejects it or the job expires.
+  Hire failRun({required String reason}) {
+    if (status != HireStatus.funded || runtimeStatus == RuntimeStatus.failed) {
+      throw InvalidRuntimeTransition(status, runtimeStatus);
     }
     if (reason.trim().isEmpty) {
       throw const InvalidHire(HireProblem.failureReasonEmpty);
     }
-    return _to(HireStatus.failed, failureReason: reason);
+    return _to(
+      status,
+      runtimeStatus: RuntimeStatus.failed,
+      failureReason: reason,
+    );
   }
 
-  /// `delivered` → `rated`, with feedback for this hire and agent, left by
-  /// this hire's consumer.
-  Hire rate(Feedback feedback) {
-    _require(HireStatus.delivered, HireEvent.rate);
+  /// Records confirmed [feedback] for this hire and agent, left by this hire's
+  /// consumer, once. The status does not change.
+  Hire recordFeedback(Feedback feedback, {required TransactionHash reference}) {
+    if (status != HireStatus.completed) throw HireNotCompleted(status);
+    if (feedbackReference != null) throw const HireAlreadyRated();
     if (feedback.hireId != id ||
         feedback.agentId != agentId ||
         feedback.client != consumer) {
       throw const FeedbackDoesNotMatchHire();
     }
-    return _to(HireStatus.rated);
+    return _to(status, feedbackReference: reference);
   }
 
-  void _require(HireStatus expected, HireEvent event) {
-    if (status != expected) throw InvalidHireTransition(status, event);
+  void _require(Set<HireStatus> allowed, HireEvent event) {
+    if (!allowed.contains(status)) throw InvalidHireTransition(status, event);
   }
 
   Hire _to(
     HireStatus next, {
     TransactionHash? paymentTransaction,
+    RuntimeStatus? runtimeStatus,
     String? failureReason,
+    HireStatus? rejectedFrom,
+    TransactionHash? feedbackReference,
   }) => Hire._(
     id: id,
     agentId: agentId,
@@ -223,7 +278,10 @@ final class Hire {
     manifestVersion: manifestVersion,
     status: next,
     paymentTransaction: paymentTransaction ?? this.paymentTransaction,
+    runtimeStatus: runtimeStatus ?? this.runtimeStatus,
     failureReason: failureReason ?? this.failureReason,
+    rejectedFrom: rejectedFrom ?? this.rejectedFrom,
+    feedbackReference: feedbackReference ?? this.feedbackReference,
   );
 }
 
