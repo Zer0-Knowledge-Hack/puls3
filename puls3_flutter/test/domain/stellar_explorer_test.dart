@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/domain/stellar_explorer.dart';
 
 void main() {
+  group('resolveEscrowContractAddress', () {
+    const custom = 'CCUSTOMESCROWCUSTOMESCROWCUSTOMESCROWCUSTOMESCROWCUSTOM';
+
+    test('blank define falls back to the testnet escrow', () {
+      // --dart-define-from-file=../.env defines PULS3_ESCROW_CONTRACT= as ''.
+      expect(resolveEscrowContractAddress(''), testnetEscrowContractAddress);
+    });
+
+    test('whitespace-only define falls back to the testnet escrow', () {
+      expect(resolveEscrowContractAddress('  	'), testnetEscrowContractAddress);
+    });
+
+    test('a set define wins, trimmed', () {
+      expect(resolveEscrowContractAddress(' $custom '), custom);
+    });
+
+    test('the define is unset in tests', () {
+      expect(escrowContractOverride, isEmpty);
+    });
+  });
+
   group('stellar_explorer', () {
     test('defaultEscrowContractAddress matches testnet deployment', () {
       expect(

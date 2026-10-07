@@ -50,7 +50,8 @@ final _contractError = RegExp(r'Error\(Contract, #(\d+)\)');
 /// Contract reads are simulations of unsigned envelopes. A result of `null`
 /// means the chain says "not there"; an infrastructure problem or a response
 /// the adapter cannot read is a [LedgerException] instead.
-final class SorobanLedger implements LedgerPort, RegistryReader {
+final class SorobanLedger
+    implements LedgerPort, RegistryReader, EscrowJobReader {
   SorobanLedger(this._rpc, this._config);
 
   final SorobanRpcClient _rpc;
@@ -101,6 +102,7 @@ final class SorobanLedger implements LedgerPort, RegistryReader {
   }
 
   /// Escrow `get_job`, or `null` when the job does not exist.
+  @override
   Future<EscrowJob?> escrowJob(int jobId) async {
     final value = await _read(
       _config.escrow,

@@ -88,8 +88,9 @@ keeps a `reputation_registry: null` slot for it.
 
 ### Prerequisites
 
-- A funded testnet identity in the Stellar CLI: `stellar keys generate <identity> --network testnet`
-  (then fund it via the [testnet friendbot](https://developers.stellar.org/docs/tools/testnet-faucet)).
+- A funded testnet identity in the Stellar CLI: `stellar keys generate <identity> --fund --network testnet`
+  (Friendbot funds it; `scripts/fund-testnet-accounts.sh <identity>` tops it up), then
+  `STELLAR_ACCOUNT=<identity>` in the root `.env`.
 - Identity/network config from the repo-root `.env.example` (`STELLAR_ACCOUNT`,
   `STELLAR_NETWORK`, optional `REGISTRY_NAME`/`REGISTRY_SYMBOL`). Keys stay in
   the Stellar CLI identity store; no secret ever goes into `.env` or `deployments/`.

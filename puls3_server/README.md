@@ -38,8 +38,13 @@ to `confirmed` or `failed` (relay step 5 in `docs/architecture/api.md`). Each
 pass polls `getTransaction` for up to 100 records, resends the persisted
 envelope at most every 30 seconds while the transaction is not found, fails
 it as `PreparationExpired` once the chain time passes its time bounds, and
-confirms `createJob` and `fund` from their escrow events. The domain effects
-on the hire are a no-op until the hire lifecycle lands (#96).
+confirms `createJob` and `fund` from their escrow events. After a successful
+`fund` the hire effect (`HireEscrowEffects`) reads the job from the escrow and
+pays the hire only if the job matches it (state `Funded`; client and
+evaluator are the consumer; provider, token, budget and `expired_at` as
+prepared); otherwise the submission fails as `JobMismatch` with the mismatching
+field. Recording the job id after `createJob` is a no-op until the hire
+lifecycle lands (#96).
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -50,6 +55,12 @@ It is off by default so tests, CI and existing deployments do not poll the
 chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
 writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
+### Hire configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
+
 ## Prerequisites
 
 - Dart 3.8 or newer
@@ -59,8 +70,11 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
 ## Start the backend
 
-From the repository root, generate the local `.env` and Serverpod password
-files (on Windows, run this from Git Bash):
+The full path (fresh clone → server and app against testnet) is in
+[docs/infra/secrets.md](../docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone).
+In short: from the repository root, generate the local Docker passwords
+(`puls3_server/.env`) and Serverpod password files (on Windows, run this from
+Git Bash):
 
 ```bash
 ./scripts/setup-local-secrets.sh
@@ -78,12 +92,16 @@ Replace every empty or `<generate>` value. The development and test
 `database`/`redis` values in `config/passwords.yaml` must match the respective
 passwords in `.env`.
 
-Then, from `puls3_server/`, start PostgreSQL and Redis and run the server with
-pending migrations applied:
+`puls3_server/.env` only holds these local Docker passwords. The server's
+public network config (`PULS3_STELLAR_*`, `PULS3_TRACKER_*`) lives in the root
+`.env` (`cp .env.example .env`). Then, from `puls3_server/`, start PostgreSQL
+and Redis, load the root config and run the server with pending migrations
+applied:
 
 ```bash
 docker compose up --build --detach
-dart run bin/main.dart --apply-migrations
+set -a; . ../.env; set +a
+dart bin/main.dart --apply-migrations
 ```
 
 The API listens on `http://localhost:8080` by default. The Flutter app reads

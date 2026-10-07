@@ -169,7 +169,7 @@ puls3_flutter/   Flutter app (Studio + Marketplace)
 puls3_server/    Serverpod backend
 puls3_client/    Generated client shared by app and server
 contracts/       Soroban workspace: identity-registry, escrow, placeholder; deployments/ holds testnet.json and demo-agents.json
-scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh) and seed (seed-demo-agents.sh) scripts
+scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh), seed (seed-demo-agents.sh) and funding (fund-testnet-accounts.sh) scripts
 spikes/          Payments proof of concept (payments-poc)
 docs/adr/        Architecture decision records
 docs/verification/ How to verify the on-chain evidence (onchain.md)
@@ -184,7 +184,7 @@ Per rules §8.1, this project existed prior to the Stellar Odyssey event. The co
 
 ## Contributing
 
-Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow.
+Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow. To run the server and the app against testnet from a fresh clone, follow **[docs/infra/secrets.md](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone)**.
 
 ## License
 

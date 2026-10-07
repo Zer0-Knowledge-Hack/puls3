@@ -1,0 +1,9 @@
+class: HireRecord
+table: hire
+serverOnly: true
+fields:
+  consumer: String
+  agentId: int
+  price: int
+  manifestVersion: int
+  expiredAt: int
