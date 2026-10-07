@@ -1,5 +1,6 @@
 import '../domain/agent_draft.dart';
 import '../domain/stellar_format.dart';
+import '../wallet/demo_envelope.dart';
 import 'deploy_gateway.dart';
 
 /// Demo [DeployGateway]: fake ids after short delays, no network. It stands
@@ -31,7 +32,7 @@ class FakeDeployGateway implements DeployGateway {
     await Future<void>.delayed(prepareDelay);
     return PreparedDeploy(
       preparationId: _ids.txHash().substring(0, 16),
-      unsignedTransaction: 'AAAA-fake-register_full-envelope',
+      unsignedTransaction: demoEnvelope(builder, note: 'deploy demo'),
     );
   }
 

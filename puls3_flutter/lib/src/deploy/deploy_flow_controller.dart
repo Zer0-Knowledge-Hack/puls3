@@ -296,7 +296,17 @@ class DeployFlowController extends ChangeNotifier {
       kind: DeployErrorKind.signatureRejected,
       step: step,
     ),
-    WalletUnavailable() => DeployError(
+    WalletAccountChanged() => DeployError(
+      kind: DeployErrorKind.accountChanged,
+      step: step,
+    ),
+    // The wallet adapter refused the prepared transaction before signing.
+    WalletInvalidPayload(:final reason) => DeployError(
+      kind: DeployErrorKind.invalidResponse,
+      step: step,
+      detail: reason,
+    ),
+    WalletNotInstalled() || WalletUnavailable() => DeployError(
       kind: DeployErrorKind.walletUnavailable,
       step: step,
     ),
