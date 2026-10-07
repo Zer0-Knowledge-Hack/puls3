@@ -138,3 +138,145 @@ When you are finished, you can shut down Serverpod with `Ctrl-C`, then stop Post
 ```bash
 docker compose stop
 ```
+
+## Health version and allowed origins
+
+`health.check` returns the package version from `pubspec.yaml`. When
+`PULS3_GIT_SHA` is set, the commit is appended as semver build metadata, for
+example `1.0.0+63fbad2`, so a deployed server names the commit it runs. A value
+with characters other than letters, digits, `-` and `.` stops the server at
+startup.
+
+Browsers may call the API server only from a loopback origin (`localhost`,
+`127.0.0.1` or `[::1]`, any port) or from an origin listed in
+`PULS3_ALLOWED_ORIGINS` (comma-separated, for example
+`https://puls3-4lw.pages.dev`). A request from any other origin gets `403`
+before an endpoint runs. Requests without an `Origin` header, such as `curl`,
+are not affected.
+
+Serverpod 3.4.13 answers CORS preflight (`OPTIONS`) requests in its own core
+middleware, before added middleware runs, so preflight responses still carry
+`Access-Control-Allow-Origin: *`. The request that follows is still rejected
+when its origin is not allowed.
+
+## Deploy to Serverpod Cloud
+
+The server runs on Serverpod Cloud, which also provides its PostgreSQL
+database. The Flutter web app is deployed separately to Cloudflare Pages (not
+covered here); build it with `--dart-define=PULS3_API_URL=<api-url>` so it
+calls this server.
+
+| | URL |
+|---|---|
+| API server | `https://<project-id>.api.serverpod.space/` (fill in after the first deploy) |
+| Health check | `POST https://<project-id>.api.serverpod.space/health/check` |
+
+Run every command from `puls3_server/` (Git Bash on Windows). The commands were
+checked against `serverpod_cloud_cli` 1.0.0 (`scloud help <command>`).
+
+### First deploy
+
+Do this once per project. Later deploys only need [Redeploy](#redeploy).
+
+1. **Install the CLI.** Version 1.0.1 needs Dart 3.12.2 or newer. Version
+   1.0.0 does not compile when pub resolves `serverpod_cloud_shared` 1.0.1, so
+   upgrade Dart (or Flutter) first if `dart --version` is older.
+
+   ```bash
+   dart pub global activate serverpod_cloud_cli
+   scloud version
+   ```
+
+2. **Log in.** Create an account at <https://accounts.serverpod.dev/> first.
+
+   ```bash
+   scloud auth login
+   ```
+
+3. **Create the project and link it.** Project ids are global; pick a free one.
+   `--plan` selects `starter` or `growth`, which can incur cost: check the plan
+   and the hackathon credits before you run it.
+
+   ```bash
+   scloud project create <project-id> --enable-db
+   scloud project link <project-id>
+   ```
+
+   `project link` writes the id into `scloud.yaml`, replacing
+   `REPLACE_WITH_PROJECT_ID`. Commit that change, so teammates can deploy
+   without linking. It only holds the project id, not credentials. Do not use
+   `scloud launch` here: it would add `serverpod run flutter_build` and
+   `serverpod generate` as pre-deploy scripts, and neither is needed.
+
+4. **Set the environment variables.** Values are public, so they are plain
+   variables, not secrets.
+
+   ```bash
+   scloud variable set SERVERPOD_APPLY_MIGRATIONS true
+   scloud variable set PULS3_ALLOWED_ORIGINS https://puls3-4lw.pages.dev
+   ```
+
+   `SERVERPOD_APPLY_MIGRATIONS=true` makes Serverpod apply pending migrations
+   from `migrations/` at every start (the same as `--apply-migrations`
+   locally). Use the origin of the Cloudflare Pages deployment, comma-separate
+   several, and never add a trailing path. The `PULS3_STELLAR_*` variables
+   default to testnet, so they are only needed to point at another network.
+   Leave `PULS3_TRACKER_ENABLED` unset: the chain submission tracker stays off
+   in this deployment.
+
+5. **Check the passwords.** Serverpod Cloud generates and manages `database`,
+   `redis`, `serviceSecret`, `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`
+   and `jwtRefreshTokenHashPepper`, so nothing has to be set today. List them
+   with `scloud password list`. Never upload `config/passwords.yaml`.
+
+6. **Deploy** (see [Redeploy](#redeploy)).
+
+### Secrets in Serverpod Cloud
+
+How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
+
+| Secret | In Serverpod Cloud |
+|---|---|
+| `database`, `redis`, `serviceSecret` | Platform-managed. No action |
+| `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
+| `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
+| `mySharedPassword` | Unused template entry. Do not set |
+| Server signing key, per-agent wallet encryption key, LLM provider key (planned) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
+
+Use `scloud variable set --secret <NAME> <value>` only for a secret that must
+not get the `SERVERPOD_PASSWORD_` prefix. Prefer `--from-file` over a value on
+the command line, so the secret does not land in the shell history.
+
+### Redeploy
+
+Anyone with access to the project can redeploy from a clean checkout of `main`:
+
+```bash
+scloud auth login                    # once per machine
+git switch main && git pull
+scloud variable set PULS3_GIT_SHA "$(git rev-parse --short HEAD)"
+scloud deploy --show-files           # uploads, builds and rolls out
+scloud status deployment show        # follow the rollout
+curl -s -X POST https://<project-id>.api.serverpod.space/health/check
+```
+
+The health check returns JSON whose `version` names the commit you deployed,
+for example `1.0.0+63fbad2`. `scloud deploy` warns when the working
+tree has uncommitted changes: they are uploaded but the deploy is recorded
+against the last commit.
+
+Useful commands:
+
+| Task | Command |
+|---|---|
+| Live status and service URLs | `scloud status live` |
+| Server logs | `scloud log --tail` |
+| Build log of the last deploy | `scloud build log` |
+| List variables | `scloud variable list` |
+| Apply changed variables without uploading | `scloud deploy --redeploy` |
+| Preview the upload without deploying | `scloud deploy --wet-run --show-files` |
+
+The upload follows `.gitignore` and the repository-root `.scloudignore`:
+passwords, run-mode configs (Serverpod Cloud generates the server
+configuration), tests, Docker files and `web/app` are left out.
