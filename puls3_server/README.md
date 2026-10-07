@@ -297,12 +297,17 @@ per project.
      -H 'Origin: https://puls3-4lw.pages.dev' <api>/health/check   # 200
    curl -s -o /dev/null -w '%{http_code}\n' -X POST \
      -H 'Origin: https://evil.example.com' <api>/health/check      # 403
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+     -H 'Origin: http://localhost:3000' <api>/health/check         # 403
    ```
 
    The first call returns JSON whose `version` is `1.0.0+<sha>` for the commit
    you deployed. If it shows `1.0.0` alone, `PULS3_GIT_SHA` was not applied:
-   check `scloud variable list`, then run `scloud deploy --redeploy`. Finally,
-   put the API URL in the root README.
+   check `scloud variable list`, then run `scloud deploy --redeploy`. The
+   localhost call must return 403: loopback origins are allowed only in the
+   `development` run mode. A 200 there means the server is not running in
+   `production`; check the "run mode" line in `scloud log` before going on.
+   Finally, put the API URL in the root README.
 
 ### Redeploy
 
