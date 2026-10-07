@@ -14,6 +14,7 @@ import '../ui/atoms/section_label.dart';
 import '../ui/atoms/skill_chip.dart';
 import '../ui/organisms/site_footer.dart';
 import 'hire_sheet.dart';
+import '../theme/breakpoints.dart';
 
 /// `/agent/:id`: agent profile with a Hire call to action.
 class AgentDetailScreen extends StatelessWidget {
@@ -66,7 +67,8 @@ class _AgentDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide =
+        MediaQuery.sizeOf(context).width >= Puls3Breakpoints.detailTwoColumn;
 
     final profile = Column(
       crossAxisAlignment: CrossAxisAlignment.start,

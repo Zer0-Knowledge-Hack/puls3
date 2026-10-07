@@ -10,6 +10,7 @@ import '../ui/molecules/agent_card.dart';
 import '../ui/organisms/agent_form.dart';
 import '../ui/organisms/site_footer.dart';
 import 'deploy_sheet.dart';
+import '../theme/breakpoints.dart';
 
 /// `/studio`: mock agent builder with a live marketplace preview.
 /// Container: owns all form state.
@@ -110,7 +111,8 @@ class _StudioScreenState extends State<StudioScreen> {
 
   Widget _buildBody(BuildContext context) {
     final price = _priceStroops;
-    final wide = MediaQuery.sizeOf(context).width >= 960;
+    final wide =
+        MediaQuery.sizeOf(context).width >= Puls3Breakpoints.studioTwoColumn;
 
     final form = AgentForm(
       nameController: _name,
@@ -166,7 +168,9 @@ class _StudioScreenState extends State<StudioScreen> {
         const SizedBox(height: Puls3Spacing.xl),
         Text(
           'Agent Studio',
-          style: MediaQuery.sizeOf(context).width < 700
+          style:
+              MediaQuery.sizeOf(context).width <
+                  Puls3Breakpoints.compactHeadline
               ? Puls3Text.h2Compact
               : Puls3Text.h1,
         ),

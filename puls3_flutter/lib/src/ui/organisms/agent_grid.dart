@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/agent.dart';
 import '../../theme/puls3_theme.dart';
 import '../molecules/agent_card.dart';
+import '../../theme/breakpoints.dart';
 
 /// Responsive grid of [AgentCard]s.
 class AgentGrid extends StatelessWidget {
@@ -16,9 +17,9 @@ class AgentGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final columns = width >= 1000
+        final columns = width >= Puls3Breakpoints.gridThreeColumns
             ? 3
-            : width >= 640
+            : width >= Puls3Breakpoints.compact
             ? 2
             : 1;
         const gap = Puls3Spacing.md;

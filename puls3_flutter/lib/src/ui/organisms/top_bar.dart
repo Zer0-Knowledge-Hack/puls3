@@ -4,6 +4,7 @@ import '../../theme/puls3_theme.dart';
 import '../atoms/content_width.dart';
 import '../atoms/puls3_logo.dart';
 import '../molecules/wallet_chip.dart';
+import '../../theme/breakpoints.dart';
 
 /// A navigation destination shown in the [TopBar].
 class TopBarLink {
@@ -46,7 +47,7 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 640;
+    final compact = MediaQuery.sizeOf(context).width < Puls3Breakpoints.compact;
     return Container(
       height: height,
       decoration: const BoxDecoration(
@@ -71,11 +72,13 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 onTap: () => onNavigate(link.path),
               ),
             const Spacer(),
-            WalletChip(
-              address: walletAddress,
-              isConnecting: isWalletConnecting,
-              onConnect: onConnectWallet,
-              compact: compact,
+            Flexible(
+              child: WalletChip(
+                address: walletAddress,
+                isConnecting: isWalletConnecting,
+                onConnect: onConnectWallet,
+                compact: compact,
+              ),
             ),
           ],
         ),
