@@ -1,6 +1,6 @@
 # puls3 Serverpod backend
 
-Serverpod **3.4.13**, pinned on **2026-09-26**. The backend currently exposes a
+Serverpod **4.0.4**, pinned on **2026-10-07**. The backend currently exposes a
 `health` endpoint so the Flutter app can verify the generated client, server,
 and shared workspace are connected, and a read-only `agent` endpoint that serves
 the agent catalog from the on-chain identity registry.
@@ -52,10 +52,10 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
 ## Prerequisites
 
-- Dart 3.8 or newer
-- Flutter 3.32 or newer (to run the app)
+- Dart 3.12.2
+- Flutter 3.44.4 (to run the app)
 - Docker with Docker Compose
-- Serverpod CLI 3.4.13: `dart pub global activate serverpod_cli 3.4.13`
+- Serverpod CLI 4.0.4: `dart pub global activate serverpod_cli 4.0.4`
 
 ## Start the backend
 
