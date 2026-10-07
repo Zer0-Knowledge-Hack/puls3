@@ -10,12 +10,14 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// The agent catalog cannot be read from the chain and no cached copy exists.
 abstract class AgentCatalogUnavailable
-    implements _i1.SerializableException, _i1.SerializableModel {
+    implements
+        _isc.SerializableException,
+        _isc.SerializableModel,
+        _isc.ProtocolSerialization {
   AgentCatalogUnavailable._({required this.message});
 
   factory AgentCatalogUnavailable({required String message}) =
@@ -34,10 +36,18 @@ abstract class AgentCatalogUnavailable
 
   /// Returns a shallow copy of this [AgentCatalogUnavailable]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   AgentCatalogUnavailable copyWith({String? message});
   @override
   Map<String, dynamic> toJson() {
+    return {
+      '__className__': 'AgentCatalogUnavailable',
+      'message': message,
+    };
+  }
+
+  @override
+  Map<String, dynamic> toJsonForProtocol() {
     return {
       '__className__': 'AgentCatalogUnavailable',
       'message': message,
@@ -56,7 +66,7 @@ class _AgentCatalogUnavailableImpl extends AgentCatalogUnavailable {
 
   /// Returns a shallow copy of this [AgentCatalogUnavailable]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   AgentCatalogUnavailable copyWith({String? message}) {
     return AgentCatalogUnavailable(message: message ?? this.message);

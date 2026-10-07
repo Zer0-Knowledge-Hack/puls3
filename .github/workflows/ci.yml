@@ -17,6 +17,7 @@ jobs:
       server: ${{ steps.paths.outputs.server }}
       app: ${{ steps.paths.outputs.app }}
       contracts: ${{ steps.paths.outputs.contracts }}
+      docker: ${{ steps.paths.outputs.docker }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -28,15 +29,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          domain=false server=false app=false contracts=false
+          domain=false server=false app=false contracts=false docker=false
           while IFS= read -r path; do
             case "$path" in
               pubspec.yaml|pubspec.lock)
-                domain=true; server=true; app=true ;;
+                domain=true; server=true; app=true; docker=true ;;
               puls3_domain/*)
-                domain=true; server=true ;;
+                domain=true; server=true; docker=true ;;
               puls3_server/*)
-                server=true ;;
+                server=true; docker=true ;;
+              .dockerignore)
+                docker=true ;;
               puls3_client/*)
                 server=true; app=true ;;
               puls3_flutter/*)
@@ -44,13 +47,14 @@ jobs:
               contracts/*)
                 contracts=true ;;
               .github/workflows/ci.yml)
-                domain=true; server=true; app=true; contracts=true ;;
+                domain=true; server=true; app=true; contracts=true; docker=true ;;
             esac
           done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "domain=$domain" >> "$GITHUB_OUTPUT"
           echo "server=$server" >> "$GITHUB_OUTPUT"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "contracts=$contracts" >> "$GITHUB_OUTPUT"
+          echo "docker=$docker" >> "$GITHUB_OUTPUT"
 
   domain:
     needs: changes
@@ -59,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with: {flutter-version: '3.41.4', cache: true}
+        with: {flutter-version: '3.44.4', cache: true}
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.pub-cache
@@ -90,13 +94,13 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with: {flutter-version: '3.41.4', cache: true}
+        with: {flutter-version: '3.44.4', cache: true}
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-      - run: flutter pub get && dart pub global activate serverpod_cli 3.4.13
+      - run: flutter pub get && dart pub global activate serverpod_cli 4.0.4
       - name: Configure test passwords
         shell: bash
         run: |
@@ -119,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with: {flutter-version: '3.41.4', cache: true}
+        with: {flutter-version: '3.44.4', cache: true}
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.pub-cache
@@ -128,6 +132,42 @@ jobs:
       - run: flutter pub get
       - working-directory: puls3_flutter
         run: flutter analyze --fatal-infos && flutter test && flutter build web --release
+
+  docker:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Plant local secret files that the build context must exclude
+        run: |
+          touch puls3_server/.env puls3_server/config/passwords.yaml
+      - name: Build server image
+        run: docker build --file puls3_server/Dockerfile --tag puls3-server:ci .
+      - name: Check runtime bundle and secret exclusion
+        run: |
+          docker run --rm --entrypoint sh puls3-server:ci -c '
+            test -x server/bin/main &&
+            test -f config/production.yaml &&
+            test ! -e config/passwords.yaml'
+
+  scripts:
+    # Offline tests for scripts/*.sh and the env inventory (no network, no real
+    # Stellar CLI). They read code, docs and config across the repository, so
+    # they run on every change.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run script tests
+        shell: bash
+        run: |
+          status=0
+          for test in scripts/tests/*.test.sh; do
+            echo "::group::$test"
+            bash "$test" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
 
   contracts:
     needs: changes
@@ -164,7 +204,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, domain, server, app, contracts]
+    needs: [changes, domain, server, app, docker, scripts, contracts]
     runs-on: ubuntu-latest
     steps:
       - name: Require every applicable component
@@ -173,9 +213,11 @@ jobs:
           DOMAIN: ${{ needs.domain.result }}
           SERVER: ${{ needs.server.result }}
           APP: ${{ needs.app.result }}
+          DOCKER: ${{ needs.docker.result }}
+          SCRIPTS: ${{ needs.scripts.result }}
           CONTRACTS: ${{ needs.contracts.result }}
         run: |
-          for result in "$CHANGES" "$DOMAIN" "$SERVER" "$APP" "$CONTRACTS"; do
+          for result in "$CHANGES" "$DOMAIN" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS"; do
             if [[ "$result" != success && "$result" != skipped ]]; then
               echo "A required CI job finished with: $result" >&2
               exit 1

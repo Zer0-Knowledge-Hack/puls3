@@ -18,8 +18,8 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 
 | Tool | Version | Needed for |
 | --- | --- | --- |
-| Flutter (includes Dart) | **3.41.4** (Dart 3.11.1) | Everything |
-| Serverpod CLI | **3.4.13** | Backend code generation |
+| Flutter (includes Dart) | **3.44.4** (Dart 3.12.2) | Everything |
+| Serverpod CLI | **4.0.4** | Backend code generation |
 | Docker Desktop | Latest | Local Postgres + Redis for the backend |
 | Git | Latest | Everything |
 | GitHub CLI (`gh`) | Latest | Optional, for PRs from the terminal |
@@ -34,8 +34,8 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
    ```bash
    cd <your-flutter-folder>
    git fetch --tags
-   git checkout 3.41.4
-   flutter --version   # must say Flutter 3.41.4 and Dart 3.11.1
+   git checkout 3.44.4
+   flutter --version   # must say Flutter 3.44.4 and Dart 3.12.2
    ```
 
 3. Check your setup: `flutter doctor`. For this project you only need **Chrome (web)** to be ✓.
@@ -43,7 +43,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 ### 1.2 Serverpod CLI
 
 ```bash
-dart pub global activate serverpod_cli 3.4.13
+dart pub global activate serverpod_cli 4.0.4
 serverpod version
 ```
 
@@ -54,7 +54,8 @@ If `serverpod` is not found, add the pub cache `bin` folder to your `PATH`:
 | Windows | `%LOCALAPPDATA%\Pub\Cache\bin` |
 | macOS / Linux | `$HOME/.pub-cache/bin` |
 
-> Do not install Serverpod 4.x yet: it needs Dart ≥ 3.12.2. The upgrade is tracked in #16.
+The CLI version must match the pinned Serverpod packages. A different major or
+patch can produce a generated-code diff that CI rejects.
 
 ### 1.3 Docker
 
@@ -284,7 +285,7 @@ repository-admin access. They cannot be proven by local commands alone.
 
 | Problem | Fix |
 | --- | --- |
-| `version solving failed` / `requires SDK version ^3.10` | Your Flutter is not 3.41.4. See [1.1](#11-flutter-and-dart). |
+| `version solving failed` / `requires SDK version ^3.12.2` | Your Flutter is not 3.44.4 (Dart 3.12.2). See [1.1](#11-flutter-and-dart). |
 | `serverpod: command not found` | Add the pub cache `bin` folder to your `PATH` ([1.2](#12-serverpod-cli)). |
 | `set it in puls3_server/.env` when running Docker | Run `./scripts/setup-local-secrets.sh` first. |
 | Port 8080 already in use | Another process uses it (maybe a static server). Stop it, or serve the web build on another port. |

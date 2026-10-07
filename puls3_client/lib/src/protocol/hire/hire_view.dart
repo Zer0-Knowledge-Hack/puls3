@@ -10,10 +10,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-
-abstract class HireView implements _i1.SerializableModel {
+abstract class HireView
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   HireView._({
     required this.hireId,
     required this.agentRegistryId,
@@ -52,7 +52,7 @@ abstract class HireView implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [HireView]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   HireView copyWith({
     int? hireId,
     int? agentRegistryId,
@@ -73,8 +73,20 @@ abstract class HireView implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'HireView',
+      'hireId': hireId,
+      'agentRegistryId': agentRegistryId,
+      'consumer': consumer,
+      'priceStroops': priceStroops,
+      'status': status,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -95,7 +107,7 @@ class _HireViewImpl extends HireView {
 
   /// Returns a shallow copy of this [HireView]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   HireView copyWith({
     int? hireId,

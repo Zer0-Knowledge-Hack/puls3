@@ -10,11 +10,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 abstract class HireRecord
-    implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
+    implements _is.TableRow<int?>, _is.ProtocolSerialization {
   HireRecord._({
     this.id,
     required this.consumer,
@@ -62,11 +61,11 @@ abstract class HireRecord
   int expiredAt;
 
   @override
-  _i1.Table<int?> get table => t;
+  _is.Table<int?> get table => t;
 
   /// Returns a shallow copy of this [HireRecord]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   HireRecord copyWith({
     int? id,
     String? consumer,
@@ -98,12 +97,11 @@ abstract class HireRecord
   }
 
   static HireRecordIncludeList includeList({
-    _i1.WhereExpressionBuilder<HireRecordTable>? where,
+    _is.WhereExpressionBuilder<HireRecordTable>? where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<HireRecordTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
     HireRecordInclude? include,
   }) {
     return HireRecordIncludeList._(
@@ -111,7 +109,6 @@ abstract class HireRecord
       limit: limit,
       offset: offset,
       orderBy: orderBy?.call(HireRecord.t),
-      orderDescending: orderDescending,
       orderByList: orderByList?.call(HireRecord.t),
       include: include,
     );
@@ -119,7 +116,7 @@ abstract class HireRecord
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -144,7 +141,7 @@ class _HireRecordImpl extends HireRecord {
 
   /// Returns a shallow copy of this [HireRecord]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   HireRecord copyWith({
     Object? id = _Undefined,
@@ -165,55 +162,55 @@ class _HireRecordImpl extends HireRecord {
   }
 }
 
-class HireRecordUpdateTable extends _i1.UpdateTable<HireRecordTable> {
+class HireRecordUpdateTable extends _is.UpdateTable<HireRecordTable> {
   HireRecordUpdateTable(super.table);
 
-  _i1.ColumnValue<String, String> consumer(String value) => _i1.ColumnValue(
+  _is.ColumnValue<String, String> consumer(String value) => _is.ColumnValue(
     table.consumer,
     value,
   );
 
-  _i1.ColumnValue<int, int> agentId(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> agentId(int value) => _is.ColumnValue(
     table.agentId,
     value,
   );
 
-  _i1.ColumnValue<int, int> price(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> price(int value) => _is.ColumnValue(
     table.price,
     value,
   );
 
-  _i1.ColumnValue<int, int> manifestVersion(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> manifestVersion(int value) => _is.ColumnValue(
     table.manifestVersion,
     value,
   );
 
-  _i1.ColumnValue<int, int> expiredAt(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> expiredAt(int value) => _is.ColumnValue(
     table.expiredAt,
     value,
   );
 }
 
-class HireRecordTable extends _i1.Table<int?> {
+class HireRecordTable extends _is.Table<int?> {
   HireRecordTable({super.tableRelation}) : super(tableName: 'hire') {
     updateTable = HireRecordUpdateTable(this);
-    consumer = _i1.ColumnString(
+    consumer = _is.ColumnString(
       'consumer',
       this,
     );
-    agentId = _i1.ColumnInt(
+    agentId = _is.ColumnInt(
       'agentId',
       this,
     );
-    price = _i1.ColumnInt(
+    price = _is.ColumnInt(
       'price',
       this,
     );
-    manifestVersion = _i1.ColumnInt(
+    manifestVersion = _is.ColumnInt(
       'manifestVersion',
       this,
     );
-    expiredAt = _i1.ColumnInt(
+    expiredAt = _is.ColumnInt(
       'expiredAt',
       this,
     );
@@ -221,18 +218,18 @@ class HireRecordTable extends _i1.Table<int?> {
 
   late final HireRecordUpdateTable updateTable;
 
-  late final _i1.ColumnString consumer;
+  late final _is.ColumnString consumer;
 
-  late final _i1.ColumnInt agentId;
+  late final _is.ColumnInt agentId;
 
-  late final _i1.ColumnInt price;
+  late final _is.ColumnInt price;
 
-  late final _i1.ColumnInt manifestVersion;
+  late final _is.ColumnInt manifestVersion;
 
-  late final _i1.ColumnInt expiredAt;
+  late final _is.ColumnInt expiredAt;
 
   @override
-  List<_i1.Column> get columns => [
+  List<_is.Column> get columns => [
     id,
     consumer,
     agentId,
@@ -242,23 +239,22 @@ class HireRecordTable extends _i1.Table<int?> {
   ];
 }
 
-class HireRecordInclude extends _i1.IncludeObject {
+class HireRecordInclude extends _is.IncludeObject {
   HireRecordInclude._();
 
   @override
-  Map<String, _i1.Include?> get includes => {};
+  Map<String, _is.Include?> get includes => {};
 
   @override
-  _i1.Table<int?> get table => HireRecord.t;
+  _is.Table<int?> get table => HireRecord.t;
 }
 
-class HireRecordIncludeList extends _i1.IncludeList {
+class HireRecordIncludeList extends _is.IncludeList {
   HireRecordIncludeList._({
-    _i1.WhereExpressionBuilder<HireRecordTable>? where,
+    _is.WhereExpressionBuilder<HireRecordTable>? where,
     super.limit,
     super.offset,
     super.orderBy,
-    super.orderDescending,
     super.orderByList,
     super.include,
   }) {
@@ -266,10 +262,10 @@ class HireRecordIncludeList extends _i1.IncludeList {
   }
 
   @override
-  Map<String, _i1.Include?> get includes => include?.includes ?? {};
+  Map<String, _is.Include?> get includes => include?.includes ?? {};
 
   @override
-  _i1.Table<int?> get table => HireRecord.t;
+  _is.Table<int?> get table => HireRecord.t;
 }
 
 class HireRecordRepository {
@@ -298,22 +294,20 @@ class HireRecordRepository {
   /// );
   /// ```
   Future<List<HireRecord>> find(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<HireRecordTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<HireRecordTable>? where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<HireRecordTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<HireRecordTable>? orderByList,
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<HireRecord>(
       where: where?.call(HireRecord.t),
       orderBy: orderBy?.call(HireRecord.t),
       orderByList: orderByList?.call(HireRecord.t),
-      orderDescending: orderDescending,
       limit: limit,
       offset: offset,
       transaction: transaction,
@@ -340,21 +334,19 @@ class HireRecordRepository {
   /// );
   /// ```
   Future<HireRecord?> findFirstRow(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<HireRecordTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<HireRecordTable>? where,
     int? offset,
-    _i1.OrderByBuilder<HireRecordTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<HireRecordTable>? orderByList,
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<HireRecord>(
       where: where?.call(HireRecord.t),
       orderBy: orderBy?.call(HireRecord.t),
       orderByList: orderByList?.call(HireRecord.t),
-      orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
       lockMode: lockMode,
@@ -364,11 +356,11 @@ class HireRecordRepository {
 
   /// Finds a single [HireRecord] by its [id] or null if no such row exists.
   Future<HireRecord?> findById(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     int id, {
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<HireRecord>(
       id,
@@ -388,16 +380,22 @@ class HireRecordRepository {
   /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
   /// rows are silently skipped, and only the successfully inserted rows are
   /// returned.
+  ///
+  /// If [noReturn] is set to `true`, the inserted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<HireRecord>> insert(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<HireRecord> rows, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
     bool ignoreConflicts = false,
+    bool noReturn = false,
   }) async {
     return session.db.insert<HireRecord>(
       rows,
       transaction: transaction,
       ignoreConflicts: ignoreConflicts,
+      noReturn: noReturn,
     );
   }
 
@@ -405,12 +403,81 @@ class HireRecordRepository {
   ///
   /// The returned [HireRecord] will have its `id` field set.
   Future<HireRecord> insertRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     HireRecord row, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.insertRow<HireRecord>(
       row,
+      transaction: transaction,
+    );
+  }
+
+  /// Upserts all [HireRecord]s in the list and returns the resulting rows.
+  ///
+  /// If a row conflicts on the given [conflictColumns], the existing row is
+  /// updated with the new values. Otherwise, a new row is inserted.
+  ///
+  /// If [updateColumns] is provided, only those columns will be updated on
+  /// conflict. If null, all non-conflict, non-id columns are updated.
+  ///
+  /// If [updateWhere] is provided, the update only applies to rows matching the
+  /// given expression. Conflicting rows that don't match are skipped and not
+  /// returned, so the resulting list may be shorter than [rows].
+  ///
+  /// The returned [HireRecord]s will have their `id` fields set.
+  ///
+  /// This is an atomic operation, meaning that if one of the rows fails,
+  /// none of the rows will be affected.
+  ///
+  /// If [noReturn] is set to `true`, the resulting rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
+  Future<List<HireRecord>> upsert(
+    _is.DatabaseSession session,
+    List<HireRecord> rows, {
+    required _is.ColumnSelections<HireRecordTable> conflictColumns,
+    _is.ColumnSelections<HireRecordTable>? updateColumns,
+    _is.WhereExpressionBuilder<HireRecordTable>? updateWhere,
+    _is.Transaction? transaction,
+    bool noReturn = false,
+  }) async {
+    return session.db.upsert<HireRecord>(
+      rows,
+      conflictColumns: conflictColumns(HireRecord.t),
+      updateColumns: updateColumns?.call(HireRecord.t),
+      updateWhere: updateWhere?.call(HireRecord.t),
+      transaction: transaction,
+      noReturn: noReturn,
+    );
+  }
+
+  /// Upserts a single [HireRecord] and returns the resulting row.
+  ///
+  /// If the row conflicts on the given [conflictColumns], the existing row is
+  /// updated. Otherwise, a new row is inserted.
+  ///
+  /// If [updateColumns] is provided, only those columns will be updated on
+  /// conflict. If null, all non-conflict, non-id columns are updated.
+  ///
+  /// If [updateWhere] is provided, the update only applies when the existing
+  /// row matches the expression. Returns `null` if no row was affected — for
+  /// example when [updateWhere] does not match the conflicting row.
+  ///
+  /// The returned [HireRecord] will have its `id` field set.
+  Future<HireRecord?> upsertRow(
+    _is.DatabaseSession session,
+    HireRecord row, {
+    required _is.ColumnSelections<HireRecordTable> conflictColumns,
+    _is.ColumnSelections<HireRecordTable>? updateColumns,
+    _is.WhereExpressionBuilder<HireRecordTable>? updateWhere,
+    _is.Transaction? transaction,
+  }) async {
+    return session.db.upsertRow<HireRecord>(
+      row,
+      conflictColumns: conflictColumns(HireRecord.t),
+      updateColumns: updateColumns?.call(HireRecord.t),
+      updateWhere: updateWhere?.call(HireRecord.t),
       transaction: transaction,
     );
   }
@@ -420,16 +487,22 @@ class HireRecordRepository {
   /// all columns.
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
+  ///
+  /// If [noReturn] is set to `true`, the updated rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<HireRecord>> update(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<HireRecord> rows, {
-    _i1.ColumnSelections<HireRecordTable>? columns,
-    _i1.Transaction? transaction,
+    _is.ColumnSelections<HireRecordTable>? columns,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.update<HireRecord>(
       rows,
       columns: columns?.call(HireRecord.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
@@ -437,10 +510,10 @@ class HireRecordRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<HireRecord> updateRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     HireRecord row, {
-    _i1.ColumnSelections<HireRecordTable>? columns,
-    _i1.Transaction? transaction,
+    _is.ColumnSelections<HireRecordTable>? columns,
+    _is.Transaction? transaction,
   }) async {
     return session.db.updateRow<HireRecord>(
       row,
@@ -452,10 +525,10 @@ class HireRecordRepository {
   /// Updates a single [HireRecord] by its [id] with the specified [columnValues].
   /// Returns the updated row or null if no row with the given id exists.
   Future<HireRecord?> updateById(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     int id, {
-    required _i1.ColumnValueListBuilder<HireRecordUpdateTable> columnValues,
-    _i1.Transaction? transaction,
+    required _is.ColumnValueListBuilder<HireRecordUpdateTable> columnValues,
+    _is.Transaction? transaction,
   }) async {
     return session.db.updateById<HireRecord>(
       id,
@@ -466,16 +539,20 @@ class HireRecordRepository {
 
   /// Updates all [HireRecord]s matching the [where] expression with the specified [columnValues].
   /// Returns the list of updated rows.
+  ///
+  /// If [noReturn] is set to `true`, the updated rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<HireRecord>> updateWhere(
-    _i1.DatabaseSession session, {
-    required _i1.ColumnValueListBuilder<HireRecordUpdateTable> columnValues,
-    required _i1.WhereExpressionBuilder<HireRecordTable> where,
+    _is.DatabaseSession session, {
+    required _is.ColumnValueListBuilder<HireRecordUpdateTable> columnValues,
+    required _is.WhereExpressionBuilder<HireRecordTable> where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<HireRecordTable>? orderBy,
-    _i1.OrderByListBuilder<HireRecordTable>? orderByList,
-    bool orderDescending = false,
-    _i1.Transaction? transaction,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.updateWhere<HireRecord>(
       columnValues: columnValues(HireRecord.t.updateTable),
@@ -484,30 +561,44 @@ class HireRecordRepository {
       offset: offset,
       orderBy: orderBy?.call(HireRecord.t),
       orderByList: orderByList?.call(HireRecord.t),
-      orderDescending: orderDescending,
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Deletes all [HireRecord]s in the list and returns the deleted rows.
+  ///
+  /// To specify the order of the returned rows use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
+  ///
+  /// If [noReturn] is set to `true`, the deleted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<HireRecord>> delete(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<HireRecord> rows, {
-    _i1.Transaction? transaction,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.delete<HireRecord>(
       rows,
+      orderBy: orderBy?.call(HireRecord.t),
+      orderByList: orderByList?.call(HireRecord.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Deletes a single [HireRecord].
   Future<HireRecord> deleteRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     HireRecord row, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.deleteRow<HireRecord>(
       row,
@@ -516,24 +607,37 @@ class HireRecordRepository {
   }
 
   /// Deletes all rows matching the [where] expression.
+  ///
+  /// To specify the order of the returned rows use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
+  /// If [noReturn] is set to `true`, the deleted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<HireRecord>> deleteWhere(
-    _i1.DatabaseSession session, {
-    required _i1.WhereExpressionBuilder<HireRecordTable> where,
-    _i1.Transaction? transaction,
+    _is.DatabaseSession session, {
+    required _is.WhereExpressionBuilder<HireRecordTable> where,
+    _is.OrderByBuilder<HireRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRecordTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.deleteWhere<HireRecord>(
       where: where(HireRecord.t),
+      orderBy: orderBy?.call(HireRecord.t),
+      orderByList: orderByList?.call(HireRecord.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<HireRecordTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<HireRecordTable>? where,
     int? limit,
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.count<HireRecord>(
       where: where?.call(HireRecord.t),
@@ -544,11 +648,11 @@ class HireRecordRepository {
 
   /// Acquires row-level locks on [HireRecord] rows matching the [where] expression.
   Future<void> lockRows(
-    _i1.DatabaseSession session, {
-    required _i1.WhereExpressionBuilder<HireRecordTable> where,
-    required _i1.LockMode lockMode,
-    required _i1.Transaction transaction,
-    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+    _is.DatabaseSession session, {
+    required _is.WhereExpressionBuilder<HireRecordTable> where,
+    required _is.LockMode lockMode,
+    required _is.Transaction transaction,
+    _is.LockBehavior lockBehavior = _is.LockBehavior.wait,
   }) async {
     return session.db.lockRows<HireRecord>(
       where: where(HireRecord.t),

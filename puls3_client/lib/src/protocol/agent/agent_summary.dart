@@ -10,12 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:puls3_client/src/protocol/protocol.dart' as _i2;
+import 'package:puls3_client/src/protocol/protocol.dart' as _ihzwmcdm;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// One agent of the catalog, built from the identity registry metadata.
-abstract class AgentSummary implements _i1.SerializableModel {
+abstract class AgentSummary
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   AgentSummary._({
     required this.id,
     required this.registryId,
@@ -44,7 +44,7 @@ abstract class AgentSummary implements _i1.SerializableModel {
       registryId: jsonSerialization['registryId'] as int,
       name: jsonSerialization['name'] as String,
       description: jsonSerialization['description'] as String,
-      skills: _i2.Protocol().deserialize<List<String>>(
+      skills: _ihzwmcdm.Protocol().deserialize<List<String>>(
         jsonSerialization['skills'],
       ),
       priceUsdcStroops: jsonSerialization['priceUsdcStroops'] as int,
@@ -79,7 +79,7 @@ abstract class AgentSummary implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   AgentSummary copyWith({
     String? id,
     int? registryId,
@@ -106,8 +106,23 @@ abstract class AgentSummary implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'AgentSummary',
+      'id': id,
+      'registryId': registryId,
+      'name': name,
+      'description': description,
+      'skills': skills.toJson(),
+      'priceUsdcStroops': priceUsdcStroops,
+      if (wallet != null) 'wallet': wallet,
+      if (model != null) 'model': model,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -136,7 +151,7 @@ class _AgentSummaryImpl extends AgentSummary {
 
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   AgentSummary copyWith({
     String? id,

@@ -1,0 +1,13 @@
+.git
+.dart_tool
+**/.dart_tool
+**/build
+.atl
+.codegraph
+video
+contracts/target
+design/logo-lab/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/config/passwords.yaml

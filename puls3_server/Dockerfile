@@ -2,24 +2,27 @@
 # docker build -f puls3_server/Dockerfile .
 
 # Build stage
-FROM dart:3.8.0 AS build
+FROM dart:3.12.2 AS build
 
 # Create a minimal workspace that preserves locked server dependency versions.
 WORKDIR /app
 COPY pubspec.lock .
+COPY puls3_domain puls3_domain
 COPY puls3_server puls3_server
 RUN printf '%s\n' \
   'name: _' \
   'environment:' \
-  '  sdk: ^3.8.0' \
+  '  sdk: ^3.12.2' \
   'workspace:' \
+  '  - puls3_domain' \
   '  - puls3_server' \
   > pubspec.yaml
 RUN dart pub get
 
-# Compile the server executable.
+# Build the server bundle. Serverpod 4 dependencies use Dart build hooks, so
+# `dart compile exe` cannot produce a complete runtime artifact anymore.
 WORKDIR /app/puls3_server
-RUN dart compile exe bin/main.dart -o bin/server
+RUN dart build cli --target bin/main.dart --output build/server
 
 # Add a fallback for the copy of possibly missing directories.
 RUN mkdir -p config web migrations
@@ -37,8 +40,8 @@ ENV role=monolith
 # Copy runtime dependencies
 COPY --from=build /runtime/ /
 
-# Copy compiled server executable
-COPY --from=build /app/puls3_server/bin/server server
+# Copy the executable and native libraries emitted by Dart build hooks.
+COPY --from=build /app/puls3_server/build/server/bundle/ server/
 
 # Copy configuration files and resources
 COPY --from=build /app/puls3_server/config/ config/
@@ -54,4 +57,4 @@ EXPOSE 8081
 EXPOSE 8082
 
 # Define the entrypoint command
-ENTRYPOINT ./server --mode=$runmode --server-id=$serverid --logging=$logging --role=$role
+ENTRYPOINT ./server/bin/main --mode=$runmode --server-id=$serverid --logging=$logging --role=$role
