@@ -1,3 +1,4 @@
+import 'package:meta/meta.dart';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
@@ -98,8 +99,10 @@ class ServerpodHireRepository implements HireRepository {
       );
       return paidHire;
     } on DatabaseQueryException catch (e) {
-      if (e.code != _uniqueViolation) rethrow;
-      final index = _indexByName[e.constraintName];
+      final index = hirePaymentIndexOf(
+        code: e.code,
+        constraintName: e.constraintName,
+      );
       if (index == null) rethrow;
       if (index == HirePaymentIndex.hireId) {
         final existing = await HirePaymentRecord.db.findFirstRow(
@@ -114,6 +117,15 @@ class ServerpodHireRepository implements HireRepository {
     }
   }
 }
+
+/// The `hire_payment` index violated by a database error, or null when the
+/// error is not a unique violation (SQLSTATE `23505`) of one of them. The
+/// repository rethrows the error in that case.
+@visibleForTesting
+HirePaymentIndex? hirePaymentIndexOf({
+  required String? code,
+  required String? constraintName,
+}) => code == _uniqueViolation ? _indexByName[constraintName] : null;
 
 /// SQLSTATE of a unique violation.
 const _uniqueViolation = '23505';
