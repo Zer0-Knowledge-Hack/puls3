@@ -10,7 +10,7 @@ Widget buildView({
   int priceUsdcStroops = 5000000,
   String destinationAddress =
       'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
-  String escrowContractAddress = defaultEscrowContractAddress,
+  String? escrowContractAddress,
   String? errorMessage,
   VoidCallback? onConfirm,
   VoidCallback? onBackToMarketplace,
@@ -47,6 +47,18 @@ void main() {
       expect(find.byType(AddressBadge), findsNWidgets(2));
       expect(find.text('Confirm & sign'), findsOneWidget);
       expect(find.textContaining('Demo only'), findsOneWidget);
+    });
+
+    testWidgets('escrow badge defaults to the resolved escrow address', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildView(phase: HirePhase.review));
+
+      final addresses = tester
+          .widgetList<AddressBadge>(find.byType(AddressBadge))
+          .map((badge) => badge.address);
+      expect(addresses, contains(defaultEscrowContractAddress));
+      expect(defaultEscrowContractAddress, testnetEscrowContractAddress);
     });
 
     testWidgets('signing phase shows signing progress indicator',

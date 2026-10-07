@@ -1,11 +1,27 @@
 /// StellarExpert testnet explorer URL utilities and default contract addresses.
 library;
 
-/// Escrow contract address shown in the UI. Defaults to the testnet deployment
-/// (PR #84); override with `--dart-define=PULS3_ESCROW_CONTRACT=<C...>`.
-const String defaultEscrowContractAddress = String.fromEnvironment(
+/// Escrow contract of the testnet deployment (PR #84).
+const String testnetEscrowContractAddress =
+    'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2';
+
+/// Raw `PULS3_ESCROW_CONTRACT` dart-define. No default on purpose: a define
+/// that is present but empty (`PULS3_ESCROW_CONTRACT=` in a
+/// `--dart-define-from-file` .env) would otherwise yield ''.
+const String escrowContractOverride = String.fromEnvironment(
   'PULS3_ESCROW_CONTRACT',
-  defaultValue: 'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
+);
+
+/// Returns [raw] trimmed, or [testnetEscrowContractAddress] when it is blank.
+String resolveEscrowContractAddress(String raw) {
+  final trimmed = raw.trim();
+  return trimmed.isEmpty ? testnetEscrowContractAddress : trimmed;
+}
+
+/// Escrow contract address shown in the UI: the `PULS3_ESCROW_CONTRACT`
+/// dart-define when set, otherwise the testnet deployment.
+final String defaultEscrowContractAddress = resolveEscrowContractAddress(
+  escrowContractOverride,
 );
 
 /// Base URL for StellarExpert on testnet.
