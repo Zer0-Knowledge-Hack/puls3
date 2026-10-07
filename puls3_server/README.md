@@ -31,6 +31,25 @@ is served. With no cached list, `list` and `get` throw the serializable
 `AgentCatalogUnavailable` exception; an outage is never an empty list, and an
 unknown id is never reported as an outage.
 
+## Chain submission tracker
+
+A background loop drives relayed `ChainSubmission` records from `submitted`
+to `confirmed` or `failed` (relay step 5 in `docs/architecture/api.md`). Each
+pass polls `getTransaction` for up to 100 records, resends the persisted
+envelope at most every 30 seconds while the transaction is not found, fails
+it as `PreparationExpired` once the chain time passes its time bounds, and
+confirms `createJob` and `fund` from their escrow events. The domain effects
+on the hire are a no-op until the hire lifecycle lands (#96).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_TRACKER_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_TRACKER_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
+
+It is off by default so tests, CI and existing deployments do not poll the
+chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
+writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
+
 ## Prerequisites
 
 - Dart 3.8 or newer

@@ -1,4 +1,6 @@
 ### Draft transport mirror of the domain Skill entity.
+### Planned: not served in the MVP. AgentSummary.skills carries only the
+### kebab-case skill ids (agent_summary.spy.yaml, #88).
 class: Skill
 fields:
   ### Kebab-case skill identifier.

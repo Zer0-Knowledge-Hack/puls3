@@ -166,7 +166,13 @@ identity names; no secret is stored in the repository.
 
 **TTL.** Escrow state is persistent and has a TTL of about 60 days. Call
 `extend_ttl(job_id)` on the escrow contract before it lapses to keep a job
-readable. Testnet resets invalidate all recorded IDs; redeploy and re-record.
+readable. Call `extend_claimable_ttl(recipient, token)` (also permissionless) to
+keep an unwithdrawn deferred payout alive; it never credits or moves funds.
+Testnet resets invalidate all recorded IDs; redeploy and re-record.
+
+**Errors.** `create_job` rejects `evaluator == provider` with
+`EvaluatorIsProvider` (117). The deployed Testnet instance gets
+`extend_claimable_ttl` and this guard only after the redeploy (#84).
 
 Inspect a deployed contract at
 `https://stellar.expert/explorer/testnet/contract/<contract-id>`, using the

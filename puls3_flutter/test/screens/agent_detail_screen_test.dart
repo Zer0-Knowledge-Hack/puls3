@@ -17,7 +17,8 @@ void main() {
     expect(find.text('Agent not found'), findsOneWidget);
   });
 
-  testWidgets('Hire flow confirms the payment', (tester) async {
+  testWidgets('Hire flow ends in the demo result without claiming a payment',
+      (tester) async {
     await pumpApp(tester, location: '/agent/agt-001');
 
     await tester.tap(find.text('Hire'));
@@ -27,8 +28,8 @@ void main() {
     await tester.tap(find.text('Confirm & sign'));
     await advance(tester, const Duration(milliseconds: 2200));
 
-    expect(find.text('Payment confirmed'), findsOneWidget);
-    expect(find.text('Paid 0.50 USDC on Stellar'), findsOneWidget);
+    expect(find.text('Demo signature only'), findsOneWidget);
+    expect(find.text('Payment confirmed'), findsNothing);
 
     await tester.tap(find.text('Back to Marketplace'));
     await advance(tester, const Duration(milliseconds: 600));
