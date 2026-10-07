@@ -143,16 +143,17 @@ docker compose stop
 
 `health.check` returns the package version from `pubspec.yaml`. When
 `PULS3_GIT_SHA` is set, the commit is appended as semver build metadata, for
-example `1.0.0+63fbad2`, so a deployed server names the commit it runs. A value
-with characters other than letters, digits, `-` and `.` stops the server at
-startup.
+example `1.0.0+63fbad2`, so a deployed server names the commit it runs. Without
+it, `health.check` returns `1.0.0` alone. A value with characters other than
+letters, digits, `-` and `.` stops the server at startup.
 
-Browsers may call the API server only from a loopback origin (`localhost`,
-`127.0.0.1` or `[::1]`, any port) or from an origin listed in
+Browsers may call the API server only from an origin listed in
 `PULS3_ALLOWED_ORIGINS` (comma-separated, for example
-`https://puls3-4lw.pages.dev`). A request from any other origin gets `403`
-before an endpoint runs. Requests without an `Origin` header, such as `curl`,
-are not affected.
+`https://puls3-4lw.pages.dev`). In the `development` run mode, loopback origins
+(`localhost`, `127.0.0.1` or `[::1]`, any port) are allowed as well; in
+`production`, `staging` and `test` they are not. A request from any other
+origin, or with several `Origin` headers, gets `403` before an endpoint runs.
+Requests without an `Origin` header, such as `curl`, are not affected.
 
 Serverpod 3.4.13 answers CORS preflight (`OPTIONS`) requests in its own core
 middleware, before added middleware runs, so preflight responses still carry
@@ -171,21 +172,56 @@ calls this server.
 | API server | `https://<project-id>.api.serverpod.space/` (fill in after the first deploy) |
 | Health check | `POST https://<project-id>.api.serverpod.space/health/check` |
 
-Run every command from `puls3_server/` (Git Bash on Windows). The commands were
-checked against `serverpod_cloud_cli` 1.0.0 (`scloud help <command>`).
+Run every command from `puls3_server/`. The commands were checked against the
+help output and source of `serverpod_cloud_cli` **1.0.0**.
+
+> **Git Bash on Windows:** pub installs the CLI as `scloud.bat`, which Git Bash
+> does not find as `scloud`. Run `alias scloud=scloud.bat` first, or use
+> PowerShell or cmd.
 
 ### First deploy
 
-Do this once per project. Later deploys only need [Redeploy](#redeploy).
+Do these steps once, in order. Steps 1 and 2 are per machine; steps 3 to 7 are
+per project.
 
-1. **Install the CLI.** Version 1.0.1 needs Dart 3.12.2 or newer. Version
-   1.0.0 does not compile when pub resolves `serverpod_cloud_shared` 1.0.1, so
-   upgrade Dart (or Flutter) first if `dart --version` is older.
+1. **Install the CLI.** Pick the path that matches `dart --version`:
 
-   ```bash
-   dart pub global activate serverpod_cloud_cli
-   scloud version
-   ```
+   - **Dart 3.12.2 or newer (preferred):**
+
+     ```bash
+     dart pub global activate serverpod_cloud_cli 1.0.1
+     ```
+
+     1.0.1 is the latest release. It needs Dart 3.12.2, so it could not be run
+     for this guide; its commands are expected to match 1.0.0.
+
+   - **Older Dart (3.10.3 to 3.12.1):** `dart pub global activate
+     serverpod_cloud_cli 1.0.0` installs but does not compile, because pub
+     picks `serverpod_cloud_shared` 1.0.1, which dropped a class 1.0.0 uses.
+     Install 1.0.0 with that dependency pinned instead:
+
+     ```bash
+     mkdir -p ~/scloud-1.0.0/bin && cd ~/scloud-1.0.0
+     printf '%s\n' \
+       'name: scloud_1_0_0' \
+       'publish_to: none' \
+       'environment:' \
+       "  sdk: '>=3.10.3 <4.0.0'" \
+       'dependencies:' \
+       '  serverpod_cloud_cli: 1.0.0' \
+       'dependency_overrides:' \
+       '  serverpod_cloud_shared: 1.0.0' \
+       'executables:' \
+       '  scloud: scloud' > pubspec.yaml
+     dart pub get
+     # Windows: $LOCALAPPDATA/Pub/Cache. macOS/Linux: $HOME/.pub-cache.
+     PUB_CACHE_DIR="${PUB_CACHE:-$LOCALAPPDATA/Pub/Cache}"
+     cp "$PUB_CACHE_DIR/hosted/pub.dev/serverpod_cloud_cli-1.0.0/bin/serverpod_cloud_cli.dart" bin/scloud.dart
+     dart pub global activate --source path .
+     cd -
+     ```
+
+   Check it with `scloud version`.
 
 2. **Log in.** Create an account at <https://accounts.serverpod.dev/> first.
 
@@ -193,22 +229,29 @@ Do this once per project. Later deploys only need [Redeploy](#redeploy).
    scloud auth login
    ```
 
-3. **Create the project and link it.** Project ids are global; pick a free one.
-   `--plan` selects `starter` or `growth`, which can incur cost: check the plan
-   and the hackathon credits before you run it.
+3. **Create the project with a database.** Project ids are global; pick a free
+   one. `starter` is the smaller of the two plans the CLI offers (`starter`,
+   `growth`). A plan can be billed: check its price and apply the hackathon
+   credits in the Serverpod Cloud console before you run this.
 
    ```bash
-   scloud project create <project-id> --enable-db
-   scloud project link <project-id>
+   scloud project create <project-id> --plan starter --enable-db
    ```
 
-   `project link` writes the id into `scloud.yaml`, replacing
-   `REPLACE_WITH_PROJECT_ID`. Commit that change, so teammates can deploy
-   without linking. It only holds the project id, not credentials. Do not use
-   `scloud launch` here: it would add `serverpod run flutter_build` and
+4. **Link the project.** This writes the id into `scloud.yaml`, replacing
+   `REPLACE_WITH_PROJECT_ID`, and keeps the pre-deploy script. Commit the
+   change, so teammates can deploy without linking. The file holds only the
+   project id, not credentials.
+
+   ```bash
+   scloud project link <project-id>
+   git add scloud.yaml && git commit -m "chore(server): link Serverpod Cloud project"
+   ```
+
+   Do not use `scloud launch` here: it adds `serverpod run flutter_build` and
    `serverpod generate` as pre-deploy scripts, and neither is needed.
 
-4. **Set the environment variables.** Values are public, so they are plain
+5. **Set the environment variables.** The values are public, so they are plain
    variables, not secrets.
 
    ```bash
@@ -216,20 +259,86 @@ Do this once per project. Later deploys only need [Redeploy](#redeploy).
    scloud variable set PULS3_ALLOWED_ORIGINS https://puls3-4lw.pages.dev
    ```
 
-   `SERVERPOD_APPLY_MIGRATIONS=true` makes Serverpod apply pending migrations
-   from `migrations/` at every start (the same as `--apply-migrations`
-   locally). Use the origin of the Cloudflare Pages deployment, comma-separate
-   several, and never add a trailing path. The `PULS3_STELLAR_*` variables
-   default to testnet, so they are only needed to point at another network.
-   Leave `PULS3_TRACKER_ENABLED` unset: the chain submission tracker stays off
-   in this deployment.
+   - `SERVERPOD_APPLY_MIGRATIONS=true` makes Serverpod apply pending migrations
+     from `migrations/` at every start (the same as `--apply-migrations`
+     locally).
+   - `PULS3_ALLOWED_ORIGINS` is the origin of the Cloudflare Pages deployment
+     (no path; comma-separate several).
+   - `PULS3_GIT_SHA` is set by the pre-deploy script in step 6. Do not set it
+     by hand.
+   - `PULS3_STELLAR_*` default to testnet. Set them only for another network.
+   - Leave `PULS3_TRACKER_ENABLED` unset: the chain submission tracker stays
+     off in this deployment.
 
-5. **Check the passwords.** Serverpod Cloud generates and manages `database`,
-   `redis`, `serviceSecret`, `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`
-   and `jwtRefreshTokenHashPepper`, so nothing has to be set today. List them
-   with `scloud password list`. Never upload `config/passwords.yaml`.
+   Serverpod Cloud generates and manages the passwords the server needs today
+   (see [Secrets in Serverpod Cloud](#secrets-in-serverpod-cloud)). Check them
+   with `scloud password list`.
 
-6. **Deploy** (see [Redeploy](#redeploy)).
+6. **Deploy.**
+
+   ```bash
+   scloud deploy --show-files
+   ```
+
+   Before it uploads, `scloud deploy` runs the pre-deploy script from
+   `scloud.yaml` on your machine, in `puls3_server/` (through `cmd /c` on
+   Windows, `bash -c` elsewhere): `dart run tool/set_deploy_sha.dart` sets
+   `PULS3_GIT_SHA` to `git rev-parse --short HEAD`, with a `-dirty` suffix when
+   tracked files have uncommitted changes. If the script fails (no `git`, no
+   `scloud` on the `PATH`, not logged in), the deploy stops before uploading.
+   The command waits for the rollout. To follow it again later, run
+   `scloud status deployment show`.
+
+7. **Verify.** Replace `<api>` with `https://<project-id>.api.serverpod.space`.
+
+   ```bash
+   curl -s -X POST <api>/health/check
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+     -H 'Origin: https://puls3-4lw.pages.dev' <api>/health/check   # 200
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+     -H 'Origin: https://evil.example.com' <api>/health/check      # 403
+   ```
+
+   The first call returns JSON whose `version` is `1.0.0+<sha>` for the commit
+   you deployed. If it shows `1.0.0` alone, `PULS3_GIT_SHA` was not applied:
+   check `scloud variable list`, then run `scloud deploy --redeploy`. Finally,
+   put the API URL in the root README.
+
+### Redeploy
+
+Anyone with access to the project, on a machine where steps 1 and 2 are done:
+
+1. Update `main`: `git switch main && git pull`.
+2. Deploy: `scloud deploy`. The pre-deploy script sets `PULS3_GIT_SHA`.
+3. Verify with the three calls of step 7. `version` must name the commit you
+   just pulled.
+
+To change only variables (no new code), run `scloud variable set ...` and then
+`scloud deploy --redeploy`, which redeploys the running build with the latest
+variables and secrets.
+
+### If a deploy or migration fails
+
+| Look at | Command |
+|---|---|
+| Rollout state of the latest deploy | `scloud status deployment show` |
+| Build output (compile and dependency errors) | `scloud build log` |
+| Server logs (startup, migrations, requests) | `scloud log --since 1h` or `scloud log --tail` |
+| Running podlets and service URLs | `scloud status live` |
+
+- **Fix forward:** fix the cause on a branch, merge it to `main`, and redeploy.
+- **Go back to a known good commit:** `git switch --detach <good-sha>`, then
+  `scloud deploy`. The CLI has no rollback command, so this uploads and builds
+  that commit again.
+- **Migrations** only move forward. Older code is not guaranteed to work
+  against a newer schema, so prefer fixing forward once a migration has run.
+  `scloud db backup` manages database snapshots; take one before a risky
+  migration.
+
+Not verified from the CLI (check on the first deploy): whether a failed build
+or rollout keeps the previous deployment serving, and whether a variable set
+by the pre-deploy script is always applied by the same deploy (the step 7
+check catches it).
 
 ### Secrets in Serverpod Cloud
 
@@ -244,35 +353,15 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | Server signing key, per-agent wallet encryption key, LLM provider key (planned) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
-Use `scloud variable set --secret <NAME> <value>` only for a secret that must
-not get the `SERVERPOD_PASSWORD_` prefix. Prefer `--from-file` over a value on
-the command line, so the secret does not land in the shell history.
+Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret
+that must not get the `SERVERPOD_PASSWORD_` prefix. Prefer `--from-file` over a
+value on the command line, so the secret does not land in the shell history.
+Never upload `config/passwords.yaml`.
 
-### Redeploy
-
-Anyone with access to the project can redeploy from a clean checkout of `main`:
-
-```bash
-scloud auth login                    # once per machine
-git switch main && git pull
-scloud variable set PULS3_GIT_SHA "$(git rev-parse --short HEAD)"
-scloud deploy --show-files           # uploads, builds and rolls out
-scloud status deployment show        # follow the rollout
-curl -s -X POST https://<project-id>.api.serverpod.space/health/check
-```
-
-The health check returns JSON whose `version` names the commit you deployed,
-for example `1.0.0+63fbad2`. `scloud deploy` warns when the working
-tree has uncommitted changes: they are uploaded but the deploy is recorded
-against the last commit.
-
-Useful commands:
+### Reference
 
 | Task | Command |
 |---|---|
-| Live status and service URLs | `scloud status live` |
-| Server logs | `scloud log --tail` |
-| Build log of the last deploy | `scloud build log` |
 | List variables | `scloud variable list` |
 | Apply changed variables without uploading | `scloud deploy --redeploy` |
 | Preview the upload without deploying | `scloud deploy --wet-run --show-files` |
