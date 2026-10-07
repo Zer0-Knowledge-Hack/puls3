@@ -169,8 +169,8 @@ calls this server.
 
 | | URL |
 |---|---|
-| API server | `https://<project-id>.api.serverpod.space/` (fill in after the first deploy) |
-| Health check | `POST https://<project-id>.api.serverpod.space/health/check` |
+| API server | `https://puls3-hub-on-stellar.api.serverpod.space/` |
+| Health check | `POST https://puls3-hub-on-stellar.api.serverpod.space/health/check` |
 
 Run every command from `puls3_server/`. The commands were checked against the
 help output and source of `serverpod_cloud_cli` **1.0.0**.
@@ -192,8 +192,8 @@ per project.
      dart pub global activate serverpod_cloud_cli 1.0.1
      ```
 
-     1.0.1 is the latest release. It needs Dart 3.12.2, so it could not be run
-     for this guide; its commands are expected to match 1.0.0.
+     1.0.1 is the latest release and needs Dart 3.12.2. The first deploy of
+     `puls3-hub-on-stellar` used it.
 
    - **Older Dart (3.10.3 to 3.12.1):** `dart pub global activate
      serverpod_cloud_cli 1.0.0` installs but does not compile, because pub
@@ -292,12 +292,12 @@ per project.
 7. **Verify.** Replace `<api>` with `https://<project-id>.api.serverpod.space`.
 
    ```bash
-   curl -s -X POST <api>/health/check
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+   curl -s -X POST -d '{}' <api>/health/check
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \
      -H 'Origin: https://puls3-4lw.pages.dev' <api>/health/check   # 200
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \
      -H 'Origin: https://evil.example.com' <api>/health/check      # 403
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \
      -H 'Origin: http://localhost:3000' <api>/health/check         # 403
    ```
 
