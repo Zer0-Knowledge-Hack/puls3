@@ -1,0 +1,37 @@
+# .scloudignore
+#
+# Files that `scloud deploy` must not upload to Serverpod Cloud. It works like
+# .gitignore, and Serverpod Cloud also honours every .gitignore, so git-ignored
+# files are never uploaded unless opted back in below. Hidden files and folders
+# (starting with ".") are ignored by default unless included explicitly.
+#
+# puls3 is a Dart workspace, so scloud reads this file from the workspace root
+# and the paths below are relative to the repository root.
+# Based on the template written by serverpod_cloud_cli 1.0.0.
+
+# Passwords. Serverpod Cloud manages the service passwords (database, redis,
+# serviceSecret) and the serverpod_auth_idp keys. Custom secrets are set with
+# `scloud password set <name> <value>` (see the Deploy section of the README).
+puls3_server/config/passwords.yaml
+puls3_server/config/google_client_secret.json
+puls3_server/config/firebase_service_account_key.json
+
+# Run-mode config files. Serverpod Cloud generates the server configuration.
+puls3_server/config/production.yaml
+puls3_server/config/staging.yaml
+puls3_server/config/development.yaml
+puls3_server/config/test.yaml
+
+# Local-only Docker setup and tests: not needed to run the server.
+puls3_server/docker-compose.yaml
+puls3_server/test/**
+
+# The Flutter web app is deployed to Cloudflare Pages, not with the server.
+puls3_server/web/app/**
+
+# Opting out of ignoring generated files.
+!puls3_server/lib/src/generated/**
+
+# Opting out of ignoring the .scloud directory (scloud deployment files).
+!.scloud/**
+!puls3_server/.scloud/**
