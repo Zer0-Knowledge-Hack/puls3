@@ -1,6 +1,8 @@
 # ADR-0002: Agent registries on Soroban, aligned with a Stellar 8004 subset
 
 - **Status:** Proposed
+- **Status note:** amended by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) (Accepted 2026-10-02). The decision text below is unchanged; each affected section carries a note.
+- **Amended by:** [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) · [What this supersedes or amends](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md#what-this-supersedes-or-amends)
 - **Date:** 2026-09-23
 - **Issue:** #6
 - **Research:** [Spike: ERC-8004 on Soroban](../spikes/erc8004-soroban.md)
@@ -16,10 +18,16 @@ We need to decide whether puls3 uses those contracts, copies them, or writes its
 
 1. **puls3 deploys its own Identity Registry (#13) and Reputation Registry (#14).** They are written by the team, in `contracts/identity-registry/` and `contracts/reputation-registry/`, on the `soroban-sdk` version pinned by #12.
 2. **Both align with the Stellar 8004 interface where the MVP subset permits it** (inspected at commit [`d92c2f4`](https://github.com/trionlabs/stellar-8004/tree/d92c2f4ee01858b6da9bf4404ac49322c324958b)). Functions explicitly marked as shared keep the same name, argument order, and types. Unmodified events and error codes retain their Stellar 8004 shape and values. This is **not drop-in compatibility**: clients need a puls3 adapter for omitted functions, typed-error differences, URI uniqueness, and the payment-backed feedback extension; in particular, puls3 changes the `NewFeedback` data and `give_feedback` signature.
+
+   > **Amended by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D5:** puls3 keeps its own deployments, but the interface target becomes **identical (drop-in) to Stellar 8004**, not a subset requiring a puls3 adapter. See [What this supersedes or amends](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md#what-this-supersedes-or-amends).
+
 3. **The supported subset and differences are explicit:**
    - Functions that panic in Stellar 8004 on bad input return `Result<_, Error>` in ours (our rule: no string panics). On success they return the same value.
    - **Out of the MVP:** NFT transfers and approvals (`transfer`, `transfer_from`, `approve`, `approve_for_all`, `get_approved`, `is_approved_for_all`) and upgrades (`propose_upgrade`, `cancel_upgrade`, `execute_upgrade`, `pending_upgrade`). Without approvals, "owner or approved" means "owner".
    - **puls3 additions:** an agent URI can be registered only once (`UriAlreadyRegistered`), plus a lookup `agent_id_by_uri`; and reputation feedback must consume a unique, pre-authorized paid hire. ERC-8004 lets one owner hold many agents, so a duplicate is defined by the URI, not by the owner.
+
+   > **Superseded by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D5:** the paid-hire gate leaves the registry. It is proven by a completed ERC-8183 escrow job and applied by readers; the trusted `authorize_feedback` authorizer and the payment-backed `give_feedback` are removed.
+
 4. **Validation Registry: out of the MVP.**
 5. **No dependency on OpenZeppelin `stellar-tokens`** until a release supports our SDK major (0.7.2 requires `soroban-sdk ^26.1`). The Identity Registry stores ownership itself and exposes the NFT read functions by name, so an NFT base can be swapped in later without changing the interface.
 
@@ -216,6 +224,8 @@ pub struct MetadataSet {
 
 The read model and shared feedback fields follow the Stellar 8004 Reputation Registry subset below. puls3 deliberately extends the write path so the contract enforces "one verified paid hire, at most one reputation entry." This makes the Reputation Registry non-drop-in-compatible with Stellar 8004.
 
+> **Superseded by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D5:** the trusted `authorize_feedback` authorizer and the payment-backed `give_feedback` gate are removed. The paid-hire rule is proven by a completed ERC-8183 escrow job and applied by readers; the drop-in registry is [#14](https://github.com/Zer0-Knowledge-Hack/puls3/issues/14).
+
 Before feedback, the Serverpod payment verifier confirms the expected asset, amount, recipient, successful transaction, and that the payment reference has not already funded another hire. It derives a deterministic `hire_id` from the puls3 hire record and verified transaction reference, then asks the configured authorizer to register `(hire_id, agent_id, client_address)`. The authorizer must authenticate, and the contract rejects a second authorization for the same `hire_id`. `give_feedback` requires the same client to authenticate, checks the tuple, and marks the authorization consumed in the same contract invocation that stores feedback. If that invocation fails, neither state change may persist. Revocation does not reset the consumed flag.
 
 The registry therefore enforces **one authorization and at most one feedback per `hire_id`**; it does not prove that the identifier represents a real payment. Payment validity and one-payment/one-hire idempotency remain trusted responsibilities of the Serverpod verifier and authorizer. The authorizer custody and recovery policy remains owned by ADR-0003.
@@ -272,6 +282,9 @@ impl ReputationRegistryContract {
     /// puls3 extension. Loads `FeedbackAuthorizer` from instance storage, requires
     /// that configured address to authenticate, and registers one payment-backed
     /// hire. A `hire_id` may be registered only once.
+    ///
+    /// Amended by ADR-0005 D5: the trusted authorizer is removed; the paid-hire
+    /// rule is proven by a completed ERC-8183 escrow job and applied by readers.
     pub fn authorize_feedback(
         e: &Env,
         hire_id: BytesN<32>,

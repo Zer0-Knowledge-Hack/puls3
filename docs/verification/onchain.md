@@ -124,4 +124,11 @@ stellar contract invoke --id $ESCROW --network testnet --source-account <funded-
   -- extend_ttl --job-id 3
 ```
 
+A deferred payout (a `Claimable` balance) is not covered by `extend_ttl`. Anyone can keep it withdrawable with `extend_claimable_ttl`, which credits nothing and does nothing if the entry does not exist:
+
+```bash
+stellar contract invoke --id $ESCROW --network testnet --source-account <funded-identity> \
+  -- extend_claimable_ttl --recipient <recipient> --token <token>
+```
+
 Expired entries can be restored with `stellar contract restore`, but a testnet reset cannot be undone.
