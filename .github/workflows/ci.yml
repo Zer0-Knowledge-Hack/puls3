@@ -151,6 +151,24 @@ jobs:
             test -f config/production.yaml &&
             test ! -e config/passwords.yaml'
 
+  scripts:
+    # Offline tests for scripts/*.sh and the env inventory (no network, no real
+    # Stellar CLI). They read code, docs and config across the repository, so
+    # they run on every change.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run script tests
+        shell: bash
+        run: |
+          status=0
+          for test in scripts/tests/*.test.sh; do
+            echo "::group::$test"
+            bash "$test" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
   contracts:
     needs: changes
     if: needs.changes.outputs.contracts == 'true'
@@ -186,7 +204,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, domain, server, app, docker, contracts]
+    needs: [changes, domain, server, app, docker, scripts, contracts]
     runs-on: ubuntu-latest
     steps:
       - name: Require every applicable component
@@ -196,9 +214,10 @@ jobs:
           SERVER: ${{ needs.server.result }}
           APP: ${{ needs.app.result }}
           DOCKER: ${{ needs.docker.result }}
+          SCRIPTS: ${{ needs.scripts.result }}
           CONTRACTS: ${{ needs.contracts.result }}
         run: |
-          for result in "$CHANGES" "$DOMAIN" "$SERVER" "$APP" "$DOCKER" "$CONTRACTS"; do
+          for result in "$CHANGES" "$DOMAIN" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS"; do
             if [[ "$result" != success && "$result" != skipped ]]; then
               echo "A required CI job finished with: $result" >&2
               exit 1
