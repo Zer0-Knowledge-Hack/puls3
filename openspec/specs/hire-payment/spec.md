@@ -8,16 +8,16 @@ Lets the server create hires and verify, from chain evidence, that an escrow job
 
 ## Requirements
 
-### Requirement: Create a requested hire
+### Requirement: Create an open hire
 
-`HireService.createHire` MUST accept an `agent_id` and the consumer Stellar address, persist a hire in status `requested` with the agent's price and manifest version, and store the `expired_at` the server prepares `create_job` with. It MUST NOT move funds, sign, or submit any transaction, and it MUST NOT return payment instructions: the prepared `create_job` envelope belongs to the relay (#96). The agent MUST have a wallet and a manifest version (`puls3.manifestVersion`, ADR-0004) of at least 1; the system MUST NOT invent a fallback version.
+`HireService.createHire` MUST accept an `agent_id` and the consumer Stellar address, persist a hire in status `open` with the agent's price and manifest version, and store the `expired_at` the server prepares `create_job` with. It MUST NOT move funds, sign, or submit any transaction, and it MUST NOT return payment instructions: the prepared `create_job` envelope belongs to the relay (#96). The agent MUST have a wallet and a manifest version (`puls3.manifestVersion`, ADR-0004) of at least 1; the system MUST NOT invent a fallback version.
 
 #### Scenario: Hire created
 
 - GIVEN a registered agent with a wallet, a price and a manifest version of at least 1
 - AND a configured `PULS3_HIRE_JOB_DURATION_SECONDS`
 - WHEN `createHire` is called with the agent id and a consumer address
-- THEN a hire exists with status `requested`, the agent's price and the consumer
+- THEN a hire exists with status `open`, the agent's price and the consumer
 - AND the stored `expired_at` equals now plus the configured duration
 
 #### Scenario: Unknown agent
@@ -47,22 +47,22 @@ The server MUST set `expired_at` to `now + PULS3_HIRE_JOB_DURATION_SECONDS`. Tha
 
 ### Requirement: Verify a funded job against its hire
 
-When the tracker sees a successful `fund` submission, `HireEscrowEffects.onFunded(submission, JobFundedEvent)` MUST load the hire named by `submission.hireId`, read the job named by the event from the escrow, and check, in this order and with the first failure winning: state exactly `Funded`; client and evaluator equal to `Hire.consumer`; provider equal to the agent wallet; agent id equal to the hire's; token equal to the configured USDC SAC; budget equal to `Hire.price`; `expired_at` equal to the value stored when the hire was created. Only when every check passes MUST it build the `Payment` from the job (payer = client, payee = provider, amount = budget, transaction = the submission's hash), move the hire `requested -> paid` through `Hire.pay`, and store the payment with the job id. The check is the pure domain function `verifyFunding`; the fee is never checked (ADR-0005 D7). The transaction status and the `JobFunded` event are the tracker's evidence, read with the shared parser (`firstJobFunded`).
+When the tracker sees a successful `fund` submission, `HireEscrowEffects.onFunded(submission, JobFundedEvent)` MUST load the hire named by `submission.hireId`, read the job named by the event from the escrow, and check, in this order and with the first failure winning: state exactly `Funded`; client and evaluator equal to `Hire.consumer`; provider equal to the agent wallet; agent id equal to the hire's; token equal to the configured USDC SAC; budget equal to `Hire.price`; `expired_at` equal to the value stored when the hire was created. Only when every check passes MUST it build the `Payment` from the job (payer = client, payee = provider, amount = budget, transaction = the submission's hash), move the hire `open -> funded` through `Hire.fund`, and store the payment with the job id. The check is the pure domain function `verifyFunding`; the fee is never checked (ADR-0005 D7). The transaction status and the `JobFunded` event are the tracker's evidence, read with the shared parser (`firstJobFunded`).
 
 #### Scenario: Valid funding pays the hire
 
-- GIVEN a `requested` hire for consumer `C`, agent wallet `P`, price `B` and prepared `expired_at` `E`
+- GIVEN a `open` hire for consumer `C`, agent wallet `P`, price `B` and prepared `expired_at` `E`
 - AND a successful `fund` submission for that hire whose job is `Funded` with client and evaluator `C`, provider `P`, the hire's agent id, the USDC SAC, budget `B` and `expired_at` `E`
 - WHEN the effect is applied
 - THEN the result is `EffectOk`
-- AND the hire is `paid` and a payment is stored with payer `C`, payee `P`, amount `B`, the transaction hash and the job id
+- AND the hire is `funded` and a payment is stored with payer `C`, payee `P`, amount `B`, the transaction hash and the job id
 
 #### Scenario: A job field does not match
 
 - GIVEN a successful `fund` submission whose job fails one check
 - WHEN the effect is applied
 - THEN the result is `JobMismatch` with `details.field` naming the field (`state`, `client`, `evaluator`, `provider`, `agent_id`, `token`, `budget` or `expired_at`)
-- AND the hire stays `requested` and nothing is stored
+- AND the hire stays `open` and nothing is stored
 
 #### Scenario: Only Funded is accepted
 
@@ -94,13 +94,13 @@ The effect MUST be safe to apply again to the same submission (a crash can happe
 
 #### Scenario: Same submission applied twice
 
-- GIVEN a hire already `paid` by the submission's transaction
+- GIVEN a hire already `funded` by the submission's transaction
 - WHEN the effect is applied again
 - THEN the result is `EffectOk`, without reading the chain, and no second payment is stored
 
-#### Scenario: Hire paid by another transaction
+#### Scenario: Hire funded by another transaction
 
-- GIVEN a hire already `paid` by a different transaction
+- GIVEN a hire already `funded` by a different transaction
 - WHEN the effect is applied
 - THEN the result is `JobMismatch` with field `job_id`
 
@@ -108,13 +108,13 @@ The effect MUST be safe to apply again to the same submission (a crash can happe
 
 - GIVEN another hire already holds the job id
 - WHEN the effect is applied
-- THEN the result is `JobMismatch` with field `job_id` and the hire stays `requested`
+- THEN the result is `JobMismatch` with field `job_id` and the hire stays `open`
 
-`details.field` is `job_id` for every case where the funding cannot be bound to this hire although the job itself may be valid: replay of a funding transaction against an already paid hire, a transaction already bound to another hire (wrong transaction) and a job id already bound to another hire (duplicate job). The contract defines only the job fields, so the three cases share one field and the effect does not report which of them applied.
+`details.field` is `job_id` for every case where the funding cannot be bound to this hire although the job itself may be valid: replay of a funding transaction against an already funded hire, a transaction already bound to another hire (wrong transaction) and a job id already bound to another hire (duplicate job). The contract defines only the job fields, so the three cases share one field and the effect does not report which of them applied.
 
 #### Scenario: Hire not payable
 
-- GIVEN a hire that is neither `requested` nor `paid`
+- GIVEN a hire that is not `open`
 - WHEN the effect is applied
 - THEN the result is `JobMismatch` without a field
 
@@ -136,4 +136,4 @@ The `hire_payment` table MUST have unique indexes on `hireId`, `transactionHash`
 
 ### Requirement: Hire state changes only through the domain
 
-The effect and the repository MUST change a hire's status only through the domain state machine (`Hire.pay`). The server MUST NOT write a status directly.
+The effect and the repository MUST change a hire's status only through the domain state machine (`Hire.fund`). The server MUST NOT write a status directly.

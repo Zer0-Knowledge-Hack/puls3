@@ -52,7 +52,7 @@ class ServerpodHireRepository implements HireRepository {
       where: (t) => t.hireId.equals(id.value),
     );
 
-    final requested = Hire(
+    final open = Hire(
       id: HireId(hireRecord.id!),
       agentId: AgentId(hireRecord.agentId),
       consumer: StellarAddress.parse(hireRecord.consumer),
@@ -61,18 +61,18 @@ class ServerpodHireRepository implements HireRepository {
     );
 
     if (paymentRecord == null) {
-      return requested;
+      return open;
     }
 
     final payment = Payment(
       transaction: TransactionHash.parse(paymentRecord.transactionHash),
-      hireId: requested.id,
+      hireId: open.id,
       payer: StellarAddress.parse(paymentRecord.payer),
       payee: StellarAddress.parse(paymentRecord.payee),
       amount: UsdcAmount.stroops(paymentRecord.amount),
     );
 
-    return requested.pay(payment, agentWallet: payment.payee);
+    return open.fund(payment, agentWallet: payment.payee);
   }
 
   @override
@@ -80,16 +80,16 @@ class ServerpodHireRepository implements HireRepository {
       (await HireRecord.db.findById(session, id.value))?.expiredAt;
 
   @override
-  Future<Hire> recordPayment(Hire paid, Payment payment, int jobId) async {
-    final paidHire = paid.status == HireStatus.paid
-        ? paid
-        : paid.pay(payment, agentWallet: payment.payee);
+  Future<Hire> recordPayment(Hire funded, Payment payment, int jobId) async {
+    final fundedHire = funded.status == HireStatus.funded
+        ? funded
+        : funded.fund(payment, agentWallet: payment.payee);
 
     try {
       await HirePaymentRecord.db.insertRow(
         session,
         HirePaymentRecord(
-          hireId: paid.id.value,
+          hireId: funded.id.value,
           transactionHash: payment.transaction.value,
           jobId: jobId,
           payer: payment.payer.value,
@@ -97,7 +97,7 @@ class ServerpodHireRepository implements HireRepository {
           amount: payment.amount.stroops,
         ),
       );
-      return paidHire;
+      return fundedHire;
     } on DatabaseQueryException catch (e) {
       final index = hirePaymentIndexOf(
         code: e.code,
@@ -107,10 +107,10 @@ class ServerpodHireRepository implements HireRepository {
       if (index == HirePaymentIndex.hireId) {
         final existing = await HirePaymentRecord.db.findFirstRow(
           session,
-          where: (t) => t.hireId.equals(paid.id.value),
+          where: (t) => t.hireId.equals(funded.id.value),
         );
         if (existing?.transactionHash == payment.transaction.value) {
-          return paidHire;
+          return fundedHire;
         }
       }
       throw HirePaymentConflict(index);

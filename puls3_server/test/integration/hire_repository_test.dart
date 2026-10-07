@@ -15,7 +15,7 @@ const _tx2 = '652a575b5d85814c19a4fed0f7d21f40acb35a399c4008d450877ee83e8b31ab';
 void main() {
   group('ServerpodHireRepository integration', () {
     withServerpod('database persistence', (sessionBuilder, _) {
-      test('create and findById returns requested hire', () async {
+      test('create and findById returns open hire', () async {
         final session = sessionBuilder.build();
         final repo = ServerpodHireRepository(session);
 
@@ -28,7 +28,7 @@ void main() {
         );
 
         expect(hire.id.value, isPositive);
-        expect(hire.status, HireStatus.requested);
+        expect(hire.status, HireStatus.open);
         expect(hire.agentId.value, 7);
         expect(hire.consumer.value, _alice);
         expect(hire.price.stroops, 5000000);
@@ -38,7 +38,7 @@ void main() {
         final found = await repo.findById(hire.id);
         expect(found, isNotNull);
         expect(found!.id, hire.id);
-        expect(found.status, HireStatus.requested);
+        expect(found.status, HireStatus.open);
         expect(found.agentId, hire.agentId);
         expect(found.consumer, hire.consumer);
         expect(found.price, hire.price);
@@ -49,7 +49,7 @@ void main() {
         expect(missing, isNull);
       });
 
-      test('recordPayment rehydrates paid hire', () async {
+      test('recordPayment rehydrates funded hire', () async {
         final session = sessionBuilder.build();
         final repo = ServerpodHireRepository(session);
 
@@ -72,12 +72,12 @@ void main() {
         final paidHire = await repo.recordPayment(hire, payment, 3);
 
         expect(paidHire.id, hire.id);
-        expect(paidHire.status, HireStatus.paid);
+        expect(paidHire.status, HireStatus.funded);
         expect(paidHire.paymentTransaction, payment.transaction);
 
         final reloaded = await repo.findById(hire.id);
         expect(reloaded, isNotNull);
-        expect(reloaded!.status, HireStatus.paid);
+        expect(reloaded!.status, HireStatus.funded);
         expect(reloaded.paymentTransaction, payment.transaction);
       });
 
@@ -168,13 +168,13 @@ void main() {
           ),
         );
 
-        // Hire2 had collisions and failed to record, so it must still be requested
+        // Hire2 had collisions and failed to record, so it must still be open
         final hire2Reloaded = await repo.findById(hire2.id);
         expect(hire2Reloaded, isNotNull);
-        expect(hire2Reloaded!.status, HireStatus.requested);
+        expect(hire2Reloaded!.status, HireStatus.open);
       });
 
-      test('concurrent same-hire same-hash retry returns paid view', () async {
+      test('concurrent same-hire same-hash retry returns funded view', () async {
         final session = sessionBuilder.build();
         final repo = ServerpodHireRepository(session);
 
@@ -195,11 +195,11 @@ void main() {
         );
 
         final first = await repo.recordPayment(hire, payment, 201);
-        expect(first.status, HireStatus.paid);
+        expect(first.status, HireStatus.funded);
 
-        // Concurrent retry with same hire and same payment returns paid view without error
+        // Concurrent retry with same hire and same payment returns funded view without error
         final retry = await repo.recordPayment(hire, payment, 201);
-        expect(retry.status, HireStatus.paid);
+        expect(retry.status, HireStatus.funded);
         expect(retry.id, hire.id);
         expect(retry.paymentTransaction, payment.transaction);
       });

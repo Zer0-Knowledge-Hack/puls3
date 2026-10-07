@@ -28,7 +28,7 @@ class HireService {
   final Map<String, String> _environment;
   final DateTime Function() _now;
 
-  /// Creates a requested hire. It has no endpoint yet: payments go through the
+  /// Creates an open hire. It has no endpoint yet: payments go through the
   /// server relay (Decision A in `docs/architecture/api.md`).
   Future<HireView> createHire({
     required int agentId,

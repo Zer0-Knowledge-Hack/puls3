@@ -58,7 +58,7 @@ sealed class FundingVerdict {
   const FundingVerdict();
 }
 
-/// The funding pays the hire: [payment] is ready for `Hire.pay`.
+/// The funding pays the hire: [payment] is ready for `Hire.fund`.
 final class FundingAccepted extends FundingVerdict {
   const FundingAccepted(this.payment);
 

@@ -24,7 +24,7 @@ final class _ConflictingRepository implements HireRepository {
   Future<int?> preparedExpiry(HireId id) async => null;
 
   @override
-  Future<Hire> recordPayment(Hire paid, Payment payment, int jobId) async =>
+  Future<Hire> recordPayment(Hire funded, Payment payment, int jobId) async =>
       throw HirePaymentConflict(conflict);
 }
 

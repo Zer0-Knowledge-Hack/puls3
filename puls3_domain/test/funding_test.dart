@@ -77,12 +77,12 @@ void main() {
       expect(payment.amount, UsdcAmount.stroops(5000000));
     });
 
-    test('the payment settles the hire through Hire.pay', () {
+    test('the payment funds the hire through Hire.fund', () {
       final accepted = verify(job()) as FundingAccepted;
 
-      final paid = hire.pay(accepted.payment, agentWallet: provider);
+      final funded = hire.fund(accepted.payment, agentWallet: provider);
 
-      expect(paid.status, HireStatus.paid);
+      expect(funded.status, HireStatus.funded);
     });
   });
 
@@ -240,16 +240,19 @@ void main() {
 
   group('FundingRejection', () {
     test('names the mismatching job field, as the escrow stores it', () {
-      expect({for (final r in FundingRejection.values) r.name: r.field}, {
-        'jobNotFunded': 'state',
-        'clientMismatch': 'client',
-        'evaluatorMismatch': 'evaluator',
-        'wrongDestination': 'provider',
-        'agentMismatch': 'agent_id',
-        'wrongAsset': 'token',
-        'amountMismatch': 'budget',
-        'expiryMismatch': 'expired_at',
-      });
+      expect(
+        {for (final r in FundingRejection.values) r.name: r.field},
+        {
+          'jobNotFunded': 'state',
+          'clientMismatch': 'client',
+          'evaluatorMismatch': 'evaluator',
+          'wrongDestination': 'provider',
+          'agentMismatch': 'agent_id',
+          'wrongAsset': 'token',
+          'amountMismatch': 'budget',
+          'expiryMismatch': 'expired_at',
+        },
+      );
     });
   });
 }

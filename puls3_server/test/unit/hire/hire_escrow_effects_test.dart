@@ -102,7 +102,7 @@ final class _ConflictingRepository extends FakeHireRepository {
   final HirePaymentIndex index;
 
   @override
-  Future<Hire> recordPayment(Hire paid, Payment payment, int jobId) async =>
+  Future<Hire> recordPayment(Hire funded, Payment payment, int jobId) async =>
       throw HirePaymentConflict(index);
 }
 
@@ -131,7 +131,7 @@ void main() {
       .having((r) => r.field, 'field', field);
 
   Future<void> expectNotPaid() async {
-    expect((await repo.findById(hire.id))!.status, HireStatus.requested);
+    expect((await repo.findById(hire.id))!.status, HireStatus.open);
     expect(repo.recordPaymentCalls, 0);
   }
 
@@ -155,7 +155,7 @@ void main() {
 
       expect(result, isA<EffectOk>());
       final stored = (await repo.findById(hire.id))!;
-      expect(stored.status, HireStatus.paid);
+      expect(stored.status, HireStatus.funded);
       expect(stored.paymentTransaction?.value, _fundTx);
       expect(repo.jobIds[hire.id.value], 3);
       final payment = repo.payments[hire.id.value]!;
@@ -197,19 +197,22 @@ void main() {
 
       expect(event.jobId, 3);
       expect(result, isA<EffectOk>());
-      expect((await repo.findById(hire.id))!.status, HireStatus.paid);
+      expect((await repo.findById(hire.id))!.status, HireStatus.funded);
       expect(repo.jobIds[hire.id.value], 3);
     });
 
-    test('is idempotent: the same submission applied twice pays once', () async {
-      expect(await fund(), isA<EffectOk>());
-      expect(await fund(), isA<EffectOk>());
+    test(
+      'is idempotent: the same submission applied twice pays once',
+      () async {
+        expect(await fund(), isA<EffectOk>());
+        expect(await fund(), isA<EffectOk>());
 
-      expect(repo.recordPaymentCalls, 1);
-      expect((await repo.findById(hire.id))!.status, HireStatus.paid);
-    });
+        expect(repo.recordPaymentCalls, 1);
+        expect((await repo.findById(hire.id))!.status, HireStatus.funded);
+      },
+    );
 
-    test('a retry of a paid hire does not read the chain again', () async {
+    test('a retry of a funded hire does not read the chain again', () async {
       expect(await fund(), isA<EffectOk>());
       ledger.jobError = const LedgerUnavailable('RPC down');
 
@@ -267,7 +270,7 @@ void main() {
       repo.jobIds[other.id.value] = 3;
 
       expect(await fund(), mismatch('job_id'));
-      expect((await repo.findById(hire.id))!.status, HireStatus.requested);
+      expect((await repo.findById(hire.id))!.status, HireStatus.open);
     });
 
     for (final index in HirePaymentIndex.values) {
@@ -285,7 +288,7 @@ void main() {
       });
     }
 
-    test('job_id: the hire was paid by another transaction', () async {
+    test('job_id: the hire was funded by another transaction', () async {
       expect(await fund(), isA<EffectOk>());
 
       final result = await fund(
@@ -301,8 +304,8 @@ void main() {
       );
     });
 
-    test('no field: the hire is no longer payable', () async {
-      repo.hires[hire.id.value] = hire.cancel();
+    test('no field: the hire is no longer open', () async {
+      repo.hires[hire.id.value] = hire.reject();
 
       expect(await fund(), mismatch(null));
       expect(repo.recordPaymentCalls, 0);

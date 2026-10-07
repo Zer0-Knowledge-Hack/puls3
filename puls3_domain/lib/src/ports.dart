@@ -19,7 +19,7 @@ enum HirePaymentIndex {
   /// The hire already has a payment.
   hireId,
 
-  /// The transaction already paid a hire (replay).
+  /// The transaction already funded a hire (replay).
   transactionHash,
 
   /// The escrow job is already bound to a hire.
@@ -38,7 +38,7 @@ final class HirePaymentConflict implements Exception {
 
 /// Loads and stores hires and their payments. Implemented by the backend.
 abstract interface class HireRepository {
-  /// Stores a new hire in [HireStatus.requested] and returns it with its id.
+  /// Stores a new hire in [HireStatus.open] and returns it with its id.
   /// [expiredAt] (unix seconds) is the `expired_at` the server prepares
   /// `create_job` with.
   Future<Hire> create({
@@ -49,7 +49,7 @@ abstract interface class HireRepository {
     required int expiredAt,
   });
 
-  /// The hire with [id], paid if it has a payment, or `null` if there is none.
+  /// The hire with [id], funded if it has a payment, or `null` if there is none.
   Future<Hire?> findById(HireId id);
 
   /// The `expired_at` stored by [create] for hire [id] (unix seconds), or
@@ -61,7 +61,7 @@ abstract interface class HireRepository {
   /// stored hire.
   ///
   /// Throws [HirePaymentConflict] naming the violated index otherwise.
-  Future<Hire> recordPayment(Hire paid, Payment payment, int jobId);
+  Future<Hire> recordPayment(Hire funded, Payment payment, int jobId);
 }
 
 /// Reads the chain. Implemented by the Stellar RPC adapter (ADR-0003).

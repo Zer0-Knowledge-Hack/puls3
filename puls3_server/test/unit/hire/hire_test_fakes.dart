@@ -40,11 +40,11 @@ class FakeHireRepository implements HireRepository {
   Future<int?> preparedExpiry(HireId id) async => expiredAtByHire[id.value];
 
   @override
-  Future<Hire> recordPayment(Hire paid, Payment payment, int jobId) async {
+  Future<Hire> recordPayment(Hire funded, Payment payment, int jobId) async {
     recordPaymentCalls++;
-    final existing = payments[paid.id.value];
+    final existing = payments[funded.id.value];
     if (existing != null) {
-      if (existing.transaction == payment.transaction) return paid;
+      if (existing.transaction == payment.transaction) return funded;
       throw const HirePaymentConflict(HirePaymentIndex.hireId);
     }
     for (final p in payments.values) {
@@ -55,10 +55,10 @@ class FakeHireRepository implements HireRepository {
     if (jobIds.values.contains(jobId)) {
       throw const HirePaymentConflict(HirePaymentIndex.jobId);
     }
-    payments[paid.id.value] = payment;
-    jobIds[paid.id.value] = jobId;
-    hires[paid.id.value] = paid;
-    return paid;
+    payments[funded.id.value] = payment;
+    jobIds[funded.id.value] = jobId;
+    hires[funded.id.value] = funded;
+    return funded;
   }
 }
 

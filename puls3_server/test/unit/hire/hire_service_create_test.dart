@@ -49,7 +49,7 @@ void main() {
       );
     }
 
-    test('returns the requested hire on happy path', () async {
+    test('returns the open hire on happy path', () async {
       final service = createService();
       final view = await service.createHire(agentId: 7, consumer: _alice);
 
@@ -57,11 +57,11 @@ void main() {
       expect(view.agentRegistryId, 7);
       expect(view.consumer, _alice);
       expect(view.priceStroops, 5000000);
-      expect(view.status, HireStatus.requested.name);
+      expect(view.status, HireStatus.open.name);
 
       final persisted = await repo.findById(HireId(view.hireId));
       expect(persisted, isNotNull);
-      expect(persisted!.status, HireStatus.requested);
+      expect(persisted!.status, HireStatus.open);
       expect(persisted.agentId.value, 7);
       expect(persisted.consumer.value, _alice);
       expect(persisted.price.stroops, 5000000);
@@ -103,33 +103,36 @@ void main() {
       expect(repo.hires, isEmpty);
     });
 
-    test('HireRequestInvalid when manifest version missing or invalid', () async {
-      final service = createService();
+    test(
+      'HireRequestInvalid when manifest version missing or invalid',
+      () async {
+        final service = createService();
 
-      // Missing manifest version
-      ledger.metadata[7]!.remove('puls3.manifestVersion');
-      await expectLater(
-        () => service.createHire(agentId: 7, consumer: _alice),
-        throwsA(isA<HireRequestInvalid>()),
-      );
-      expect(repo.hires, isEmpty);
+        // Missing manifest version
+        ledger.metadata[7]!.remove('puls3.manifestVersion');
+        await expectLater(
+          () => service.createHire(agentId: 7, consumer: _alice),
+          throwsA(isA<HireRequestInvalid>()),
+        );
+        expect(repo.hires, isEmpty);
 
-      // Non-integer manifest version
-      ledger.metadata[7]!['puls3.manifestVersion'] = encodeUtf8('not-an-int');
-      await expectLater(
-        () => service.createHire(agentId: 7, consumer: _alice),
-        throwsA(isA<HireRequestInvalid>()),
-      );
-      expect(repo.hires, isEmpty);
+        // Non-integer manifest version
+        ledger.metadata[7]!['puls3.manifestVersion'] = encodeUtf8('not-an-int');
+        await expectLater(
+          () => service.createHire(agentId: 7, consumer: _alice),
+          throwsA(isA<HireRequestInvalid>()),
+        );
+        expect(repo.hires, isEmpty);
 
-      // Manifest version < 1
-      ledger.metadata[7]!['puls3.manifestVersion'] = encodeUtf8('0');
-      await expectLater(
-        () => service.createHire(agentId: 7, consumer: _alice),
-        throwsA(isA<HireRequestInvalid>()),
-      );
-      expect(repo.hires, isEmpty);
-    });
+        // Manifest version < 1
+        ledger.metadata[7]!['puls3.manifestVersion'] = encodeUtf8('0');
+        await expectLater(
+          () => service.createHire(agentId: 7, consumer: _alice),
+          throwsA(isA<HireRequestInvalid>()),
+        );
+        expect(repo.hires, isEmpty);
+      },
+    );
 
     test('HireRequestInvalid on invalid consumer address', () async {
       final service = createService();

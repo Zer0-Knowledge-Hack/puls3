@@ -16,7 +16,7 @@ typedef HireRepositoryScope =
 ///
 /// After a successful `fund`, [onFunded] reads the job from the escrow,
 /// checks it against the hire with [verifyFunding] and, only if every check
-/// passes, moves the hire to `paid` through [Hire.pay] and stores the payment
+/// passes, moves the hire to `funded` through [Hire.fund] and stores the payment
 /// with the job id. Anything that does not match is a `JobMismatch` naming
 /// the job field; a job the escrow cannot return is `JobEvidenceUnavailable`.
 /// A failing chain read is thrown, so the tracker retries the submission. A
@@ -24,13 +24,13 @@ typedef HireRepositoryScope =
 /// is a terminal `JobMismatch` without a field.
 ///
 /// `details.field` is `job_id` whenever the funding cannot be bound to the
-/// hire although the job itself may be valid: the hire is already paid by
+/// hire although the job itself may be valid: the hire is already funded by
 /// another transaction (replay), or the store reports that the hire, the
 /// transaction or the job id is already bound (wrong transaction or
 /// duplicate job). They share one field because the contract defines only the
 /// job fields; the effect does not report which of them applied.
 ///
-/// Applying the same submission again is harmless: the hire is already paid
+/// Applying the same submission again is harmless: the hire is already funded
 /// by its transaction and the effect answers ok without reading the chain.
 ///
 /// The tracker only calls this for transactions the server relayed, and
@@ -90,13 +90,13 @@ final class HireEscrowEffects implements EscrowEffects {
     // An unknown hire cannot appear later: terminal, not retried.
     if (hire == null || expiredAt == null) return _mismatch(null);
     switch (hire.status) {
-      case HireStatus.requested:
+      case HireStatus.open:
         break;
-      case HireStatus.paid
+      case HireStatus.funded
           when hire.paymentTransaction?.value == submission.transactionHash:
         return const EffectResult.ok();
-      case HireStatus.paid:
-        // Another transaction already paid it: this job is not the hire's.
+      case HireStatus.funded:
+        // Another transaction already funded it: this job is not the hire's.
         return _mismatch(_jobIdField);
       default:
         return _mismatch(null);
@@ -121,9 +121,9 @@ final class HireEscrowEffects implements EscrowEffects {
       case FundingRejected(:final reason):
         return _mismatch(reason.field);
       case FundingAccepted(:final payment):
-        final paid = hire.pay(payment, agentWallet: agentWallet);
+        final funded = hire.fund(payment, agentWallet: agentWallet);
         try {
-          await repository.recordPayment(paid, payment, event.jobId);
+          await repository.recordPayment(funded, payment, event.jobId);
         } on HirePaymentConflict {
           // The hire, the transaction or the job is already bound.
           return _mismatch(_jobIdField);
