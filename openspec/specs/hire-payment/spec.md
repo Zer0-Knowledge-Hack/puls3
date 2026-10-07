@@ -76,6 +76,12 @@ When the tracker sees a successful `fund` submission, `HireEscrowEffects.onFunde
 - WHEN the effect is applied
 - THEN the result is `JobEvidenceUnavailable` and nothing is stored
 
+#### Scenario: The submission has no usable hire
+
+- GIVEN a successful `fund` submission with no `hireId`, or whose `hireId` names no stored hire
+- WHEN the effect is applied
+- THEN the result is `JobMismatch` without a field, the submission is marked `failed` and the tracker does not retry it, because no retry can make the hire appear
+
 #### Scenario: The chain cannot be read
 
 - GIVEN reading the job or the agent wallet fails with a ledger error
@@ -103,6 +109,8 @@ The effect MUST be safe to apply again to the same submission (a crash can happe
 - GIVEN another hire already holds the job id
 - WHEN the effect is applied
 - THEN the result is `JobMismatch` with field `job_id` and the hire stays `requested`
+
+`details.field` is `job_id` for every case where the funding cannot be bound to this hire although the job itself may be valid: replay of a funding transaction against an already paid hire, a transaction already bound to another hire (wrong transaction) and a job id already bound to another hire (duplicate job). The contract defines only the job fields, so the three cases share one field and the effect does not report which of them applied.
 
 #### Scenario: Hire not payable
 

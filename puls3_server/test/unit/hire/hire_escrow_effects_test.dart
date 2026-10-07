@@ -342,17 +342,25 @@ void main() {
       await expectNotPaid();
     });
 
-    test('a submission without a hire is a bug, not an outcome', () async {
-      await expectLater(
-        fund(submission: _submission(hireId: null)),
-        throwsA(isA<StateError>()),
+    test('a submission without a hire is a terminal JobMismatch', () async {
+      final result = await fund(submission: _submission(hireId: null));
+
+      expect(
+        result,
+        isA<EffectFailed>()
+            .having((r) => r.code, 'code', SubmissionOutcomeCode.jobMismatch)
+            .having((r) => r.field, 'field', isNull),
       );
     });
 
-    test('an unknown hire is a bug, not an outcome', () async {
-      await expectLater(
-        fund(submission: _submission(hireId: 99)),
-        throwsA(isA<StateError>()),
+    test('an unknown hire is a terminal JobMismatch', () async {
+      final result = await fund(submission: _submission(hireId: 99));
+
+      expect(
+        result,
+        isA<EffectFailed>()
+            .having((r) => r.code, 'code', SubmissionOutcomeCode.jobMismatch)
+            .having((r) => r.field, 'field', isNull),
       );
     });
   });

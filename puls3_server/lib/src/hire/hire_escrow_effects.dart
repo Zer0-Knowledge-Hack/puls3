@@ -19,7 +19,16 @@ typedef HireRepositoryScope =
 /// passes, moves the hire to `paid` through [Hire.pay] and stores the payment
 /// with the job id. Anything that does not match is a `JobMismatch` naming
 /// the job field; a job the escrow cannot return is `JobEvidenceUnavailable`.
-/// A failing chain read is thrown, so the tracker retries the submission.
+/// A failing chain read is thrown, so the tracker retries the submission. A
+/// submission without a hire, or naming an unknown one, can never succeed and
+/// is a terminal `JobMismatch` without a field.
+///
+/// `details.field` is `job_id` whenever the funding cannot be bound to the
+/// hire although the job itself may be valid: the hire is already paid by
+/// another transaction (replay), or the store reports that the hire, the
+/// transaction or the job id is already bound (wrong transaction or
+/// duplicate job). They share one field because the contract defines only the
+/// job fields; the effect does not report which of them applied.
 ///
 /// Applying the same submission again is harmless: the hire is already paid
 /// by its transaction and the effect answers ok without reading the chain.
@@ -61,9 +70,10 @@ final class HireEscrowEffects implements EscrowEffects {
     JobFundedEvent event,
   ) async {
     final hireId = submission.hireId;
-    if (hireId == null) {
-      throw StateError('Fund submission ${submission.id} has no hire');
-    }
+    // A fund submission the server relayed always carries its hire; if it
+    // does not, no retry can ever fix it, so it is a terminal mismatch
+    // rather than an error the tracker would retry forever.
+    if (hireId == null) return _mismatch(null);
     return await _repositories(
       (repository) => _fund(repository, HireId(hireId), submission, event),
     );
@@ -77,11 +87,8 @@ final class HireEscrowEffects implements EscrowEffects {
   ) async {
     final hire = await repository.findById(hireId);
     final expiredAt = await repository.preparedExpiry(hireId);
-    if (hire == null || expiredAt == null) {
-      throw StateError(
-        'Fund submission ${submission.id} names unknown hire ${hireId.value}',
-      );
-    }
+    // An unknown hire cannot appear later: terminal, not retried.
+    if (hire == null || expiredAt == null) return _mismatch(null);
     switch (hire.status) {
       case HireStatus.requested:
         break;
