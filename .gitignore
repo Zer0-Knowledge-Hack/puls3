@@ -1,5 +1,5 @@
 # Local secrets. Generate them with scripts/setup-local-secrets.sh.
-# Do not commit them (public repo). Tracked in #30 (testnet configuration and secrets management).
+# Do not commit them (public repo). See docs/infra/secrets.md.
 puls3_server/.env
 .vscode/launch.json
 .github/workflows/tests.yml

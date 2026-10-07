@@ -18,7 +18,7 @@ class HirePaymentView extends StatelessWidget {
     required this.agentName,
     required this.priceUsdcStroops,
     required this.destinationAddress,
-    this.escrowContractAddress = defaultEscrowContractAddress,
+    this.escrowContractAddress,
     required this.onConfirm,
     required this.onBackToMarketplace,
     this.errorMessage,
@@ -29,7 +29,10 @@ class HirePaymentView extends StatelessWidget {
   final String agentName;
   final int priceUsdcStroops;
   final String destinationAddress;
-  final String escrowContractAddress;
+
+  /// Escrow contract shown in the summary; null shows
+  /// [defaultEscrowContractAddress].
+  final String? escrowContractAddress;
   final String? errorMessage;
   final VoidCallback onConfirm;
   final VoidCallback onBackToMarketplace;
@@ -88,7 +91,10 @@ class HirePaymentView extends StatelessWidget {
               KeyValueRow(
                 label: 'Escrow',
                 value: '',
-                valueWidget: AddressBadge(address: escrowContractAddress),
+                valueWidget: AddressBadge(
+                  address:
+                      escrowContractAddress ?? defaultEscrowContractAddress,
+                ),
               ),
               const KeyValueRow(
                 label: 'Network fee',

@@ -70,8 +70,11 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
 ## Start the backend
 
-From the repository root, generate the local `.env` and Serverpod password
-files (on Windows, run this from Git Bash):
+The full path (fresh clone → server and app against testnet) is in
+[docs/infra/secrets.md](../docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone).
+In short: from the repository root, generate the local Docker passwords
+(`puls3_server/.env`) and Serverpod password files (on Windows, run this from
+Git Bash):
 
 ```bash
 ./scripts/setup-local-secrets.sh
@@ -89,12 +92,16 @@ Replace every empty or `<generate>` value. The development and test
 `database`/`redis` values in `config/passwords.yaml` must match the respective
 passwords in `.env`.
 
-Then, from `puls3_server/`, start PostgreSQL and Redis and run the server with
-pending migrations applied:
+`puls3_server/.env` only holds these local Docker passwords. The server's
+public network config (`PULS3_STELLAR_*`, `PULS3_TRACKER_*`) lives in the root
+`.env` (`cp .env.example .env`). Then, from `puls3_server/`, start PostgreSQL
+and Redis, load the root config and run the server with pending migrations
+applied:
 
 ```bash
 docker compose up --build --detach
-dart run bin/main.dart --apply-migrations
+set -a; . ../.env; set +a
+dart bin/main.dart --apply-migrations
 ```
 
 The API listens on `http://localhost:8080` by default. The Flutter app reads
