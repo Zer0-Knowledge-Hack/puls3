@@ -7,6 +7,9 @@ import 'package:puls3_flutter/src/domain/stellar_format.dart';
 import 'package:puls3_flutter/src/screens/hire_sheet.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
 import 'package:puls3_flutter/src/state/app_scope.dart';
+import 'package:puls3_flutter/src/state/notification_center.dart';
+import 'package:puls3_flutter/src/state/profile_controller.dart';
+import 'package:puls3_flutter/src/state/review_store.dart';
 import 'package:puls3_flutter/src/state/wallet_controller.dart';
 import 'package:puls3_flutter/src/wallet/wallet_port.dart';
 
@@ -24,6 +27,9 @@ class TestWallet implements WalletPort {
   Future<String> connect() async {
     return _address = 'GTESTUSERWALLET1234567890';
   }
+
+  @override
+  Future<void> disconnect() async => _address = null;
 
   @override
   Future<String> signTransaction(String unsignedXdr) async {
@@ -47,6 +53,9 @@ Widget buildTestSheet({
       wallet: walletController,
       ids: FakeLedgerIds(),
       deployGateway: FakeDeployGateway(),
+      notifications: NotificationCenter(seed: const []),
+      profile: ProfileController(),
+      reviews: ReviewStore(seed: []),
       child: Scaffold(
         body: HireSheet(agent: agent),
       ),
@@ -61,15 +70,15 @@ void main() {
     description: 'Autonomous ledger analytics agent.',
     skills: ['On-chain analytics'],
     priceUsdcStroops: 5000000,
-    stellarAddress:
-        'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+    stellarAddress: 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
     model: 'gpt-4o',
     rating: 0.0,
   );
 
   group('HireSheet', () {
-    testWidgets('successful signing shows the demo result, not a payment',
-        (tester) async {
+    testWidgets('successful signing shows the demo result, not a payment', (
+      tester,
+    ) async {
       final wallet = TestWallet(initialAddress: 'GUSER123');
 
       await tester.pumpWidget(
@@ -89,10 +98,10 @@ void main() {
       expect(find.text('View on StellarExpert'), findsNothing);
     });
 
-    testWidgets('failing wallet transitions to error and allows retry',
-        (tester) async {
-      final wallet =
-          TestWallet(initialAddress: 'GUSER123', shouldFail: true);
+    testWidgets('failing wallet transitions to error and allows retry', (
+      tester,
+    ) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123', shouldFail: true);
 
       await tester.pumpWidget(
         buildTestSheet(agent: testAgent, walletPort: wallet),

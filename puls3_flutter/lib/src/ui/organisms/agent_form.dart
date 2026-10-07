@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/agent_draft.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/section_label.dart';
 import '../atoms/skill_chip.dart';
@@ -21,7 +22,7 @@ class AgentForm extends StatelessWidget {
     required this.suggestedSkills,
     required this.onAddSkill,
     required this.onRemoveSkill,
-    this.priceError,
+    this.errors = const {},
   });
 
   final TextEditingController nameController;
@@ -36,11 +37,14 @@ class AgentForm extends StatelessWidget {
   final List<String> suggestedSkills;
   final ValueChanged<String> onAddSkill;
   final ValueChanged<String> onRemoveSkill;
-  final String? priceError;
+
+  /// Messages for the fields that break a manifest rule; shown under them.
+  final Map<AgentDraftField, String> errors;
 
   @override
   Widget build(BuildContext context) {
     const gap = SizedBox(height: Puls3Spacing.md);
+    final full = skills.length >= AgentDraftRules.skillsMax;
     final remainingSuggestions = suggestedSkills
         .where((s) => !skills.contains(s))
         .toList();
@@ -54,14 +58,26 @@ class AgentForm extends StatelessWidget {
           key: const Key('agent-name-field'),
           controller: nameController,
           style: Puls3Text.body,
-          decoration: const InputDecoration(labelText: 'Agent name'),
+          maxLength: AgentDraftRules.nameMax,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: 'Agent name',
+            errorText: errors[AgentDraftField.name],
+          ),
         ),
         gap,
         TextField(
+          key: const Key('agent-description-field'),
           controller: descriptionController,
           style: Puls3Text.body,
-          maxLines: 2,
-          decoration: const InputDecoration(labelText: 'Description'),
+          minLines: 2,
+          maxLines: 4,
+          maxLength: AgentDraftRules.descriptionMax,
+          decoration: InputDecoration(
+            labelText: 'Description',
+            helperText: 'Public. What the agent does, in one or two lines.',
+            errorText: errors[AgentDraftField.description],
+          ),
         ),
         gap,
         DropdownButtonFormField<String>(
@@ -81,26 +97,36 @@ class AgentForm extends StatelessWidget {
         const SectionLabel('Behavior'),
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
+          key: const Key('agent-prompt-field'),
           controller: promptController,
           style: Puls3Text.data,
           minLines: 4,
           maxLines: 8,
-          decoration: const InputDecoration(
+          maxLength: AgentDraftRules.promptMax,
+          decoration: InputDecoration(
             labelText: 'System prompt',
+            helperText: 'Private. Only you can see it.',
             alignLabelWithHint: true,
+            errorText: errors[AgentDraftField.prompt],
           ),
         ),
         gap,
         TextField(
           controller: skillController,
           style: Puls3Text.body,
+          enabled: !full,
+          maxLength: 32,
           decoration: InputDecoration(
             labelText: 'Add a skill',
             hintText: 'Type and press Enter',
+            counterText: '',
+            helperText:
+                '${skills.length} of ${AgentDraftRules.skillsMax} skills',
+            errorText: errors[AgentDraftField.skills],
             suffixIcon: IconButton(
               tooltip: 'Add skill',
               icon: const Icon(Icons.add_rounded),
-              onPressed: () => onAddSkill(skillController.text),
+              onPressed: full ? null : () => onAddSkill(skillController.text),
             ),
           ),
           onSubmitted: onAddSkill,
@@ -116,8 +142,9 @@ class AgentForm extends StatelessWidget {
                 selected: true,
                 onDelete: () => onRemoveSkill(skill),
               ),
-            for (final skill in remainingSuggestions)
-              SkillChip(label: '+ $skill', onTap: () => onAddSkill(skill)),
+            if (!full)
+              for (final skill in remainingSuggestions)
+                SkillChip(label: '+ $skill', onTap: () => onAddSkill(skill)),
           ],
         ),
         const SizedBox(height: Puls3Spacing.lg),
@@ -131,7 +158,8 @@ class AgentForm extends StatelessWidget {
             labelText: 'Price per task',
             suffixText: 'USDC',
             suffixStyle: Puls3Text.data,
-            errorText: priceError,
+            helperText: 'Paid per task in USDC. You receive it on approval.',
+            errorText: errors[AgentDraftField.price],
           ),
         ),
       ],

@@ -17,8 +17,9 @@ void main() {
     expect(find.text('Agent not found'), findsOneWidget);
   });
 
-  testWidgets('Hire flow ends in the demo result without claiming a payment',
-      (tester) async {
+  testWidgets('Hire flow ends in the demo result without claiming a payment', (
+    tester,
+  ) async {
     await pumpApp(tester, location: '/agent/agt-001');
 
     await tester.tap(find.text('Hire'));
@@ -33,7 +34,7 @@ void main() {
 
     await tester.tap(find.text('Back to Marketplace'));
     await advance(tester, const Duration(milliseconds: 600));
-    expect(find.text('Soroban Auditor'), findsOneWidget);
+    expect(inResults('Soroban Auditor'), findsOneWidget);
   });
 
   testWidgets('Agent detail lays out on a phone', (tester) async {

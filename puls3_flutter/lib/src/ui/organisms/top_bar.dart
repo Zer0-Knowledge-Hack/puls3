@@ -29,6 +29,7 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
     required this.walletAddress,
     required this.isWalletConnecting,
     required this.onConnectWallet,
+    this.badges = const {},
   });
 
   final List<TopBarLink> links;
@@ -38,6 +39,9 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isWalletConnecting;
   final VoidCallback onConnectWallet;
 
+  /// Unread counts per link path, shown as a dot on that link.
+  final Map<String, int> badges;
+
   static const double height = Puls3Spacing.topBarHeight;
   static const double logoMarkHeight = 28;
 
@@ -46,7 +50,7 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 640;
+    final compact = MediaQuery.sizeOf(context).width < 900;
     return Container(
       height: height,
       decoration: const BoxDecoration(
@@ -68,6 +72,7 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 icon: link.icon,
                 selected: currentPath.startsWith(link.path),
                 compact: compact,
+                badge: badges[link.path] ?? 0,
                 onTap: () => onNavigate(link.path),
               ),
             const Spacer(),
@@ -95,6 +100,7 @@ class _NavLink extends StatelessWidget {
     required this.selected,
     required this.compact,
     required this.onTap,
+    this.badge = 0,
   });
 
   final String label;
@@ -102,6 +108,7 @@ class _NavLink extends StatelessWidget {
   final bool selected;
   final bool compact;
   final VoidCallback onTap;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +124,12 @@ class _NavLink extends StatelessWidget {
         child: compact
             ? Tooltip(
                 message: label,
-                child: Icon(icon, size: 20, color: color),
+                child: Badge(
+                  isLabelVisible: badge > 0,
+                  backgroundColor: Puls3Colors.accent,
+                  smallSize: 8,
+                  child: Icon(icon, size: 20, color: color),
+                ),
               )
             : Text(
                 label,

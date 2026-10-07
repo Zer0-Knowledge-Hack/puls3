@@ -68,3 +68,18 @@ Future<void> advance(WidgetTester tester, Duration duration) async {
     elapsed += step;
   }
 }
+
+/// [text] inside the marketplace results list (not the "Top rated"
+/// carousel, which repeats some agents).
+Finder inResults(String text) => find.descendant(
+  of: find.byKey(const ValueKey('market-results')),
+  matching: find.text(text),
+);
+
+/// Ticks "I agree to the puls3 agent policies" in the Studio.
+Future<void> acceptPolicies(WidgetTester tester) async {
+  final box = find.byKey(const Key('policy-checkbox'));
+  await tester.ensureVisible(box);
+  await tester.tap(box);
+  await tester.pump();
+}

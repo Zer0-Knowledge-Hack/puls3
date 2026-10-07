@@ -120,7 +120,7 @@ class HirePaymentView extends StatelessWidget {
           children: [
             const Icon(Icons.info_outline, color: Puls3Colors.accent, size: 28),
             const SizedBox(width: Puls3Spacing.sm),
-            Text('Demo signature only', style: Puls3Text.h3),
+            Expanded(child: Text('Demo signature only', style: Puls3Text.h3)),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),
@@ -150,9 +150,13 @@ class HirePaymentView extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.error_outline, color: Puls3Colors.accent, size: 28),
+            const Icon(
+              Icons.error_outline,
+              color: Puls3Colors.accent,
+              size: 28,
+            ),
             const SizedBox(width: Puls3Spacing.sm),
-            Text('Payment failed', style: Puls3Text.h3),
+            Expanded(child: Text('Payment failed', style: Puls3Text.h3)),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),

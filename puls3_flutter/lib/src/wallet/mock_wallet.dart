@@ -26,6 +26,9 @@ class MockWallet implements WalletPort {
   @override
   String? get address => _address;
 
+  @override
+  Future<void> disconnect() async => _address = null;
+
   /// Simulates the user switching to another account in the wallet.
   void switchAccount() => _address = _ids.accountAddress();
 

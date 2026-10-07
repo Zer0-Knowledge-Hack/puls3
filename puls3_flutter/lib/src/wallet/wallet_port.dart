@@ -12,6 +12,9 @@ abstract interface class WalletPort {
   /// The connected public address, or null while disconnected.
   String? get address;
 
+  /// Forgets the connection. Nothing is signed or revoked on chain.
+  Future<void> disconnect();
+
   /// Signs and submits [unsignedXdr]. Returns the transaction hash.
   ///
   /// Throws a [WalletException], for example [WalletSignatureRejected] when
@@ -41,4 +44,9 @@ final class WalletUnavailable extends WalletException {
 /// The wallet is on another network than the app (for example mainnet).
 final class WalletWrongNetwork extends WalletException {
   const WalletWrongNetwork();
+}
+
+/// The account cannot cover the payment plus the network fee.
+final class WalletInsufficientFunds extends WalletException {
+  const WalletInsufficientFunds();
 }

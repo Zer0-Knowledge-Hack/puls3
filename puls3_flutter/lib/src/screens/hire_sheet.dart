@@ -5,12 +5,14 @@ import '../domain/agent.dart';
 import '../state/app_scope.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/organisms/hire_payment_view.dart';
+import '../wallet/wallet_port.dart';
 
 /// Opens the hire and pay flow for [agent].
 Future<void> showHireSheet(BuildContext context, Agent agent) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (_) => HireSheet(agent: agent),
   );
 }
@@ -52,9 +54,11 @@ class _HireSheetState extends State<HireSheet> {
       if (!mounted) return;
       setState(() {
         _phase = HirePhase.error;
-        _errorMessage = e is Exception
-            ? e.toString().replaceFirst('Exception: ', '')
-            : 'Payment could not be completed';
+        _errorMessage = switch (e) {
+          WalletException() => walletErrorMessage(e),
+          Exception() => e.toString().replaceFirst('Exception: ', ''),
+          _ => 'Payment could not be completed',
+        };
       });
     }
   }
@@ -67,14 +71,11 @@ class _HireSheetState extends State<HireSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final gutter = narrow ? Puls3Spacing.md : Puls3Spacing.lg;
+    return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          Puls3Spacing.lg,
-          0,
-          Puls3Spacing.lg,
-          Puls3Spacing.lg,
-        ),
+        padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Puls3Spacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: HirePaymentView(
@@ -92,3 +93,15 @@ class _HireSheetState extends State<HireSheet> {
     );
   }
 }
+
+/// A human message for a wallet failure. In every case nothing was signed,
+/// so no funds moved.
+String walletErrorMessage(WalletException e) => switch (e) {
+  WalletSignatureRejected() =>
+    'You cancelled the payment in your wallet. No funds moved.',
+  WalletInsufficientFunds() =>
+    'Not enough USDC, or XLM for the network fee. No funds moved.',
+  WalletWrongNetwork() =>
+    'Switch your wallet to Stellar Testnet, then try again.',
+  WalletUnavailable() => 'Open or unlock your wallet, then try again.',
+};

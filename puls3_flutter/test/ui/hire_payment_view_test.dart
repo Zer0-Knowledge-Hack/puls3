@@ -35,29 +35,33 @@ Widget buildView({
 
 void main() {
   group('HirePaymentView', () {
-    testWidgets('review phase renders price, destination, and escrow contract',
-        (tester) async {
-      await tester.pumpWidget(buildView(phase: HirePhase.review));
+    testWidgets(
+      'review phase renders price, destination, and escrow contract',
+      (tester) async {
+        await tester.pumpWidget(buildView(phase: HirePhase.review));
 
-      expect(find.text('Hire Ledger Scout'), findsOneWidget);
-      expect(find.text('Escrow'), findsOneWidget);
-      expect(find.text('Destination'), findsOneWidget);
+        expect(find.text('Hire Ledger Scout'), findsOneWidget);
+        expect(find.text('Escrow'), findsOneWidget);
+        expect(find.text('Destination'), findsOneWidget);
 
-      // Finds two AddressBadges: destination and escrow contract
-      expect(find.byType(AddressBadge), findsNWidgets(2));
-      expect(find.text('Confirm & sign'), findsOneWidget);
-      expect(find.textContaining('Demo only'), findsOneWidget);
-    });
+        // Finds two AddressBadges: destination and escrow contract
+        expect(find.byType(AddressBadge), findsNWidgets(2));
+        expect(find.text('Confirm & sign'), findsOneWidget);
+        expect(find.textContaining('Demo only'), findsOneWidget);
+      },
+    );
 
-    testWidgets('signing phase shows signing progress indicator',
-        (tester) async {
+    testWidgets('signing phase shows signing progress indicator', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildView(phase: HirePhase.signing));
 
       expect(find.text('Signing…'), findsOneWidget);
     });
 
-    testWidgets('demo phase does not claim a payment or link to the explorer',
-        (tester) async {
+    testWidgets('demo phase does not claim a payment or link to the explorer', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildView(phase: HirePhase.confirmed));
 
       expect(find.text('Demo signature only'), findsOneWidget);
@@ -67,8 +71,9 @@ void main() {
       expect(find.text('View on StellarExpert'), findsNothing);
     });
 
-    testWidgets('error phase renders error message and invokes onRetry',
-        (tester) async {
+    testWidgets('error phase renders error message and invokes onRetry', (
+      tester,
+    ) async {
       var retried = false;
 
       await tester.pumpWidget(
