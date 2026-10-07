@@ -10,11 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Basic backend health information exposed to generated clients.
-abstract class BackendHealth implements _i1.SerializableModel {
+abstract class BackendHealth
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   BackendHealth._({required this.version});
 
   factory BackendHealth({required String version}) = _BackendHealthImpl;
@@ -28,7 +28,7 @@ abstract class BackendHealth implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [BackendHealth]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   BackendHealth copyWith({String? version});
   @override
   Map<String, dynamic> toJson() {
@@ -39,8 +39,16 @@ abstract class BackendHealth implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'BackendHealth',
+      'version': version,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -49,7 +57,7 @@ class _BackendHealthImpl extends BackendHealth {
 
   /// Returns a shallow copy of this [BackendHealth]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   BackendHealth copyWith({String? version}) {
     return BackendHealth(version: version ?? this.version);

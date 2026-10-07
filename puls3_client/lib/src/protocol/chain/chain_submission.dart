@@ -10,14 +10,14 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Durable server-side record of one relay or server-signed submission.
 /// Polled through the resource that owns it; the client sees only the
 /// fields without `scope=serverOnly`. Serverpod requires serverOnly fields to
 /// be nullable; ChainSubmissionStore always sets them.
-abstract class ChainSubmission implements _i1.SerializableModel {
+abstract class ChainSubmission
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ChainSubmission._({
     this.id,
     this.preparationId,
@@ -49,7 +49,7 @@ abstract class ChainSubmission implements _i1.SerializableModel {
       state: jsonSerialization['state'] as String,
       errorCode: jsonSerialization['errorCode'] as String?,
       explorerUrl: jsonSerialization['explorerUrl'] as String?,
-      updatedAt: _i1.DateTimeJsonExtension.fromJson(
+      updatedAt: _isc.DateTimeJsonExtension.fromJson(
         jsonSerialization['updatedAt'],
       ),
     );
@@ -86,7 +86,7 @@ abstract class ChainSubmission implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ChainSubmission]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ChainSubmission copyWith({
     int? id,
     String? preparationId,
@@ -113,8 +113,23 @@ abstract class ChainSubmission implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ChainSubmission',
+      if (id != null) 'id': id,
+      if (preparationId != null) 'preparationId': preparationId,
+      'purpose': purpose,
+      'transaction': transaction,
+      'state': state,
+      if (errorCode != null) 'errorCode': errorCode,
+      if (explorerUrl != null) 'explorerUrl': explorerUrl,
+      'updatedAt': updatedAt.toJson(),
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -143,7 +158,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
 
   /// Returns a shallow copy of this [ChainSubmission]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ChainSubmission copyWith({
     Object? id = _Undefined,

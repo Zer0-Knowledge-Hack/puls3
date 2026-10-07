@@ -3,7 +3,7 @@ description: Pure Dart domain model of puls3 (entities, value objects, ports and
 publish_to: none
 
 environment:
-  sdk: '^3.8.0'
+  sdk: '^3.12.2'
 
 resolution: workspace
 
