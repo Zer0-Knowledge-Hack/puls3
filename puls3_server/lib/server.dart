@@ -21,12 +21,15 @@ void run(List<String> args) async {
   // server at startup instead of failing the first health call.
   stdout.writeln('puls3 server version ${HealthEndpoint.appVersion}');
 
-  // Only loopback origins and those in PULS3_ALLOWED_ORIGINS may call the
-  // API server from a browser (see README). An invalid list stops startup.
-  final allowedOrigins = AllowedOrigins.fromEnvironment(Platform.environment);
-  pod.server.addMiddleware(originGate(allowedOrigins));
-  stdout.writeln(
-    'Allowed browser origins: loopback, ${allowedOrigins.configured}',
+  // Only the origins in PULS3_ALLOWED_ORIGINS (plus loopback in development)
+  // may call the API server from a browser (see README). An invalid list
+  // stops startup.
+  pod.server.addMiddleware(
+    originGateFromEnvironment(
+      Platform.environment,
+      runMode: pod.runMode,
+      log: stdout.writeln,
+    ),
   );
 
   // Initialize authentication services for the server.
