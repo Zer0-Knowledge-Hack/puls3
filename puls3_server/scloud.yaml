@@ -1,6 +1,12 @@
 # This file configures your Serverpod Cloud project.
 # It is automatically generated and updated by the `scloud` command.
-# 
+#
+# puls3: REPLACE_WITH_PROJECT_ID is a placeholder. `scloud project link
+# <project-id>` (step 4 of "Deploy to Serverpod Cloud" in README.md) replaces it
+# and rewrites this file without these puls3 comments; commit the result.
+# The pre-deploy script runs locally before each upload and sets PULS3_GIT_SHA
+# to the deployed commit (tool/set_deploy_sha.dart).
+#
 # Useful commands:
 # - Deploy: `scloud deploy`
 # - Get Help: `scloud help`
@@ -10,5 +16,6 @@
 project:
   projectId: "REPLACE_WITH_PROJECT_ID"
   scripts:
-    pre_deploy: []
+    pre_deploy:
+      - "dart run tool/set_deploy_sha.dart"
     post_deploy: []
