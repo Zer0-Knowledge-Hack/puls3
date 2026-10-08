@@ -22,6 +22,9 @@ abstract class HireRecord
     required this.price,
     required this.manifestVersion,
     required this.expiredAt,
+    this.requestId,
+    this.input,
+    this.jobId,
   });
 
   factory HireRecord({
@@ -31,6 +34,9 @@ abstract class HireRecord
     required int price,
     required int manifestVersion,
     required int expiredAt,
+    String? requestId,
+    String? input,
+    int? jobId,
   }) = _HireRecordImpl;
 
   factory HireRecord.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -41,6 +47,9 @@ abstract class HireRecord
       price: jsonSerialization['price'] as int,
       manifestVersion: jsonSerialization['manifestVersion'] as int,
       expiredAt: jsonSerialization['expiredAt'] as int,
+      requestId: jsonSerialization['requestId'] as String?,
+      input: jsonSerialization['input'] as String?,
+      jobId: jsonSerialization['jobId'] as int?,
     );
   }
 
@@ -61,6 +70,15 @@ abstract class HireRecord
 
   int expiredAt;
 
+  /// Client idempotency key; null for rows that predate it.
+  String? requestId;
+
+  /// The hire input text; null for rows that predate it.
+  String? input;
+
+  /// Escrow job id, bound once when the create_job is confirmed.
+  int? jobId;
+
   @override
   _i1.Table<int?> get table => t;
 
@@ -74,6 +92,9 @@ abstract class HireRecord
     int? price,
     int? manifestVersion,
     int? expiredAt,
+    String? requestId,
+    String? input,
+    int? jobId,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -85,6 +106,9 @@ abstract class HireRecord
       'price': price,
       'manifestVersion': manifestVersion,
       'expiredAt': expiredAt,
+      if (requestId != null) 'requestId': requestId,
+      if (input != null) 'input': input,
+      if (jobId != null) 'jobId': jobId,
     };
   }
 
@@ -133,6 +157,9 @@ class _HireRecordImpl extends HireRecord {
     required int price,
     required int manifestVersion,
     required int expiredAt,
+    String? requestId,
+    String? input,
+    int? jobId,
   }) : super._(
          id: id,
          consumer: consumer,
@@ -140,6 +167,9 @@ class _HireRecordImpl extends HireRecord {
          price: price,
          manifestVersion: manifestVersion,
          expiredAt: expiredAt,
+         requestId: requestId,
+         input: input,
+         jobId: jobId,
        );
 
   /// Returns a shallow copy of this [HireRecord]
@@ -153,6 +183,9 @@ class _HireRecordImpl extends HireRecord {
     int? price,
     int? manifestVersion,
     int? expiredAt,
+    Object? requestId = _Undefined,
+    Object? input = _Undefined,
+    Object? jobId = _Undefined,
   }) {
     return HireRecord(
       id: id is int? ? id : this.id,
@@ -161,6 +194,9 @@ class _HireRecordImpl extends HireRecord {
       price: price ?? this.price,
       manifestVersion: manifestVersion ?? this.manifestVersion,
       expiredAt: expiredAt ?? this.expiredAt,
+      requestId: requestId is String? ? requestId : this.requestId,
+      input: input is String? ? input : this.input,
+      jobId: jobId is int? ? jobId : this.jobId,
     );
   }
 }
@@ -192,6 +228,21 @@ class HireRecordUpdateTable extends _i1.UpdateTable<HireRecordTable> {
     table.expiredAt,
     value,
   );
+
+  _i1.ColumnValue<String, String> requestId(String? value) => _i1.ColumnValue(
+    table.requestId,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> input(String? value) => _i1.ColumnValue(
+    table.input,
+    value,
+  );
+
+  _i1.ColumnValue<int, int> jobId(int? value) => _i1.ColumnValue(
+    table.jobId,
+    value,
+  );
 }
 
 class HireRecordTable extends _i1.Table<int?> {
@@ -217,6 +268,18 @@ class HireRecordTable extends _i1.Table<int?> {
       'expiredAt',
       this,
     );
+    requestId = _i1.ColumnString(
+      'requestId',
+      this,
+    );
+    input = _i1.ColumnString(
+      'input',
+      this,
+    );
+    jobId = _i1.ColumnInt(
+      'jobId',
+      this,
+    );
   }
 
   late final HireRecordUpdateTable updateTable;
@@ -231,6 +294,15 @@ class HireRecordTable extends _i1.Table<int?> {
 
   late final _i1.ColumnInt expiredAt;
 
+  /// Client idempotency key; null for rows that predate it.
+  late final _i1.ColumnString requestId;
+
+  /// The hire input text; null for rows that predate it.
+  late final _i1.ColumnString input;
+
+  /// Escrow job id, bound once when the create_job is confirmed.
+  late final _i1.ColumnInt jobId;
+
   @override
   List<_i1.Column> get columns => [
     id,
@@ -239,6 +311,9 @@ class HireRecordTable extends _i1.Table<int?> {
     price,
     manifestVersion,
     expiredAt,
+    requestId,
+    input,
+    jobId,
   ];
 }
 

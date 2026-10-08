@@ -7,3 +7,16 @@ fields:
   price: int
   manifestVersion: int
   expiredAt: int
+  ### Client idempotency key; null for rows that predate it.
+  requestId: String?
+  ### The hire input text; null for rows that predate it.
+  input: String?
+  ### Escrow job id, bound once when the create_job is confirmed.
+  jobId: int?
+indexes:
+  hire_consumer_request_idx:
+    fields: consumer, requestId
+    unique: true
+  hire_job_id_idx:
+    fields: jobId
+    unique: true

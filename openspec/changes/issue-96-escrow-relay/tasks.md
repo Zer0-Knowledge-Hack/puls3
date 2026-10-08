@@ -50,9 +50,9 @@ Chain strategy: size-exception
 
 ## C3: Protocol and migration
 
-- [ ] 3.1 RED: protocol round-trip tests in `test/protocol/` for `Puls3ApiException`, `PreparedTransaction`, `CreateHireResult`, `HireDetail`.
-- [ ] 3.2 GREEN: create the four `lib/src/protocol/*.spy.yaml` models, `lib/src/hire/escrow_preparation.spy.yaml`; modify `lib/src/hire/hire.spy.yaml` (`requestId?`, `input?`, `jobId?`, unique indexes).
-- [ ] 3.3 Run `serverpod generate` and `serverpod create-migration`; commit `migrations/<ts>/`.
+- [x] 3.1 RED: protocol round-trip tests in `test/protocol/` for `Puls3ApiException`, `PreparedTransaction`, `CreateHireResult`, `HireDetail`.
+- [x] 3.2 GREEN: create the four `lib/src/protocol/*.spy.yaml` models, `lib/src/hire/escrow_preparation.spy.yaml`; modify `lib/src/hire/hire.spy.yaml` (`requestId?`, `input?`, `jobId?`, unique indexes).
+- [x] 3.3 Run `serverpod generate` and `serverpod create-migration`; commit `migrations/<ts>/`.
 
 ## C4: Codec and RPC (P1, P2)
 
