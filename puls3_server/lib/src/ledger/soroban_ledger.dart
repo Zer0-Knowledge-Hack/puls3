@@ -42,8 +42,6 @@ const _escrowJobNotFound = 1;
 const _simulationFee = 100;
 const _simulationSequence = 0;
 
-final _contractError = RegExp(r'Error\(Contract, #(\d+)\)');
-
 /// Reads the Stellar chain through Soroban RPC. It never signs or submits,
 /// although the [SorobanRpcClient] it uses can submit.
 ///
@@ -146,11 +144,10 @@ final class SorobanLedger
     }
     final error = result['error'];
     if (error is String && error.isNotEmpty) {
-      final code = _contractError.firstMatch(error)?.group(1);
-      if (code == null) {
+      final number = contractErrorCode(error);
+      if (number == null) {
         throw LedgerUnavailable('$function simulation failed');
       }
-      final number = int.parse(code);
       if (absentErrors.contains(number)) return null;
       throw LedgerContractError(number, '$function failed with #$number');
     }
