@@ -274,7 +274,9 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `WalletChallenge` | `challengeId`, `wallet`, `payload`, `expiresAt` |
 | `NetworkConfig` | `network`, `rpcUrl`, `networkPassphrase`, `usdcContractId`, `escrowContractId`, `platformFeeBps`, `identityRegistryContractId`, `reputationRegistryContractId`, `explorerBaseUrl` |
 | [`AgentSummary`](models/agent_summary.spy.yaml) | `id: String`, `registryId: int`, `name: String`, `description: String`, `skills: List<String>`, `priceUsdcStroops: int`, `wallet: String?`, `model: String?` |
-| `AgentManifestDraft` | ADR-0004 fields: `version`, `name`, `description`, `skills`, `model`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price` |
+| `AgentManifestDraft` | ADR-0004 fields without `version` (a draft has none; the deployed `AgentManifest` gets it): `name`, `description`, `skills`, `model: ModelId`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price`. `DraftVersionConflict` is a storage concern (`StudioDraft.revision`), not a manifest field |
+
+**Manifest wire mapping.** Dart fields are flat camelCase; the JSON (the hash input) is nested snake_case: `systemPrompt` ↔ `system_prompt`, `inputType` and `inputMaxChars` ↔ `input.type` and `input.max_chars`, `outputType` and `outputMaxChars` ↔ `output.type` and `output.max_chars`, `price` (`UsdcAmount`) ↔ `price: {asset: "USDC", amount: stroops}`, `model` ↔ `model: {provider, id}`. A deployed manifest adds `schema` and `version`. `fromJson` reports every mismatch as an `InvalidManifest` problem and never throws a type error. See [domain model](../domain/model.md).
 | `StudioDraft` | `draftId`, `manifest`, `revision`, `deployState` |
 | `TestRunResult` | `output`, `remainingDailyRuns` |
 | [`PreparedTransaction`](models/prepared_transaction.spy.yaml) | `preparationId`, `purpose`, `signer`, `networkPassphrase`, `unsignedTransactionXdr?`, `authorizationEntryXdr?`, `transaction?`, `signatureExpirationLedger?`, `expiresAt` |

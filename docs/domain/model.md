@@ -14,6 +14,11 @@ The domain is the ubiquitous language of puls3. The backend, the app and the con
 | **Hire** | One task a consumer asks an agent to do, at the price the agent had when the hire was created. It is an ERC-8183 escrow job and moves through the same states: `open`, `funded`, `submitted`, then `completed`, `rejected` or `expired` ([ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D6); see [Hire lifecycle](hire-lifecycle.md). Runtime progress and feedback are data on the hire, not states. |
 | **Payment** | The USDC transfer on Stellar that pays for a hire: who paid, who received, how much, and in which transaction. |
 | **Feedback** | The score (1 to 5) and optional comment a consumer leaves about a hire they paid for. The hire keeps a reference to it once it is confirmed on-chain. |
+| **Manifest** | The deployable definition of an agent ([ADR-0004](../adr/0004-agent-manifest-and-deployment.md)): name, description, skills, model, system prompt, input and output limits, price, and a version. It is immutable, and editing creates a new version. `AgentManifest` in code. |
+| **Draft** | A manifest still being edited: every field optional, no version. `validate` is the deploy gate. `AgentManifestDraft` in code. |
+| **ModelId** | The model an agent runs on: a provider (`workers-ai` for the free Cloudflare Workers AI, or a paid provider the builder brings their own key for) and a provider-specific id. It never holds a credential. |
+| **ModelPolicy** | The configured list of models agents may use. It is injected into validation and is not a domain constant. |
+| **ManifestVersion** | The version number of a deployed manifest, from 1 to 2⁵³−1. A hire records the version it was paid for (`Hire.manifestVersion`). |
 | **Reputation** | What the catalog shows about an agent's past work, computed from its feedback. The formula is #11; it is not a class here. |
 
 Value objects: `StellarAddress` (a `G…` account or `C…` contract address), `UsdcAmount` (USDC in stroops, an integer), `AgentId` (the on-chain agent id), `HireId`, `TransactionHash`.
@@ -72,7 +77,43 @@ classDiagram
   class UsdcAmount {
     int stroops
   }
+  class AgentManifestDraft {
+    String name
+    String description
+    List~Skill~ skills
+    ModelId model
+    String systemPrompt
+    InputType inputType
+    int inputMaxChars
+    OutputType outputType
+    int outputMaxChars
+    UsdcAmount price
+    validate(ModelPolicy, ManifestVersion) AgentManifest
+  }
+  class AgentManifest {
+    ManifestVersion version
+    toDraft() AgentManifestDraft
+    toCanonicalJson() String
+  }
+  class ModelId {
+    String provider
+    String id
+  }
+  class ModelPolicy {
+    allows(ModelId) bool
+    isPaid(String) bool
+  }
+  class ManifestVersion {
+    int value
+    next() ManifestVersion
+  }
   Agent "1" *-- "1..5" Skill
+  AgentManifestDraft ..> AgentManifest : validate
+  AgentManifestDraft --> ModelId : model
+  AgentManifestDraft "1" *-- "1..5" Skill
+  AgentManifest --> ManifestVersion
+  AgentManifest --> ModelId : model
+  ModelPolicy ..> ModelId : allows
   Agent --> AgentId
   Agent --> StellarAddress : owner, wallet
   Agent --> UsdcAmount : price
@@ -120,3 +161,15 @@ Each invariant has at least one test named after it (`I1`, `I2`, …) that fails
 | I20 | A `Hire` records feedback only when it is `completed`, at most once, and only for that hire and agent, left by its consumer. Its status does not change | `HireNotCompleted`, `HireAlreadyRated`, `FeedbackDoesNotMatchHire` |
 | I21 | Runtime progress moves only while the hire is `funded`: `queued` (set by `fund`) → `running`, and `queued` or `running` → `failed` with a non-blank reason | `InvalidRuntimeTransition`, `InvalidHire` |
 | I22 | A `rejected` hire records the state it was rejected from (`open`, `funded` or `submitted`) | — |
+| I23 | A `ModelId` has a kebab-case provider of at most 32 characters and an id that is not blank, has no whitespace and is at most 128 characters (runes). It holds no credential | `InvalidManifest` (`modelMalformed`) |
+| I24 | A `ModelPolicy` never lists `workers-ai` as a paid provider. `workers-ai` passes only for the ids in `workersAiModels`; a paid provider passes when it is in `paidProviders`, with any id; `isPaid` is true for every provider except `workers-ai` | `ArgumentError` (policy), `InvalidManifest` (`modelNotAllowed`, `modelProviderNotEnabled`) |
+| I25 | A `ManifestVersion` is an integer from 1 to 2⁵³−1; `next()` past the maximum fails. Drafts have no version | `InvalidManifest` (`versionInvalid`) |
+| I26 | An `AgentManifestDraft` may have any field missing or below its minimum, but never above a maximum, with duplicate skill ids, with `tools`, unknown keys or a `version` | `InvalidManifest` |
+| I27 | Manifest texts count runes, a blank text counts as missing, and stored text is never trimmed. Name 3 to 48, description 10 to 280, system prompt 20 to 8,000 | `InvalidManifest` (`nameTooShort`, …) |
+| I28 | A manifest has 1 to 5 skills with unique ids, each a valid `Skill` (I6) | `InvalidManifest` (`skillsMissing`, `skillsTooMany`, `skillIdDuplicate`, …) |
+| I29 | A deployable manifest's model passes the injected `ModelPolicy` (I24) | `InvalidManifest` (`modelNotAllowed`, `modelProviderNotEnabled`) |
+| I30 | `input.max_chars` is 1 to 8,000 and `output.max_chars` is 1 to 16,000; input type is `text`, output type is `text` or `markdown` | `InvalidManifest` (`inputMaxCharsTooLow`, `outputMaxCharsTooHigh`, …) |
+| I31 | A manifest price is a positive `UsdcAmount` in `USDC` | `InvalidManifest` (`priceNotPositive`, `priceAssetUnsupported`) |
+| I32 | `validate` turns a complete draft into an immutable `AgentManifest` or throws one `InvalidManifest` listing every broken rule once, in field order (then skill order). The same input gives the same result | `InvalidManifest` |
+
+The manifest invariants (I23–I32) are tested in `puls3_domain/test/manifest_test.dart`. Its other groups cover the wire form: `fromJson` reports every type mismatch as a problem and never throws a type error; integral numbers count as integers (on the web `3.0` and `3` are one value); `toCanonicalJson()` sorts keys at every depth, writes no whitespace and accepts integers only (the salted hash is the server's job, [ADR-0004](../adr/0004-agent-manifest-and-deployment.md)).
