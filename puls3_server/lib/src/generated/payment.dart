@@ -10,14 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 /// Draft transport mirror of the domain Payment entity.
 /// Built by the server only after the funded escrow job passes every
 /// funding verification check (docs/architecture/api.md, ADR-0005).
 abstract class Payment
-    implements _i1.SerializableModel, _i1.ProtocolSerialization {
+    implements _is.SerializableModel, _is.ProtocolSerialization {
   Payment._({
     required this.transaction,
     required this.hireId,
@@ -62,7 +61,7 @@ abstract class Payment
 
   /// Returns a shallow copy of this [Payment]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   Payment copyWith({
     String? transaction,
     int? hireId,
@@ -96,7 +95,7 @@ abstract class Payment
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -117,7 +116,7 @@ class _PaymentImpl extends Payment {
 
   /// Returns a shallow copy of this [Payment]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   Payment copyWith({
     String? transaction,

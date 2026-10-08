@@ -38,33 +38,33 @@ CREATE UNIQUE INDEX "hire_job_id_idx" ON "hire" USING btree ("jobId");
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261008012344930', now())
+    VALUES ('puls3', '20261008045629402', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261008012344930', "timestamp" = now();
+    DO UPDATE SET "version" = '20261008045629402', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod', '20260129180959368', now())
+    VALUES ('serverpod', '20260824182259319', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260129180959368', "timestamp" = now();
+    DO UPDATE SET "version" = '20260824182259319', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod_auth_idp
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod_auth_idp', '20260213194423028', now())
+    VALUES ('serverpod_auth_idp', '20260924105404509', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260213194423028', "timestamp" = now();
+    DO UPDATE SET "version" = '20260924105404509', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod_auth_core
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod_auth_core', '20260129181112269', now())
+    VALUES ('serverpod_auth_core', '20260924105232991', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260129181112269', "timestamp" = now();
+    DO UPDATE SET "version" = '20260924105232991', "timestamp" = now();
 
 
 COMMIT;

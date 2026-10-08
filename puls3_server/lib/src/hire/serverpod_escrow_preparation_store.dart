@@ -71,8 +71,7 @@ final class ServerpodEscrowPreparationStore implements EscrowPreparationStore {
     final row = await EscrowPreparation.db.findFirstRow(
       _session,
       where: (t) => t.hireId.equals(hireId) & t.supersededAt.equals(null),
-      orderBy: (t) => t.id,
-      orderDescending: true,
+      orderByList: (t) => [t.id.desc()],
     );
     return row == null ? null : _stored(row);
   }

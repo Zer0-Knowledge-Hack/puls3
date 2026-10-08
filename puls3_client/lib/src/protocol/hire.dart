@@ -10,11 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Draft transport mirror of the domain Hire entity (ADR-0005 D6, #73).
-abstract class Hire implements _i1.SerializableModel {
+abstract class Hire
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   Hire._({
     required this.id,
     required this.agentId,
@@ -99,7 +99,7 @@ abstract class Hire implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [Hire]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   Hire copyWith({
     int? id,
     int? agentId,
@@ -132,8 +132,26 @@ abstract class Hire implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'Hire',
+      'id': id,
+      'agentId': agentId,
+      'consumer': consumer,
+      'price': price,
+      'manifestVersion': manifestVersion,
+      if (status != null) 'status': status,
+      if (paymentTransaction != null) 'paymentTransaction': paymentTransaction,
+      if (runtimeStatus != null) 'runtimeStatus': runtimeStatus,
+      if (failureReason != null) 'failureReason': failureReason,
+      if (rejectedFrom != null) 'rejectedFrom': rejectedFrom,
+      if (feedbackReference != null) 'feedbackReference': feedbackReference,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -168,7 +186,7 @@ class _HireImpl extends Hire {
 
   /// Returns a shallow copy of this [Hire]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   Hire copyWith({
     int? id,

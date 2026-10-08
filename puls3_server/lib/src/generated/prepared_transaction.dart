@@ -10,13 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 /// Server-prepared payload that the session wallet signs unchanged and
 /// returns to the matching `submit…` method (server relay, Decision A).
 abstract class PreparedTransaction
-    implements _i1.SerializableModel, _i1.ProtocolSerialization {
+    implements _is.SerializableModel, _is.ProtocolSerialization {
   PreparedTransaction._({
     required this.preparationId,
     required this.purpose,
@@ -54,7 +53,7 @@ abstract class PreparedTransaction
       transaction: jsonSerialization['transaction'] as String?,
       signatureExpirationLedger:
           jsonSerialization['signatureExpirationLedger'] as int?,
-      expiresAt: _i1.DateTimeJsonExtension.fromJson(
+      expiresAt: _is.DateTimeJsonExtension.fromJson(
         jsonSerialization['expiresAt'],
       ),
     );
@@ -96,7 +95,7 @@ abstract class PreparedTransaction
 
   /// Returns a shallow copy of this [PreparedTransaction]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   PreparedTransaction copyWith({
     String? preparationId,
     String? purpose,
@@ -148,7 +147,7 @@ abstract class PreparedTransaction
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -179,7 +178,7 @@ class _PreparedTransactionImpl extends PreparedTransaction {
 
   /// Returns a shallow copy of this [PreparedTransaction]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   PreparedTransaction copyWith({
     String? preparationId,

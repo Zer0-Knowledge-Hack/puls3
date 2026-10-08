@@ -10,12 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Server-prepared payload that the session wallet signs unchanged and
 /// returns to the matching `submit…` method (server relay, Decision A).
-abstract class PreparedTransaction implements _i1.SerializableModel {
+abstract class PreparedTransaction
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   PreparedTransaction._({
     required this.preparationId,
     required this.purpose,
@@ -53,7 +53,7 @@ abstract class PreparedTransaction implements _i1.SerializableModel {
       transaction: jsonSerialization['transaction'] as String?,
       signatureExpirationLedger:
           jsonSerialization['signatureExpirationLedger'] as int?,
-      expiresAt: _i1.DateTimeJsonExtension.fromJson(
+      expiresAt: _isc.DateTimeJsonExtension.fromJson(
         jsonSerialization['expiresAt'],
       ),
     );
@@ -95,7 +95,7 @@ abstract class PreparedTransaction implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [PreparedTransaction]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   PreparedTransaction copyWith({
     String? preparationId,
     String? purpose,
@@ -127,8 +127,27 @@ abstract class PreparedTransaction implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'PreparedTransaction',
+      'preparationId': preparationId,
+      'purpose': purpose,
+      'signer': signer,
+      'networkPassphrase': networkPassphrase,
+      if (unsignedTransactionXdr != null)
+        'unsignedTransactionXdr': unsignedTransactionXdr,
+      if (authorizationEntryXdr != null)
+        'authorizationEntryXdr': authorizationEntryXdr,
+      if (transaction != null) 'transaction': transaction,
+      if (signatureExpirationLedger != null)
+        'signatureExpirationLedger': signatureExpirationLedger,
+      'expiresAt': expiresAt.toJson(),
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -159,7 +178,7 @@ class _PreparedTransactionImpl extends PreparedTransaction {
 
   /// Returns a shallow copy of this [PreparedTransaction]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   PreparedTransaction copyWith({
     String? preparationId,

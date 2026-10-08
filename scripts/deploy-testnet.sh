@@ -71,7 +71,7 @@ fi
 ADMIN_ADDRESS="$(stellar keys address "$IDENTITY" 2>/dev/null || true)"
 if [ -z "$ADMIN_ADDRESS" ]; then
   echo "error: Stellar identity '$IDENTITY' does not exist or has no address." >&2
-  echo "Create or fund it first: stellar keys generate $IDENTITY --network $NETWORK" >&2
+  echo "Create and fund it first: stellar keys generate $IDENTITY --fund --network $NETWORK" >&2
   exit 1
 fi
 

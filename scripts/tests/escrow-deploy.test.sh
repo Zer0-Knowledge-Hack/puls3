@@ -158,6 +158,7 @@ expect_no_call "missing identity sends nothing" "^deploy "
 fresh_env
 expect_exit "unknown identity exits 1" 1 run_deploy missing-id
 expect_out "unknown identity message" "does not exist"
+expect_out "unknown identity hint creates and funds it" "stellar keys generate missing-id --fund --network testnet"
 expect_no_call "unknown identity sends nothing" "^deploy "
 fresh_env
 expect_exit "non-testnet network exits 1" 1 env STELLAR_NETWORK=mainnet bash "$SCRIPT"

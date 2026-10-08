@@ -10,11 +10,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 abstract class HireView
-    implements _i1.SerializableModel, _i1.ProtocolSerialization {
+    implements _is.SerializableModel, _is.ProtocolSerialization {
   HireView._({
     required this.hireId,
     required this.agentRegistryId,
@@ -53,7 +52,7 @@ abstract class HireView
 
   /// Returns a shallow copy of this [HireView]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   HireView copyWith({
     int? hireId,
     int? agentRegistryId,
@@ -87,7 +86,7 @@ abstract class HireView
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -108,7 +107,7 @@ class _HireViewImpl extends HireView {
 
   /// Returns a shallow copy of this [HireView]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   HireView copyWith({
     int? hireId,

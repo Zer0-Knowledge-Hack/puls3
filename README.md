@@ -169,7 +169,7 @@ puls3_flutter/   Flutter app (Studio + Marketplace)
 puls3_server/    Serverpod backend
 puls3_client/    Generated client shared by app and server
 contracts/       Soroban workspace: identity-registry, escrow, placeholder; deployments/ holds testnet.json and demo-agents.json
-scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh) and seed (seed-demo-agents.sh) scripts
+scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh), seed (seed-demo-agents.sh) and funding (fund-testnet-accounts.sh) scripts
 spikes/          Payments proof of concept (payments-poc)
 docs/adr/        Architecture decision records
 docs/verification/ How to verify the on-chain evidence (onchain.md)
@@ -182,9 +182,18 @@ design/          Design sources (logo lab)
 
 Per rules §8.1, this project existed prior to the Stellar Odyssey event. The codebase before the hackathon kickoff (Sep 19, 2026) was established at commit [`8bd23dc26605906683f32e2c177a2c7bde018db6`](https://github.com/Zer0-Knowledge-Hack/puls3/commit/8bd23dc26605906683f32e2c177a2c7bde018db6). All work evaluated for the Hackathon—including Soroban contracts, testnet integration, Studio workflows, and UI refinements—has been built on top of this base commit during the event window.
 
+## Deploy
+
+| Part | Where | Public URL |
+| --- | --- | --- |
+| Server (Serverpod) | Serverpod Cloud | `https://<project-id>.api.serverpod.space/` (set after the first deploy) |
+| Web app (Flutter) | Cloudflare Pages | [puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/) |
+
+Server deploy and redeploy, step by step: [`puls3_server/README.md`](puls3_server/README.md#deploy-to-serverpod-cloud). Check a deployed server with `curl -s -X POST <server-url>/health/check`, which returns the deployed version. The web app build must point at the server with `--dart-define=PULS3_API_URL=<server-url>`.
+
 ## Contributing
 
-Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow.
+Team members: read **[CONTRIBUTING.md](CONTRIBUTING.md)** to set up your machine and learn the workflow. To run the server and the app against testnet from a fresh clone, follow **[docs/infra/secrets.md](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone)**.
 
 ## License
 

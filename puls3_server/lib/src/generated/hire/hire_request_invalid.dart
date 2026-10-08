@@ -10,14 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 abstract class HireRequestInvalid
     implements
-        _i1.SerializableException,
-        _i1.SerializableModel,
-        _i1.ProtocolSerialization {
+        _is.SerializableException,
+        _is.SerializableModel,
+        _is.ProtocolSerialization {
   HireRequestInvalid._({required this.message});
 
   factory HireRequestInvalid({required String message}) =
@@ -31,7 +30,7 @@ abstract class HireRequestInvalid
 
   /// Returns a shallow copy of this [HireRequestInvalid]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   HireRequestInvalid copyWith({String? message});
   @override
   Map<String, dynamic> toJson() {
@@ -61,7 +60,7 @@ class _HireRequestInvalidImpl extends HireRequestInvalid {
 
   /// Returns a shallow copy of this [HireRequestInvalid]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   HireRequestInvalid copyWith({String? message}) {
     return HireRequestInvalid(message: message ?? this.message);

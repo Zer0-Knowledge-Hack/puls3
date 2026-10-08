@@ -1,5 +1,6 @@
 {
   "__className__": "serverpod.DatabaseDefinition",
+  "schemaVersion": 2,
   "moduleName": "puls3",
   "tables": [
     {
@@ -12,14 +13,16 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "id",
+          "fieldName": "id",
           "columnType": 6,
           "isNullable": false,
-          "columnDefault": "nextval('chain_submission_id_seq'::regclass)",
+          "columnDefault": "serial",
           "dartType": "int?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "preparationId",
+          "fieldName": "preparationId",
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
@@ -27,6 +30,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "purpose",
+          "fieldName": "purpose",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -34,6 +38,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "transaction",
+          "fieldName": "transaction",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -41,6 +46,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "state",
+          "fieldName": "state",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -48,6 +54,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "errorCode",
+          "fieldName": "errorCode",
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
@@ -55,6 +62,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "explorerUrl",
+          "fieldName": "explorerUrl",
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
@@ -62,6 +70,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "updatedAt",
+          "fieldName": "updatedAt",
           "columnType": 4,
           "isNullable": false,
           "dartType": "DateTime"
@@ -69,6 +78,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "hireId",
+          "fieldName": "hireId",
           "columnType": 6,
           "isNullable": true,
           "dartType": "int?"
@@ -76,6 +86,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "signedEnvelopeXdr",
+          "fieldName": "signedEnvelopeXdr",
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
@@ -83,6 +94,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "validUntil",
+          "fieldName": "validUntil",
           "columnType": 4,
           "isNullable": true,
           "dartType": "DateTime?"
@@ -90,6 +102,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "lastSentAt",
+          "fieldName": "lastSentAt",
           "columnType": 4,
           "isNullable": true,
           "dartType": "DateTime?"
@@ -97,6 +110,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "sendAttempts",
+          "fieldName": "sendAttempts",
           "columnType": 6,
           "isNullable": true,
           "columnDefault": "0",
@@ -105,6 +119,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "createdAt",
+          "fieldName": "createdAt",
           "columnType": 4,
           "isNullable": true,
           "dartType": "DateTime?"
@@ -112,6 +127,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "lastCheckedAt",
+          "fieldName": "lastCheckedAt",
           "columnType": 4,
           "isNullable": true,
           "dartType": "DateTime?"
@@ -119,20 +135,6 @@
       ],
       "foreignKeys": [],
       "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "chain_submission_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
         {
           "__className__": "serverpod.IndexDefinition",
           "indexName": "chain_submission_preparation_idx",
@@ -204,174 +206,6 @@
     },
     {
       "__className__": "serverpod.TableDefinition",
-      "name": "escrow_preparation",
-      "dartName": "EscrowPreparation",
-      "module": "puls3",
-      "schema": "public",
-      "columns": [
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "id",
-          "columnType": 6,
-          "isNullable": false,
-          "columnDefault": "nextval('escrow_preparation_id_seq'::regclass)",
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "preparationId",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "hireId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "purpose",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "signer",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "unsignedEnvelopeXdr",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "transactionHash",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "sequence",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "validUntil",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "jobExpiredAt",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "rejectReason",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "supersededAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "submittedAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        }
-      ],
-      "foreignKeys": [],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "escrow_preparation_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "escrow_preparation_id_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "preparationId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "escrow_preparation_hire_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "hireId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "escrow_preparation_transaction_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "transactionHash"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        }
-      ],
-      "managed": true
-    },
-    {
-      "__className__": "serverpod.TableDefinition",
       "name": "hire",
       "dartName": "HireRecord",
       "module": "puls3",
@@ -380,14 +214,16 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "id",
+          "fieldName": "id",
           "columnType": 6,
           "isNullable": false,
-          "columnDefault": "nextval('hire_id_seq'::regclass)",
+          "columnDefault": "serial",
           "dartType": "int?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "consumer",
+          "fieldName": "consumer",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -395,6 +231,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "agentId",
+          "fieldName": "agentId",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -402,6 +239,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "price",
+          "fieldName": "price",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -409,6 +247,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "manifestVersion",
+          "fieldName": "manifestVersion",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -416,82 +255,14 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "expiredAt",
+          "fieldName": "expiredAt",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "requestId",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "input",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "jobId",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
         }
       ],
       "foreignKeys": [],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "hire_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "hire_consumer_request_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "consumer"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "requestId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "hire_job_id_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "jobId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        }
-      ],
+      "indexes": [],
       "managed": true
     },
     {
@@ -504,14 +275,16 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "id",
+          "fieldName": "id",
           "columnType": 6,
           "isNullable": false,
-          "columnDefault": "nextval('hire_payment_id_seq'::regclass)",
+          "columnDefault": "serial",
           "dartType": "int?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "hireId",
+          "fieldName": "hireId",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -519,6 +292,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "transactionHash",
+          "fieldName": "transactionHash",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -526,6 +300,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "jobId",
+          "fieldName": "jobId",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -533,6 +308,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "payer",
+          "fieldName": "payer",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -540,6 +316,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "payee",
+          "fieldName": "payee",
           "columnType": 0,
           "isNullable": false,
           "dartType": "String"
@@ -547,6 +324,7 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "amount",
+          "fieldName": "amount",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -554,20 +332,6 @@
       ],
       "foreignKeys": [],
       "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "hire_payment_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
         {
           "__className__": "serverpod.IndexDefinition",
           "indexName": "hire_id",
@@ -618,17 +382,17 @@
     {
       "__className__": "serverpod.DatabaseMigrationVersion",
       "module": "serverpod",
-      "version": "20260129180959368"
+      "version": "20260824182259319"
     },
     {
       "__className__": "serverpod.DatabaseMigrationVersion",
       "module": "serverpod_auth_idp",
-      "version": "20260213194423028"
+      "version": "20260924105404509"
     },
     {
       "__className__": "serverpod.DatabaseMigrationVersion",
       "module": "serverpod_auth_core",
-      "version": "20260129181112269"
+      "version": "20260924105232991"
     }
   ],
   "migrationApiVersion": 1

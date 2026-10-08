@@ -10,13 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
-import 'package:puls3_server/src/generated/protocol.dart' as _i2;
+import 'package:puls3_server/src/generated/protocol.dart' as _i7k47pdw;
+import 'package:serverpod/serverpod.dart' as _is;
 
 /// One agent of the catalog, built from the identity registry metadata.
 abstract class AgentSummary
-    implements _i1.SerializableModel, _i1.ProtocolSerialization {
+    implements _is.SerializableModel, _is.ProtocolSerialization {
   AgentSummary._({
     required this.id,
     required this.registryId,
@@ -45,7 +44,7 @@ abstract class AgentSummary
       registryId: jsonSerialization['registryId'] as int,
       name: jsonSerialization['name'] as String,
       description: jsonSerialization['description'] as String,
-      skills: _i2.Protocol().deserialize<List<String>>(
+      skills: _i7k47pdw.Protocol().deserialize<List<String>>(
         jsonSerialization['skills'],
       ),
       priceUsdcStroops: jsonSerialization['priceUsdcStroops'] as int,
@@ -80,7 +79,7 @@ abstract class AgentSummary
 
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   AgentSummary copyWith({
     String? id,
     int? registryId,
@@ -123,7 +122,7 @@ abstract class AgentSummary
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -152,7 +151,7 @@ class _AgentSummaryImpl extends AgentSummary {
 
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   AgentSummary copyWith({
     String? id,

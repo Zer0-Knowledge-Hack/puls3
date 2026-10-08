@@ -10,14 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod/serverpod.dart' as _is;
 
 /// One unsigned escrow envelope the server prepared for a session wallet.
 /// Kept so that submit can verify the signed envelope against the exact
 /// prepared bytes, and so a newer preparation can supersede an older one.
 abstract class EscrowPreparation
-    implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
+    implements _is.TableRow<int?>, _is.ProtocolSerialization {
   EscrowPreparation._({
     this.id,
     required this.preparationId,
@@ -62,22 +61,22 @@ abstract class EscrowPreparation
       unsignedEnvelopeXdr: jsonSerialization['unsignedEnvelopeXdr'] as String,
       transactionHash: jsonSerialization['transactionHash'] as String,
       sequence: jsonSerialization['sequence'] as int,
-      validUntil: _i1.DateTimeJsonExtension.fromJson(
+      validUntil: _is.DateTimeJsonExtension.fromJson(
         jsonSerialization['validUntil'],
       ),
       jobExpiredAt: jsonSerialization['jobExpiredAt'] as int?,
       rejectReason: jsonSerialization['rejectReason'] as String?,
-      createdAt: _i1.DateTimeJsonExtension.fromJson(
+      createdAt: _is.DateTimeJsonExtension.fromJson(
         jsonSerialization['createdAt'],
       ),
       supersededAt: jsonSerialization['supersededAt'] == null
           ? null
-          : _i1.DateTimeJsonExtension.fromJson(
+          : _is.DateTimeJsonExtension.fromJson(
               jsonSerialization['supersededAt'],
             ),
       submittedAt: jsonSerialization['submittedAt'] == null
           ? null
-          : _i1.DateTimeJsonExtension.fromJson(
+          : _is.DateTimeJsonExtension.fromJson(
               jsonSerialization['submittedAt'],
             ),
     );
@@ -129,11 +128,11 @@ abstract class EscrowPreparation
   DateTime? submittedAt;
 
   @override
-  _i1.Table<int?> get table => t;
+  _is.Table<int?> get table => t;
 
   /// Returns a shallow copy of this [EscrowPreparation]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   EscrowPreparation copyWith({
     int? id,
     String? preparationId,
@@ -181,12 +180,11 @@ abstract class EscrowPreparation
   }
 
   static EscrowPreparationIncludeList includeList({
-    _i1.WhereExpressionBuilder<EscrowPreparationTable>? where,
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<EscrowPreparationTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
     EscrowPreparationInclude? include,
   }) {
     return EscrowPreparationIncludeList._(
@@ -194,7 +192,6 @@ abstract class EscrowPreparation
       limit: limit,
       offset: offset,
       orderBy: orderBy?.call(EscrowPreparation.t),
-      orderDescending: orderDescending,
       orderByList: orderByList?.call(EscrowPreparation.t),
       include: include,
     );
@@ -202,7 +199,7 @@ abstract class EscrowPreparation
 
   @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _is.SerializationManager.encode(this);
   }
 }
 
@@ -243,7 +240,7 @@ class _EscrowPreparationImpl extends EscrowPreparation {
 
   /// Returns a shallow copy of this [EscrowPreparation]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   EscrowPreparation copyWith({
     Object? id = _Undefined,
@@ -283,136 +280,136 @@ class _EscrowPreparationImpl extends EscrowPreparation {
 }
 
 class EscrowPreparationUpdateTable
-    extends _i1.UpdateTable<EscrowPreparationTable> {
+    extends _is.UpdateTable<EscrowPreparationTable> {
   EscrowPreparationUpdateTable(super.table);
 
-  _i1.ColumnValue<String, String> preparationId(String value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<String, String> preparationId(String value) =>
+      _is.ColumnValue(
         table.preparationId,
         value,
       );
 
-  _i1.ColumnValue<int, int> hireId(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> hireId(int value) => _is.ColumnValue(
     table.hireId,
     value,
   );
 
-  _i1.ColumnValue<String, String> purpose(String value) => _i1.ColumnValue(
+  _is.ColumnValue<String, String> purpose(String value) => _is.ColumnValue(
     table.purpose,
     value,
   );
 
-  _i1.ColumnValue<String, String> signer(String value) => _i1.ColumnValue(
+  _is.ColumnValue<String, String> signer(String value) => _is.ColumnValue(
     table.signer,
     value,
   );
 
-  _i1.ColumnValue<String, String> unsignedEnvelopeXdr(String value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<String, String> unsignedEnvelopeXdr(String value) =>
+      _is.ColumnValue(
         table.unsignedEnvelopeXdr,
         value,
       );
 
-  _i1.ColumnValue<String, String> transactionHash(String value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<String, String> transactionHash(String value) =>
+      _is.ColumnValue(
         table.transactionHash,
         value,
       );
 
-  _i1.ColumnValue<int, int> sequence(int value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> sequence(int value) => _is.ColumnValue(
     table.sequence,
     value,
   );
 
-  _i1.ColumnValue<DateTime, DateTime> validUntil(DateTime value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<DateTime, DateTime> validUntil(DateTime value) =>
+      _is.ColumnValue(
         table.validUntil,
         value,
       );
 
-  _i1.ColumnValue<int, int> jobExpiredAt(int? value) => _i1.ColumnValue(
+  _is.ColumnValue<int, int> jobExpiredAt(int? value) => _is.ColumnValue(
     table.jobExpiredAt,
     value,
   );
 
-  _i1.ColumnValue<String, String> rejectReason(String? value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<String, String> rejectReason(String? value) =>
+      _is.ColumnValue(
         table.rejectReason,
         value,
       );
 
-  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _is.ColumnValue(
         table.createdAt,
         value,
       );
 
-  _i1.ColumnValue<DateTime, DateTime> supersededAt(DateTime? value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<DateTime, DateTime> supersededAt(DateTime? value) =>
+      _is.ColumnValue(
         table.supersededAt,
         value,
       );
 
-  _i1.ColumnValue<DateTime, DateTime> submittedAt(DateTime? value) =>
-      _i1.ColumnValue(
+  _is.ColumnValue<DateTime, DateTime> submittedAt(DateTime? value) =>
+      _is.ColumnValue(
         table.submittedAt,
         value,
       );
 }
 
-class EscrowPreparationTable extends _i1.Table<int?> {
+class EscrowPreparationTable extends _is.Table<int?> {
   EscrowPreparationTable({super.tableRelation})
     : super(tableName: 'escrow_preparation') {
     updateTable = EscrowPreparationUpdateTable(this);
-    preparationId = _i1.ColumnString(
+    preparationId = _is.ColumnString(
       'preparationId',
       this,
     );
-    hireId = _i1.ColumnInt(
+    hireId = _is.ColumnInt(
       'hireId',
       this,
     );
-    purpose = _i1.ColumnString(
+    purpose = _is.ColumnString(
       'purpose',
       this,
     );
-    signer = _i1.ColumnString(
+    signer = _is.ColumnString(
       'signer',
       this,
     );
-    unsignedEnvelopeXdr = _i1.ColumnString(
+    unsignedEnvelopeXdr = _is.ColumnString(
       'unsignedEnvelopeXdr',
       this,
     );
-    transactionHash = _i1.ColumnString(
+    transactionHash = _is.ColumnString(
       'transactionHash',
       this,
     );
-    sequence = _i1.ColumnInt(
+    sequence = _is.ColumnInt(
       'sequence',
       this,
     );
-    validUntil = _i1.ColumnDateTime(
+    validUntil = _is.ColumnDateTime(
       'validUntil',
       this,
     );
-    jobExpiredAt = _i1.ColumnInt(
+    jobExpiredAt = _is.ColumnInt(
       'jobExpiredAt',
       this,
     );
-    rejectReason = _i1.ColumnString(
+    rejectReason = _is.ColumnString(
       'rejectReason',
       this,
     );
-    createdAt = _i1.ColumnDateTime(
+    createdAt = _is.ColumnDateTime(
       'createdAt',
       this,
     );
-    supersededAt = _i1.ColumnDateTime(
+    supersededAt = _is.ColumnDateTime(
       'supersededAt',
       this,
     );
-    submittedAt = _i1.ColumnDateTime(
+    submittedAt = _is.ColumnDateTime(
       'submittedAt',
       this,
     );
@@ -421,45 +418,45 @@ class EscrowPreparationTable extends _i1.Table<int?> {
   late final EscrowPreparationUpdateTable updateTable;
 
   /// Opaque id the client echoes back on submit.
-  late final _i1.ColumnString preparationId;
+  late final _is.ColumnString preparationId;
 
-  late final _i1.ColumnInt hireId;
+  late final _is.ColumnInt hireId;
 
   /// createJob, fund, complete or reject.
-  late final _i1.ColumnString purpose;
+  late final _is.ColumnString purpose;
 
   /// StrKey of the session wallet that must sign.
-  late final _i1.ColumnString signer;
+  late final _is.ColumnString signer;
 
   /// Base64 unsigned TransactionEnvelope XDR, exactly as returned.
-  late final _i1.ColumnString unsignedEnvelopeXdr;
+  late final _is.ColumnString unsignedEnvelopeXdr;
 
   /// Lowercase hex network hash of the prepared transaction.
-  late final _i1.ColumnString transactionHash;
+  late final _is.ColumnString transactionHash;
 
   /// Source account sequence number the envelope uses.
-  late final _i1.ColumnInt sequence;
+  late final _is.ColumnInt sequence;
 
   /// End of the envelope time bounds; after it the preparation is expired.
-  late final _i1.ColumnDateTime validUntil;
+  late final _is.ColumnDateTime validUntil;
 
   /// expired_at the create_job was prepared with; bound to the hire when the
   /// job is confirmed.
-  late final _i1.ColumnInt jobExpiredAt;
+  late final _is.ColumnInt jobExpiredAt;
 
   /// Reject reason baked into a reject envelope.
-  late final _i1.ColumnString rejectReason;
+  late final _is.ColumnString rejectReason;
 
-  late final _i1.ColumnDateTime createdAt;
+  late final _is.ColumnDateTime createdAt;
 
   /// Set when a newer preparation replaced this one.
-  late final _i1.ColumnDateTime supersededAt;
+  late final _is.ColumnDateTime supersededAt;
 
   /// Set when a submit claimed this preparation.
-  late final _i1.ColumnDateTime submittedAt;
+  late final _is.ColumnDateTime submittedAt;
 
   @override
-  List<_i1.Column> get columns => [
+  List<_is.Column> get columns => [
     id,
     preparationId,
     hireId,
@@ -477,23 +474,22 @@ class EscrowPreparationTable extends _i1.Table<int?> {
   ];
 }
 
-class EscrowPreparationInclude extends _i1.IncludeObject {
+class EscrowPreparationInclude extends _is.IncludeObject {
   EscrowPreparationInclude._();
 
   @override
-  Map<String, _i1.Include?> get includes => {};
+  Map<String, _is.Include?> get includes => {};
 
   @override
-  _i1.Table<int?> get table => EscrowPreparation.t;
+  _is.Table<int?> get table => EscrowPreparation.t;
 }
 
-class EscrowPreparationIncludeList extends _i1.IncludeList {
+class EscrowPreparationIncludeList extends _is.IncludeList {
   EscrowPreparationIncludeList._({
-    _i1.WhereExpressionBuilder<EscrowPreparationTable>? where,
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? where,
     super.limit,
     super.offset,
     super.orderBy,
-    super.orderDescending,
     super.orderByList,
     super.include,
   }) {
@@ -501,10 +497,10 @@ class EscrowPreparationIncludeList extends _i1.IncludeList {
   }
 
   @override
-  Map<String, _i1.Include?> get includes => include?.includes ?? {};
+  Map<String, _is.Include?> get includes => include?.includes ?? {};
 
   @override
-  _i1.Table<int?> get table => EscrowPreparation.t;
+  _is.Table<int?> get table => EscrowPreparation.t;
 }
 
 class EscrowPreparationRepository {
@@ -533,22 +529,20 @@ class EscrowPreparationRepository {
   /// );
   /// ```
   Future<List<EscrowPreparation>> find(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<EscrowPreparationTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<EscrowPreparationTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<EscrowPreparationTable>? orderByList,
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<EscrowPreparation>(
       where: where?.call(EscrowPreparation.t),
       orderBy: orderBy?.call(EscrowPreparation.t),
       orderByList: orderByList?.call(EscrowPreparation.t),
-      orderDescending: orderDescending,
       limit: limit,
       offset: offset,
       transaction: transaction,
@@ -575,21 +569,19 @@ class EscrowPreparationRepository {
   /// );
   /// ```
   Future<EscrowPreparation?> findFirstRow(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<EscrowPreparationTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? where,
     int? offset,
-    _i1.OrderByBuilder<EscrowPreparationTable>? orderBy,
-    bool orderDescending = false,
-    _i1.OrderByListBuilder<EscrowPreparationTable>? orderByList,
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<EscrowPreparation>(
       where: where?.call(EscrowPreparation.t),
       orderBy: orderBy?.call(EscrowPreparation.t),
       orderByList: orderByList?.call(EscrowPreparation.t),
-      orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
       lockMode: lockMode,
@@ -599,11 +591,11 @@ class EscrowPreparationRepository {
 
   /// Finds a single [EscrowPreparation] by its [id] or null if no such row exists.
   Future<EscrowPreparation?> findById(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     int id, {
-    _i1.Transaction? transaction,
-    _i1.LockMode? lockMode,
-    _i1.LockBehavior? lockBehavior,
+    _is.Transaction? transaction,
+    _is.LockMode? lockMode,
+    _is.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<EscrowPreparation>(
       id,
@@ -623,16 +615,22 @@ class EscrowPreparationRepository {
   /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
   /// rows are silently skipped, and only the successfully inserted rows are
   /// returned.
+  ///
+  /// If [noReturn] is set to `true`, the inserted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<EscrowPreparation>> insert(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<EscrowPreparation> rows, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
     bool ignoreConflicts = false,
+    bool noReturn = false,
   }) async {
     return session.db.insert<EscrowPreparation>(
       rows,
       transaction: transaction,
       ignoreConflicts: ignoreConflicts,
+      noReturn: noReturn,
     );
   }
 
@@ -640,12 +638,81 @@ class EscrowPreparationRepository {
   ///
   /// The returned [EscrowPreparation] will have its `id` field set.
   Future<EscrowPreparation> insertRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     EscrowPreparation row, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.insertRow<EscrowPreparation>(
       row,
+      transaction: transaction,
+    );
+  }
+
+  /// Upserts all [EscrowPreparation]s in the list and returns the resulting rows.
+  ///
+  /// If a row conflicts on the given [conflictColumns], the existing row is
+  /// updated with the new values. Otherwise, a new row is inserted.
+  ///
+  /// If [updateColumns] is provided, only those columns will be updated on
+  /// conflict. If null, all non-conflict, non-id columns are updated.
+  ///
+  /// If [updateWhere] is provided, the update only applies to rows matching the
+  /// given expression. Conflicting rows that don't match are skipped and not
+  /// returned, so the resulting list may be shorter than [rows].
+  ///
+  /// The returned [EscrowPreparation]s will have their `id` fields set.
+  ///
+  /// This is an atomic operation, meaning that if one of the rows fails,
+  /// none of the rows will be affected.
+  ///
+  /// If [noReturn] is set to `true`, the resulting rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
+  Future<List<EscrowPreparation>> upsert(
+    _is.DatabaseSession session,
+    List<EscrowPreparation> rows, {
+    required _is.ColumnSelections<EscrowPreparationTable> conflictColumns,
+    _is.ColumnSelections<EscrowPreparationTable>? updateColumns,
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? updateWhere,
+    _is.Transaction? transaction,
+    bool noReturn = false,
+  }) async {
+    return session.db.upsert<EscrowPreparation>(
+      rows,
+      conflictColumns: conflictColumns(EscrowPreparation.t),
+      updateColumns: updateColumns?.call(EscrowPreparation.t),
+      updateWhere: updateWhere?.call(EscrowPreparation.t),
+      transaction: transaction,
+      noReturn: noReturn,
+    );
+  }
+
+  /// Upserts a single [EscrowPreparation] and returns the resulting row.
+  ///
+  /// If the row conflicts on the given [conflictColumns], the existing row is
+  /// updated. Otherwise, a new row is inserted.
+  ///
+  /// If [updateColumns] is provided, only those columns will be updated on
+  /// conflict. If null, all non-conflict, non-id columns are updated.
+  ///
+  /// If [updateWhere] is provided, the update only applies when the existing
+  /// row matches the expression. Returns `null` if no row was affected — for
+  /// example when [updateWhere] does not match the conflicting row.
+  ///
+  /// The returned [EscrowPreparation] will have its `id` field set.
+  Future<EscrowPreparation?> upsertRow(
+    _is.DatabaseSession session,
+    EscrowPreparation row, {
+    required _is.ColumnSelections<EscrowPreparationTable> conflictColumns,
+    _is.ColumnSelections<EscrowPreparationTable>? updateColumns,
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? updateWhere,
+    _is.Transaction? transaction,
+  }) async {
+    return session.db.upsertRow<EscrowPreparation>(
+      row,
+      conflictColumns: conflictColumns(EscrowPreparation.t),
+      updateColumns: updateColumns?.call(EscrowPreparation.t),
+      updateWhere: updateWhere?.call(EscrowPreparation.t),
       transaction: transaction,
     );
   }
@@ -655,16 +722,22 @@ class EscrowPreparationRepository {
   /// all columns.
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
+  ///
+  /// If [noReturn] is set to `true`, the updated rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<EscrowPreparation>> update(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<EscrowPreparation> rows, {
-    _i1.ColumnSelections<EscrowPreparationTable>? columns,
-    _i1.Transaction? transaction,
+    _is.ColumnSelections<EscrowPreparationTable>? columns,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.update<EscrowPreparation>(
       rows,
       columns: columns?.call(EscrowPreparation.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
@@ -672,10 +745,10 @@ class EscrowPreparationRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<EscrowPreparation> updateRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     EscrowPreparation row, {
-    _i1.ColumnSelections<EscrowPreparationTable>? columns,
-    _i1.Transaction? transaction,
+    _is.ColumnSelections<EscrowPreparationTable>? columns,
+    _is.Transaction? transaction,
   }) async {
     return session.db.updateRow<EscrowPreparation>(
       row,
@@ -687,11 +760,11 @@ class EscrowPreparationRepository {
   /// Updates a single [EscrowPreparation] by its [id] with the specified [columnValues].
   /// Returns the updated row or null if no row with the given id exists.
   Future<EscrowPreparation?> updateById(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     int id, {
-    required _i1.ColumnValueListBuilder<EscrowPreparationUpdateTable>
+    required _is.ColumnValueListBuilder<EscrowPreparationUpdateTable>
     columnValues,
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.updateById<EscrowPreparation>(
       id,
@@ -702,17 +775,21 @@ class EscrowPreparationRepository {
 
   /// Updates all [EscrowPreparation]s matching the [where] expression with the specified [columnValues].
   /// Returns the list of updated rows.
+  ///
+  /// If [noReturn] is set to `true`, the updated rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<EscrowPreparation>> updateWhere(
-    _i1.DatabaseSession session, {
-    required _i1.ColumnValueListBuilder<EscrowPreparationUpdateTable>
+    _is.DatabaseSession session, {
+    required _is.ColumnValueListBuilder<EscrowPreparationUpdateTable>
     columnValues,
-    required _i1.WhereExpressionBuilder<EscrowPreparationTable> where,
+    required _is.WhereExpressionBuilder<EscrowPreparationTable> where,
     int? limit,
     int? offset,
-    _i1.OrderByBuilder<EscrowPreparationTable>? orderBy,
-    _i1.OrderByListBuilder<EscrowPreparationTable>? orderByList,
-    bool orderDescending = false,
-    _i1.Transaction? transaction,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.updateWhere<EscrowPreparation>(
       columnValues: columnValues(EscrowPreparation.t.updateTable),
@@ -721,30 +798,44 @@ class EscrowPreparationRepository {
       offset: offset,
       orderBy: orderBy?.call(EscrowPreparation.t),
       orderByList: orderByList?.call(EscrowPreparation.t),
-      orderDescending: orderDescending,
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Deletes all [EscrowPreparation]s in the list and returns the deleted rows.
+  ///
+  /// To specify the order of the returned rows use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
+  ///
+  /// If [noReturn] is set to `true`, the deleted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<EscrowPreparation>> delete(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     List<EscrowPreparation> rows, {
-    _i1.Transaction? transaction,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.delete<EscrowPreparation>(
       rows,
+      orderBy: orderBy?.call(EscrowPreparation.t),
+      orderByList: orderByList?.call(EscrowPreparation.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Deletes a single [EscrowPreparation].
   Future<EscrowPreparation> deleteRow(
-    _i1.DatabaseSession session,
+    _is.DatabaseSession session,
     EscrowPreparation row, {
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.deleteRow<EscrowPreparation>(
       row,
@@ -753,24 +844,37 @@ class EscrowPreparationRepository {
   }
 
   /// Deletes all rows matching the [where] expression.
+  ///
+  /// To specify the order of the returned rows use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
+  /// If [noReturn] is set to `true`, the deleted rows are not read back from
+  /// the database and an empty list is returned. This avoids the overhead of
+  /// transferring and deserializing the rows when the result is not needed.
   Future<List<EscrowPreparation>> deleteWhere(
-    _i1.DatabaseSession session, {
-    required _i1.WhereExpressionBuilder<EscrowPreparationTable> where,
-    _i1.Transaction? transaction,
+    _is.DatabaseSession session, {
+    required _is.WhereExpressionBuilder<EscrowPreparationTable> where,
+    _is.OrderByBuilder<EscrowPreparationTable>? orderBy,
+    _is.OrderByListBuilder<EscrowPreparationTable>? orderByList,
+    _is.Transaction? transaction,
+    bool noReturn = false,
   }) async {
     return session.db.deleteWhere<EscrowPreparation>(
       where: where(EscrowPreparation.t),
+      orderBy: orderBy?.call(EscrowPreparation.t),
+      orderByList: orderByList?.call(EscrowPreparation.t),
       transaction: transaction,
+      noReturn: noReturn,
     );
   }
 
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.DatabaseSession session, {
-    _i1.WhereExpressionBuilder<EscrowPreparationTable>? where,
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<EscrowPreparationTable>? where,
     int? limit,
-    _i1.Transaction? transaction,
+    _is.Transaction? transaction,
   }) async {
     return session.db.count<EscrowPreparation>(
       where: where?.call(EscrowPreparation.t),
@@ -781,11 +885,11 @@ class EscrowPreparationRepository {
 
   /// Acquires row-level locks on [EscrowPreparation] rows matching the [where] expression.
   Future<void> lockRows(
-    _i1.DatabaseSession session, {
-    required _i1.WhereExpressionBuilder<EscrowPreparationTable> where,
-    required _i1.LockMode lockMode,
-    required _i1.Transaction transaction,
-    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+    _is.DatabaseSession session, {
+    required _is.WhereExpressionBuilder<EscrowPreparationTable> where,
+    required _is.LockMode lockMode,
+    required _is.Transaction transaction,
+    _is.LockBehavior lockBehavior = _is.LockBehavior.wait,
   }) async {
     return session.db.lockRows<EscrowPreparation>(
       where: where(EscrowPreparation.t),

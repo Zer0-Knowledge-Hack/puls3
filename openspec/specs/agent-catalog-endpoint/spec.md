@@ -191,12 +191,12 @@ The endpoint MUST lazily build a default service from `StellarConfig.fromEnviron
 
 ### Requirement: Generated client committed
 
-The output of `serverpod generate` (server `generated/` and `puls3_client` protocol) for `AgentSummary`, `AgentCatalogUnavailable` and the `agent` endpoint MUST be committed, and MUST be byte-identical to what `serverpod_cli` 3.4.13 produces.
+The output of `serverpod generate` (server `generated/` and `puls3_client` protocol) for `AgentSummary`, `AgentCatalogUnavailable` and the `agent` endpoint MUST be committed, and MUST be byte-identical to what the repository-pinned `serverpod_cli` 4.0.4 produces.
 
 #### Scenario: No generated diff
 
 - GIVEN the change is committed
-- WHEN CI runs `serverpod generate` with `serverpod_cli` 3.4.13
+- WHEN CI runs `serverpod generate` with `serverpod_cli` 4.0.4
 - THEN `git diff` over `puls3_server` and `puls3_client` is empty
 
 #### Scenario: Client exposes the endpoint

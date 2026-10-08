@@ -10,13 +10,15 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:puls3_client/src/protocol/protocol.dart' as _i2;
+import 'package:puls3_client/src/protocol/protocol.dart' as _ihzwmcdm;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Stable, safe error transported by every puls3 Serverpod endpoint.
 abstract class Puls3ApiException
-    implements _i1.SerializableException, _i1.SerializableModel {
+    implements
+        _isc.SerializableException,
+        _isc.SerializableModel,
+        _isc.ProtocolSerialization {
   Puls3ApiException._({
     required this.code,
     this.message,
@@ -35,7 +37,7 @@ abstract class Puls3ApiException
       message: jsonSerialization['message'] as String?,
       details: jsonSerialization['details'] == null
           ? null
-          : _i2.Protocol().deserialize<Map<String, String>>(
+          : _ihzwmcdm.Protocol().deserialize<Map<String, String>>(
               jsonSerialization['details'],
             ),
     );
@@ -54,7 +56,7 @@ abstract class Puls3ApiException
 
   /// Returns a shallow copy of this [Puls3ApiException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   Puls3ApiException copyWith({
     String? code,
     String? message,
@@ -62,6 +64,16 @@ abstract class Puls3ApiException
   });
   @override
   Map<String, dynamic> toJson() {
+    return {
+      '__className__': 'Puls3ApiException',
+      'code': code,
+      if (message != null) 'message': message,
+      if (details != null) 'details': details?.toJson(),
+    };
+  }
+
+  @override
+  Map<String, dynamic> toJsonForProtocol() {
     return {
       '__className__': 'Puls3ApiException',
       'code': code,
@@ -91,7 +103,7 @@ class _Puls3ApiExceptionImpl extends Puls3ApiException {
 
   /// Returns a shallow copy of this [Puls3ApiException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   Puls3ApiException copyWith({
     String? code,

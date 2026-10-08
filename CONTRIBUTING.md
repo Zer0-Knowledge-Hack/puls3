@@ -18,8 +18,8 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 
 | Tool | Version | Needed for |
 | --- | --- | --- |
-| Flutter (includes Dart) | **3.41.4** (Dart 3.11.1) | Everything |
-| Serverpod CLI | **3.4.13** | Backend code generation |
+| Flutter (includes Dart) | **3.44.4** (Dart 3.12.2) | Everything |
+| Serverpod CLI | **4.0.4** | Backend code generation |
 | Docker Desktop | Latest | Local Postgres + Redis for the backend |
 | Git | Latest | Everything |
 | GitHub CLI (`gh`) | Latest | Optional, for PRs from the terminal |
@@ -34,8 +34,8 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
    ```bash
    cd <your-flutter-folder>
    git fetch --tags
-   git checkout 3.41.4
-   flutter --version   # must say Flutter 3.41.4 and Dart 3.11.1
+   git checkout 3.44.4
+   flutter --version   # must say Flutter 3.44.4 and Dart 3.12.2
    ```
 
 3. Check your setup: `flutter doctor`. For this project you only need **Chrome (web)** to be ✓.
@@ -43,7 +43,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 ### 1.2 Serverpod CLI
 
 ```bash
-dart pub global activate serverpod_cli 3.4.13
+dart pub global activate serverpod_cli 4.0.4
 serverpod version
 ```
 
@@ -54,7 +54,8 @@ If `serverpod` is not found, add the pub cache `bin` folder to your `PATH`:
 | Windows | `%LOCALAPPDATA%\Pub\Cache\bin` |
 | macOS / Linux | `$HOME/.pub-cache/bin` |
 
-> Do not install Serverpod 4.x yet: it needs Dart ≥ 3.12.2. The upgrade is tracked in #16.
+The CLI version must match the pinned Serverpod packages. A different major or
+patch can produce a generated-code diff that CI rejects.
 
 ### 1.3 Docker
 
@@ -63,6 +64,8 @@ Install Docker Desktop (<https://www.docker.com/products/docker-desktop>) and ma
 ---
 
 ## 2. Run the project
+
+The canonical step-by-step path (fresh clone → server and app against testnet) is **[docs/infra/secrets.md → Run against testnet from a fresh clone](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone)**. This section only adds context.
 
 ### 2.1 Clone and install dependencies
 
@@ -76,12 +79,14 @@ The repo is a **Dart pub workspace**. The root `pubspec.yaml` groups `puls3_serv
 
 ### 2.2 Run the app (frontend only)
 
-The app currently uses mock data, so it does not need the backend.
+The app loads the agent catalog from the server and falls back to the bundled demo catalog when the server is unreachable, so it also runs without the backend:
 
 ```bash
 cd puls3_flutter
-flutter run -d chrome
+flutter run -d chrome --dart-define-from-file=../.env
 ```
+
+`../.env` is the root config (`cp .env.example .env`).
 
 To check a production build:
 
@@ -94,27 +99,7 @@ Use a port other than 8080, because the backend uses 8080.
 
 ### 2.3 Run the backend
 
-1. **Generate your local secrets (first time only):**
-
-   ```bash
-   ./scripts/setup-local-secrets.sh
-   ```
-
-   This creates `puls3_server/.env` and `puls3_server/config/passwords.yaml` with random values that are only valid on your machine. Both files are git-ignored. On Windows, run it from **Git Bash**.
-2. **Start Postgres and Redis:**
-
-   ```bash
-   cd puls3_server
-   docker compose up --build --detach
-   ```
-
-3. **Start the server:**
-
-   ```bash
-   dart bin/main.dart --apply-migrations
-   ```
-
-4. **Stop everything when you are done:** press `Ctrl+C` to stop the server, then run `docker compose stop`.
+Follow steps 2, 3 and 5 of the [canonical path](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone): local secrets, root `.env`, then `docker compose up --build --detach`, `set -a; . ../.env; set +a` and `dart bin/main.dart --apply-migrations` from `puls3_server/`. Stop with `Ctrl+C`, then `docker compose stop`.
 
 | Service | Local port |
 | --- | --- |
@@ -253,7 +238,7 @@ The repo is **public**. Anything you push can be seen and copied.
 
 - **Never commit secrets:** Stellar secret seeds (`S…`), API keys, passwords, or `.env` files.
 - Local secrets live in git-ignored files (`puls3_server/.env`, `puls3_server/config/passwords.yaml`). Use `scripts/setup-local-secrets.sh` to create them.
-- Read keys from environment variables, and document every new one in an `.env.example`.
+- Read keys from environment variables, and document every new one in the root `.env.example` (and any new secret in [`docs/infra/secrets.md`](docs/infra/secrets.md)). `bash scripts/tests/env-inventory.test.sh` checks both.
 - If you leak a secret, tell the team right away and rotate it. Deleting the commit is not enough.
 
 ---
@@ -300,7 +285,7 @@ repository-admin access. They cannot be proven by local commands alone.
 
 | Problem | Fix |
 | --- | --- |
-| `version solving failed` / `requires SDK version ^3.10` | Your Flutter is not 3.41.4. See [1.1](#11-flutter-and-dart). |
+| `version solving failed` / `requires SDK version ^3.12.2` | Your Flutter is not 3.44.4 (Dart 3.12.2). See [1.1](#11-flutter-and-dart). |
 | `serverpod: command not found` | Add the pub cache `bin` folder to your `PATH` ([1.2](#12-serverpod-cli)). |
 | `set it in puls3_server/.env` when running Docker | Run `./scripts/setup-local-secrets.sh` first. |
 | Port 8080 already in use | Another process uses it (maybe a static server). Stop it, or serve the web build on another port. |

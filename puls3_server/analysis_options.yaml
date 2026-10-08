@@ -19,6 +19,9 @@ linter:
   rules:
     unawaited_futures: true
     avoid_print: true
+    # Public constructor parameter names intentionally omit private-field
+    # underscores; changing them would break named call sites.
+    prefer_initializing_formals: false
 
 analyzer:
   exclude:

@@ -57,31 +57,6 @@ CREATE INDEX "chain_submission_state_idx" ON "chain_submission" USING btree ("st
 CREATE INDEX "chain_submission_hire_idx" ON "chain_submission" USING btree ("hireId");
 
 --
--- Class EscrowPreparation as table escrow_preparation
---
-CREATE TABLE "escrow_preparation" (
-    "id" bigserial PRIMARY KEY,
-    "preparationId" text NOT NULL,
-    "hireId" bigint NOT NULL,
-    "purpose" text NOT NULL,
-    "signer" text NOT NULL,
-    "unsignedEnvelopeXdr" text NOT NULL,
-    "transactionHash" text NOT NULL,
-    "sequence" bigint NOT NULL,
-    "validUntil" timestamp without time zone NOT NULL,
-    "jobExpiredAt" bigint,
-    "rejectReason" text,
-    "createdAt" timestamp without time zone NOT NULL,
-    "supersededAt" timestamp without time zone,
-    "submittedAt" timestamp without time zone
-);
-
--- Indexes
-CREATE UNIQUE INDEX "escrow_preparation_id_idx" ON "escrow_preparation" USING btree ("preparationId");
-CREATE INDEX "escrow_preparation_hire_idx" ON "escrow_preparation" USING btree ("hireId");
-CREATE INDEX "escrow_preparation_transaction_idx" ON "escrow_preparation" USING btree ("transactionHash");
-
---
 -- Class HireRecord as table hire
 --
 CREATE TABLE "hire" (
@@ -90,15 +65,8 @@ CREATE TABLE "hire" (
     "agentId" bigint NOT NULL,
     "price" bigint NOT NULL,
     "manifestVersion" bigint NOT NULL,
-    "expiredAt" bigint NOT NULL,
-    "requestId" text,
-    "input" text,
-    "jobId" bigint
+    "expiredAt" bigint NOT NULL
 );
-
--- Indexes
-CREATE UNIQUE INDEX "hire_consumer_request_idx" ON "hire" USING btree ("consumer", "requestId");
-CREATE UNIQUE INDEX "hire_job_id_idx" ON "hire" USING btree ("jobId");
 
 --
 -- Class HirePaymentRecord as table hire_payment
@@ -128,12 +96,34 @@ CREATE TABLE "serverpod_cloud_storage" (
     "addedTime" timestamp without time zone NOT NULL,
     "expiration" timestamp without time zone,
     "byteData" bytea NOT NULL,
-    "verified" boolean NOT NULL
+    "verified" boolean NOT NULL,
+    "contentType" text,
+    "cacheControl" text,
+    "contentDisposition" text,
+    "contentEncoding" text,
+    "customMetadata" text
 );
 
 -- Indexes
 CREATE UNIQUE INDEX "serverpod_cloud_storage_path_idx" ON "serverpod_cloud_storage" USING btree ("storageId", "path");
 CREATE INDEX "serverpod_cloud_storage_expiration" ON "serverpod_cloud_storage" USING btree ("expiration");
+
+--
+-- Class CloudStorageDirectDownloadEntry as table serverpod_cloud_storage_direct_download
+--
+CREATE TABLE "serverpod_cloud_storage_direct_download" (
+    "id" bigserial PRIMARY KEY,
+    "storageId" text NOT NULL,
+    "path" text NOT NULL,
+    "expiration" timestamp without time zone NOT NULL,
+    "authKey" text NOT NULL,
+    "downloadFileName" text,
+    "contentType" text
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "serverpod_cloud_storage_direct_download_auth_key" ON "serverpod_cloud_storage_direct_download" USING btree ("authKey");
+CREATE INDEX "serverpod_cloud_storage_direct_download_expiration" ON "serverpod_cloud_storage_direct_download" USING btree ("expiration");
 
 --
 -- Class CloudStorageDirectUploadEntry as table serverpod_cloud_storage_direct_upload
@@ -143,7 +133,15 @@ CREATE TABLE "serverpod_cloud_storage_direct_upload" (
     "storageId" text NOT NULL,
     "path" text NOT NULL,
     "expiration" timestamp without time zone NOT NULL,
-    "authKey" text NOT NULL
+    "authKey" text NOT NULL,
+    "maxFileSize" bigint NOT NULL DEFAULT 10485760,
+    "contentLength" bigint,
+    "preventOverwrite" boolean NOT NULL DEFAULT false,
+    "contentType" text,
+    "cacheControl" text,
+    "contentDisposition" text,
+    "contentEncoding" text,
+    "customMetadata" text
 );
 
 -- Indexes
@@ -158,13 +156,26 @@ CREATE TABLE "serverpod_future_call" (
     "time" timestamp without time zone NOT NULL,
     "serializedObject" text,
     "serverId" text NOT NULL,
-    "identifier" text
+    "identifier" text,
+    "scheduling" json
 );
 
 -- Indexes
 CREATE INDEX "serverpod_future_call_time_idx" ON "serverpod_future_call" USING btree ("time");
 CREATE INDEX "serverpod_future_call_serverId_idx" ON "serverpod_future_call" USING btree ("serverId");
 CREATE INDEX "serverpod_future_call_identifier_idx" ON "serverpod_future_call" USING btree ("identifier");
+
+--
+-- Class FutureCallClaimEntry as table serverpod_future_call_claim
+--
+CREATE TABLE "serverpod_future_call_claim" (
+    "id" bigserial PRIMARY KEY,
+    "futureCallId" bigint,
+    "lastHeartbeatTime" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "future_call_unique_idx" ON "serverpod_future_call_claim" USING btree ("futureCallId");
 
 --
 -- Class ServerHealthConnectionInfo as table serverpod_health_connection_info
@@ -216,7 +227,7 @@ CREATE TABLE "serverpod_log" (
 );
 
 -- Indexes
-CREATE INDEX "serverpod_log_sessionLogId_idx" ON "serverpod_log" USING btree ("sessionLogId");
+CREATE INDEX "serverpod_log_sessionLogId_idx" ON "serverpod_log" USING btree ("sessionLogId", "order");
 
 --
 -- Class MessageLogEntry as table serverpod_message_log
@@ -234,6 +245,9 @@ CREATE TABLE "serverpod_message_log" (
     "slow" boolean NOT NULL,
     "order" bigint NOT NULL
 );
+
+-- Indexes
+CREATE INDEX "serverpod_message_log_sessionLogId_idx" ON "serverpod_message_log" USING btree ("sessionLogId", "order");
 
 --
 -- Class MethodInfo as table serverpod_method
@@ -278,7 +292,7 @@ CREATE TABLE "serverpod_query_log" (
 );
 
 -- Indexes
-CREATE INDEX "serverpod_query_log_sessionLogId_idx" ON "serverpod_query_log" USING btree ("sessionLogId");
+CREATE INDEX "serverpod_query_log_sessionLogId_idx" ON "serverpod_query_log" USING btree ("sessionLogId", "order");
 
 --
 -- Class ReadWriteTestEntry as table serverpod_readwrite_test
@@ -502,14 +516,14 @@ CREATE TABLE "serverpod_auth_idp_rate_limited_request_attempt" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid_v7(),
     "domain" text NOT NULL,
     "source" text NOT NULL,
-    "nonce" text NOT NULL,
+    "key" text NOT NULL,
     "ipAddress" text,
     "attemptedAt" timestamp without time zone NOT NULL,
     "extraData" json
 );
 
 -- Indexes
-CREATE INDEX "serverpod_auth_idp_rate_limited_request_attempt_composite" ON "serverpod_auth_idp_rate_limited_request_attempt" USING btree ("domain", "source", "nonce", "attemptedAt");
+CREATE INDEX "serverpod_auth_idp_rate_limited_request_attempt_composite" ON "serverpod_auth_idp_rate_limited_request_attempt" USING btree ("domain", "source", "key", "attemptedAt");
 
 --
 -- Class SecretChallenge as table serverpod_auth_idp_secret_challenge
@@ -590,6 +604,16 @@ CREATE TABLE "serverpod_auth_core_user" (
     "scopeNames" json NOT NULL,
     "blocked" boolean NOT NULL
 );
+
+--
+-- Foreign relations for "serverpod_future_call_claim" table
+--
+ALTER TABLE ONLY "serverpod_future_call_claim"
+    ADD CONSTRAINT "serverpod_future_call_claim_fk_0"
+    FOREIGN KEY("futureCallId")
+    REFERENCES "serverpod_future_call"("id")
+    ON DELETE CASCADE
+    ON UPDATE NO ACTION;
 
 --
 -- Foreign relations for "serverpod_log" table
@@ -773,7 +797,8 @@ ALTER TABLE ONLY "serverpod_auth_core_profile"
     FOREIGN KEY("imageId")
     REFERENCES "serverpod_auth_core_profile_image"("id")
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
+    ON UPDATE NO ACTION
+    DEFERRABLE INITIALLY DEFERRED;
 
 --
 -- Foreign relations for "serverpod_auth_core_profile_image" table
@@ -800,33 +825,33 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261008012344930', now())
+    VALUES ('puls3', '20261007214534790-upgrade-4-0', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261008012344930', "timestamp" = now();
+    DO UPDATE SET "version" = '20261007214534790-upgrade-4-0', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod', '20260129180959368', now())
+    VALUES ('serverpod', '20260824182259319', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260129180959368', "timestamp" = now();
+    DO UPDATE SET "version" = '20260824182259319', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod_auth_idp
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod_auth_idp', '20260213194423028', now())
+    VALUES ('serverpod_auth_idp', '20260924105404509', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260213194423028', "timestamp" = now();
+    DO UPDATE SET "version" = '20260924105404509', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod_auth_core
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('serverpod_auth_core', '20260129181112269', now())
+    VALUES ('serverpod_auth_core', '20260924105232991', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260129181112269', "timestamp" = now();
+    DO UPDATE SET "version" = '20260924105232991', "timestamp" = now();
 
 
 COMMIT;

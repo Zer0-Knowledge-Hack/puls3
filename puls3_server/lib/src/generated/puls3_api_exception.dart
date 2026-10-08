@@ -10,16 +10,15 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod/serverpod.dart' as _i1;
-import 'package:puls3_server/src/generated/protocol.dart' as _i2;
+import 'package:puls3_server/src/generated/protocol.dart' as _i7k47pdw;
+import 'package:serverpod/serverpod.dart' as _is;
 
 /// Stable, safe error transported by every puls3 Serverpod endpoint.
 abstract class Puls3ApiException
     implements
-        _i1.SerializableException,
-        _i1.SerializableModel,
-        _i1.ProtocolSerialization {
+        _is.SerializableException,
+        _is.SerializableModel,
+        _is.ProtocolSerialization {
   Puls3ApiException._({
     required this.code,
     this.message,
@@ -38,7 +37,7 @@ abstract class Puls3ApiException
       message: jsonSerialization['message'] as String?,
       details: jsonSerialization['details'] == null
           ? null
-          : _i2.Protocol().deserialize<Map<String, String>>(
+          : _i7k47pdw.Protocol().deserialize<Map<String, String>>(
               jsonSerialization['details'],
             ),
     );
@@ -57,7 +56,7 @@ abstract class Puls3ApiException
 
   /// Returns a shallow copy of this [Puls3ApiException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   Puls3ApiException copyWith({
     String? code,
     String? message,
@@ -104,7 +103,7 @@ class _Puls3ApiExceptionImpl extends Puls3ApiException {
 
   /// Returns a shallow copy of this [Puls3ApiException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_is.useResult
   @override
   Puls3ApiException copyWith({
     String? code,
