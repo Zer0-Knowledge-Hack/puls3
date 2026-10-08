@@ -1,3 +1,5 @@
+import 'package:serverpod/serverpod.dart' show Transaction;
+
 import '../generated/protocol.dart';
 import 'submission_values.dart';
 
@@ -100,6 +102,11 @@ abstract interface class ChainSubmissionStore {
   /// [transactionHash] already has a record, and [ArgumentError] when
   /// [preparationId] does not fit [purpose]: wallet-signed purposes need
   /// one, server-signed purposes never have one.
+  ///
+  /// With a [transaction] the insert joins it, so a preparation claim and
+  /// this record commit or roll back together; a unique violation then
+  /// aborts the transaction, which the caller must roll back. Stores
+  /// without a database ignore it.
   Future<StoredSubmission> insertSubmitted({
     required SubmissionPurpose purpose,
     required String transactionHash,
@@ -108,6 +115,7 @@ abstract interface class ChainSubmissionStore {
     String? preparationId,
     int? hireId,
     String? explorerUrl,
+    Transaction? transaction,
   });
 
   /// The record of [preparationId], or `null`.

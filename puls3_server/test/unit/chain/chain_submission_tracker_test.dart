@@ -9,6 +9,7 @@ import 'package:puls3_server/src/ledger/escrow_events.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
+import 'package:serverpod/serverpod.dart' show Transaction;
 import 'package:test/test.dart';
 
 import '../../support/fake_escrow_effects.dart';
@@ -67,6 +68,7 @@ final class _FlakyStore implements ChainSubmissionStore {
     String? preparationId,
     int? hireId,
     String? explorerUrl,
+    Transaction? transaction,
   }) => _inner.insertSubmitted(
     purpose: purpose,
     transactionHash: transactionHash,
@@ -75,6 +77,7 @@ final class _FlakyStore implements ChainSubmissionStore {
     preparationId: preparationId,
     hireId: hireId,
     explorerUrl: explorerUrl,
+    transaction: transaction,
   );
 
   @override

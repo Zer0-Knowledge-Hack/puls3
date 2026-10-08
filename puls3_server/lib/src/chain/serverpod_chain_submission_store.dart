@@ -32,6 +32,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
     String? preparationId,
     int? hireId,
     String? explorerUrl,
+    Transaction? transaction,
   }) async {
     checkPreparation(purpose, preparationId);
     final now = _now().toUtc();
@@ -52,6 +53,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
           createdAt: now,
           lastCheckedAt: now,
         ),
+        transaction: transaction,
       );
       return _stored(row);
     } on DatabaseQueryException catch (e) {

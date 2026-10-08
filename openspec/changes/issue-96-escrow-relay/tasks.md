@@ -63,8 +63,8 @@ Chain strategy: size-exception
 
 ## C5: Preparation store and claim
 
-- [ ] 5.1 RED: integration test: conditional-UPDATE race prepare vs submit; claim 0 rows -> superseded; `ChainSubmissionConflict` re-read. Covers: Superseded, Concurrent submits.
-- [ ] 5.2 GREEN: `lib/src/hire/escrow_preparation_store.dart` + Serverpod impl; add optional `Transaction?` to `lib/src/chain/serverpod_chain_submission_store.dart`.
+- [x] 5.1 RED: integration test: conditional-UPDATE race prepare vs submit; claim 0 rows -> superseded; `ChainSubmissionConflict` re-read. Covers: Superseded, Concurrent submits.
+- [x] 5.2 GREEN: `lib/src/hire/escrow_preparation_store.dart` + Serverpod impl; add optional `Transaction?` to `lib/src/chain/serverpod_chain_submission_store.dart`.
 
 ## C6: Services (P2-P5)
 
