@@ -953,6 +953,125 @@ void main() {
       });
     });
   });
+
+  group('Manifest JSON', () {
+    AgentManifest deployed([int version = 1]) =>
+        complete().validate(policy, ManifestVersion(version));
+
+    test('toJson adds schema and version to the draft document', () {
+      final json = deployed(3).toJson();
+      expect(json['schema'], 'puls3.agent-manifest/v1');
+      expect(json['version'], 3);
+      expect(
+        Map.of(json)
+          ..remove('schema')
+          ..remove('version'),
+        complete().toJson(),
+      );
+    });
+
+    test('S30 a manifest round-trips in every field', () {
+      final m = deployed(7);
+      expect(AgentManifest.fromJson(m.toJson(), policy), m);
+    });
+
+    test('schema is optional on input but must match when present', () {
+      final doc = deployed().toJson()..remove('schema');
+      expect(AgentManifest.fromJson(doc, policy), deployed());
+    });
+
+    test('S33 a wrong schema is schemaUnsupported', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()..['schema'] = 'puls3.agent-manifest/v2',
+          policy,
+        ),
+        problems([ManifestProblem.schemaUnsupported]),
+      );
+    });
+
+    test('a missing or invalid version is versionInvalid', () {
+      for (final version in [
+        null,
+        0,
+        -1,
+        1.5,
+        '1',
+        ManifestVersion.maxValue + 1,
+      ]) {
+        final doc = deployed().toJson()..['version'] = version;
+        expect(
+          () => AgentManifest.fromJson(doc, policy),
+          problems([ManifestProblem.versionInvalid]),
+          reason: '$version',
+        );
+      }
+    });
+
+    test('deploy rules apply: a partial document lists what is missing', () {
+      expect(
+        () => AgentManifest.fromJson({'version': 1}, policy),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('a malformed field is reported once, not also as missing', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['name'] = 5
+            ..['skills'] = [
+              {'id': 'Bad Id', 'name': 'A'},
+            ],
+          policy,
+        ),
+        problems([
+          ManifestProblem.nameMalformed,
+          ManifestProblem.skillIdNotKebabCase,
+        ]),
+      );
+    });
+
+    test('S24/S19 tools and credentials are rejected in a manifest too', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['tools'] = []
+            ..['credential'] = 'sk',
+          policy,
+        ),
+        problems([
+          ManifestProblem.toolsNotSupported,
+          ManifestProblem.unknownKey,
+        ]),
+      );
+    });
+
+    test('a non-object is notAnObject', () {
+      expect(
+        () => AgentManifest.fromJson('x', policy),
+        problems([ManifestProblem.notAnObject]),
+      );
+    });
+
+    test('the model policy applies to parsed manifests', () {
+      final doc = deployed().toJson()
+        ..['model'] = {'provider': 'openai', 'id': 'gpt'};
+      expect(
+        () => AgentManifest.fromJson(doc, policy),
+        problems([ManifestProblem.modelProviderNotEnabled]),
+      );
+    });
+  });
 }
 
 Map<String, Object?> draftDoc() => {

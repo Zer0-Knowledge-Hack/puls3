@@ -409,6 +409,26 @@ final class AgentManifest {
 
   String get schema => schemaId;
 
+  /// Reads a deployable manifest from the wire document. `schema` is optional
+  /// but must match; `version` is required. Throws [InvalidManifest] listing
+  /// every parse problem and every deploy rule the fields break under [policy].
+  factory AgentManifest.fromJson(Object? json, ModelPolicy policy) {
+    final parsed = _parseDocument(json, manifest: true);
+    final problems = _merge(
+      parsed.problems,
+      parsed.draft._check(forDeploy: true, policy: policy),
+    );
+    if (problems.isNotEmpty) throw InvalidManifest(problems);
+    return parsed.draft.validate(policy, parsed.version!);
+  }
+
+  /// The wire document, `schema` and `version` included.
+  Map<String, Object?> toJson() => {
+    'schema': schema,
+    'version': version.value,
+    ...toDraft().toJson(),
+  };
+
   /// The editable form, without a version. This manifest is not changed.
   AgentManifestDraft toDraft() => AgentManifestDraft(
     name: name,
@@ -483,6 +503,7 @@ List<ManifestProblem> _merge(
   List<ManifestProblem> parse,
   List<ManifestProblem> check,
 ) {
+  if (parse.contains(ManifestProblem.notAnObject)) return parse;
   final all = {...parse, ...check};
   return [
     for (final p in all)
