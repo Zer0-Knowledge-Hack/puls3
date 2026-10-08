@@ -61,6 +61,21 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 |---|---|---|
 | `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
 
+## Agent wallet custody
+
+Each agent gets its own custodied ed25519 account (ADR-0003 decision 4). The
+server generates the keypair, encrypts the secret seed with AES-256-GCM, and
+stores only the ciphertext, nonce, MAC and key version in `agent_wallet`. The
+plaintext seed is never logged, stored or returned; only the public `G…`
+address leaves the custody adapter.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_AGENT_WALLET_SECRET_KEY` | none (required) | Base64 of a random 32-byte key (`openssl rand -base64 32`) that encrypts agent secrets at rest. When unset, creating an agent wallet fails with `AgentWalletCustodyUnavailable`. |
+
+Funding the account and adding its USDC trustline, and the on-chain
+registration (`register_full` / `set_agent_wallet`), are the next part of #18.
+
 ## Prerequisites
 
 - Dart 3.12.2

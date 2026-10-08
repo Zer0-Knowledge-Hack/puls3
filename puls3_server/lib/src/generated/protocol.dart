@@ -21,6 +21,7 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
     as _iais;
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'agent/agent_wallet.dart' as _ickya0iq;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
@@ -33,6 +34,7 @@ import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_view.dart' as _ivruwodq;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
+export 'agent/agent_wallet.dart';
 export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
@@ -52,6 +54,99 @@ class Protocol extends _is.DatabaseSerializationManager {
   static final Protocol _instance = Protocol._().._registerHostProtocols();
 
   static List<_isp.TableDefinition> get targetTableDefinitions => [
+    _isp.TableDefinition(
+      name: 'agent_wallet',
+      dartName: 'AgentWallet',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'address',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'ciphertext',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'nonce',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'mac',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'keyVersion',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'agent_wallet_address_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'address',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'agent_wallet_owner_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'owner',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     _isp.TableDefinition(
       name: 'chain_submission',
       dartName: 'ChainSubmission',
@@ -396,6 +491,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
     }
+    if (t == _ickya0iq.AgentWallet) {
+      return _ickya0iq.AgentWallet.fromJson(data) as T;
+    }
     if (t == _iz6hnyrm.ChainSubmission) {
       return _iz6hnyrm.ChainSubmission.fromJson(data) as T;
     }
@@ -434,6 +532,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ickya0iq.AgentWallet?>()) {
+      return (data != null ? _ickya0iq.AgentWallet.fromJson(data) : null) as T;
     }
     if (t == _is.getType<_iz6hnyrm.ChainSubmission?>()) {
       return (data != null ? _iz6hnyrm.ChainSubmission.fromJson(data) : null)
@@ -501,6 +602,7 @@ class Protocol extends _is.DatabaseSerializationManager {
     return switch (type) {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _ickya0iq.AgentWallet => 'AgentWallet',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
@@ -529,6 +631,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'AgentCatalogUnavailable';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _ickya0iq.AgentWallet():
+        return 'AgentWallet';
       case _iz6hnyrm.ChainSubmission():
         return 'ChainSubmission';
       case _izw8z7ou.Greeting():
@@ -580,6 +684,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'AgentWallet') {
+      return deserialize<_ickya0iq.AgentWallet>(data['data']);
     }
     if (dataClassName == 'ChainSubmission') {
       return deserialize<_iz6hnyrm.ChainSubmission>(data['data']);
@@ -652,6 +759,8 @@ class Protocol extends _is.DatabaseSerializationManager {
       }
     }
     switch (t) {
+      case _ickya0iq.AgentWallet:
+        return _ickya0iq.AgentWallet.t;
       case _iz6hnyrm.ChainSubmission:
         return _iz6hnyrm.ChainSubmission.t;
       case _ikb6z54u.HireRecord:
