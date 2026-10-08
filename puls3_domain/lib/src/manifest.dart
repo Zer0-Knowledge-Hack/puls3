@@ -125,7 +125,7 @@ enum OutputType { text, markdown }
 ///
 /// Building a draft accepts missing fields and texts below their minimum, so a
 /// half-written manifest can be saved. It rejects values above a maximum.
-/// [problemsForDeploy] lists what is still missing for a deploy.
+/// [validate] is the deploy gate.
 final class AgentManifestDraft {
   AgentManifestDraft._(
     this.name,
@@ -185,6 +185,26 @@ final class AgentManifestDraft {
   /// The Studio's test run uses it before the deploy.
   List<ManifestProblem> problemsForDeploy(ModelPolicy policy) =>
       _check(forDeploy: true, policy: policy);
+
+  /// The deployable manifest, or [InvalidManifest] listing every broken rule.
+  /// The caller passes `latest?.next() ?? ManifestVersion.first` as [version].
+  AgentManifest validate(ModelPolicy policy, ManifestVersion version) {
+    final problems = problemsForDeploy(policy);
+    if (problems.isNotEmpty) throw InvalidManifest(problems);
+    return AgentManifest._(
+      version,
+      name!,
+      description!,
+      skills!,
+      model!,
+      systemPrompt!,
+      inputType!,
+      inputMaxChars!,
+      outputType!,
+      outputMaxChars!,
+      price!,
+    );
+  }
 
   /// One pass over the fields in manifest order. A draft skips only the
   /// missing and below-minimum rules; everything else always applies.
@@ -295,3 +315,92 @@ final class AgentManifestDraft {
     return found;
   }
 }
+
+/// A validated, immutable agent manifest ready to deploy. Every field is set
+/// and the skill lists cannot be changed.
+final class AgentManifest {
+  AgentManifest._(
+    this.version,
+    this.name,
+    this.description,
+    this.skills,
+    this.model,
+    this.systemPrompt,
+    this.inputType,
+    this.inputMaxChars,
+    this.outputType,
+    this.outputMaxChars,
+    this.price,
+  );
+
+  static const schemaId = 'puls3.agent-manifest/v1';
+
+  final ManifestVersion version;
+  final String name;
+  final String description;
+  final List<Skill> skills;
+  final ModelId model;
+  final String systemPrompt;
+  final InputType inputType;
+  final int inputMaxChars;
+  final OutputType outputType;
+  final int outputMaxChars;
+  final UsdcAmount price;
+
+  String get schema => schemaId;
+
+  /// The editable form, without a version. This manifest is not changed.
+  AgentManifestDraft toDraft() => AgentManifestDraft(
+    name: name,
+    description: description,
+    skills: skills,
+    model: model,
+    systemPrompt: systemPrompt,
+    inputType: inputType,
+    inputMaxChars: inputMaxChars,
+    outputType: outputType,
+    outputMaxChars: outputMaxChars,
+    price: price,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is AgentManifest &&
+      other.version == version &&
+      other.name == name &&
+      other.description == description &&
+      _sameSkills(other.skills, skills) &&
+      other.model == model &&
+      other.systemPrompt == systemPrompt &&
+      other.inputType == inputType &&
+      other.inputMaxChars == inputMaxChars &&
+      other.outputType == outputType &&
+      other.outputMaxChars == outputMaxChars &&
+      other.price == price;
+
+  @override
+  int get hashCode => Object.hash(
+    version,
+    name,
+    description,
+    Object.hashAll(skills.map((s) => s.id)),
+    model,
+    systemPrompt,
+    inputType,
+    inputMaxChars,
+    outputType,
+    outputMaxChars,
+    price,
+  );
+}
+
+bool _sameSkills(List<Skill> a, List<Skill> b) =>
+    a.length == b.length &&
+    [
+      for (var i = 0; i < a.length; i++)
+        a[i].id == b[i].id &&
+            a[i].name == b[i].name &&
+            a[i].description == b[i].description &&
+            a[i].tags.length == b[i].tags.length &&
+            a[i].tags.indexed.every((t) => b[i].tags[t.$1] == t.$2),
+    ].every((same) => same);

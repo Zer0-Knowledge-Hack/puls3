@@ -413,6 +413,89 @@ void main() {
     });
   });
 
+  group('I32 Deploy', () {
+    test('a complete draft becomes a version 1 manifest', () {
+      final m = complete().validate(policy, ManifestVersion.first);
+      expect(m.version, ManifestVersion.first);
+      expect(m.schema, 'puls3.agent-manifest/v1');
+      expect(m.name, 'Copy Forge');
+      expect(m.model, llama);
+      expect(m.price, UsdcAmount.stroops(3000000));
+    });
+
+    test('an empty draft lists one missing problem per required field', () {
+      expect(
+        () => AgentManifestDraft().validate(policy, ManifestVersion.first),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('six problems come at once, in field order, and are stable', () {
+      AgentManifestDraft bad() => complete(
+        name: 'ab',
+        description: 'short',
+        skills: [],
+        model: ModelId(provider: 'workers-ai', id: 'other'),
+        inputMaxChars: 0,
+        price: UsdcAmount.zero,
+      );
+      const expected = [
+        ManifestProblem.nameTooShort,
+        ManifestProblem.descriptionTooShort,
+        ManifestProblem.skillsMissing,
+        ManifestProblem.modelNotAllowed,
+        ManifestProblem.inputMaxCharsTooLow,
+        ManifestProblem.priceNotPositive,
+      ];
+      expect(
+        () => bad().validate(policy, ManifestVersion.first),
+        problems(expected),
+      );
+      expect(bad().problemsForDeploy(policy), expected);
+      expect(bad().problemsForDeploy(policy), expected);
+    });
+
+    test('the same input gives equal manifests', () {
+      final a = complete().validate(policy, ManifestVersion.first);
+      final b = complete().validate(policy, ManifestVersion.first);
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+      expect(
+        a,
+        isNot(complete(name: 'Other').validate(policy, ManifestVersion.first)),
+      );
+      expect(a, isNot(complete().validate(policy, ManifestVersion(2))));
+    });
+
+    test('skills and tags cannot be changed afterwards', () {
+      final tagged = Skill(id: 'rewrite', name: 'Rewrite', tags: ['copy']);
+      final m = complete(
+        skills: [tagged],
+      ).validate(policy, ManifestVersion.first);
+      expect(() => m.skills.add(skill('x')), throwsUnsupportedError);
+      expect(() => m.skills.first.tags.add('x'), throwsUnsupportedError);
+    });
+
+    test('toDraft has no version and leaves the manifest alone', () {
+      final m = complete().validate(policy, ManifestVersion(3));
+      final d = m.toDraft();
+      expect(d.name, m.name);
+      expect(d.skills, m.skills);
+      expect(d.price, m.price);
+      expect(d.validate(policy, m.version.next()).version, ManifestVersion(4));
+      expect(m.version, ManifestVersion(3));
+    });
+  });
+
   group('InvalidManifest', () {
     test('carries the problems in order with a readable message', () {
       final e = InvalidManifest([
@@ -448,6 +531,202 @@ void main() {
 
     test('rejects an empty list', () {
       expect(() => InvalidManifest([]), throwsArgumentError);
+    });
+  });
+
+  group('Hardening: runes, equality, aliasing, deploy edges', () {
+    const emoji = '\u{1F600}';
+    String emojis(int n) => emoji * n;
+
+    test('name counts runes, not UTF-16 units', () {
+      expect(emojis(2).length, 4);
+      expect(deploy(complete(name: emojis(2))), [ManifestProblem.nameTooShort]);
+      expect(deploy(complete(name: emojis(3))), isEmpty);
+      expect(deploy(complete(name: emojis(25))), isEmpty);
+      expect(deploy(complete(name: emojis(48))), isEmpty);
+      expect(
+        () => complete(name: emojis(49)),
+        problems([ManifestProblem.nameTooLong]),
+      );
+    });
+
+    test('description counts runes, not UTF-16 units', () {
+      expect(deploy(complete(description: emojis(5))), [
+        ManifestProblem.descriptionTooShort,
+      ]);
+      expect(deploy(complete(description: emojis(10))), isEmpty);
+      expect(deploy(complete(description: emojis(280))), isEmpty);
+      expect(
+        () => complete(description: emojis(281)),
+        problems([ManifestProblem.descriptionTooLong]),
+      );
+    });
+
+    test('systemPrompt counts runes, not UTF-16 units', () {
+      expect(deploy(complete(systemPrompt: emojis(10))), [
+        ManifestProblem.systemPromptTooShort,
+      ]);
+      expect(deploy(complete(systemPrompt: emojis(20))), isEmpty);
+      expect(deploy(complete(systemPrompt: emojis(8000))), isEmpty);
+      expect(
+        () => complete(systemPrompt: emojis(8001)),
+        problems([ManifestProblem.systemPromptTooLong]),
+      );
+    });
+
+    Skill tagged({
+      String id = 'rewrite',
+      String name = 'Rewrite',
+      String description = 'Rewrites',
+      List<String> tags = const ['copy'],
+    }) => Skill(id: id, name: name, description: description, tags: tags);
+
+    AgentManifest build({
+      int version = 1,
+      String name = 'Copy Forge',
+      String description = 'Rewrites marketing copy.',
+      List<Skill>? skills,
+      ModelId? model,
+      String systemPrompt = 'You rewrite copy in a clear voice.',
+      int inputMaxChars = 4000,
+      OutputType outputType = OutputType.markdown,
+      int outputMaxChars = 8000,
+      int price = 3000000,
+    }) => AgentManifestDraft(
+      name: name,
+      description: description,
+      skills: skills ?? [tagged()],
+      model: model ?? llama,
+      systemPrompt: systemPrompt,
+      inputType: InputType.text,
+      inputMaxChars: inputMaxChars,
+      outputType: outputType,
+      outputMaxChars: outputMaxChars,
+      price: UsdcAmount.stroops(price),
+    ).validate(policy, ManifestVersion(version));
+
+    test('equal manifests have equal hash codes', () {
+      expect(build(), build());
+      expect(build().hashCode, build().hashCode);
+    });
+
+    test('a manifest differing in one field only is not equal', () {
+      final base = build();
+      final variants = <String, AgentManifest>{
+        'version': build(version: 2),
+        'name': build(name: 'Other Name'),
+        'description': build(description: 'Rewrites other copy.'),
+        'skill id': build(skills: [tagged(id: 'other')]),
+        'skill name': build(skills: [tagged(name: 'Other')]),
+        'skill description': build(skills: [tagged(description: 'Different')]),
+        'skill tags': build(
+          skills: [
+            tagged(tags: ['other']),
+          ],
+        ),
+        'skill tag count': build(
+          skills: [
+            tagged(tags: ['copy', 'more']),
+          ],
+        ),
+        'skill count': build(skills: [tagged(), skill('second')]),
+        'model': build(
+          model: ModelId(provider: 'anthropic', id: 'x'),
+        ),
+        'systemPrompt': build(systemPrompt: 'You rewrite copy differently.'),
+        'inputMaxChars': build(inputMaxChars: 4001),
+        'outputType': build(outputType: OutputType.text),
+        'outputMaxChars': build(outputMaxChars: 8001),
+        'price': build(price: 3000001),
+      };
+      variants.forEach((field, other) {
+        expect(base == other, isFalse, reason: field);
+        expect(other == base, isFalse, reason: field);
+      });
+    });
+
+    test(
+      'changing the original skills list after building changes nothing',
+      () {
+        final original = [skill('a')];
+        final draft = complete(skills: original);
+        final manifest = draft.validate(policy, ManifestVersion.first);
+        final expected = complete(
+          skills: [skill('a')],
+        ).validate(policy, ManifestVersion.first);
+
+        original
+          ..add(skill('b'))
+          ..add(skill('c'));
+        expect(draft.skills!.map((s) => s.id), ['a']);
+        expect(manifest.skills.map((s) => s.id), ['a']);
+        expect(manifest, expected);
+
+        original.clear();
+        expect(draft.skills!.map((s) => s.id), ['a']);
+        expect(manifest.skills.map((s) => s.id), ['a']);
+        expect(draft.problemsForDeploy(policy), isEmpty);
+        expect(manifest, expected);
+      },
+    );
+
+    test('changing the list after validate leaves the manifest alone', () {
+      final original = [skill('a')];
+      final draft = complete(skills: original);
+      final manifest = draft.validate(policy, ManifestVersion.first);
+      original.add(skill('b'));
+      expect(draft.validate(policy, ManifestVersion.first), manifest);
+      expect(manifest.skills, hasLength(1));
+    });
+
+    test('a draft skills list cannot be changed', () {
+      final draft = complete();
+      expect(() => draft.skills!.add(skill('x')), throwsUnsupportedError);
+    });
+
+    test('input or output type without a max is missing on deploy', () {
+      final full = complete();
+      final noInputMax = AgentManifestDraft(
+        name: full.name,
+        description: full.description,
+        skills: full.skills,
+        model: full.model,
+        systemPrompt: full.systemPrompt,
+        inputType: InputType.text,
+        outputType: OutputType.markdown,
+        outputMaxChars: 8000,
+        price: full.price,
+      );
+      expect(deploy(noInputMax), [ManifestProblem.inputMissing]);
+      final noOutputMax = AgentManifestDraft(
+        name: full.name,
+        description: full.description,
+        skills: full.skills,
+        model: full.model,
+        systemPrompt: full.systemPrompt,
+        inputType: InputType.text,
+        inputMaxChars: 4000,
+        outputType: OutputType.markdown,
+        price: full.price,
+      );
+      expect(deploy(noOutputMax), [ManifestProblem.outputMissing]);
+    });
+
+    test('toDraft then validate gives back an equal manifest', () {
+      final m = build();
+      final again = m.toDraft().validate(policy, m.version);
+      expect(again, m);
+      expect(again.hashCode, m.hashCode);
+    });
+
+    test('a whitespace-only systemPrompt is missing on deploy only', () {
+      final d = complete(systemPrompt: ' \n\t ');
+      expect(d.systemPrompt, ' \n\t ');
+      expect(deploy(d), [ManifestProblem.systemPromptMissing]);
+      expect(
+        () => d.validate(policy, ManifestVersion.first),
+        problems([ManifestProblem.systemPromptMissing]),
+      );
     });
   });
 }
