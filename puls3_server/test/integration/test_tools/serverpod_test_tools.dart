@@ -15,10 +15,15 @@ import 'dart:async' as _ida;
 import 'dart:io' as _idi;
 import 'package:puls3_server/src/generated/agent/agent_summary.dart'
     as _ih3rdrku;
+import 'package:puls3_server/src/generated/create_hire_result.dart'
+    as _iba6uw0u;
 import 'package:puls3_server/src/generated/greetings/greeting.dart'
     as _idslfse3;
 import 'package:puls3_server/src/generated/health/backend_health.dart'
     as _im9biaqa;
+import 'package:puls3_server/src/generated/hire_detail.dart' as _i0z7bvay;
+import 'package:puls3_server/src/generated/prepared_transaction.dart'
+    as _ip1gnsd7;
 import 'package:serverpod/serverpod.dart' as _is;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _iacs;
@@ -165,6 +170,8 @@ class TestEndpoints {
   late final _GreetingEndpoint greeting;
 
   late final _HealthEndpoint health;
+
+  late final _HireEndpoint hire;
 }
 
 class _InternalTestEndpoints extends TestEndpoints
@@ -191,6 +198,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     health = _HealthEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    hire = _HireEndpoint(
       endpoints,
       serializationManager,
     );
@@ -662,6 +673,221 @@ class _HealthEndpoint {
                   _localCallContext.arguments,
                 )
                 as _ida.Future<_im9biaqa.BackendHealth>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _HireEndpoint {
+  _HireEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<_iba6uw0u.CreateHireResult> createHire(
+    _ist.TestSessionBuilder sessionBuilder,
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'createHire',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'createHire',
+          parameters: _ist.testObjectToJson({
+            'agentId': agentId,
+            'consumer': consumer,
+            'input': input,
+            'requestId': requestId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_iba6uw0u.CreateHireResult>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareCreateJob(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'prepareCreateJob',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'prepareCreateJob',
+          parameters: _ist.testObjectToJson({'hireId': hireId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareFund(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'prepareFund',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'prepareFund',
+          parameters: _ist.testObjectToJson({'hireId': hireId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareComplete(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'prepareComplete',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'prepareComplete',
+          parameters: _ist.testObjectToJson({'hireId': hireId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareReject(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+    String reason,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'prepareReject',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'prepareReject',
+          parameters: _ist.testObjectToJson({
+            'hireId': hireId,
+            'reason': reason,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i0z7bvay.HireDetail> submitEscrowCall(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'submitEscrowCall',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'submitEscrowCall',
+          parameters: _ist.testObjectToJson({
+            'hireId': hireId,
+            'preparationId': preparationId,
+            'signedTransactionXdr': signedTransactionXdr,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i0z7bvay.HireDetail>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

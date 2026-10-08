@@ -20,6 +20,7 @@ import '../auth/email_idp_endpoint.dart' as _iuc1hd5t;
 import '../auth/jwt_refresh_endpoint.dart' as _inwq3ztq;
 import '../greetings/greeting_endpoint.dart' as _il624ik7;
 import '../health/health_endpoint.dart' as _id9paj9q;
+import '../hire/hire_endpoint.dart' as _icdhibuq;
 
 class Endpoints extends _is.EndpointDispatch {
   @override
@@ -53,6 +54,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'health',
+          null,
+        ),
+      'hire': _icdhibuq.HireEndpoint()
+        ..initialize(
+          server,
+          'hire',
           null,
         ),
     };
@@ -334,6 +341,162 @@ class Endpoints extends _is.EndpointDispatch {
                 Map<String, dynamic> params,
               ) async => (endpoints['health'] as _id9paj9q.HealthEndpoint)
                   .check(session),
+        ),
+      },
+    );
+    connectors['hire'] = _is.EndpointConnector(
+      name: 'hire',
+      endpoint: endpoints['hire']!,
+      methodConnectors: {
+        'createHire': _is.MethodConnector(
+          name: 'createHire',
+          params: {
+            'agentId': _is.ParameterDescription(
+              name: 'agentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'consumer': _is.ParameterDescription(
+              name: 'consumer',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'input': _is.ParameterDescription(
+              name: 'input',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'requestId': _is.ParameterDescription(
+              name: 'requestId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _icdhibuq.HireEndpoint).createHire(
+                    session,
+                    params['agentId'],
+                    params['consumer'],
+                    params['input'],
+                    params['requestId'],
+                  ),
+        ),
+        'prepareCreateJob': _is.MethodConnector(
+          name: 'prepareCreateJob',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _icdhibuq.HireEndpoint)
+                  .prepareCreateJob(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
+        'prepareFund': _is.MethodConnector(
+          name: 'prepareFund',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _icdhibuq.HireEndpoint).prepareFund(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
+        'prepareComplete': _is.MethodConnector(
+          name: 'prepareComplete',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _icdhibuq.HireEndpoint).prepareComplete(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
+        'prepareReject': _is.MethodConnector(
+          name: 'prepareReject',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'reason': _is.ParameterDescription(
+              name: 'reason',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _icdhibuq.HireEndpoint).prepareReject(
+                    session,
+                    params['hireId'],
+                    params['reason'],
+                  ),
+        ),
+        'submitEscrowCall': _is.MethodConnector(
+          name: 'submitEscrowCall',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'preparationId': _is.ParameterDescription(
+              name: 'preparationId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'signedTransactionXdr': _is.ParameterDescription(
+              name: 'signedTransactionXdr',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _icdhibuq.HireEndpoint)
+                  .submitEscrowCall(
+                    session,
+                    params['hireId'],
+                    params['preparationId'],
+                    params['signedTransactionXdr'],
+                  ),
         ),
       },
     );
