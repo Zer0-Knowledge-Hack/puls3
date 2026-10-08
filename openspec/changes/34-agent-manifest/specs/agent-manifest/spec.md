@@ -4,7 +4,7 @@
 
 Defines, in the pure-Dart `puls3_domain` package, the one shared model of what an agent is: an editable draft, a validated immutable deployable manifest, the model policy, the validation problems, versioning, JSON and the canonical form. The Studio (#35, #37), the runtime (#20) and the deploy flow (#18) all use it. Field rules come from the spike `docs/spikes/agent-definition.md` (question 1) and ADR-0004.
 
-> **Scope:** the domain holds no hash, no salt, no credential and no persistence. The salted SHA-256 hash, the BYOK credential reference and the "a paid provider needs a stored credential" check belong to the server deploy flow (#18, #35). `puls3_domain` keeps zero runtime dependencies.
+> **Scope:** the domain holds no hash, no salt, no credential and no persistence. The salted SHA-256 hash, the builder credential reference (for any provider: builders always run on their own account, demo agents excepted) and the "the provider needs a stored credential" check belong to the server deploy flow (#18, #35). `puls3_domain` keeps zero runtime dependencies.
 
 ## ADDED Requirements
 
