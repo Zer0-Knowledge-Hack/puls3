@@ -56,10 +56,10 @@ Chain strategy: size-exception
 
 ## C4: Codec and RPC (P1, P2)
 
-- [ ] 4.1 RED: `test/ledger/envelope_codec_test.dart`, one test per field/reason: malformed (empty, non-base64, truncated, trailing, fee-bump), mismatch contract/function/arguments/source/timeBounds/other (P1), signature missing/wrongSigner/doesNotVerify, non-SOURCE_ACCOUNT auth. Covers: Malformed, Body differs x6, Unsigned, Signed by another key, Signature does not verify.
-- [ ] 4.2 GREEN: `lib/src/ledger/envelope_codec.dart` port + adapter file (build, parse, firstDifference, verify).
-- [ ] 4.3 RED/GREEN: `lib/src/ledger/soroban_rpc_client.dart` `getLedgerEntries` (sequence) and base64 simulate; tests with recorded responses.
-- [ ] 4.4 RED/GREEN: `lib/src/hire/chain_accounts.dart` port + adapter, ChainUnavailable on failure (P3 `simulationFailed`).
+- [x] 4.1 RED: `test/ledger/envelope_codec_test.dart`, one test per field/reason: malformed (empty, non-base64, truncated, trailing, fee-bump), mismatch contract/function/arguments/source/timeBounds/other (P1), signature missing/wrongSigner/doesNotVerify, non-SOURCE_ACCOUNT auth. Covers: Malformed, Body differs x6, Unsigned, Signed by another key, Signature does not verify.
+- [x] 4.2 GREEN: `lib/src/ledger/envelope_codec.dart` port + `lib/src/ledger/stellar_envelope_codec.dart` adapter (build, parse, firstDifference, verify); `ScArg.address/i128/voidValue` added to `xdr_invoke_encoder.dart`.
+- [x] 4.3 RED/GREEN: `lib/src/ledger/soroban_rpc_client.dart` `accountSequence` (getLedgerEntries) and `simulateTransactionBase64`; tests on real recorded testnet responses.
+- [x] 4.4 RED/GREEN: `lib/src/hire/chain_accounts.dart` port + adapter, ChainUnavailable on failure (P3 `simulationFailed`).
 
 ## C5: Preparation store and claim
 

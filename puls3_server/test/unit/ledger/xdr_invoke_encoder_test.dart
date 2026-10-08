@@ -165,6 +165,57 @@ void main() {
       });
     });
 
+    group('ScArg address, i128 and void', () {
+      /// The hex of one argument sent to `get_metadata`, cut out the same way
+      /// as in the `ScArg.string` group.
+      String argument(ScArg arg) {
+        final hex = _hex(
+          encodeInvokeEnvelope(
+            source: _source,
+            fee: 100,
+            sequence: 0,
+            contract: _registry,
+            function: 'get_metadata',
+            args: [arg],
+          ),
+        );
+        final start = hex.indexOf(_registryKey) + 64 + 8 + 24 + 8;
+        return hex.substring(start, hex.length - 3 * 8);
+      }
+
+      test('writes an account address as SC_ADDRESS_TYPE_ACCOUNT', () {
+        expect(
+          argument(ScArg.address(_source)),
+          ['00000012', '00000000', '00000000', _sourceKey].join(),
+        );
+      });
+
+      test('writes a contract address as SC_ADDRESS_TYPE_CONTRACT', () {
+        expect(
+          argument(ScArg.address(_registry)),
+          ['00000012', '00000001', _registryKey].join(),
+        );
+      });
+
+      test('writes a positive i128 as hi 0 and the value in lo', () {
+        expect(
+          argument(const ScArg.i128(5000000)),
+          ['0000000a', '0000000000000000', '00000000004c4b40'].join(),
+        );
+      });
+
+      test('sign-extends a negative i128 into hi', () {
+        expect(
+          argument(const ScArg.i128(-1)),
+          ['0000000a', 'ffffffffffffffff', 'ffffffffffffffff'].join(),
+        );
+      });
+
+      test('writes void as the bare SCV_VOID discriminant', () {
+        expect(argument(const ScArg.voidValue()), '00000001');
+      });
+    });
+
     test('encodes a sequence above 2^32 as a big-endian int64', () {
       final envelope = encodeInvokeEnvelope(
         source: _source,

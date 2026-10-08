@@ -41,3 +41,12 @@ final class RpcRequestRejected extends LedgerException {
   /// The JSON-RPC error message, as the node sent it.
   final String rpcMessage;
 }
+
+final _contractError = RegExp(r'Error\(Contract, #(\d+)\)');
+
+/// The `N` of an `Error(Contract, #N)` in a simulation error text, or `null`
+/// when the text names no contract error.
+int? contractErrorCode(String simulationError) {
+  final code = _contractError.firstMatch(simulationError)?.group(1);
+  return code == null ? null : int.parse(code);
+}
