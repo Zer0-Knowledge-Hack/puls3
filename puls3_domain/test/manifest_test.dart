@@ -11,13 +11,13 @@ Matcher problems(List<ManifestProblem> expected) => throwsA(
 );
 
 final policy = ModelPolicy(
-  workersAiModels: {'@cf/meta/llama-3.1-8b-instruct'},
+  workersAiModels: {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},
   paidProviders: {'anthropic'},
 );
 
 final llama = ModelId(
   provider: 'workers-ai',
-  id: '@cf/meta/llama-3.1-8b-instruct',
+  id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
 );
 
 Skill skill([String id = 'rewrite']) => Skill(id: id, name: 'Rewrite');
@@ -119,9 +119,9 @@ void main() {
     test('accepts a workers-ai id with slashes, dots and at sign', () {
       final m = ModelId(
         provider: 'workers-ai',
-        id: '@cf/meta/llama-3.1-8b-instruct',
+        id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       );
-      expect(m.id, '@cf/meta/llama-3.1-8b-instruct');
+      expect(m.id, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     });
 
     test('provider must be kebab-case', () {
@@ -166,10 +166,12 @@ void main() {
   group('I24 ModelPolicy', () {
     final llama = ModelId(
       provider: 'workers-ai',
-      id: '@cf/meta/llama-3.1-8b-instruct',
+      id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     );
     ModelPolicy policy({
-      Set<String> workersAiModels = const {'@cf/meta/llama-3.1-8b-instruct'},
+      Set<String> workersAiModels = const {
+        '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      },
       Set<String> paidProviders = const {'anthropic'},
     }) => ModelPolicy(
       workersAiModels: workersAiModels,
@@ -225,7 +227,7 @@ void main() {
     });
 
     test('copies its sets so later changes do not leak in', () {
-      final models = {'@cf/meta/llama-3.1-8b-instruct'};
+      final models = {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'};
       final paid = {'anthropic'};
       final p = policy(workersAiModels: models, paidProviders: paid);
       models.clear();
@@ -948,7 +950,7 @@ void main() {
         ],
         'model': {
           'provider': 'workers-ai',
-          'id': '@cf/meta/llama-3.1-8b-instruct',
+          'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
         },
         'system_prompt': 'You rewrite copy in a clear voice.',
         'input': {'type': 'text', 'max_chars': 4000},
@@ -1483,7 +1485,10 @@ Map<String, Object?> draftDoc() => {
       'tags': ['copy'],
     },
   ],
-  'model': {'provider': 'workers-ai', 'id': '@cf/meta/llama-3.1-8b-instruct'},
+  'model': {
+    'provider': 'workers-ai',
+    'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  },
   'system_prompt': 'You rewrite copy in a clear voice.',
   'input': {'type': 'text', 'max_chars': 4000},
   'output': {'type': 'markdown', 'max_chars': 8000},

@@ -13,7 +13,7 @@
   ],
   "model": {
     "provider": "workers-ai",
-    "id": "@cf/meta/llama-3.1-8b-instruct"
+    "id": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
   },
   "system_prompt": "You are Brief Bot. The user gives you a long text. Reply with at most five bullet points that capture its key points, in the language of the text. Do not add facts that the text does not state.",
   "input": {

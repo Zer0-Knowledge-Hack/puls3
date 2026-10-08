@@ -119,7 +119,7 @@ Lengths MUST be counted in Unicode runes (code points), not UTF-16 units. Text t
 
 #### Scenario: S15 Allowed workers-ai model
 
-- GIVEN a policy allowing `workers-ai` id `@cf/meta/llama-3.1-8b-instruct`
+- GIVEN a policy allowing `workers-ai` id `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
 - WHEN a draft with that model is validated
 - THEN no model problem is reported
 

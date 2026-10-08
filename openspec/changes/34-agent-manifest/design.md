@@ -96,7 +96,7 @@ final class AgentManifest { // same fields, non-null, plus version; value equali
 | `puls3_domain/lib/puls3_domain.dart` | Modify: export |
 | `puls3_domain/test/manifest_test.dart` | Create |
 | `docs/architecture/examples/agent-manifest.example.json` | Keep: it already uses `{provider,id}` and `version`. It is used as a fixture for `AgentManifest.fromJson` |
-| `docs/architecture/examples/agent-manifest.workers-ai.example.json` | Create: `@cf/meta/llama-3.1-8b-instruct` (illustrative, set by config) |
+| `docs/architecture/examples/agent-manifest.workers-ai.example.json` | Create: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (illustrative, set by config) |
 | `.github/workflows/ci.yml` | Modify: `docs/architecture/examples/*` → domain=true |
 | `docs/adr/0004-*.md`, `docs/domain/model.md`, `docs/architecture/api.md` | Modify |
 

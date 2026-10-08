@@ -48,7 +48,7 @@ PR 3 was split at 3.4/3.5 (the JSON part alone passed ~400 authored lines: 336 c
 ## PR 3b (feat/34-agent-manifest-03b-canonical): DONE, 3.5-3.9
 
 - 3.5/3.6 `AgentManifest.toCanonicalJson()` over a public `canonicalJson(Object?)` (sorted keys at every depth via `_sortKeysDeep`, `jsonEncode`, `StateError` on any double, `dart:convert` only). `canonicalJson` is public so the double rule is testable and the server (#18) can reuse it.
-- 3.7 `docs/architecture/examples/agent-manifest.workers-ai.example.json` (Brief Bot, `workers-ai`, `@cf/meta/llama-3.1-8b-instruct`, v1).
+- 3.7 `docs/architecture/examples/agent-manifest.workers-ai.example.json` (Brief Bot, `workers-ai`, `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, v1).
 - 3.8 Fixture tests (S38-S40 and `toJson` equals source) read `../docs/architecture/examples/*.json` from `puls3_domain`. Mutation check: adding a `credential` key to the workers-ai example failed the group, then was restored. The Copy Forge example needed no change.
 - 3.9 `.github/workflows/ci.yml`: `docs/architecture/examples/*` sets `domain=true` only.
 - Deviation: the example file (3.7) existed before the fixture tests ran, so the 3.8 RED was verified by mutation rather than by a missing file.
