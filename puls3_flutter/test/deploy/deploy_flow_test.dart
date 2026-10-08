@@ -427,6 +427,9 @@ void main() {
 
       h.wallet.failure = null;
       await tester.tap(find.text('Try again'));
+      // The wallet forgot the wrong-network session: it reconnects first,
+      // with the same account, then signs the same transaction.
+      await h.settle(const Duration(milliseconds: 600));
       await h.sign();
       expect(h.statusOf(DeployStep.registering), StepStatus.active);
       expect(h.gateway.prepares, hasLength(1));
