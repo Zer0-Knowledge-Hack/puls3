@@ -8,6 +8,7 @@ export 'src/entities.dart';
 export 'src/errors.dart';
 export 'src/funding.dart';
 export 'src/hire_status.dart';
+export 'src/manifest.dart';
 export 'src/ports.dart';
 export 'src/stellar_address.dart';
 export 'src/values.dart';
