@@ -503,18 +503,30 @@ final class _Parsed {
   final ManifestVersion? version;
 }
 
-/// Deduplicates in order and drops a "missing" problem when the same field
+/// Deduplicates, orders by field (the enum order, so a parse problem and a rule
+/// problem on different fields interleave as the fields do) and drops a "missing" problem when the same field
 /// already has a "malformed" one, so one bad field is reported once.
 List<ManifestProblem> _merge(
   List<ManifestProblem> parse,
   List<ManifestProblem> check,
 ) {
   if (parse.contains(ManifestProblem.notAnObject)) return parse;
-  final all = {...parse, ...check};
+  final all = [
+    ...{...parse, ...check},
+  ]..sort((a, b) => a.index.compareTo(b.index));
   return [
     for (final p in all)
       if (!(_supersededBy[p] ?? const {}).any(all.contains)) p,
   ];
+}
+
+/// A wire number read as an integer: see [_integer]. Anything beyond +-(2^53-1)
+/// is refused, because dart2js cannot hold it exactly. On the web `3.0` and
+/// `3` are one value, so an integral number is accepted whichever way it was
+/// written.
+int? _wireInteger(Object? value) {
+  final n = _integer(value);
+  return n == null || n.abs() > ManifestVersion.maxValue ? null : n;
 }
 
 const _supersededBy = <ManifestProblem, Set<ManifestProblem>>{
@@ -569,7 +581,8 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
   int? whole(Map<Object?, Object?> from, String key, ManifestProblem bad) {
     final value = from[key];
     if (value == null) return null;
-    if (value is int) return value;
+    final n = _wireInteger(value);
+    if (n != null) return n;
     found.add(bad);
     return null;
   }
@@ -619,7 +632,8 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
     }
     final raw = doc['version'];
     try {
-      version = raw is int ? ManifestVersion(raw) : null;
+      final n = _wireInteger(raw);
+      version = n == null ? null : ManifestVersion(n);
     } on InvalidManifest {
       version = null;
     }
@@ -752,16 +766,46 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
 ///
 /// The same data always gives the same text, whatever the key order it was
 /// built with. Non-ASCII text is kept as is, so UTF-8 encoding the result gives
-/// the canonical bytes. Throws [StateError] on any `double`, because floats have
-/// no single textual form.
+/// the canonical bytes.
+///
+/// Numbers must be integers. An integral `double` such as `3.0` is written as
+/// `3`: on the web (dart2js) `3.0` and `3` are the same value, so they cannot
+/// be told apart. Throws [StateError] on a non-integral or non-finite number, on
+/// an integral `double` outside +-(2^53-1), and on any map key that is not a
+/// `String`.
 String canonicalJson(Object? value) => jsonEncode(_sortKeysDeep(value));
 
 Object? _sortKeysDeep(Object? node) => switch (node) {
   Map() => {
-    for (final key in (node.keys.cast<String>().toList()..sort()))
+    for (final key in (_stringKeys(node)..sort()))
       key: _sortKeysDeep(node[key]),
   },
   List() => [for (final item in node) _sortKeysDeep(item)],
-  double() => throw StateError('canonical JSON has no floats: $node'),
+  num() =>
+    _integer(node) ??
+        (throw StateError('canonical JSON allows integers only: $node')),
   _ => node,
 };
+
+List<String> _stringKeys(Map<Object?, Object?> map) {
+  for (final key in map.keys) {
+    if (key is! String) {
+      throw StateError('canonical JSON keys must be strings: $key');
+    }
+  }
+  return map.keys.cast<String>().toList();
+}
+
+/// [value] as an `int` when it is an integer: an `int`, or a finite integral
+/// `double` within +-(2^53-1) (the range a double holds exactly). Otherwise
+/// null.
+int? _integer(Object? value) {
+  if (value is int) return value;
+  if (value is double &&
+      value.isFinite &&
+      value == value.truncateToDouble() &&
+      value.abs() <= ManifestVersion.maxValue) {
+    return value.toInt();
+  }
+  return null;
+}

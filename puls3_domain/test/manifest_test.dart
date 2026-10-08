@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:test/test.dart';
@@ -775,7 +776,7 @@ void main() {
     });
 
     test('S4 a float or out-of-range price amount is malformed', () {
-      for (final amount in [1.5, 3000000.0, -1, UsdcAmount.maxStroops + 1]) {
+      for (final amount in [1.5, double.nan, -1, UsdcAmount.maxStroops + 1]) {
         expect(
           () => AgentManifestDraft.fromJson(
             draftDoc()..['price'] = {'asset': 'USDC', 'amount': amount},
@@ -957,6 +958,209 @@ void main() {
     });
   });
 
+  group('JSON edge cases', () {
+    AgentManifest deployed() =>
+        complete().validate(policy, ManifestVersion.first);
+
+    List<Object?> skills(int n) => [
+      for (var i = 0; i < n; i++) {'id': 'skill-$i', 'name': 'Skill $i'},
+    ];
+
+    test('skillsTooMany through JSON', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills(6)),
+        problems([ManifestProblem.skillsTooMany]),
+      );
+      expect(
+        AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills(5)).skills,
+        hasLength(5),
+      );
+    });
+
+    test('skillIdDuplicate through JSON', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['skills'] = [
+              {'id': 'same', 'name': 'A'},
+              {'id': 'same', 'name': 'B'},
+            ],
+        ),
+        problems([ManifestProblem.skillIdDuplicate]),
+      );
+    });
+
+    test('tools is toolsNotSupported at every level, never unknownKey', () {
+      final cases = <String, void Function(Map<String, Object?>)>{
+        'skill': (d) => ((d['skills']! as List).first as Map)['tools'] = 'x',
+        'model': (d) => (d['model']! as Map)['tools'] = 'x',
+        'input': (d) => (d['input']! as Map)['tools'] = 'x',
+        'output': (d) => (d['output']! as Map)['tools'] = 'x',
+        'price': (d) => (d['price']! as Map)['tools'] = 'x',
+      };
+      cases.forEach((label, mutate) {
+        final doc = draftDoc();
+        mutate(doc);
+        expect(
+          () => AgentManifestDraft.fromJson(doc),
+          problems([ManifestProblem.toolsNotSupported]),
+          reason: label,
+        );
+      });
+    });
+
+    test('a non-string schema is schemaUnsupported', () {
+      for (final schema in <Object?>[
+        3,
+        true,
+        <Object?>[],
+        <String, Object?>{},
+      ]) {
+        expect(
+          () => AgentManifest.fromJson(
+            deployed().toJson()..['schema'] = schema,
+            policy,
+          ),
+          problems([ManifestProblem.schemaUnsupported]),
+          reason: '$schema',
+        );
+      }
+    });
+
+    test('a null skill item is skillsMalformed', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = [null]),
+        problems([ManifestProblem.skillsMalformed]),
+      );
+    });
+
+    test('JSON null counts as absent in a draft', () {
+      final d = AgentManifestDraft.fromJson(
+        {
+          for (final key in draftDoc().keys) key: null,
+        }..remove('version'),
+      );
+      expect(d.toJson(), isEmpty);
+    });
+
+    test('JSON null counts as absent in a manifest', () {
+      final doc = <String, Object?>{
+        for (final key in draftDoc().keys) key: null,
+        'version': 1,
+      };
+      expect(
+        () => AgentManifest.fromJson(doc, policy),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('a null version in a draft is versionInDraft', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['version'] = null),
+        problems([ManifestProblem.versionInDraft]),
+      );
+    });
+
+    test('several unknown keys give a single unknownKey', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['a'] = 1
+            ..['b'] = 2
+            ..['model'] = {'provider': 'workers-ai', 'id': 'x', 'c': 3},
+        ),
+        problems([ManifestProblem.unknownKey]),
+      );
+    });
+
+    test('a manifest root that is null or a list is notAnObject', () {
+      for (final root in <Object?>[null, <Object?>[], 'x', 3]) {
+        expect(
+          () => AgentManifest.fromJson(root, policy),
+          problems([ManifestProblem.notAnObject]),
+          reason: '$root',
+        );
+      }
+    });
+
+    test('max_chars beyond the exact integer range is malformed', () {
+      for (final huge in <Object?>[ManifestVersion.maxValue + 2, 1e30]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['input'] = {'type': 'text', 'max_chars': huge},
+          ),
+          problems([ManifestProblem.inputMalformed]),
+          reason: '$huge',
+        );
+      }
+    });
+
+    test('max_chars given as text is malformed in a manifest', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()..['output'] = {'type': 'text', 'max_chars': '1'},
+          policy,
+        ),
+        problems([ManifestProblem.outputMalformed]),
+      );
+    });
+
+    test('integral numbers are integers, as on the web', () {
+      final d = AgentManifestDraft.fromJson(
+        draftDoc()
+          ..['input'] = {'type': 'text', 'max_chars': 4000.0}
+          ..['price'] = {'asset': 'USDC', 'amount': 3000000.0},
+      );
+      expect(d.inputMaxChars, 4000);
+      expect(d.price, UsdcAmount.stroops(3000000));
+      final m = AgentManifest.fromJson(
+        deployed().toJson()..['version'] = 2.0,
+        policy,
+      );
+      expect(m.version, ManifestVersion(2));
+    });
+
+    test('non-integral or non-finite numbers are malformed', () {
+      for (final n in <double>[3.5, double.nan, double.infinity]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['output'] = {'type': 'text', 'max_chars': n},
+          ),
+          problems([ManifestProblem.outputMalformed]),
+          reason: '$n',
+        );
+      }
+    });
+
+    test('problems follow field order across parse and rule problems', () {
+      // name breaks a rule (too short), description is the wrong type and the
+      // price is zero: field order, not all parse problems then all rules.
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['name'] = 'ab'
+            ..['description'] = 5
+            ..['price'] = {'asset': 'USDC', 'amount': 0},
+          policy,
+        ),
+        problems([
+          ManifestProblem.nameTooShort,
+          ManifestProblem.descriptionMalformed,
+          ManifestProblem.priceNotPositive,
+        ]),
+      );
+    });
+  });
+
   group('Manifest JSON', () {
     AgentManifest deployed([int version = 1]) =>
         complete().validate(policy, ManifestVersion(version));
@@ -1053,8 +1257,8 @@ void main() {
           policy,
         ),
         problems([
-          ManifestProblem.toolsNotSupported,
           ManifestProblem.unknownKey,
+          ManifestProblem.toolsNotSupported,
         ]),
       );
     });
@@ -1145,16 +1349,45 @@ void main() {
       expect(manifest().toCanonicalJson(), manifest().toCanonicalJson());
     });
 
-    test('canonicalJson rejects any double with StateError', () {
+    test('canonicalJson rejects non-integral numbers with StateError', () {
       for (final value in <Object?>[
         1.5,
-        3.0,
+        double.nan,
+        double.infinity,
+        double.negativeInfinity,
+        1e30,
         {'a': 1.5},
         [
           1,
           {
-            'b': [2.0],
+            'b': [2.5],
           },
+        ],
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+    });
+
+    test('canonicalJson writes an integral double as an integer', () {
+      // On the web 3.0 and 3 are the same value, so both must give "3".
+      expect(canonicalJson(3.0), '3');
+      expect(
+        canonicalJson({
+          'a': -2.0,
+          'b': [0.0],
+        }),
+        '{"a":-2,"b":[0]}',
+      );
+    });
+
+    test('canonicalJson rejects non-string map keys with StateError', () {
+      for (final value in <Object?>[
+        {1: 'a'},
+        {
+          'a': {null: 1},
+        },
+        [
+          {2.5: 'x'},
         ],
       ]) {
         expect(() => canonicalJson(value), throwsStateError, reason: '$value');
@@ -1173,7 +1406,14 @@ void main() {
   });
 
   group('Reference examples', () {
-    const dir = '../docs/architecture/examples';
+    // Resolved from the package location, so the tests do not depend on the
+    // directory `dart test` runs from.
+    final packageRoot = File.fromUri(
+      Isolate.resolvePackageUriSync(
+        Uri.parse('package:puls3_domain/puls3_domain.dart'),
+      )!,
+    ).parent.parent.path;
+    final dir = '$packageRoot/../docs/architecture/examples';
     Object? load(String file) =>
         jsonDecode(File('$dir/$file').readAsStringSync());
     const copyForge = 'agent-manifest.example.json';
