@@ -2,14 +2,18 @@ import 'package:meta/meta.dart';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
-import '../generated/protocol.dart';
+import '../generated/protocol.dart' hide Hire, Payment;
+import 'hire_lifecycle_store.dart';
 
 /// PostgreSQL-backed implementation of [HireRepository] using Serverpod ORM.
 ///
 /// A unique violation (SQLSTATE 23505) surfaces as a [DatabaseQueryException]
 /// whose `constraintName` is the violated index; [recordPayment] maps the
 /// three `hire_payment` indexes to [HirePaymentConflict].
-class ServerpodHireRepository implements HireRepository {
+///
+/// It is also the [HireLifecycleStore]: the relay's view of a hire adds the
+/// idempotency key, the input and the escrow job id (design D10).
+class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
   ServerpodHireRepository(this.session);
 
   final Session session;
@@ -39,6 +43,101 @@ class ServerpodHireRepository implements HireRepository {
       consumer: consumer,
       price: price,
       manifestVersion: manifestVersion,
+    );
+  }
+
+  @override
+  Future<HireRow?> findHire(int id) async {
+    final record = await HireRecord.db.findById(session, id);
+    return record == null ? null : _row(record);
+  }
+
+  @override
+  Future<HireRow?> findHireByRequest(String consumer, String requestId) async {
+    final record = await HireRecord.db.findFirstRow(
+      session,
+      where: (t) => t.consumer.equals(consumer) & t.requestId.equals(requestId),
+    );
+    return record == null ? null : _row(record);
+  }
+
+  @override
+  Future<HireRow> insertHire(NewHire hire, {Transaction? transaction}) async {
+    try {
+      final record = await HireRecord.db.insertRow(
+        session,
+        HireRecord(
+          consumer: hire.consumer,
+          agentId: hire.agentId,
+          price: hire.price,
+          manifestVersion: hire.manifestVersion,
+          expiredAt: hire.expiredAt,
+          requestId: hire.requestId,
+          input: hire.input,
+        ),
+        transaction: transaction,
+      );
+      return _row(record, transaction: transaction);
+    } on DatabaseQueryException catch (e) {
+      if (e.code == _uniqueViolation && e.constraintName == _requestIndex) {
+        throw const HireRequestConflict();
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<JobBinding> bindJob(
+    int hireId,
+    int jobId, {
+    required int expiredAt,
+  }) async {
+    final record = await HireRecord.db.findById(session, hireId);
+    if (record == null) throw StateError('hire $hireId does not exist');
+    if (record.jobId == jobId) return JobBinding.alreadyBound;
+    if (record.jobId != null) return JobBinding.taken;
+    try {
+      final updated = await HireRecord.db.updateWhere(
+        session,
+        columnValues: (t) => [t.jobId(jobId), t.expiredAt(expiredAt)],
+        where: (t) => t.id.equals(hireId) & t.jobId.equals(null),
+      );
+      if (updated.isNotEmpty) return JobBinding.bound;
+    } on DatabaseQueryException catch (e) {
+      if (e.code == _uniqueViolation && e.constraintName == _jobIdIndex) {
+        return JobBinding.taken;
+      }
+      rethrow;
+    }
+    // A concurrent bind won the conditional update.
+    final current = await HireRecord.db.findById(session, hireId);
+    return current?.jobId == jobId ? JobBinding.alreadyBound : JobBinding.taken;
+  }
+
+  /// The wire view of [record]: no status until the job exists, `open`
+  /// after, `funded` once a payment is recorded.
+  Future<HireRow> _row(HireRecord record, {Transaction? transaction}) async {
+    final payment = await HirePaymentRecord.db.findFirstRow(
+      session,
+      where: (t) => t.hireId.equals(record.id!),
+      transaction: transaction,
+    );
+    return HireRow(
+      id: record.id!,
+      consumer: record.consumer,
+      agentId: record.agentId,
+      price: record.price,
+      manifestVersion: record.manifestVersion,
+      expiredAt: record.expiredAt,
+      requestId: record.requestId,
+      input: record.input,
+      jobId: record.jobId,
+      paymentTransaction: payment?.transactionHash,
+      status: payment != null
+          ? HireStatus.funded
+          : record.jobId != null
+          ? HireStatus.open
+          : null,
     );
   }
 
@@ -129,6 +228,10 @@ HirePaymentIndex? hirePaymentIndexOf({
 
 /// SQLSTATE of a unique violation.
 const _uniqueViolation = '23505';
+
+/// Unique indexes of `hire` (`hire.spy.yaml`).
+const _requestIndex = 'hire_consumer_request_idx';
+const _jobIdIndex = 'hire_job_id_idx';
 
 /// The unique indexes of `hire_payment`, by the name the migration gives
 /// them (`hire_payment.spy.yaml`). Any other violated constraint is not a

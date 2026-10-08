@@ -73,7 +73,16 @@ else
   bad "runs flutter build web --release in puls3_flutter" "$(cat "$log")"
 fi
 
-# 3. A failed clone stops the build before Flutter runs.
+# 3. PULS3_API_URL from the Pages environment becomes a dart-define.
+log="$WORK/api-url"
+run_build "$log" PULS3_API_URL=https://example.api.serverpod.space/
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_API_URL=https://example.api.serverpod.space/" "$log"; then
+  ok "passes PULS3_API_URL as a dart-define"
+else
+  bad "passes PULS3_API_URL as a dart-define" "$(cat "$log")"
+fi
+
+# 4. A failed clone stops the build before Flutter runs.
 log="$WORK/clone-fails"
 if run_build "$log" GIT_STUB_FAIL=1; then
   bad "failed clone exits non-zero" "exit 0"

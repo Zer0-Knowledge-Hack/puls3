@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
-import 'package:puls3_flutter/src/domain/stellar_format.dart';
+import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/screens/hire_sheet.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
 import 'package:puls3_flutter/src/state/app_scope.dart';
@@ -25,6 +25,21 @@ class TestWallet implements WalletPort {
   }
 
   @override
+  Future<void> disconnect() async => _address = null;
+
+  @override
+  String get name => 'Test wallet';
+
+  @override
+  Uri? get installUrl => null;
+
+  @override
+  String? get network => address == null ? null : stellarTestnetPassphrase;
+
+  @override
+  Future<String> signAuthEntry(String entryXdr) async => entryXdr;
+
+  @override
   Future<String> signTransaction(String unsignedXdr) async {
     if (shouldFail) {
       throw Exception('Signature rejected by user');
@@ -44,7 +59,7 @@ Widget buildTestSheet({
     home: AppScope(
       catalog: catalog,
       wallet: walletController,
-      ids: FakeLedgerIds(),
+      deployGateway: FakeDeployGateway(),
       child: Scaffold(
         body: HireSheet(agent: agent),
       ),
