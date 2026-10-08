@@ -5,6 +5,7 @@ import '../state/app_scope.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/organisms/top_bar.dart';
+import 'wallet_sheet.dart';
 
 /// Container for every non-landing screen: wires the [TopBar] to the router
 /// and the wallet. On phones the destinations move to a bottom navigation
@@ -45,7 +46,7 @@ class AppShell extends StatelessWidget {
             onNavigate: (path) => context.go(path),
             walletAddress: wallet.address,
             isWalletConnecting: wallet.isConnecting,
-            onConnectWallet: wallet.connect,
+            onConnectWallet: () => showWalletSheet(context),
           ),
         ),
       ),
