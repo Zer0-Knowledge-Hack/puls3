@@ -37,6 +37,14 @@ TDD evidence: each group was written first and run to failure before the impleme
 
 Test-hardening commit (PR 2b, tests only, `test(domain): harden manifest rune, equality and immutability tests`): REL-001 emoji rune counting for name/description/systemPrompt, REL-002 equality per field and hash stability, REL-003 caller-list aliasing, REL-004 type-without-max, toDraft round trip, whitespace-only prompt. Characterization tests; each was checked by mutating production code (runes.length -> length, dropping each field from `==`/`_sameSkills`, removing the skills copy, unstable hashCode) and every mutation failed the suite before restore.
 
+## PR 3a (feat/34-agent-manifest-03a-json): DONE, 3.1-3.4
+
+PR 3 was split at 3.4/3.5 (the JSON part alone passed ~400 authored lines: 336 code + 361 tests).
+- 3.1/3.2 `AgentManifestDraft.fromJson`/`toJson`; private `_parseDocument` turns every type mismatch into a problem; parse problems are merged with `_check` through `_merge` (ordered, deduplicated; a `xMissing` is dropped when the same field is already `xMalformed`/skill-invalid).
+- 3.3/3.4 `AgentManifest.fromJson(json, policy)` and `toJson()`; `schema` optional on input, `version` required.
+- Carried deviation resolved: S14 per-skill problems (`skillIdNotKebabCase`, `skillNameLength`) and wrong-type problems are now reachable and tested through JSON.
+- Deviations: one `unknownKey` per document (deduplicated, no key name or path in the enum); `schema` in a draft is `unknownKey`; `price` without a valid `USDC` asset is `priceAssetUnsupported`; a skill with a missing `id`/`name` reports the skill rule, not malformed; explicit JSON `null` counts as absent.
+
 ## Remaining
 
-PR 3 (3.1-3.9), PR 4 (4.1-4.4).
+PR 3b (3.5-3.9), PR 4 (4.1-4.4).
