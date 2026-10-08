@@ -210,3 +210,66 @@ final class InvalidFeedback extends DomainError {
     FeedbackProblem.commentTooLong => 'comment must be at most 500 characters',
   };
 }
+
+/// A rule of the agent manifest that an input breaks. Declaration order is the
+/// order of the manifest fields, which is the order problems are reported in.
+enum ManifestProblem {
+  notAnObject,
+  unknownKey,
+  toolsNotSupported,
+  versionInDraft,
+  schemaUnsupported,
+  versionInvalid,
+  nameMalformed,
+  nameMissing,
+  nameTooShort,
+  nameTooLong,
+  descriptionMalformed,
+  descriptionMissing,
+  descriptionTooShort,
+  descriptionTooLong,
+  skillsMalformed,
+  skillsMissing,
+  skillsTooMany,
+  skillIdNotKebabCase,
+  skillNameLength,
+  skillIdDuplicate,
+  modelMalformed,
+  modelMissing,
+  modelProviderNotEnabled,
+  modelNotAllowed,
+  systemPromptMalformed,
+  systemPromptMissing,
+  systemPromptTooShort,
+  systemPromptTooLong,
+  inputMalformed,
+  inputMissing,
+  inputTypeUnsupported,
+  inputMaxCharsTooLow,
+  inputMaxCharsTooHigh,
+  outputMalformed,
+  outputMissing,
+  outputTypeUnsupported,
+  outputMaxCharsTooLow,
+  outputMaxCharsTooHigh,
+  priceMalformed,
+  priceMissing,
+  priceAssetUnsupported,
+  priceNotPositive,
+}
+
+/// Every rule an agent manifest input broke in one call, in a stable order.
+final class InvalidManifest extends DomainError {
+  InvalidManifest(List<ManifestProblem> problems)
+    : problems = List.unmodifiable(problems) {
+    if (problems.isEmpty) {
+      throw ArgumentError.value(problems, 'problems', 'must not be empty');
+    }
+  }
+
+  final List<ManifestProblem> problems;
+
+  @override
+  String get message =>
+      'invalid agent manifest: ${problems.map((p) => p.name).join(', ')}';
+}
