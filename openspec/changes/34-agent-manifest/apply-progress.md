@@ -18,13 +18,19 @@ Each group was written first and run to failure (symbols missing) before the imp
 PR 2 was split at 2.8 (auto-chain). 2a is based on PR 1.
 - R.1 REL-001: `ManifestVersion.maxValue` = 2^53-1; the factory and `next()` fail with `InvalidManifest([versionInvalid])` past it.
 - R.2 REL-002: `InvalidManifest.message` is a `switch` over `ManifestProblem`; the enum-name test was replaced.
-- 2.1-2.3 `AgentManifestDraft`, `InputType`, `OutputType`, private `_check` (ordered; runes, whitespace = missing, no trim; a draft skips only missing and below-min), `problemsForDeploy`.
+- 2.1-2.3 `AgentManifestDraft`, `InputType`, `OutputType`, private `_check`, `problemsForDeploy`.
 - 2.4/2.5 skills (count, duplicate id), model policy problems, input/output max chars, price positivity.
 
 Deviations: S14 per-skill problems and wrong-type problems are unreachable with typed Dart fields; they land with JSON in PR 3.
 
-TDD evidence: each group was written first and run to failure before the implementation.
+## PR 2b (feat/34-agent-manifest-02b-validate): DONE, 2.6-2.8
+
+- 2.6/2.7 `AgentManifest` (value equality, unmodifiable skills/tags), `validate(policy, version)`, `toDraft()`.
+- 2.8 Gate green.
+- S25 six-at-once uses `inputMaxChars: 0` (above-max is a build-time error in drafts, S3).
+
+TDD evidence: each group was written first and run to failure before the implementation (the I32 group failed to compile before `AgentManifest` existed).
 
 ## Remaining
 
-PR 2b (2.6-2.8), PR 3 (3.1-3.9), PR 4 (4.1-4.4).
+PR 3 (3.1-3.9), PR 4 (4.1-4.4).

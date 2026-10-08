@@ -51,15 +51,21 @@ Split at 2.8 (auto-chain, no size exception): PR 2 reached ~720 lines.
 - PR 2a `feat/34-agent-manifest-02a-draft` (base PR 1): R.1, R.2, 2.1-2.5.
 - PR 2b `feat/34-agent-manifest-02b-validate` (base 2a): 2.6-2.8.
 
+PR 1 review follow-ups (PR 2a, done first, commit `fix(domain): cap manifest version and word manifest problems readably`):
+
+- [x] R.1 REL-001: `ManifestVersion` capped at 2^53-1 (`maxValue`); `next()` at the cap throws `InvalidManifest([versionInvalid])`. Tests: cap, cap+1, `next()` at and below the cap.
+- [x] R.2 REL-002: `InvalidManifest.message` maps each `ManifestProblem` through a `switch` to readable text; test updated (no raw enum names) and a test checks every problem has a unique readable text.
+
+Notes: `problemsForDeploy` landed in 2a (2.3) and is tested there (one line over `_check`). Skill per-index problems (`skillIdNotKebabCase`, `skillNameLength`, S14) cannot occur on a `Skill` list because `Skill` validates on construction; they surface from JSON in PR 3 (3.2). S25 six-at-once uses `inputMaxChars: 0` (a value above the max is rejected when the draft is built, per S3).
 
 - [x] 2.1 RED: group I27 Text rules via draft/`validate` helpers: runes (3 emoji pass), whitespace-only = missing, no trimming, boundaries 3/48, 10/280, 20/8000 (S8-S11). Done: fails.
 - [x] 2.2 RED: group I26 Draft tolerance: empty draft ok (S1), below-min ok (S2), above-max rejected for name/prompt/maxChars (S3). Done: fails.
 - [x] 2.3 GREEN: `AgentManifestDraft` factory + private `_check(fields, {forDeploy, policy})` (ordered, deduplicated problems; text and max rules; D2, D3, D10). Done: 2.1 draft-mode parts and 2.2 green.
 - [x] 2.4 RED: group I28-I31 field rules: skills count 0/1/5/6, duplicate id, invalid id/name per index, `Skill` reused (S12-S14); input/output boundaries and types (S20, S21); price positive, asset (S22 non-float part, S23); model policy problems (S15-S17, S43). Done: fails.
 - [x] 2.5 GREEN: extend `_check` with skills, model, input, output and price rules; `problemsForDeploy(policy)`. Done: 2.4 green.
-- [ ] 2.6 RED: group I32 Deploy: complete draft -> `AgentManifest` v1 (S5), all-missing list (S6), six problems at once in fixed order (S25), same input twice equal (S26), immutability of skills and tags (S7), `toDraft()` has no version and original unchanged (S29). Done: fails.
-- [ ] 2.7 GREEN: `AgentManifest` (non-null, unmodifiable lists, value equality) + `validate(policy, version)` + `toDraft()`. Done: 2.6 green.
-- [ ] 2.8 REFACTOR: dedupe field checks, gate, commit `feat(domain): add agent manifest draft and deploy validation`. Check line count; apply the split contingency here if >~400.
+- [x] 2.6 RED: group I32 Deploy: complete draft -> `AgentManifest` v1 (S5), all-missing list (S6), six problems at once in fixed order (S25), same input twice equal (S26), immutability of skills and tags (S7), `toDraft()` has no version and original unchanged (S29). Done: fails.
+- [x] 2.7 GREEN: `AgentManifest` (non-null, unmodifiable lists, value equality) + `validate(policy, version)` + `toDraft()`. Done: 2.6 green.
+- [x] 2.8 REFACTOR: dedupe field checks, gate, commit `feat(domain): add agent manifest draft and deploy validation`. Check line count; apply the split contingency here if >~400.
 
 ## PR 3: JSON, canonical form, examples (~380 lines)
 

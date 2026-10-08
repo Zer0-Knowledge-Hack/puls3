@@ -413,6 +413,89 @@ void main() {
     });
   });
 
+  group('I32 Deploy', () {
+    test('a complete draft becomes a version 1 manifest', () {
+      final m = complete().validate(policy, ManifestVersion.first);
+      expect(m.version, ManifestVersion.first);
+      expect(m.schema, 'puls3.agent-manifest/v1');
+      expect(m.name, 'Copy Forge');
+      expect(m.model, llama);
+      expect(m.price, UsdcAmount.stroops(3000000));
+    });
+
+    test('an empty draft lists one missing problem per required field', () {
+      expect(
+        () => AgentManifestDraft().validate(policy, ManifestVersion.first),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('six problems come at once, in field order, and are stable', () {
+      AgentManifestDraft bad() => complete(
+        name: 'ab',
+        description: 'short',
+        skills: [],
+        model: ModelId(provider: 'workers-ai', id: 'other'),
+        inputMaxChars: 0,
+        price: UsdcAmount.zero,
+      );
+      const expected = [
+        ManifestProblem.nameTooShort,
+        ManifestProblem.descriptionTooShort,
+        ManifestProblem.skillsMissing,
+        ManifestProblem.modelNotAllowed,
+        ManifestProblem.inputMaxCharsTooLow,
+        ManifestProblem.priceNotPositive,
+      ];
+      expect(
+        () => bad().validate(policy, ManifestVersion.first),
+        problems(expected),
+      );
+      expect(bad().problemsForDeploy(policy), expected);
+      expect(bad().problemsForDeploy(policy), expected);
+    });
+
+    test('the same input gives equal manifests', () {
+      final a = complete().validate(policy, ManifestVersion.first);
+      final b = complete().validate(policy, ManifestVersion.first);
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+      expect(
+        a,
+        isNot(complete(name: 'Other').validate(policy, ManifestVersion.first)),
+      );
+      expect(a, isNot(complete().validate(policy, ManifestVersion(2))));
+    });
+
+    test('skills and tags cannot be changed afterwards', () {
+      final tagged = Skill(id: 'rewrite', name: 'Rewrite', tags: ['copy']);
+      final m = complete(
+        skills: [tagged],
+      ).validate(policy, ManifestVersion.first);
+      expect(() => m.skills.add(skill('x')), throwsUnsupportedError);
+      expect(() => m.skills.first.tags.add('x'), throwsUnsupportedError);
+    });
+
+    test('toDraft has no version and leaves the manifest alone', () {
+      final m = complete().validate(policy, ManifestVersion(3));
+      final d = m.toDraft();
+      expect(d.name, m.name);
+      expect(d.skills, m.skills);
+      expect(d.price, m.price);
+      expect(d.validate(policy, m.version.next()).version, ManifestVersion(4));
+      expect(m.version, ManifestVersion(3));
+    });
+  });
+
   group('InvalidManifest', () {
     test('carries the problems in order with a readable message', () {
       final e = InvalidManifest([
