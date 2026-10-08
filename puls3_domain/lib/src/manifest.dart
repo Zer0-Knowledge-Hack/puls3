@@ -798,9 +798,12 @@ List<String> _stringKeys(Map<Object?, Object?> map) {
 
 /// [value] as an `int` when it is an integer: an `int`, or a finite integral
 /// `double` within +-(2^53-1) (the range a double holds exactly). Otherwise
-/// null.
+/// null. The range applies to `int` too: on dart2js every integral double is
+/// an `int`, so the check must not depend on the platform.
 int? _integer(Object? value) {
-  if (value is int) return value;
+  if (value is int) {
+    return value.abs() <= ManifestVersion.maxValue ? value : null;
+  }
   if (value is double &&
       value.isFinite &&
       value == value.truncateToDouble() &&

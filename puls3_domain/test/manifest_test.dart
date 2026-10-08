@@ -1368,6 +1368,20 @@ void main() {
       }
     });
 
+    test('canonicalJson rejects an int beyond +-(2^53-1) with StateError', () {
+      // On the web every integral double is an int, so 1e30 reaches this
+      // branch there; on the VM this exercises it directly.
+      for (final value in <Object?>[
+        9007199254740992,
+        -9007199254740992,
+        {'a': 9007199254740992},
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+      expect(canonicalJson(9007199254740991), '9007199254740991');
+      expect(canonicalJson(-9007199254740991), '-9007199254740991');
+    });
+
     test('canonicalJson writes an integral double as an integer', () {
       // On the web 3.0 and 3 are the same value, so both must give "3".
       expect(canonicalJson(3.0), '3');
