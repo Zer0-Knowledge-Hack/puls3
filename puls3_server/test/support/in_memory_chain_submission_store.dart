@@ -1,5 +1,6 @@
 import 'package:puls3_server/src/chain/chain_submission_store.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
+import 'package:serverpod/serverpod.dart' show Transaction;
 
 /// In-memory [ChainSubmissionStore] with the same unique indexes and
 /// conditional transitions as the Serverpod one.
@@ -23,6 +24,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     String? preparationId,
     int? hireId,
     String? explorerUrl,
+    Transaction? transaction,
   }) async {
     checkPreparation(purpose, preparationId);
     if (preparationId != null &&
@@ -61,6 +63,10 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
     }
     return null;
   }
+
+  @override
+  Future<List<StoredSubmission>> listByHire(int hireId) async =>
+      _rows.values.where((r) => r.hireId == hireId).toList();
 
   @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) async {
