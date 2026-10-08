@@ -75,6 +75,17 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<List<StoredSubmission>> listByHire(int hireId) async {
+    final rows = await ChainSubmission.db.find(
+      _session,
+      where: (t) => t.hireId.equals(hireId),
+      orderBy: (t) => t.id,
+    );
+    // A row this store cannot read is skipped: the tracker fails it.
+    return [for (final row in rows) ?_tryStored(row)];
+  }
+
+  @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) async {
     checkListLimit(limit);
     // One query on chain_submission_state_idx, so a batch never repeats a

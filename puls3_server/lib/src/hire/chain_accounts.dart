@@ -34,9 +34,9 @@ final class RpcChainAccounts implements ChainAccounts {
     try {
       sequence = await _rpc.accountSequence(account);
     } on LedgerException {
-      throw _chainUnavailable();
+      throw chainUnavailable();
     }
-    if (sequence == null) throw _chainUnavailable();
+    if (sequence == null) throw chainUnavailable();
     return sequence;
   }
 
@@ -53,12 +53,13 @@ final class RpcChainAccounts implements ChainAccounts {
     try {
       return await _rpc.simulateTransactionBase64(envelope);
     } on LedgerException {
-      throw _chainUnavailable();
+      throw chainUnavailable();
     }
   }
 }
 
-Puls3ApiException _chainUnavailable() => Puls3ApiException(
+/// The error every unreadable chain or failed simulation maps to.
+Puls3ApiException chainUnavailable() => Puls3ApiException(
   code: 'ChainUnavailable',
   message: 'The chain could not be read or the call could not be simulated.',
   details: {'reason': 'simulationFailed'},

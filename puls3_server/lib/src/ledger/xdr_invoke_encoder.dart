@@ -28,6 +28,15 @@ sealed class ScArg {
   /// An `SCV_VOID` argument, for example an absent `Option`.
   const factory ScArg.voidValue() = _Void;
 
+  /// An `SCV_BYTES` argument for a `BytesN<32>` parameter. Throws
+  /// [ArgumentError] unless [value] is exactly 32 bytes.
+  factory ScArg.bytes32(Uint8List value) {
+    if (value.length != 32) {
+      throw ArgumentError.value(value.length, 'value.length', 'must be 32');
+    }
+    return _Bytes32(Uint8List.fromList(value));
+  }
+
   void _write(XdrWriter out);
 }
 
@@ -95,6 +104,18 @@ final class _I128 extends ScArg {
     ..uint64(value);
 }
 
+final class _Bytes32 extends ScArg {
+  const _Bytes32(this.value) : super._();
+
+  final Uint8List value;
+
+  @override
+  void _write(XdrWriter out) => out
+    ..uint32(_scvBytes)
+    ..uint32(value.length)
+    ..opaque(value);
+}
+
 final class _Void extends ScArg {
   const _Void() : super._();
 
@@ -115,6 +136,7 @@ const _scvVoid = 1;
 const _scvU32 = 3;
 const _scvU64 = 5;
 const _scvI128 = 10;
+const _scvBytes = 13;
 const _scvString = 14;
 const _scvAddress = 18;
 

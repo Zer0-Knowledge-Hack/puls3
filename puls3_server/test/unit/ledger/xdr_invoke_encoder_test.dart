@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
@@ -213,6 +214,22 @@ void main() {
 
       test('writes void as the bare SCV_VOID discriminant', () {
         expect(argument(const ScArg.voidValue()), '00000001');
+      });
+
+      test('writes a 32-byte value as SCV_BYTES with its length', () {
+        final value = Uint8List.fromList(List.generate(32, (i) => i));
+        expect(
+          argument(ScArg.bytes32(value)),
+          [
+            '0000000d',
+            '00000020',
+            for (final b in value) b.toRadixString(16).padLeft(2, '0'),
+          ].join(),
+        );
+      });
+
+      test('rejects a value that is not 32 bytes', () {
+        expect(() => ScArg.bytes32(Uint8List(31)), throwsArgumentError);
       });
     });
 

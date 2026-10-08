@@ -85,6 +85,10 @@ final class _FlakyStore implements ChainSubmissionStore {
       _inner.findByPreparation(preparationId);
 
   @override
+  Future<List<StoredSubmission>> listByHire(int hireId) =>
+      _inner.listByHire(hireId);
+
+  @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) =>
       _inner.listSubmitted(limit: limit);
 

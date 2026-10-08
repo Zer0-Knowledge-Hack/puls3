@@ -73,9 +73,12 @@ final class PreparedEnvelope {
   final Uint8List hash;
 
   /// [hash] as 64 lowercase hex characters, the form `getTransaction` takes.
-  String get hashHex =>
-      hash.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  String get hashHex => hexOf(hash);
 }
+
+/// [bytes] as lowercase hex.
+String hexOf(Uint8List bytes) =>
+    bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
 /// One `DecoratedSignature` of an envelope.
 final class EnvelopeSignature {
@@ -100,6 +103,9 @@ final class SignedEnvelope {
   /// The network transaction hash of [body].
   final Uint8List hash;
   final List<EnvelopeSignature> signatures;
+
+  /// [hash] as 64 lowercase hex characters.
+  String get hashHex => hexOf(hash);
 }
 
 /// Why [EnvelopeCodec.parse] refused an envelope.

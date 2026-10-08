@@ -16,6 +16,7 @@ dependencies:
   http: ^1.6.0
   meta: ^1.17.0
   serverpod_auth_idp_server: 3.4.13
+  crypto: ^3.0.7
   stellar_dart: ^2.3.0
 
 dev_dependencies:

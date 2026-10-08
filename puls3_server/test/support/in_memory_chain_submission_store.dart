@@ -65,6 +65,10 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<List<StoredSubmission>> listByHire(int hireId) async =>
+      _rows.values.where((r) => r.hireId == hireId).toList();
+
+  @override
   Future<List<StoredSubmission>> listSubmitted({int limit = 100}) async {
     checkListLimit(limit);
     final submitted =

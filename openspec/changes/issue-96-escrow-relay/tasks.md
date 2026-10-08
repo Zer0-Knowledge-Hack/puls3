@@ -68,12 +68,12 @@ Chain strategy: size-exception
 
 ## C6: Services (P2-P5)
 
-- [ ] 6.1 RED: `test/hire/escrow_relay_service_test.dart` with port fakes: prepare fund/complete/reject, config missing (P2, no literal defaults), `SubmissionInProgress`, `PaymentAlreadySubmitted`, `InvalidHireTransition`, `InvalidRejectReason`, supersession reuses sequence, `prepareFund` no balance (P3), `description` empty (P5). Covers: Prepare, Preparation validity, One in flight.
-- [ ] 6.2 RED: submit order tests: ownership, `PreparationNotFound`, timeBounds/superseded expiry, repeated submit after validUntil (P4), verification before persistence, persist-then-send, RPC reject/unreachable never throw, repeat returns record, `complete`/`reject` stay `submitted`.
-- [ ] 6.3 GREEN: `lib/src/hire/escrow_relay_service.dart`.
-- [ ] 6.4 RED/GREEN: `createHire` returns `CreateHireResult` in `lib/src/hire/hire_service.dart`, `hire_lifecycle_store.dart`, `serverpod_hire_repository.dart`: requestId idempotency, `IdempotencyKeyReused`, per-wallet scope, prepare-first rollback.
-- [ ] 6.5 RED/GREEN: real `onJobCreated` in `lib/src/hire/hire_escrow_effects.dart` (idempotent, job id bound once, jobMismatch).
-- [ ] 6.6 REFACTOR: remove duplication across services; keep tests green.
+- [x] 6.1 RED: `test/hire/escrow_relay_service_test.dart` with port fakes: prepare fund/complete/reject, config missing (P2, no literal defaults), `SubmissionInProgress`, `PaymentAlreadySubmitted`, `InvalidHireTransition`, `InvalidRejectReason`, supersession reuses sequence, `prepareFund` no balance (P3), `description` empty (P5). Covers: Prepare, Preparation validity, One in flight.
+- [x] 6.2 RED: submit order tests: ownership, `PreparationNotFound`, timeBounds/superseded expiry, repeated submit after validUntil (P4), verification before persistence, persist-then-send, RPC reject/unreachable never throw, repeat returns record, `complete`/`reject` stay `submitted`.
+- [x] 6.3 GREEN: `lib/src/hire/escrow_relay_service.dart`.
+- [x] 6.4 RED/GREEN: `createHire` returns `CreateHireResult` in `lib/src/hire/hire_service.dart`, `hire_lifecycle_store.dart`, `serverpod_hire_repository.dart`: requestId idempotency, `IdempotencyKeyReused`, per-wallet scope, prepare-first rollback.
+- [x] 6.5 RED/GREEN: real `onJobCreated` in `lib/src/hire/hire_escrow_effects.dart` (idempotent, job id bound once, jobMismatch).
+- [x] 6.6 REFACTOR: remove duplication across services; keep tests green.
 
 ## C7: Endpoint, seam, wiring
 

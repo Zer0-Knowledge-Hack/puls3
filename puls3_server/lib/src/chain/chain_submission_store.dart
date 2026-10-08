@@ -121,6 +121,10 @@ abstract interface class ChainSubmissionStore {
   /// The record of [preparationId], or `null`.
   Future<StoredSubmission?> findByPreparation(String preparationId);
 
+  /// Every record of [hireId], any purpose and state, oldest first (by id).
+  /// Empty when the hire has none.
+  Future<List<StoredSubmission>> listByHire(int hireId);
+
   /// Up to [limit] `submitted` records, least recently checked first
   /// (`lastCheckedAt`, then id), read in one query. A record goes to the
   /// back once [recordCheck] records a check, so more than [limit] records
