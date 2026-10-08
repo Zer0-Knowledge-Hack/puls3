@@ -1,7 +1,7 @@
 # MVP user flows
 
-- **Issue:** #22 · **Date:** 2026-09-26
-- **Sources:** [vision](../vision.md) (MVP scope), [ADR-0002](../adr/0002-agent-registry-on-soroban.md) (registry), [ADR-0003](../adr/0003-payment-rail-and-custody.md) (payments), [ADR-0004](../adr/0004-agent-manifest-and-deployment.md) (manifest and deploy), [domain model](../domain/model.md)
+- **Issues:** #22, #76 · **Date:** 2026-09-26 · **Updated:** 2026-10-08 (ADR-0005 escrow and hire states)
+- **Sources:** [vision](../vision.md) (MVP scope), [ADR-0002](../adr/0002-agent-registry-on-soroban.md) (registry), [ADR-0003](../adr/0003-payment-rail-and-custody.md) (custody), [ADR-0004](../adr/0004-agent-manifest-and-deployment.md) (manifest and deploy), [ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) (escrow, hire states, feedback), [API contract](../architecture/api.md), [domain model](../domain/model.md)
 
 What the user does, step by step, including what happens when something fails. The wireframes (#23), the API contract (#8), and the app screens (#25–#28) derive from these flows. Agent Studio details (drafts, test run, edit, my agents) are added to this file by #36.
 
@@ -135,7 +135,12 @@ flowchart TD
 
 ## F5. Hire and pay an agent
 
-Rail and checks follow ADR-0003: a USDC transfer to the agent's muxed address, verified by the server before the agent runs.
+A hire is an ERC-8183 escrow job ([ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D1, D6):
+- the consumer is the client and the evaluator;
+- the agent wallet is the provider;
+- the escrow holds the USDC until the job is completed, rejected or refunded.
+
+The server prepares every envelope, the wallet signs it unchanged, and the server verifies, relays and tracks it ([API contract](../architecture/api.md#server-relay-submission), Decision A). The agent runs only once the tracker confirms `fund` and the job matches the hire ([funding verification](../architecture/api.md#funding-verification)).
 
 ```mermaid
 flowchart TD
@@ -144,77 +149,92 @@ flowchart TD
   C -- No --> C1["F1 connect wallet, then resume"]
   C -- Yes --> D{"Enough USDC and a USDC trustline?"}
   D -- No --> D1["Show balance and how to get testnet USDC"]
-  D -- Yes --> E["Confirm: server creates the hire"]
-  E --> F["Wallet asks to sign the USDC transfer"]
+  D -- Yes --> E["Confirm: server creates the hire and prepares create_job"]
+  E --> F["Wallet signs create_job; server relays it"]
   F --> G{"Signed?"}
-  G -- No --> G1["Hire not paid, back to review"]
-  G -- Yes --> H["Server verifies the payment on-chain"]
-  H --> I{"All checks pass?"}
-  I -- "Not yet visible" --> I1["Keep checking, show Verifying"]
-  I -- No --> I2["Payment rejected with reason, hire stays unpaid"]
-  I -- Yes --> J["Agent runs: go to F6"]
+  G -- No --> G1["Nothing on chain, back to review"]
+  G -- Yes --> H["Job confirmed: hire is open; server prepares fund"]
+  H --> I["Wallet signs fund; server relays it"]
+  I --> J{"Signed?"}
+  J -- No --> J1["Hire stays open: sign again, or Cancel"]
+  J -- Yes --> K["Tracker confirms fund and checks the job"]
+  K --> L{"Job matches the hire?"}
+  L -- "Not final yet" --> L1["Keep polling, show Verifying payment"]
+  L -- No --> L2["Payment does not match: funds stay in escrow until expired_at"]
+  L -- Yes --> M["Hire funded: agent runs, go to F6"]
 ```
 
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
-| 1 | `S04-hire-sheet` | Types the task input | Shows the price in USDC and the character limit | Input over the agent's limit: inline error, **Confirm** disabled |
+| 1 | `S04-hire-sheet` | Types the task input | Shows the price in USDC, the character limit, and that the payment is held in escrow until the client approves the result | Input over the agent's limit: inline error, **Confirm** disabled. The server checks it again (`InputTooLong`) |
 | 2 | `S04-hire-sheet` | — | Checks the wallet is connected and holds enough USDC | No wallet: F1. Not enough USDC or no trustline: shows the balance and how to get testnet USDC, **Confirm** disabled |
-| 3 | `S04-hire-sheet` | Taps **Confirm and pay** | Server creates the hire (hire id, price and manifest version fixed) and returns the payment: USDC contract, the agent's muxed address, amount | Server error: "Could not create the hire", **Retry** |
-| 4 | `S04-hire-sheet` (wallet popup) | Signs the USDC transfer | Submits it; shows **Paying…** | Rejects: "Payment cancelled", hire stays unpaid, back to review. Tx fails (fees, balance changed): reason shown, **Retry** |
-| 5 | `S04-hire-sheet` | — | Server verifies: success, sent by the USDC contract, to the agent's wallet, exact amount, this hire's id, hash not used before. Shows **Verifying payment…** | Not visible yet: keeps checking. A check fails: "Payment does not match this hire", shows the tx link, hire stays unpaid |
-| 6 | `S04-hire-sheet` | — | Payment confirmed: shows the tx hash with an explorer link, and the hire moves to running. In the background, the server (the configured feedback authorizer) submits `authorize_feedback` for this hire (see F7) | Authorization tx fails: the server retries it; F7 step 2 checks it again before rating |
+| 3 | `S04-hire-sheet` | Taps **Confirm and pay** | Server creates the hire record (agent, price and manifest version fixed) and returns the unsigned `create_job` envelope. In it, the consumer is the client and the evaluator, the agent wallet is the provider, the hire price is the budget, and the server sets `expired_at` | Server error: "Could not create the hire", **Retry** (same request id, so no duplicate hire) |
+| 4 | `S04-hire-sheet` (wallet popup) | Signs `create_job` | Server verifies the signed envelope against what it prepared, relays it, and shows **Creating the job…** until the tracker confirms it. The hire is then `open` | Rejects: nothing reaches the chain, back to review. Preparation expired or rejected: the app asks for a new one and the user signs again |
+| 5 | `S04-hire-sheet` (wallet popup) | Signs `fund` | Server prepares `fund` (budget = hire price, the client's maximum fee), verifies and relays the signed envelope, and shows **Verifying payment…** while it polls | Rejects: hire stays `open`; the user can sign again or **Cancel** (step 7). Tx fails (balance changed, fees): reason shown, sign again |
+| 6 | `S04-hire-sheet` | — | Tracker confirms `fund` and reads the job: state `Funded`, client and evaluator = consumer, provider = agent wallet, USDC token, budget = price, `expired_at` as prepared. The hire becomes `funded`, the `fund` transaction is shown with an explorer link, and the agent run is queued | Job does not match the hire (`JobMismatch`, `JobEvidenceUnavailable`): "Payment does not match this hire", with the tx link. The funds stay in the escrow and return through `claim_refund` after `expired_at` |
+| 7 | `S04-hire-sheet` | Taps **Cancel** on an `open` hire | Server prepares `reject` from `open`; the wallet signs it and the server relays it. The hire becomes `rejected` (from `open`), shown as **Cancelled**. No funds were held, so nothing is refunded | Rejects: hire stays `open`. An unfunded hire past `expired_at` is shown as **Expired**, with no transaction |
 
-## F6. Track a hire and see its result
+## F6. Track a hire, see its result and approve it
 
-States follow the hire lifecycle (#10): Requested → Paid → InProgress → Delivered → Rated.
+Hire states follow ADR-0005 D6 ([hire lifecycle](../domain/hire-lifecycle.md)):
+- the hire states are `open`, `funded`, `submitted`, `completed`, `rejected` and `expired`;
+- the hire stays `funded` while the agent works;
+- runtime progress (`queued`, `running`, `failed`) is separate data shown alongside it.
 
 ```mermaid
 flowchart TD
-  A["S04: payment confirmed"] --> B["S06 hire detail: InProgress"]
+  A["S04: payment confirmed"] --> B["S06 hire detail: Funded, Queued or Running"]
   B --> C{"Agent finished?"}
-  C -- "Failed or timed out" --> C1["Hire marked failed, reason shown"]
-  C -- Yes --> D["Delivered: result shown"]
-  D --> E["Copy result, or Rate: go to F7"]
-  F["S05 my hires"] --> B
+  C -- "Run failed or timed out" --> C1["Run failed, reason shown: Reject and refund"]
+  C1 --> R1{"Client rejects?"}
+  R1 -- Yes --> R2["Rejected: funds back to the client"]
+  R1 -- "No, never returns" --> R3["After expired_at: claim_refund, Expired, funds back"]
+  C -- Yes --> D["Agent submits: Submitted, result shown"]
+  D --> E{"Client decision before the approval deadline"}
+  E -- Approve --> F["Completed: escrow pays the agent, Rate: go to F7"]
+  E -- Reject --> G["Rejected: funds back to the client"]
+  E -- "No decision" --> H["Deadline passes: release, Completed"]
+  S["S05 my hires"] --> B
 ```
 
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
 | 1 | `S04-hire-sheet` | Taps **View hire** | Opens `S06-hire-detail` (`/hires/:id`) | — |
-| 2 | `S06-hire-detail` | — | Shows status (Paid, InProgress), the agent, the price paid and the payment tx link | — |
-| 3 | `S06-hire-detail` | Waits | Updates the status while the agent runs | Agent fails or times out: status **Failed** with the reason. Refunds are out of the MVP ([vision](../vision.md#out)): the screen says so and keeps the payment link |
-| 4 | `S06-hire-detail` | — | Status **Delivered**: shows the result | Result larger than the screen: scrollable, with **Copy** |
-| 5 | `S05-my-hires` | Opens `/hires` later | Lists the user's hires with status, newest first | Wallet not connected: F1 (hires are tied to the paying address) |
+| 2 | `S06-hire-detail` | — | Shows the status (**Funded**), the run progress (**Queued**, **Running**), the agent, the price held in escrow and the `fund` tx link | — |
+| 3 | `S06-hire-detail` | Waits | Polls the hire while the agent runs. On success the agent account signs `submit` (server-signed), and once it is confirmed the hire is **Submitted** with the result | Run fails or times out: the status stays **Funded**, the run shows **Failed** with the reason, and **Reject and refund** is offered (step 5). If the client never acts, the tracker calls `claim_refund` after `expired_at` and the hire becomes **Expired**, with the funds back to the client and the refund tx linked |
+| 4 | `S06-hire-detail` | Reads the result, taps **Approve** | Shows the result and the time left until the approval deadline. **Approve** prepares `complete`; the wallet signs and the server relays it. The hire becomes **Completed**, and the escrow pays the agent | Result larger than the screen: scrollable, with **Copy**. No decision before the deadline: the tracker calls the permissionless `release` and the hire becomes **Completed** (silence approves, D4). The countdown UI is planned by HackMeridian (D2) and the window length is deferred (D3) |
+| 5 | `S06-hire-detail` | Taps **Reject** (with an optional reason) | Prepares `reject`; the wallet signs and the server relays it. The hire becomes **Rejected**, the funds return to the client, and the refund tx is linked | After the approval deadline, **Reject** is hidden: the escrow refuses it. A reject is final: there are no disputes in the MVP (D8). Only rejects of submitted work count against the client |
+| 6 | `S05-my-hires` | Opens `/hires` later | Lists the user's hires with status and run progress, newest first. A reject from `open` is labeled **Cancelled** | Wallet not connected: F1 (hires are tied to the client address) |
 
 ## F7. Rate an agent (P1)
 
-Feedback rules come from the domain (I16, I17) and ADR-0002. The Reputation Registry accepts `give_feedback` only for a hire that the **configured feedback authorizer** (our server) registered first with `authorize_feedback(hire_id, agent_id, client_address)`, after verifying the payment in F5. `hire_id` is a 32-byte id the server derives from the hire record and its payment transaction. `give_feedback` must be signed by that same `client_address` (the address that paid), and it consumes the authorization, so each hire is rated once.
+Feedback rules come from the domain (I16, I17, I20) and ADR-0005 D5:
+- **The registry.** The Reputation Registry is a Stellar 8004 drop-in, with no `authorize_feedback` step.
+- **Who can rate.** The paid-hire rule is proven by a completed escrow job. Readers count feedback only from clients with completed jobs.
+- **What the hire keeps.** A rating is not a hire state: the hire keeps a reference to the confirmed feedback, and each hire is rated once.
 
 ```mermaid
 flowchart TD
   A["S06: Rate"] --> B["S10 rate sheet: score 1 to 5, optional comment"]
-  B --> C{"Hire delivered and not rated yet?"}
+  B --> C{"Hire completed and not rated yet?"}
   C -- No --> C1["Rate button hidden or already rated message"]
-  C -- Yes --> K{"Connected wallet is the address that paid?"}
-  K -- No --> K1["Switch to the paying wallet"]
-  K -- Yes --> Z{"Authorizer registered this hire with authorize_feedback?"}
-  Z -- No --> Z1["Server submits authorize_feedback and waits for confirmation"]
-  Z1 --> D
-  Z -- Yes --> D["Wallet asks to sign the feedback"]
-  D --> E{"Signed and accepted?"}
+  C -- Yes --> K{"Connected wallet is the hire's client?"}
+  K -- No --> K1["Switch to the wallet that hired"]
+  K -- Yes --> D["Server prepares give_feedback; wallet signs it"]
+  D --> E{"Signed and confirmed?"}
   E -- "Rejected" --> E1["Rating not sent, stay on S10"]
-  E -- "Not authorized or already rated" --> E2["Reason shown, back to S06"]
+  E -- "Already rated" --> E2["Reason shown, back to S06"]
   E -- Yes --> F["Rating saved, shown on S03"]
 ```
 
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
-| 1 | `S06-hire-detail` | Taps **Rate** | Opens `S10-rate-sheet` | Hire not delivered, or already rated: **Rate** hidden, or "You already rated this hire" |
-| 2 | `S10-rate-sheet` | — | Checks that the connected wallet is the address that paid, and that the server's `authorize_feedback` for this hire is confirmed on-chain. If it is missing (the background call from F5 failed), the server, as the configured authorizer, submits `authorize_feedback(hire_id, agent_id, client_address)` now and waits | Another wallet connected: "Rate with the wallet that paid". Authorization cannot be recorded: "Rating unavailable right now", **Retry**; **Send** stays disabled until it is confirmed |
-| 3 | `S10-rate-sheet` | Picks a score and writes an optional comment | Validates: score 1–5, comment ≤ 500 characters | Comment too long: inline error, **Send** disabled |
-| 4 | `S10-rate-sheet` (wallet popup) | Signs the feedback | Submits `give_feedback` with this `hire_id`; the contract checks and consumes the authorization in the same call | Rejects: "Rating not sent", stay on S10 |
-| 5 | `S10-rate-sheet` | — | Waits for confirmation | `HireAuthorizationConsumed`: "You already rated this hire", back to S06. `HireNotAuthorized` (should not happen after step 2): back to step 2 |
-| 6 | `S06-hire-detail` | — | Status **Rated**; the new score counts in the agent's rating on S03 | — |
+| 1 | `S06-hire-detail` | Taps **Rate** | Opens `S10-rate-sheet`. **Rate** shows only on a **Completed** hire with no rating yet | Hire not completed, or already rated: **Rate** hidden, or "You already rated this hire" |
+| 2 | `S10-rate-sheet` | — | Checks, without side effects, that the connected wallet is the hire's client and the hire is completed | Another wallet connected: "Rate with the wallet that hired" |
+| 3 | `S10-rate-sheet` | Picks a score and writes an optional comment | Validates: score 1–5, comment ≤ 500 characters. The server validates again and prepares `give_feedback` with the client as source | Comment too long: inline error, **Send** disabled |
+| 4 | `S10-rate-sheet` (wallet popup) | Signs the feedback | Server verifies the signed envelope against what it prepared, relays it and tracks it | Rejects: "Rating not sent", stay on S10 |
+| 5 | `S10-rate-sheet` | — | Polls until the feedback is confirmed | `HireAlreadyRated`: "You already rated this hire", back to S06 |
+| 6 | `S06-hire-detail` | — | The hire stays **Completed** and shows the rating. The new score counts in the agent's rating on S03 (served once #21 lands) | — |
 
 ---
 
@@ -229,8 +249,8 @@ The shortest path that shows find → pay → result. Uses the demo shell's mock
 | 0–2 s | `S01-landing` | Tap **Explore agents** |
 | 2–5 s | `S02-marketplace` | Tap one skill chip; the grid narrows |
 | 5–7 s | `S03-agent-detail` | Tap a card, show price and rating, tap **Hire** |
-| 7–11 s | `S04-hire-sheet` | Type a short task, **Confirm and pay**, payment confirmed with tx hash |
-| 11–15 s | `S06-hire-detail` | Result appears |
+| 7–11 s | `S04-hire-sheet` | Type a short task, **Confirm and pay**, funds held in escrow with the tx hash |
+| 11–15 s | `S06-hire-detail` | Result appears, **Approve** |
 
 ### Serverpod video, under 2 minutes (#4)
 
@@ -241,8 +261,8 @@ Covers the five demo criteria of the [vision](../vision.md#7-demo-success-criter
 | 0:00–0:10 | `S01-landing` | One-line pitch | — |
 | 0:10–0:40 | `S07-studio` → `S08-deploy-sheet` | Fill in a prompt-only agent, **Deploy**, sign twice, open the explorer on the new agent | 1 |
 | 0:40–0:55 | `S02-marketplace` | The new agent appears in the catalog, served by Serverpod | 2 |
-| 0:55–1:25 | `S03-agent-detail` → `S04-hire-sheet` | **Hire**, sign the USDC transfer, **Verifying payment…**, open the tx on the explorer | 3 |
-| 1:25–1:40 | `S06-hire-detail` | Status moves to **Delivered**, result shown | 4 |
+| 0:55–1:25 | `S03-agent-detail` → `S04-hire-sheet` | **Hire**, sign `create_job` and `fund`, **Verifying payment…**, open the `fund` tx on the explorer: the USDC is held by the escrow | 3 |
+| 1:25–1:40 | `S06-hire-detail` | **Funded**, run **Running**, then **Submitted** with the result; **Approve** and the hire is **Completed** (the escrow pays the agent) | 4 |
 | 1:40–1:55 | `S10-rate-sheet` → `S03-agent-detail` | Rate 5, the rating shows on the agent | 5 |
 | 1:55–2:00 | — | Closing line | — |
 
