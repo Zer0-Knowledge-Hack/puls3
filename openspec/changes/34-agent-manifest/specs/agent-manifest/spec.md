@@ -32,9 +32,10 @@ Defines, in the pure-Dart `puls3_domain` package, the one shared model of what a
 
 #### Scenario: S4 Wrong types are rejected in a draft
 
-- GIVEN JSON where `name` is a number, `skills` is a string, or `price.amount` is a string or a float
+- GIVEN JSON where `name` is a number, `skills` is a string, or `price.amount` is a string or a non-integral number such as `1.5`
 - WHEN `AgentManifestDraft.fromJson` is called
 - THEN it fails with `InvalidManifest` listing a wrong-type problem for each such field
+- AND an integral number written with a decimal point, such as `price.amount` `3000000.0`, is accepted as that integer
 
 ### Requirement: Validate for deploy
 
@@ -110,7 +111,7 @@ Lengths MUST be counted in Unicode runes (code points), not UTF-16 units. Text t
 
 - GIVEN a skill whose `id` is `Not Kebab` and another whose name is empty
 - WHEN validated for deploy
-- THEN `InvalidManifest` lists one problem per skill, each identifying which skill and what is wrong
+- THEN `InvalidManifest` lists each distinct skill problem kind once (the problem carries no skill index)
 
 ### Requirement: Model and model policy
 
@@ -162,7 +163,7 @@ Lengths MUST be counted in Unicode runes (code points), not UTF-16 units. Text t
 
 ### Requirement: Input, output and price
 
-At deploy: `input.type` MUST be `text` and `input.max_chars` MUST be an integer from 1 to 8,000. `output.type` MUST be `text` or `markdown` and `output.max_chars` MUST be an integer from 1 to 16,000. `price.asset` MUST be `USDC` and `price.amount` MUST be an integer of stroops (7 decimals) greater than zero; a float MUST never be accepted. The price MUST use the existing `UsdcAmount`.
+At deploy: `input.type` MUST be `text` and `input.max_chars` MUST be an integer from 1 to 8,000. `output.type` MUST be `text` or `markdown` and `output.max_chars` MUST be an integer from 1 to 16,000. `price.asset` MUST be `USDC` and `price.amount` MUST be an integer of stroops (7 decimals) greater than zero. Numbers are integers by value: an integral number written with a decimal point (such as `3000000.0`) MUST be accepted as that integer, because Flutter web (dart2js) cannot tell `3.0` from `3` and validation MUST NOT depend on the platform. A non-integral number (such as `1.5`), NaN, infinity, or a value beyond ±(2^53−1) MUST be rejected. The price MUST use the existing `UsdcAmount`.
 
 #### Scenario: S20 Input boundaries
 
@@ -183,7 +184,8 @@ At deploy: `input.type` MUST be `text` and `input.max_chars` MUST be an integer 
 - GIVEN amount 1 and amount 3,000,000
 - WHEN validated for deploy
 - THEN both pass
-- AND amount 0, a negative amount, or a JSON float such as `1.5` or `3000000.0` fail (zero and negative with a price problem, floats with a wrong-type problem)
+- AND amount 0, a negative amount, or a non-integral JSON number such as `1.5` fail (zero and negative with a price problem, the non-integral number with a wrong-type problem)
+- AND `3000000.0` passes, as the integer 3,000,000
 
 #### Scenario: S23 Price asset
 
@@ -210,11 +212,11 @@ A `tools` key MUST be rejected in every JSON input, draft or manifest, with its 
 
 ### Requirement: Error aggregation
 
-`InvalidManifest` MUST carry a list of `ManifestProblem` values covering every violation found in one call, not only the first. The list MUST be in a deterministic order (field order of the manifest, then skill index) and MUST be non-empty. `InvalidManifest` MUST be a `DomainError` with a readable message.
+`InvalidManifest` MUST carry a list of `ManifestProblem` values covering every violation found in one call, not only the first. The list MUST be in a deterministic order (field order of the manifest, then problem kind within skills) and MUST be non-empty. `InvalidManifest` MUST be a `DomainError` with a readable message.
 
 #### Scenario: S25 All problems at once
 
-- GIVEN a draft with a 2-rune name, a 5-rune description, 0 skills, a disallowed model, a zero price and `inputMaxChars` of 9,000
+- GIVEN a draft with a 2-rune name, a 5-rune description, 0 skills, a disallowed model, a zero price and `inputMaxChars` of 0 (below its minimum; a value above the maximum is already rejected when the draft is built, see S3)
 - WHEN `validate` is called
 - THEN the thrown `InvalidManifest` lists all six problems in one list
 
@@ -250,7 +252,7 @@ A `tools` key MUST be rejected in every JSON input, draft or manifest, with its 
 
 ### Requirement: JSON round-trip
 
-`AgentManifest.toJson` MUST produce the snake_case document of the spike table: `schema`, `version`, `name`, `description`, `skills` (each `id`, `name`, `description`, `tags`), `model` (`provider`, `id`), `system_prompt`, `input` (`type`, `max_chars`), `output` (`type`, `max_chars`), `price` (`asset`, `amount`). `AgentManifest.fromJson` MUST validate with a policy and accept this document. `AgentManifestDraft.fromJson` and `toJson` MUST use the same keys without `schema` and `version`. Both `fromJson` methods MUST reject unknown keys at every level with an unknown-key problem naming the key. `fromJson` of a manifest MUST reject a `schema` other than `puls3.agent-manifest/v1`.
+`AgentManifest.toJson` MUST produce the snake_case document of the spike table: `schema`, `version`, `name`, `description`, `skills` (each `id`, `name`, `description`, `tags`), `model` (`provider`, `id`), `system_prompt`, `input` (`type`, `max_chars`), `output` (`type`, `max_chars`), `price` (`asset`, `amount`). `AgentManifest.fromJson` MUST validate with a policy and accept this document. `AgentManifestDraft.fromJson` and `toJson` MUST use the same keys without `schema` and `version`. Both `fromJson` methods MUST reject unknown keys at every level with an unknown-key problem (a single `unknownKey` problem per document; the problem does not carry the key name). `fromJson` of a manifest MUST reject a `schema` other than `puls3.agent-manifest/v1`.
 
 #### Scenario: S30 Manifest round-trip
 
@@ -268,7 +270,7 @@ A `tools` key MUST be rejected in every JSON input, draft or manifest, with its 
 
 - GIVEN JSON with an unknown key at the top level, inside `skills[0]`, `input` or `price`
 - WHEN `fromJson` is called
-- THEN it fails with `InvalidManifest` containing one unknown-key problem per key
+- THEN it fails with `InvalidManifest` containing a single `unknownKey` problem for the document, however many unknown keys it holds
 
 #### Scenario: S33 Wrong schema
 
@@ -278,7 +280,7 @@ A `tools` key MUST be rejected in every JSON input, draft or manifest, with its 
 
 ### Requirement: Canonical JSON
 
-The manifest MUST expose a canonical form: UTF-8 bytes of the JSON with object keys sorted (by code unit, at every depth), no whitespace between tokens, array order preserved, and integers only (no floats). The same manifest MUST always give identical bytes, independent of how it was built or the key order of the input JSON. The domain MUST NOT compute a hash or accept a salt; those belong to the server (#18).
+The manifest MUST expose a canonical form: UTF-8 bytes of the JSON with object keys sorted (by code unit, at every depth), no whitespace between tokens, array order preserved, and integers only: an integral number is written as an integer (`3.0` as `3`), while a non-integral number, NaN, infinity or a value beyond ±(2^53−1) MUST be rejected. The same manifest MUST always give identical bytes, independent of how it was built or the key order of the input JSON. The domain MUST NOT compute a hash or accept a salt; those belong to the server (#18).
 
 #### Scenario: S34 Sorted keys, no whitespace
 

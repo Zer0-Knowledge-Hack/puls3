@@ -73,6 +73,12 @@ Fixes F.1-F.5 (strict TDD: 7 new or changed tests failed first, then the code; s
 - 4.3 `docs/architecture/api.md`: `version` removed from `AgentManifestDraft`, wire mapping note added, `DraftVersionConflict` kept as a storage concern.
 - 4.4 Links and invariant ids checked against the tests.
 
+## Escalation resolution
+
+User decision (binding): integral numbers written with a decimal point (3000000.0) are accepted as integers everywhere, since dart2js cannot tell `3.0` from `3`. Non-integral, NaN, infinity and |x| > 2^53-1 are rejected.
+- E.1 `_integer` now range-checks the `int` branch too (RED: `canonicalJson(9007199254740992)` did not throw). Commit d6595f7. Gate: analyze clean, 234 tests, format clean.
+- E.2 spec.md amended for W1 (numbers), W2 (S25 uses `inputMaxChars` 0), W3 (one `unknownKey` per document, one problem per distinct skill problem kind, ordered by field then kind). verify-report W1-W3 marked resolved; W4 (size:exception) kept.
+
 ## Remaining
 
 Verify (`sdd-verify`), then open the single PR.
