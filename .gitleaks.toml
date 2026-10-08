@@ -14,7 +14,34 @@ keywords = ["S"]
 # Soroban RPC responses carry `key_hash`, the public SHA-256 of a ledger key
 # in a TTL entry. Test fixtures record real testnet responses, so these
 # hashes are chain data, not secrets.
-[allowlist]
+[[allowlists]]
 description = "Soroban ledger key hashes"
 regexTarget = "line"
 regexes = ['''"key_hash":\s*"[0-9a-f]{64}"''']
+
+# generic-api-key matches on three kinds of public, non-secret text. Each rule
+# below needs the file path AND the shape of the line, so a real key anywhere
+# else (or a different line in the same file) is still reported.
+[[allowlists]]
+description = "Env var name constants in the relay config"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+paths = ['''puls3_server/lib/src/hire/hire_relay_config\.dart''']
+regexes = ['''^\w+ = 'PULS3_[A-Z0-9_]+'$''']
+
+[[allowlists]]
+description = "Class-name lookups in the generated protocol"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+paths = ['''(puls3_server/lib/src/generated|puls3_client/lib/src/protocol)/protocol\.dart''']
+regexes = ['''^\S+\.\w+ => '\w+'$''']
+
+[[allowlists]]
+description = "Ledger key XDR recorded from testnet in relay fixtures"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''puls3_server/test/fixtures/escrow_relay/.*\.json''']
+regexes = ['''"key":\s*"AAAA[A-Za-z0-9+/=]+"''']

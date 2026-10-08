@@ -57,6 +57,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  blockchain_utils:
+    dependency: transitive
+    description:
+      name: blockchain_utils
+      sha256: "81ed3cdea69e0a1be27f17aaa137186afa893025a1fde210be32348764082e4e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.1.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -1170,6 +1178,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.12.1"
+  stellar_dart:
+    dependency: transitive
+    description:
+      name: stellar_dart
+      sha256: "6e2a8fe73361e72cc437062f59e2ad8c9f6075d3a6bf59276743924df6ec7c95"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
   stellar_flutter_sdk:
     dependency: transitive
     description:

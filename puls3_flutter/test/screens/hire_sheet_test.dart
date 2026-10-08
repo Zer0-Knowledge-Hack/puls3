@@ -25,6 +25,21 @@ class TestWallet implements WalletPort {
   }
 
   @override
+  Future<void> disconnect() async => _address = null;
+
+  @override
+  String get name => 'Test wallet';
+
+  @override
+  Uri? get installUrl => null;
+
+  @override
+  String? get network => address == null ? null : stellarTestnetPassphrase;
+
+  @override
+  Future<String> signAuthEntry(String entryXdr) async => entryXdr;
+
+  @override
   Future<String> signTransaction(String unsignedXdr) async {
     if (shouldFail) {
       throw Exception('Signature rejected by user');

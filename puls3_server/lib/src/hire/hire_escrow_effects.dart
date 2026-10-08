@@ -1,18 +1,36 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
-import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
 import '../chain/escrow_effects.dart';
 import '../chain/submission_values.dart';
 import '../ledger/escrow_events.dart';
 import '../ledger/escrow_job.dart';
+import 'escrow_preparation_store.dart';
+import 'hire_lifecycle_store.dart';
 
 /// Runs [action] with a [HireRepository] that is valid only until it returns,
 /// so a composition root can open and close a database session around it.
 typedef HireRepositoryScope =
     Future<T> Function<T>(Future<T> Function(HireRepository repository) action);
 
+/// Like [HireRepositoryScope], for the relay's view of a hire and its
+/// preparations.
+typedef HireLifecycleScope =
+    Future<T> Function<T>(
+      Future<T> Function(
+        HireLifecycleStore hires,
+        EscrowPreparationStore preparations,
+      )
+      action,
+    );
+
 /// The hire side of the escrow effects (api.md relay step 5).
+///
+/// After a successful `create_job`, [onJobCreated] binds the job id to the
+/// hire named by the submission, which opens it, and takes the job's
+/// `expired_at` from the preparation the submission relayed. A job id that
+/// is already bound to another hire, or a hire that already holds another
+/// job, is a `JobMismatch` on `job_id`. Applying it again is a no-op.
 ///
 /// After a successful `fund`, [onFunded] reads the job from the escrow,
 /// checks it against the hire with [verifyFunding] and, only if every check
@@ -40,29 +58,56 @@ typedef HireRepositoryScope =
 final class HireEscrowEffects implements EscrowEffects {
   HireEscrowEffects({
     required HireRepositoryScope repositories,
+    required HireLifecycleScope lifecycle,
     required LedgerPort ledger,
     required EscrowJobReader jobs,
     required StellarAddress usdc,
-    ChainLog log = ignoreChainLog,
   }) : _repositories = repositories,
+       _lifecycle = lifecycle,
        _ledger = ledger,
        _jobs = jobs,
-       _usdc = usdc,
-       _noJobCreatedEffect = NoopEscrowEffects(log: log);
+       _usdc = usdc;
 
   final HireRepositoryScope _repositories;
+  final HireLifecycleScope _lifecycle;
   final LedgerPort _ledger;
   final EscrowJobReader _jobs;
   final StellarAddress _usdc;
-  final EscrowEffects _noJobCreatedEffect;
 
-  /// Recording the job id after `create_job` belongs to the hire lifecycle
-  /// (#96); until it exists the event is only logged.
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
     JobCreatedEvent event,
-  ) => _noJobCreatedEffect.onJobCreated(submission, event);
+  ) async {
+    final hireId = submission.hireId;
+    // Like a fund, a create_job the server relayed always carries its hire.
+    if (hireId == null) return _mismatch(null);
+    return await _lifecycle((hires, preparations) async {
+      // A relayed create_job always has its hire and preparation, so a
+      // missing one breaks an invariant: thrown, so the tracker retries.
+      final hire = await hires.findHire(hireId);
+      if (hire == null) throw StateError('hire $hireId does not exist');
+      final preparationId = submission.preparationId;
+      final preparation = preparationId == null
+          ? null
+          : await preparations.findByPreparationId(preparationId);
+      final expiredAt = preparation?.jobExpiredAt;
+      if (expiredAt == null) {
+        throw StateError(
+          'submission ${submission.id} has no prepared create_job expiry',
+        );
+      }
+      final binding = await hires.bindJob(
+        hireId,
+        event.jobId,
+        expiredAt: expiredAt,
+      );
+      return switch (binding) {
+        JobBinding.bound || JobBinding.alreadyBound => const EffectResult.ok(),
+        JobBinding.taken => _mismatch(_jobIdField),
+      };
+    });
+  }
 
   @override
   Future<EffectResult> onFunded(

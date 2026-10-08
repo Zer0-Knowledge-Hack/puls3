@@ -1,0 +1,40 @@
+### One unsigned escrow envelope the server prepared for a session wallet.
+### Kept so that submit can verify the signed envelope against the exact
+### prepared bytes, and so a newer preparation can supersede an older one.
+class: EscrowPreparation
+table: escrow_preparation
+serverOnly: true
+fields:
+  ### Opaque id the client echoes back on submit.
+  preparationId: String
+  hireId: int
+  ### createJob, fund, complete or reject.
+  purpose: String
+  ### StrKey of the session wallet that must sign.
+  signer: String
+  ### Base64 unsigned TransactionEnvelope XDR, exactly as returned.
+  unsignedEnvelopeXdr: String
+  ### Lowercase hex network hash of the prepared transaction.
+  transactionHash: String
+  ### Source account sequence number the envelope uses.
+  sequence: int
+  ### End of the envelope time bounds; after it the preparation is expired.
+  validUntil: DateTime
+  ### expired_at the create_job was prepared with; bound to the hire when the
+  ### job is confirmed.
+  jobExpiredAt: int?
+  ### Reject reason baked into a reject envelope.
+  rejectReason: String?
+  createdAt: DateTime
+  ### Set when a newer preparation replaced this one.
+  supersededAt: DateTime?
+  ### Set when a submit claimed this preparation.
+  submittedAt: DateTime?
+indexes:
+  escrow_preparation_id_idx:
+    fields: preparationId
+    unique: true
+  escrow_preparation_hire_idx:
+    fields: hireId
+  escrow_preparation_transaction_idx:
+    fields: transactionHash

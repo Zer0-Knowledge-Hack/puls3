@@ -202,7 +202,11 @@ class DeployFlowController extends ChangeNotifier {
           _signed ??
           await _attempt<String>(DeployStep.awaitingSignature, () async {
             // The transaction names the account it was prepared for. If the
-            // wallet switched account since, it cannot sign it.
+            // wallet switched account since, it cannot sign it. After a
+            // network switch the wallet forgot its session: connect again.
+            if (_wallet.address == null) {
+              await _waitForWallet(_wallet.connect());
+            }
             if (_wallet.address != _builder) throw const _AccountChanged();
             return _waitForWallet(
               _wallet.signTransaction(prepared.unsignedTransaction),
@@ -296,7 +300,17 @@ class DeployFlowController extends ChangeNotifier {
       kind: DeployErrorKind.signatureRejected,
       step: step,
     ),
-    WalletUnavailable() => DeployError(
+    WalletAccountChanged() => DeployError(
+      kind: DeployErrorKind.accountChanged,
+      step: step,
+    ),
+    // The wallet adapter refused the prepared transaction before signing.
+    WalletInvalidPayload(:final reason) => DeployError(
+      kind: DeployErrorKind.invalidResponse,
+      step: step,
+      detail: reason,
+    ),
+    WalletNotInstalled() || WalletUnavailable() => DeployError(
       kind: DeployErrorKind.walletUnavailable,
       step: step,
     ),
@@ -315,7 +329,7 @@ class DeployFlowController extends ChangeNotifier {
         detail: message,
         transactionHash: transactionHash,
       ),
-    _WalletTimeout() => DeployError(
+    WalletTimedOut() || _WalletTimeout() => DeployError(
       kind: DeployErrorKind.walletTimeout,
       step: step,
     ),

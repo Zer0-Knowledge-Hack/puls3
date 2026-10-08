@@ -16,3 +16,10 @@ greeting:
   - hello:
 health:
   - check:
+hire:
+  - createHire:
+  - prepareCreateJob:
+  - prepareFund:
+  - prepareComplete:
+  - prepareReject:
+  - submitEscrowCall:
