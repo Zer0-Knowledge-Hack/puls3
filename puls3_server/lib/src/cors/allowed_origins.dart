@@ -110,7 +110,7 @@ Middleware originGateFromEnvironment(
 /// endpoint, which also stops "simple" cross-origin POSTs that CORS alone would
 /// let run.
 ///
-/// Preflight (`OPTIONS`) requests are passed on untouched: in Serverpod 3.4.13
+/// Preflight (`OPTIONS`) requests are passed on untouched: in Serverpod 4.0.4
 /// the core header middleware answers them before any added middleware runs.
 Middleware originGate(AllowedOrigins allowed) {
   return (next) => (req) async {
