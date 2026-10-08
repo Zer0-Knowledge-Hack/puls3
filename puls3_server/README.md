@@ -241,7 +241,7 @@ Browsers may call the API server only from an origin listed in
 origin, or with several `Origin` headers, gets `403` before an endpoint runs.
 Requests without an `Origin` header, such as `curl`, are not affected.
 
-Serverpod 3.4.13 answers CORS preflight (`OPTIONS`) requests in its own core
+Serverpod 4.0.4 answers CORS preflight (`OPTIONS`) requests in its own core
 middleware, before added middleware runs, so preflight responses still carry
 `Access-Control-Allow-Origin: *`. The request that follows is still rejected
 when its origin is not allowed.

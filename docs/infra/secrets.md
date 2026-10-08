@@ -4,7 +4,7 @@ The repo is public. **No secret is ever committed**: not in code, not in `.env.e
 
 ## Run against testnet from a fresh clone
 
-This is the canonical setup path; CONTRIBUTING.md, the root README and `puls3_server/README.md` link here. Run every command from **Git Bash** on Windows. Prerequisites: Flutter, Serverpod CLI 3.4.13 and Docker ([CONTRIBUTING.md §1](../../CONTRIBUTING.md#1-set-up-your-machine)), and the Stellar CLI for step 4 ([contracts/README.md](../../contracts/README.md#prerequisites)).
+This is the canonical setup path; CONTRIBUTING.md, the root README and `puls3_server/README.md` link here. Run every command from **Git Bash** on Windows. Prerequisites: Flutter, Serverpod CLI 4.0.4 and Docker ([CONTRIBUTING.md §1](../../CONTRIBUTING.md#1-set-up-your-machine)), and the Stellar CLI for step 4 ([contracts/README.md](../../contracts/README.md#prerequisites)).
 
 Two env files, two jobs:
 
