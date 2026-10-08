@@ -112,12 +112,11 @@ final _accountAddress = RegExp(r'^G[A-Z2-7]{55}$');
 class DeployFlowController extends ChangeNotifier {
   DeployFlowController({
     required this.draft,
-    required DeployGateway gateway,
-    required WalletController wallet,
+    required this._gateway,
+    required this._wallet,
     this.stepTimeout,
     this.signatureTimeout,
-  }) : _gateway = gateway,
-       _wallet = wallet;
+  });
 
   final AgentDraft draft;
   final DeployGateway _gateway;
