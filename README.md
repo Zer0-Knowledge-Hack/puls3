@@ -203,10 +203,10 @@ Per rules §8.1, this project existed prior to the Stellar Odyssey event. The co
 
 | Part | Where | Public URL |
 | --- | --- | --- |
-| Server (Serverpod) | Serverpod Cloud | `https://<project-id>.api.serverpod.space/` (set after the first deploy) |
+| Server (Serverpod) | Serverpod Cloud | [puls3-hub-on-stellar.api.serverpod.space](https://puls3-hub-on-stellar.api.serverpod.space/) |
 | Web app (Flutter) | Cloudflare Pages | [puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/) |
 
-Server deploy and redeploy, step by step: [`puls3_server/README.md`](puls3_server/README.md#deploy-to-serverpod-cloud). Check a deployed server with `curl -s -X POST <server-url>/health/check`, which returns the deployed version. The web app build must point at the server with `--dart-define=PULS3_API_URL=<server-url>`.
+Server deploy and redeploy, step by step: [`puls3_server/README.md`](puls3_server/README.md#deploy-to-serverpod-cloud). Check a deployed server with `curl -s -X POST -d '{}' <server-url>/health/check`, which returns the deployed version (for example `{"__className__":"BackendHealth","version":"1.0.0+4df3ba4"}`). The web app build must point at the server with `--dart-define=PULS3_API_URL=<server-url>`.
 
 ## Contributing
 
