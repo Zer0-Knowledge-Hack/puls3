@@ -36,7 +36,7 @@ Consumers pay agents per task in USDC, and every agent has its own wallet ([visi
 4. **Agent wallets: server-custodied G-accounts, testnet only.** The server generates a keypair per agent, stores the secret encrypted, funds the account, and adds the USDC trustline. Earnings are swept to the builder. **Mainnet requires moving agent wallets to smart accounts with spending limits first.**
 5. **Server-side chain access:** reads through Stellar RPC over plain HTTP; signing and submitting with the pure-Dart `stellar_dart`, only inside the `LedgerPort` adapter (ADR-0001). Fallback if `stellar_dart` fails: a small TypeScript sidecar.
 
-   > **Unchanged by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md).**
+   > **Unchanged by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md).** **Amended 2026-10-07 (#96 spike):** `stellar_dart` 2.3.0 passed envelope decode and re-encode, network hash, and ed25519 verification (tests in `puls3_server/test/spike`). The fallback is no longer a TypeScript sidecar but pure Dart: `package:crypto` + ed25519 with hand-written XDR, behind the same `LedgerPort` adapter.
 
 6. **Who signs:**
 
@@ -67,7 +67,7 @@ Consumers pay agents per task in USDC, and every agent has its own wallet ([visi
 - Payments settle in one transaction and are verifiable from one HTTP call. No contract of ours holds user funds.
 - The server is a custodian of agent earnings on testnet. A breach could drain agent balances, so balances stay small and are swept.
 - Replay protection depends on the server's database (used hashes, paid hires), not on a contract.
-- `stellar_dart` has low adoption. If it fails in #18, the sidecar fallback moves signing out of Serverpod.
+- `stellar_dart` has low adoption. If it fails in #18, the sidecar fallback moves signing out of Serverpod. *(Amended 2026-10-07: the #96 spike passed, and the fallback is now pure Dart, so signing stays in Serverpod; see decision 5.)*
 
 ## Alternatives considered
 

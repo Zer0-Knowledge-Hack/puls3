@@ -1,0 +1,21 @@
+### Everything the app shows about one hire (docs/architecture/api.md,
+### "Response shapes not copied from the domain").
+class: HireDetail
+fields:
+  hire: Hire
+  ### The catalog entry whose registryId is hire.agentId.
+  agent: AgentSummary
+  input: String
+  result: String?
+  payment: Payment?
+  ### Escrow job id, set once the create_job is confirmed.
+  jobId: int?
+  ### The job's expired_at.
+  expiresAt: DateTime?
+  ### The job's approval_deadline, set once the job is submitted.
+  approvalDeadline: DateTime?
+  rejectReason: String?
+  ### The hire's latest escrow submission, any purpose.
+  escrowSubmission: ChainSubmission?
+  feedbackSubmission: ChainSubmission?
+  paymentExplorerUrl: String?
