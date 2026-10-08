@@ -1,0 +1,30 @@
+### Draft transport mirror of the domain Hire entity (ADR-0005 D6, #73).
+class: Hire
+fields:
+  ### Domain HireId encoded as an integer.
+  id: int
+  ### Domain AgentId encoded as an integer.
+  agentId: int
+  ### Domain StellarAddress encoded as a StrKey string.
+  consumer: String
+  ### Domain UsdcAmount encoded as integer USDC stroops.
+  price: int
+  manifestVersion: int
+  ### HireStatus enum name: open, funded, submitted, completed, rejected,
+  ### expired. Mirrors the ERC-8183 escrow job state. Null until create_job is
+  ### confirmed (no on-chain job yet). expired is also derived for an unfunded
+  ### open job past expired_at.
+  status: String?
+  ### Domain TransactionHash of the confirmed `fund` transaction, lowercase hex.
+  paymentTransaction: String?
+  ### RuntimeStatus enum name: queued, running, failed. Runtime progress while
+  ### the hire is funded; not a hire state.
+  runtimeStatus: String?
+  ### Safe runtime failure reason when runtimeStatus is failed.
+  failureReason: String?
+  ### HireStatus the reject came from (open, funded, submitted) when status is
+  ### rejected. The app labels a reject from open as "Cancelled".
+  rejectedFrom: String?
+  ### Reference to the confirmed ERC-8004 feedback for this hire, for example
+  ### the give_feedback transaction hash. Replaces the former rated state.
+  feedbackReference: String?
