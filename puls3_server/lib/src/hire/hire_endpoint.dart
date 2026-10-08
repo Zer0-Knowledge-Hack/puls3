@@ -15,7 +15,7 @@ import 'session_wallet.dart';
 /// (`WalletMismatch`), and ownership of a hire is checked against the session
 /// wallet by the services.
 ///
-/// `getHire` and `listHires` are not part of this endpoint yet.
+/// `listHires` is not part of this endpoint yet.
 ///
 /// Follow-ups: `InputTooLong` has no documented limit, so the input length is
 /// not checked here; `PersistenceUnavailable` is not mapped, so a database
@@ -101,6 +101,21 @@ class HireEndpoint extends Endpoint {
     session,
     (relay, wallet) => relay.prepareReject(wallet, hireId, reason),
   );
+
+  /// The hire [hireId] as its [consumer] sees it: escrow status, run
+  /// progress and result (F6). Read-only, so the app polls it.
+  Future<HireDetail> getHire(
+    Session session,
+    int hireId,
+    String consumer,
+  ) async {
+    final wallet = await _wallet.requireLogin(session);
+    _requireSameWallet(wallet, consumer);
+    final query =
+        _servicesOn(session).query ??
+        (throw StateError('HireServices has no query service'));
+    return query.getHire(wallet, hireId);
+  }
 
   /// Verifies the wallet-signed envelope of [preparationId] and relays it.
   Future<HireDetail> submitEscrowCall(

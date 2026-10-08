@@ -9,6 +9,7 @@ import 'src/cors/allowed_origins.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 import 'src/health/health_endpoint.dart';
+import 'src/runtime/agent_runtime_wiring.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -101,6 +102,13 @@ void run(List<String> args) async {
   final tracker = startChainTracker(pod, Platform.environment);
   if (tracker != null) {
     pod.experimental.shutdownTasks.addTask('chain-tracker', tracker.stop);
+  }
+
+  // Run the agent of every funded hire, when PULS3_RUNTIME_ENABLED=true and
+  // the anthropicApiKey password is set (#20, see README).
+  final runtime = startAgentRuntime(pod, Platform.environment);
+  if (runtime != null) {
+    pod.experimental.shutdownTasks.addTask('agent-runtime', runtime.stop);
   }
 }
 

@@ -1,0 +1,24 @@
+### The agent run of one funded hire (#20). Created as queued in the same
+### transaction that records the hire's payment, so every funded hire gets
+### exactly one run. State changes are conditional updates, so two runners
+### never run the same hire.
+class: HireRunRecord
+table: hire_run
+serverOnly: true
+fields:
+  hireId: int
+  ### queued, running, succeeded or failed.
+  state: String
+  queuedAt: DateTime
+  startedAt: DateTime?
+  finishedAt: DateTime?
+  ### The agent's output, set when the run succeeded.
+  result: String?
+  ### A safe RuntimeFailure code (for example timeout), set when it failed.
+  failureReason: String?
+indexes:
+  hire_run_hire_idx:
+    fields: hireId
+    unique: true
+  hire_run_state_idx:
+    fields: state

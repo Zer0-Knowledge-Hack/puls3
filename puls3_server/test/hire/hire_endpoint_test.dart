@@ -7,6 +7,7 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_endpoint.dart';
+import 'package:puls3_server/src/hire/hire_query_service.dart';
 import 'package:puls3_server/src/hire/hire_relay_config.dart';
 import 'package:puls3_server/src/hire/hire_service.dart';
 import 'package:puls3_server/src/hire/hire_services.dart';
@@ -16,6 +17,7 @@ import 'package:serverpod/serverpod.dart' show Session;
 import 'package:test/test.dart';
 
 import '../support/fake_envelope_codec.dart';
+import '../support/in_memory_hire_run_store.dart';
 import '../support/relay_rig.dart';
 
 /// The endpoint never uses the session itself; it only hands it to the seam
@@ -83,6 +85,19 @@ void main() {
           now: () => rig.clock,
         ),
         relay: rig.service,
+        query: HireQueryService(
+          hires: rig.hires,
+          runs: InMemoryHireRunStore(),
+          submissions: rig.submissions,
+          agents: (registryId) async => AgentSummary(
+            id: 'agt-001',
+            registryId: registryId,
+            name: 'Test Agent',
+            description: 'A helpful test agent for verification.',
+            skills: const ['coding'],
+            priceUsdcStroops: 5000000,
+          ),
+        ),
       );
     };
   }
@@ -116,6 +131,11 @@ void main() {
       session,
       (await rig.hire(status: HireStatus.open)).id,
       'not what I asked for',
+    ),
+    'getHire': () async => endpoint.getHire(
+      session,
+      (await rig.hire(status: HireStatus.funded)).id,
+      alice,
     ),
     'submitEscrowCall': () async {
       final hire = await rig.hire(status: HireStatus.open);
@@ -353,6 +373,54 @@ void main() {
         );
       },
     );
+  });
+
+  group('getHire', () {
+    test('returns the hire of the session wallet', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+
+      final detail = await endpoint.getHire(session, hire.id, alice);
+
+      expect(detail.hire.id, hire.id);
+      expect(detail.hire.status, 'funded');
+    });
+
+    test(
+      'a consumer other than the session wallet is WalletMismatch',
+      () async {
+        final hire = await rig.hire(status: HireStatus.funded);
+
+        await expectLater(
+          endpoint.getHire(session, hire.id, stranger),
+          throwsA(
+            isA<Puls3ApiException>().having(
+              (e) => e.code,
+              'code',
+              'WalletMismatch',
+            ),
+          ),
+        );
+        expect(events, ['requireLogin']);
+      },
+    );
+
+    test('a hire of another wallet is HireNotOwned', () async {
+      final hire = await rig.hire(
+        status: HireStatus.funded,
+        consumer: stranger,
+      );
+
+      await expectLater(
+        endpoint.getHire(session, hire.id, alice),
+        throwsA(
+          isA<Puls3ApiException>().having(
+            (e) => e.code,
+            'code',
+            'HireNotOwned',
+          ),
+        ),
+      );
+    });
   });
 
   group('a hire of another wallet is HireNotOwned', () {

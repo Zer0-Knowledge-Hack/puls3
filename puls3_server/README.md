@@ -55,6 +55,40 @@ It is off by default so tests, CI and existing deployments do not poll the
 chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
 writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
+## Agent runtime
+
+A second background loop runs the agent of every funded hire once (#20).
+When the tracker records a hire's payment, it queues a run (`hire_run`) in
+the same transaction. Each pass:
+1. fails runs still `running` past the timeout plus a minute (`interrupted`);
+2. takes up to 10 queued runs, one at a time, with a conditional update, so
+   two runners never run the same hire;
+3. loads the manifest the hire pinned and calls the model through
+   `AgentRunner` (input and output limits, timeout that aborts the call);
+4. stores the result, or a safe failure code such as `timeout`,
+   `provider_error:<type>` or `manifest_unavailable`.
+
+Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
+`HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
+`running`, `failed`), with the `result` and `failureReason`.
+
+A successful run leaves the hire `funded` with its result: the server-signed
+escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
+deployed manifests, the demo agents' manifests are seeded in
+`lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
+(`agt-006` Copy Forge, `agt-007` Support Relay).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PULS3_RUNTIME_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_RUNTIME_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
+| `PULS3_RUNTIME_TIMEOUT_SECONDS` | `120` | Longest one run may take; it must end before the job's `expired_at` |
+| Serverpod password `anthropicApiKey` | none | The Anthropic API key. Locally, `shared: anthropicApiKey:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set anthropicApiKey --from-file <file>`. Without it the loop does not start, even when enabled |
+
+It is off by default so tests, CI and existing deployments never call a paid
+model. It writes `[agent-runtime]` lines to stdout (info) and stderr
+(warnings).
+
 ### Hire configuration
 
 | Variable | Default | Meaning |
