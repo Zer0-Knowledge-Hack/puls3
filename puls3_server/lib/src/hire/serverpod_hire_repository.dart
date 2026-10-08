@@ -2,7 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
-import '../generated/protocol.dart';
+import '../generated/protocol.dart' hide Hire, Payment;
 
 /// PostgreSQL-backed implementation of [HireRepository] using Serverpod ORM.
 ///
