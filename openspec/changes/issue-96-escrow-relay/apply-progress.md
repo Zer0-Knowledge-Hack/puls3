@@ -72,3 +72,20 @@
 | 6.4 | `test/unit/hire/hire_service_create_test.dart` + `test/integration/hire_relay_flow_test.dart` | Unit + Integration | 8 old createHire tests rewritten | compile error | 17 unit, 5 Postgres | retry, expiry, reused key, scope, race, rollback | `HireRelayConfig` |
 | 6.5 | `test/unit/hire/hire_escrow_effects_test.dart` | Unit + Integration | 27/27 | compile error | 34 passed | bound, twice, clash, other job, no hire, retry | clean |
 | 6.6 | all | all | full suites green after each step | n/a | 494 + 68 | n/a | see above |
+
+## Batch 7 (C7 Endpoint, seam, wiring): tasks 7.1, 7.2, 7.3 complete (FINAL)
+
+- Strict TDD, size:exception, single PR (one commit per phase, parent commits). Not committed; all 7 phases done (20/20 tasks).
+- 7.1 RED: `test/hire/hire_endpoint_test.dart` failed to compile (HireEndpoint, HireServices, SessionWallet missing). 7.2 GREEN: 35 tests passed.
+- `lib/src/hire/session_wallet.dart`: `SessionWallet.requireLogin(Session)` and `FailClosedSessionWallet` (`AuthenticationUnavailable`). `lib/src/hire/hire_endpoint.dart`: `HireEndpoint` with static `@visibleForTesting` setters `sessionWallet` and `servicesBuilder`; each of the six methods calls `requireLogin` first and exactly once, then builds the services (so a caller without a session reaches no store/chain). `createHire` order: login, `InvalidStellarAddress`, `WalletMismatch`, `InvalidAgentId` (agentId < 1), then the service. Mapping: `AgentUnavailable` -> `AgentNotFound`, `HireRequestInvalid` -> `InvalidHire` (with message), `HireLedgerUnavailable` -> `ChainUnavailable`. `HireConfigurationMissing` and `Puls3ApiException` propagate unchanged. `lib/src/hire/hire_services.dart`: `HireServices`, `HireWiring` (process-wide RPC client, catalog cache, codec built lazily on the first request past login from `Platform.environment`; per-request stores on the session). Relay settings are read by `HireRelayConfig` when used, so a missing key fails only that call.
+- Generation: `~/AppData/Local/Pub/Cache/bin/serverpod.bat generate` registered the `hire` endpoint (endpoints.dart, protocol.yaml, `puls3_client/.../client.dart`, `test/integration/test_tools/serverpod_test_tools.dart`). No model changed: NO migration needed.
+- README: the three relay keys and the fail-closed `SessionWallet` documented in `puls3_server/README.md` (Hire configuration).
+- Deviation: production wiring lives in `hire_services.dart` created lazily by the endpoint (the pattern of `AgentEndpoint`), not in `chain_tracker_wiring.dart` (the tracker's effects scope was already wired in C6; the endpoint is instantiated by generated code with no hook in `server.dart`).
+- Follow-ups (not done): `InputTooLong` (no documented limit; input length unchecked); `AgentInactive` (HireService raises one `AgentUnavailable` for a missing agent and for an agent without wallet, both map to `AgentNotFound`); `PersistenceUnavailable` unmapped; `onFunded` does not compare the payment job id with `hire.jobId` (not small: the effect reads the hire through the domain repository, the job id lives in the lifecycle store, and every onFunded test would need a lifecycle row; the prepared `fund` carries `hire.jobId` and `verifyFunding` already checks client, evaluator, provider, token, budget and expiry); `getHire`/`listHires` are not implemented.
+- Verification: `dart test test/unit test/protocol test/spike test/ledger test/hire` -> 529 passed (was 494); `dart test test/integration` (Postgres/Redis containers started) -> 68 passed; `dart analyze --fatal-infos` -> no issues. pubspec.lock churn (33/57) restored after each run.
+- TDD Cycle Evidence:
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 7.1/7.2 | `test/hire/hire_endpoint_test.dart` | Unit (fakes) | 494/494 | compile error (no endpoint) | 35 passed | six methods x (order, no session), WalletMismatch, InvalidStellarAddress, InvalidAgentId, error mapping, HireNotOwned x5, default wiring | unused field removed |
+| 7.3 | README | Docs | n/a | n/a | n/a | structural | n/a |

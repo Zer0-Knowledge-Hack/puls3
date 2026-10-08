@@ -17,10 +17,11 @@ import '../auth/email_idp_endpoint.dart' as _i3;
 import '../auth/jwt_refresh_endpoint.dart' as _i4;
 import '../greetings/greeting_endpoint.dart' as _i5;
 import '../health/health_endpoint.dart' as _i6;
+import '../hire/hire_endpoint.dart' as _i7;
 import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
-    as _i7;
-import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _i8;
+import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
+    as _i9;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -54,6 +55,12 @@ class Endpoints extends _i1.EndpointDispatch {
         ..initialize(
           server,
           'health',
+          null,
+        ),
+      'hire': _i7.HireEndpoint()
+        ..initialize(
+          server,
+          'hire',
           null,
         ),
     };
@@ -335,9 +342,162 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
       },
     );
-    modules['serverpod_auth_idp'] = _i7.Endpoints()
+    connectors['hire'] = _i1.EndpointConnector(
+      name: 'hire',
+      endpoint: endpoints['hire']!,
+      methodConnectors: {
+        'createHire': _i1.MethodConnector(
+          name: 'createHire',
+          params: {
+            'agentId': _i1.ParameterDescription(
+              name: 'agentId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'consumer': _i1.ParameterDescription(
+              name: 'consumer',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'input': _i1.ParameterDescription(
+              name: 'input',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'requestId': _i1.ParameterDescription(
+              name: 'requestId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _i7.HireEndpoint).createHire(
+                session,
+                params['agentId'],
+                params['consumer'],
+                params['input'],
+                params['requestId'],
+              ),
+        ),
+        'prepareCreateJob': _i1.MethodConnector(
+          name: 'prepareCreateJob',
+          params: {
+            'hireId': _i1.ParameterDescription(
+              name: 'hireId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _i7.HireEndpoint).prepareCreateJob(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
+        'prepareFund': _i1.MethodConnector(
+          name: 'prepareFund',
+          params: {
+            'hireId': _i1.ParameterDescription(
+              name: 'hireId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _i7.HireEndpoint).prepareFund(
+                session,
+                params['hireId'],
+              ),
+        ),
+        'prepareComplete': _i1.MethodConnector(
+          name: 'prepareComplete',
+          params: {
+            'hireId': _i1.ParameterDescription(
+              name: 'hireId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _i7.HireEndpoint).prepareComplete(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
+        'prepareReject': _i1.MethodConnector(
+          name: 'prepareReject',
+          params: {
+            'hireId': _i1.ParameterDescription(
+              name: 'hireId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'reason': _i1.ParameterDescription(
+              name: 'reason',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _i7.HireEndpoint).prepareReject(
+                session,
+                params['hireId'],
+                params['reason'],
+              ),
+        ),
+        'submitEscrowCall': _i1.MethodConnector(
+          name: 'submitEscrowCall',
+          params: {
+            'hireId': _i1.ParameterDescription(
+              name: 'hireId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'preparationId': _i1.ParameterDescription(
+              name: 'preparationId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'signedTransactionXdr': _i1.ParameterDescription(
+              name: 'signedTransactionXdr',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _i7.HireEndpoint).submitEscrowCall(
+                    session,
+                    params['hireId'],
+                    params['preparationId'],
+                    params['signedTransactionXdr'],
+                  ),
+        ),
+      },
+    );
+    modules['serverpod_auth_idp'] = _i8.Endpoints()
       ..initializeEndpoints(server);
-    modules['serverpod_auth_core'] = _i8.Endpoints()
+    modules['serverpod_auth_core'] = _i9.Endpoints()
       ..initializeEndpoints(server);
   }
 }

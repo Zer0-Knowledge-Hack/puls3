@@ -60,6 +60,26 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 | Variable | Default | Meaning |
 |---|---|---|
 | `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
+| `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
+| `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
+| `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
+
+The three relay keys have no default, fallback or placeholder. They are read
+when an operation needs them, so a missing, empty, non-integer or out-of-range
+value makes that call fail with `HireConfigurationMissing` naming the key
+(`createHire` and the `prepare*` methods read the keys they need;
+`submitEscrowCall` reads none) and never stops the server or affects the other endpoints.
+
+### Hire endpoint sessions
+
+`HireEndpoint` (`createHire`, `prepareCreateJob`, `prepareFund`,
+`prepareComplete`, `prepareReject`, `submitEscrowCall`) resolves the caller
+through the `SessionWallet` seam before doing any work. Until wallet sessions
+exist (#25) the production binding, `FailClosedSessionWallet`, fails closed:
+every call is rejected with `AuthenticationUnavailable`, so the hire methods
+are not usable against a running server yet. Tests inject a fake with
+`HireEndpoint.sessionWallet`. `InputTooLong` has no documented limit, so the
+hire `input` length is not checked.
 
 ## Prerequisites
 

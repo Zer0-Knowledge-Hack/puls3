@@ -20,7 +20,10 @@ import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
     as _i5;
 import 'package:puls3_client/src/protocol/greetings/greeting.dart' as _i6;
 import 'package:puls3_client/src/protocol/health/backend_health.dart' as _i7;
-import 'protocol.dart' as _i8;
+import 'package:puls3_client/src/protocol/create_hire_result.dart' as _i8;
+import 'package:puls3_client/src/protocol/prepared_transaction.dart' as _i9;
+import 'package:puls3_client/src/protocol/hire_detail.dart' as _i10;
+import 'protocol.dart' as _i11;
 
 /// Serves the agent catalog read from the on-chain identity registry.
 ///
@@ -308,6 +311,97 @@ class EndpointHealth extends _i1.EndpointRef {
       );
 }
 
+/// Creates hires and relays their escrow calls (api.md, `HireEndpoint`).
+///
+/// Every method first resolves the caller through [SessionWallet.requireLogin]
+/// and only then builds the services, so a caller without a session reaches no
+/// store and no chain. Wallet parameters must equal the session wallet
+/// (`WalletMismatch`), and ownership of a hire is checked against the session
+/// wallet by the services.
+///
+/// `getHire` and `listHires` are not part of this endpoint yet.
+///
+/// Follow-ups: `InputTooLong` has no documented limit, so the input length is
+/// not checked here; `PersistenceUnavailable` is not mapped, so a database
+/// failure surfaces as Serverpod's own internal error.
+/// {@category Endpoint}
+class EndpointHire extends _i1.EndpointRef {
+  EndpointHire(_i1.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'hire';
+
+  /// Creates the hire of [requestId] for [consumer] and prepares its
+  /// `create_job`; repeating the request returns the same hire.
+  _i2.Future<_i8.CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) => caller.callServerEndpoint<_i8.CreateHireResult>(
+    'hire',
+    'createHire',
+    {
+      'agentId': agentId,
+      'consumer': consumer,
+      'input': input,
+      'requestId': requestId,
+    },
+  );
+
+  /// A fresh unsigned `create_job` for a hire that has no job yet.
+  _i2.Future<_i9.PreparedTransaction> prepareCreateJob(int hireId) =>
+      caller.callServerEndpoint<_i9.PreparedTransaction>(
+        'hire',
+        'prepareCreateJob',
+        {'hireId': hireId},
+      );
+
+  /// The unsigned `fund` of an open hire.
+  _i2.Future<_i9.PreparedTransaction> prepareFund(int hireId) =>
+      caller.callServerEndpoint<_i9.PreparedTransaction>(
+        'hire',
+        'prepareFund',
+        {'hireId': hireId},
+      );
+
+  /// The unsigned `complete` of a submitted hire.
+  _i2.Future<_i9.PreparedTransaction> prepareComplete(int hireId) =>
+      caller.callServerEndpoint<_i9.PreparedTransaction>(
+        'hire',
+        'prepareComplete',
+        {'hireId': hireId},
+      );
+
+  /// The unsigned `reject` of a hire, with the consumer's [reason].
+  _i2.Future<_i9.PreparedTransaction> prepareReject(
+    int hireId,
+    String reason,
+  ) => caller.callServerEndpoint<_i9.PreparedTransaction>(
+    'hire',
+    'prepareReject',
+    {
+      'hireId': hireId,
+      'reason': reason,
+    },
+  );
+
+  /// Verifies the wallet-signed envelope of [preparationId] and relays it.
+  _i2.Future<_i10.HireDetail> submitEscrowCall(
+    int hireId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) => caller.callServerEndpoint<_i10.HireDetail>(
+    'hire',
+    'submitEscrowCall',
+    {
+      'hireId': hireId,
+      'preparationId': preparationId,
+      'signedTransactionXdr': signedTransactionXdr,
+    },
+  );
+}
+
 class Modules {
   Modules(Client client) {
     serverpod_auth_idp = _i4.Caller(client);
@@ -339,7 +433,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i8.Protocol(),
+         _i11.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -353,6 +447,7 @@ class Client extends _i1.ServerpodClientShared {
     jwtRefresh = EndpointJwtRefresh(this);
     greeting = EndpointGreeting(this);
     health = EndpointHealth(this);
+    hire = EndpointHire(this);
     modules = Modules(this);
   }
 
@@ -366,6 +461,8 @@ class Client extends _i1.ServerpodClientShared {
 
   late final EndpointHealth health;
 
+  late final EndpointHire hire;
+
   late final Modules modules;
 
   @override
@@ -375,6 +472,7 @@ class Client extends _i1.ServerpodClientShared {
     'jwtRefresh': jwtRefresh,
     'greeting': greeting,
     'health': health,
+    'hire': hire,
   };
 
   @override

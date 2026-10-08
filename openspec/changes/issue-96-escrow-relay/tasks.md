@@ -77,6 +77,6 @@ Chain strategy: size-exception
 
 ## C7: Endpoint, seam, wiring
 
-- [ ] 7.1 RED: `test/hire/hire_endpoint_test.dart` fake `SessionWallet`: every method calls `requireLogin` once first; `WalletMismatch`; not logged in. Covers: Seam enforced, Not logged in.
-- [ ] 7.2 GREEN: `lib/src/hire/session_wallet.dart` (fail-closed `AuthenticationUnavailable`), `lib/src/hire/hire_endpoint.dart`, wire `lib/src/chain/chain_tracker_wiring.dart`.
-- [ ] 7.3 Document the three config keys (P2) in `puls3_server/README.md`; run full `dart test` and `dart analyze`.
+- [x] 7.1 RED: `test/hire/hire_endpoint_test.dart` fake `SessionWallet`: every method calls `requireLogin` once first; `WalletMismatch`; not logged in. Covers: Seam enforced, Not logged in.
+- [x] 7.2 GREEN: `lib/src/hire/session_wallet.dart` (fail-closed `AuthenticationUnavailable`), `lib/src/hire/hire_endpoint.dart`, `lib/src/hire/hire_services.dart` (lazy production wiring; the tracker wiring needed no further change after C6), regenerated endpoint registry and client.
+- [x] 7.3 Document the three config keys (P2) in `puls3_server/README.md`; run full `dart test` and `dart analyze`.
