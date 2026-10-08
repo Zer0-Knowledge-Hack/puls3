@@ -44,9 +44,9 @@ Chain strategy: size-exception
 
 ## C2: Doc reconciliation (depends on 1.2, P6)
 
-- [ ] 2.1 Fix `docs/architecture/api.md` line ~66 and sidecar lines ~133, 421, 451 (P6).
-- [ ] 2.2 Dated amendment in `docs/adr/0003-payment-rail-and-custody.md` (lines 37, 70); fix `docs/adr/0001-system-architecture.md` line 127.
-- [ ] 2.3 Align `specs/escrow-relay/spec.md` and `design.md` field names to final P1 (`time_bounds` vs `timeBounds`, `other`).
+- [x] 2.1 Fix `docs/architecture/api.md` line ~66 and sidecar lines ~133, 421, 451 (P6).
+- [x] 2.2 Dated amendment in `docs/adr/0003-payment-rail-and-custody.md` (lines 37, 70); fix `docs/adr/0001-system-architecture.md` line 127.
+- [x] 2.3 Align `specs/escrow-relay/spec.md` and `design.md` field names to final P1 (`time_bounds` vs `timeBounds`, `other`).
 
 ## C3: Protocol and migration
 

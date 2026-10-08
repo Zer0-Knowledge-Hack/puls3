@@ -150,7 +150,7 @@ Every `HireEndpoint` method MUST resolve the wallet through `SessionWallet.requi
 
 `InvalidSignedEnvelope` applies when the XDR is empty, not base64, truncated, has trailing bytes, or is a fee-bump envelope.
 
-`EnvelopeMismatch` applies when the transaction body differs in any byte from the prepared body. Comparison is by body bytes; decoding is used only to name `details.field`, the first differing group in this order: `contract`, `function`, `arguments`, `source`, `time_bounds`. A difference outside those groups (for example fee, sequence, Soroban data) MUST still raise `EnvelopeMismatch` with `details.field = other`.
+`EnvelopeMismatch` applies when the transaction body differs in any byte from the prepared body. Comparison is by body bytes; decoding is used only to name `details.field`, the first differing group in this order: `contract`, `function`, `arguments`, `source`, `timeBounds`. A difference outside those groups (for example fee, sequence number, Soroban data, memo, or envelope type) MUST still raise `EnvelopeMismatch` with `details.field = other`.
 
 `InvalidTransactionSignature` applies when the envelope carries no signature from the session wallet or one that does not verify over the transaction hash for the configured network. `details.reason` is `missing` (no signatures), `wrongSigner` (signatures exist but none from the session wallet) or `doesNotVerify` (a signature from the session wallet fails verification).
 
@@ -188,11 +188,11 @@ Every `HireEndpoint` method MUST resolve the wallet through `SessionWallet.requi
 
 - GIVEN a signed envelope whose time bounds differ from the prepared ones
 - WHEN `submitEscrowCall` is called
-- THEN it fails with `EnvelopeMismatch` and `details.field = time_bounds`
+- THEN it fails with `EnvelopeMismatch` and `details.field = timeBounds`
 
 #### Scenario: Body differs outside the named groups
 
-- GIVEN a signed envelope whose fee, sequence number or Soroban data differs
+- GIVEN a signed envelope whose fee, sequence number, Soroban data, memo or envelope type differs
 - WHEN `submitEscrowCall` is called
 - THEN it fails with `EnvelopeMismatch` and `details.field = other`
 
