@@ -16,5 +16,12 @@ FLUTTER_DIR="${PULS3_FLUTTER_DIR:-$REPO_ROOT/flutter}"
 git clone https://github.com/flutter/flutter.git -b "$FLUTTER_VERSION" --depth 1 "$FLUTTER_DIR"
 export PATH="$FLUTTER_DIR/bin:$PATH"
 
+build_args=(--release)
+# Set PULS3_API_URL in the Pages project environment to point the app at the
+# deployed server (see puls3_server/README.md).
+if [ -n "${PULS3_API_URL:-}" ]; then
+  build_args+=("--dart-define=PULS3_API_URL=$PULS3_API_URL")
+fi
+
 cd "$REPO_ROOT/puls3_flutter"
-flutter build web --release
+flutter build web "${build_args[@]}"
