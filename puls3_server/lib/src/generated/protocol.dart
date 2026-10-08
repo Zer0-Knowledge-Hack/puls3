@@ -20,7 +20,9 @@ import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
 import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
     as _iais;
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
+import 'agent/agent_record.dart' as _ia7sdlqn;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'agent/catalog_index_state.dart' as _ixu8n9dt;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
@@ -32,7 +34,9 @@ import 'hire/hire_payment.dart' as _i7gyvijy;
 import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_view.dart' as _ivruwodq;
 export 'agent/agent_catalog_unavailable.dart';
+export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
+export 'agent/catalog_index_state.dart';
 export 'chain/chain_submission.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
@@ -52,6 +56,149 @@ class Protocol extends _is.DatabaseSerializationManager {
   static final Protocol _instance = Protocol._().._registerHostProtocols();
 
   static List<_isp.TableDefinition> get targetTableDefinitions => [
+    _isp.TableDefinition(
+      name: 'agent_record',
+      dartName: 'AgentRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'registryId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'name',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'description',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'skills',
+          columnType: _isp.ColumnType.json,
+          isNullable: false,
+          dartType: 'List<String>',
+        ),
+        _isp.ColumnDefinition(
+          name: 'priceUsdcStroops',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'wallet',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'model',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'agent_record_registry_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'registryId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'agent_record_agent_id_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'agentId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'catalog_index_state',
+      dartName: 'CatalogIndexState',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'network',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'lastProcessedLedger',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'catalog_index_network_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'network',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     _isp.TableDefinition(
       name: 'chain_submission',
       dartName: 'ChainSubmission',
@@ -393,8 +540,14 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _it6c3ckv.AgentCatalogUnavailable) {
       return _it6c3ckv.AgentCatalogUnavailable.fromJson(data) as T;
     }
+    if (t == _ia7sdlqn.AgentRecord) {
+      return _ia7sdlqn.AgentRecord.fromJson(data) as T;
+    }
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
+    }
+    if (t == _ixu8n9dt.CatalogIndexState) {
+      return _ixu8n9dt.CatalogIndexState.fromJson(data) as T;
     }
     if (t == _iz6hnyrm.ChainSubmission) {
       return _iz6hnyrm.ChainSubmission.fromJson(data) as T;
@@ -432,8 +585,15 @@ class Protocol extends _is.DatabaseSerializationManager {
               : null)
           as T;
     }
+    if (t == _is.getType<_ia7sdlqn.AgentRecord?>()) {
+      return (data != null ? _ia7sdlqn.AgentRecord.fromJson(data) : null) as T;
+    }
     if (t == _is.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ixu8n9dt.CatalogIndexState?>()) {
+      return (data != null ? _ixu8n9dt.CatalogIndexState.fromJson(data) : null)
+          as T;
     }
     if (t == _is.getType<_iz6hnyrm.ChainSubmission?>()) {
       return (data != null ? _iz6hnyrm.ChainSubmission.fromJson(data) : null)
@@ -500,7 +660,9 @@ class Protocol extends _is.DatabaseSerializationManager {
   static String? getClassNameForType(Type type) {
     return switch (type) {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
+      _ia7sdlqn.AgentRecord => 'AgentRecord',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _ixu8n9dt.CatalogIndexState => 'CatalogIndexState',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
@@ -527,8 +689,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     switch (data) {
       case _it6c3ckv.AgentCatalogUnavailable():
         return 'AgentCatalogUnavailable';
+      case _ia7sdlqn.AgentRecord():
+        return 'AgentRecord';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _ixu8n9dt.CatalogIndexState():
+        return 'CatalogIndexState';
       case _iz6hnyrm.ChainSubmission():
         return 'ChainSubmission';
       case _izw8z7ou.Greeting():
@@ -578,8 +744,14 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'AgentCatalogUnavailable') {
       return deserialize<_it6c3ckv.AgentCatalogUnavailable>(data['data']);
     }
+    if (dataClassName == 'AgentRecord') {
+      return deserialize<_ia7sdlqn.AgentRecord>(data['data']);
+    }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'CatalogIndexState') {
+      return deserialize<_ixu8n9dt.CatalogIndexState>(data['data']);
     }
     if (dataClassName == 'ChainSubmission') {
       return deserialize<_iz6hnyrm.ChainSubmission>(data['data']);
@@ -652,6 +824,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       }
     }
     switch (t) {
+      case _ia7sdlqn.AgentRecord:
+        return _ia7sdlqn.AgentRecord.t;
+      case _ixu8n9dt.CatalogIndexState:
+        return _ixu8n9dt.CatalogIndexState.t;
       case _iz6hnyrm.ChainSubmission:
         return _iz6hnyrm.ChainSubmission.t;
       case _ikb6z54u.HireRecord:

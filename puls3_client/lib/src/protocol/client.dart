@@ -24,12 +24,14 @@ import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
 import 'protocol.dart' as _il2as5qe;
 
-/// Serves the agent catalog read from the on-chain identity registry.
+/// Serves the agent catalog from the Postgres index, with an on-chain
+/// fallback while the index is empty.
 ///
-/// It only delegates to [AgentCatalogService], which owns caching and the
-/// outage policy. When the chain cannot be read and nothing is cached, `list`
-/// and `get` throw [AgentCatalogUnavailable] instead of answering with an
-/// empty catalog or `null`.
+/// The endpoint depends only on [CatalogReader]; every chain detail lives in
+/// [buildAgentCatalogReader] and the services behind it. When the chain is
+/// unreachable and nothing is indexed, `list` and `get` may throw
+/// [AgentCatalogUnavailable] through the fallback instead of answering with
+/// an empty catalog.
 /// {@category Endpoint}
 class EndpointAgent extends _isc.EndpointRef {
   EndpointAgent(_isc.EndpointCaller caller) : super(caller);
@@ -37,7 +39,7 @@ class EndpointAgent extends _isc.EndpointRef {
   @override
   String get name => 'agent';
 
-  /// Every agent registered on chain with valid metadata, oldest first.
+  /// Every agent in the catalog, ordered by registry id.
   _ida.Future<List<_i78wn19p.AgentSummary>> list() =>
       caller.callServerEndpoint<List<_i78wn19p.AgentSummary>>(
         'agent',
@@ -45,7 +47,7 @@ class EndpointAgent extends _isc.EndpointRef {
         {},
       );
 
-  /// The agent with the metadata id [id], or `null` when there is none.
+  /// The agent with metadata id [id], or `null` when there is none.
   _ida.Future<_i78wn19p.AgentSummary?> get(String id) =>
       caller.callServerEndpoint<_i78wn19p.AgentSummary?>(
         'agent',

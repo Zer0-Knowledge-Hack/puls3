@@ -61,6 +61,8 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 `submitEscrowCall` accepts any client-signed escrow preparation (`createJob`, `fund`, `complete`, `reject`); the preparation's `purpose` selects the domain effect. `prepareReject` hashes `reason` (short display-safe text) into the ERC-8183 `reason` (`bytes32`) and stores the text with the hire.
 
+**Catalog reads (#17).** `listAgents` and `getAgent` are served from the Postgres `agent_record` index, which the server syncs from the identity registry (bootstrap from registry state, then registry events after a stored per-network cursor). While the index is empty the server falls back to reading the registry directly, so `CatalogUnavailable` no longer fires for a chain outage once the index has rows. `listAgents` returns the whole index; Flutter filters by name and skill client-side (F2-3, F2-4). Pagination and server-side search are deferred to a follow-up issue.
+
 **Lifecycle error rule.** Hire methods report a wrong hire state with one code per family, so clients can branch on it:
 
 - Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` and `prepareFund` need `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted` before `approvalDeadline`.

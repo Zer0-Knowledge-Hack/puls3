@@ -1,65 +1,37 @@
-import 'dart:io';
-
-import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
-import '../ledger/soroban_ledger.dart';
-import '../ledger/soroban_rpc_client.dart';
-import '../ledger/stellar_config.dart';
-import 'agent_catalog_service.dart';
+import 'agent_catalog_wiring.dart';
+import 'catalog_reader.dart';
 
-/// How long one Soroban RPC call may take before the chain counts as down.
-const _rpcTimeout = Duration(seconds: 8);
-
-/// Serves the agent catalog read from the on-chain identity registry.
+/// Serves the agent catalog from the Postgres index, with an on-chain
+/// fallback while the index is empty.
 ///
-/// It only delegates to [AgentCatalogService], which owns caching and the
-/// outage policy. When the chain cannot be read and nothing is cached, `list`
-/// and `get` throw [AgentCatalogUnavailable] instead of answering with an
-/// empty catalog or `null`.
+/// The endpoint depends only on [CatalogReader]; every chain detail lives in
+/// [buildAgentCatalogReader] and the services behind it. When the chain is
+/// unreachable and nothing is indexed, `list` and `get` may throw
+/// [AgentCatalogUnavailable] through the fallback instead of answering with
+/// an empty catalog.
 class AgentEndpoint extends Endpoint {
-  static AgentCatalogService? _service;
-
-  /// The service in use. The first call builds the default one from the
-  /// `PULS3_STELLAR_*` environment and keeps it for the life of the process.
-  static AgentCatalogService get _instance =>
-      _service ??= (_defaultBuilder ?? buildDefaultService)();
-
-  static AgentCatalogService Function()? _defaultBuilder;
-
-  /// Replaces how the lazy default is built, for tests. `null` restores it.
+  /// Builds the default reader from a [Session]. Replaceable for tests.
   @visibleForTesting
-  static set defaultServiceBuilder(AgentCatalogService Function()? builder) =>
-      _defaultBuilder = builder;
+  static CatalogReader Function(Session session) defaultServiceBuilder =
+      buildAgentCatalogReader;
 
-  /// Replaces the service, for tests. `null` restores the lazy default.
+  static CatalogReader? _service;
+
+  /// Replaces the reader, for tests. `null` restores the default builder.
   @visibleForTesting
-  static set service(AgentCatalogService? service) => _service = service;
+  static set service(CatalogReader? service) => _service = service;
 
-  /// Every agent registered on chain with valid metadata, oldest first.
-  Future<List<AgentSummary>> list(Session session) => _instance.list();
+  CatalogReader _reader(Session session) =>
+      _service ?? defaultServiceBuilder(session);
 
-  /// The agent with the metadata id [id], or `null` when there is none.
-  Future<AgentSummary?> get(Session session, String id) => _instance.get(id);
+  /// Every agent in the catalog, ordered by registry id.
+  Future<List<AgentSummary>> list(Session session) => _reader(session).list();
 
-  /// Builds the default service from the `PULS3_STELLAR_*` [environment]
-  /// (the process environment when omitted) and [httpClient] (a new client
-  /// when omitted).
-  @visibleForTesting
-  static AgentCatalogService buildDefaultService({
-    Map<String, String>? environment,
-    http.Client? httpClient,
-  }) {
-    final config = StellarConfig.fromEnvironment(
-      environment ?? Platform.environment,
-    );
-    final rpc = SorobanRpcClient(
-      httpClient: httpClient ?? http.Client(),
-      url: config.rpcUrl,
-      timeout: _rpcTimeout,
-    );
-    return AgentCatalogService(SorobanLedger(rpc, config));
-  }
+  /// The agent with metadata id [id], or `null` when there is none.
+  Future<AgentSummary?> get(Session session, String id) =>
+      _reader(session).get(id);
 }
