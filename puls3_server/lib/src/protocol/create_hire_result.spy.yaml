@@ -1,0 +1,9 @@
+### Result of HireEndpoint.createHire: the persisted hire and, when the
+### create_job envelope could be prepared, the unsigned transaction the
+### session wallet must sign.
+class: CreateHireResult
+fields:
+  hire: Hire
+  ### The unsigned create_job preparation. Null when the hire already has a
+  ### submitted or confirmed create_job.
+  preparedCreateJob: PreparedTransaction?

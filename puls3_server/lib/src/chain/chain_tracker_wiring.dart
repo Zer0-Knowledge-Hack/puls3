@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:serverpod/serverpod.dart';
 
 import '../hire/hire_escrow_effects.dart';
+import '../hire/serverpod_escrow_preparation_store.dart';
 import '../hire/serverpod_hire_repository.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
@@ -27,8 +28,7 @@ const _passTimeout = Duration(minutes: 5);
 ///
 /// Each pass opens its own session, so a pass never holds a connection
 /// between ticks. The escrow effects ([HireEscrowEffects]) open their own
-/// short session per call; recording the job id after `create_job` waits for
-/// the hire lifecycle (#96).
+/// short session per call.
 TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   final config = TrackerLoopConfig.fromEnvironment(env);
   if (!config.enabled) return null;
@@ -52,10 +52,20 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
           await session.close();
         }
       },
+      lifecycle: <T>(action) async {
+        final session = await pod.createSession();
+        try {
+          return await action(
+            ServerpodHireRepository(session),
+            ServerpodEscrowPreparationStore(session),
+          );
+        } finally {
+          await session.close();
+        }
+      },
       ledger: reader,
       jobs: reader,
       usdc: stellar.usdcSac,
-      log: log,
     ),
     log: log,
   );
