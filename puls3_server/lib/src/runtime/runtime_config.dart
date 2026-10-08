@@ -1,18 +1,27 @@
-/// Agent runtime settings, read from environment variables:
+/// Agent runtime settings.
 ///
-/// | Variable | Field |
+/// | Source | Field |
 /// |---|---|
-/// | `PULS3_ANTHROPIC_API_KEY` | [anthropicApiKey] (secret; never logged) |
-/// | `PULS3_RUNTIME_TIMEOUT_SECONDS` | [timeout] |
+/// | Serverpod password `anthropicApiKey` (secret; never logged) | [anthropicApiKey] |
+/// | `PULS3_RUNTIME_TIMEOUT_SECONDS` environment variable | [timeout] |
+///
+/// The key is a secret, so it never comes from `.env`, which the app compiles
+/// into its build (docs/infra/secrets.md). The composition root reads it from
+/// Serverpod's passwords: `passwords.yaml` locally,
+/// `scloud password set anthropicApiKey` on Serverpod Cloud.
 final class RuntimeConfig {
   const RuntimeConfig({required this.anthropicApiKey, required this.timeout});
 
-  /// Builds the configuration from [env] (normally `Platform.environment`).
+  /// Builds the configuration from [env] (normally `Platform.environment`)
+  /// and the Serverpod password [anthropicApiKey].
   ///
-  /// An unset or empty key disables the runtime. An unset or empty timeout
+  /// A null or empty key disables the runtime. An unset or empty timeout
   /// uses [defaultTimeout]; a timeout that is not a positive whole number of
   /// seconds throws [FormatException].
-  factory RuntimeConfig.fromEnvironment(Map<String, String> env) {
+  factory RuntimeConfig.fromEnvironment(
+    Map<String, String> env, {
+    required String? anthropicApiKey,
+  }) {
     String? read(String name) {
       final value = env[name];
       return value == null || value.isEmpty ? null : value;
@@ -33,7 +42,9 @@ final class RuntimeConfig {
       timeout = Duration(seconds: parsed);
     }
     return RuntimeConfig(
-      anthropicApiKey: read('PULS3_ANTHROPIC_API_KEY'),
+      anthropicApiKey: anthropicApiKey == null || anthropicApiKey.isEmpty
+          ? null
+          : anthropicApiKey,
       timeout: timeout,
     );
   }

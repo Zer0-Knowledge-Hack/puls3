@@ -4,9 +4,8 @@ import 'package:test/test.dart';
 void main() {
   test('reads the key and the timeout', () {
     final config = RuntimeConfig.fromEnvironment({
-      'PULS3_ANTHROPIC_API_KEY': 'secret-key',
       'PULS3_RUNTIME_TIMEOUT_SECONDS': '90',
-    });
+    }, anthropicApiKey: 'secret-key');
 
     expect(config.anthropicApiKey, 'secret-key');
     expect(config.timeout, const Duration(seconds: 90));
@@ -14,14 +13,19 @@ void main() {
   });
 
   test('without a key the runtime is disabled', () {
-    for (final env in [
-      <String, String>{},
-      {'PULS3_ANTHROPIC_API_KEY': ''},
-    ]) {
-      final config = RuntimeConfig.fromEnvironment(env);
-      expect(config.isEnabled, isFalse);
-      expect(config.anthropicApiKey, isNull);
+    for (final key in [null, '']) {
+      final config = RuntimeConfig.fromEnvironment({}, anthropicApiKey: key);
+      expect(config.isEnabled, isFalse, reason: '$key');
+      expect(config.anthropicApiKey, isNull, reason: '$key');
     }
+  });
+
+  test('the key is never read from the environment', () {
+    final config = RuntimeConfig.fromEnvironment({
+      'PULS3_ANTHROPIC_API_KEY': 'from-env',
+      'ANTHROPIC_API_KEY': 'from-env',
+    }, anthropicApiKey: null);
+    expect(config.isEnabled, isFalse);
   });
 
   test('an unset or empty timeout uses the default', () {
@@ -30,7 +34,7 @@ void main() {
       {'PULS3_RUNTIME_TIMEOUT_SECONDS': ''},
     ]) {
       expect(
-        RuntimeConfig.fromEnvironment(env).timeout,
+        RuntimeConfig.fromEnvironment(env, anthropicApiKey: null).timeout,
         RuntimeConfig.defaultTimeout,
       );
     }
@@ -41,7 +45,7 @@ void main() {
       expect(
         () => RuntimeConfig.fromEnvironment({
           'PULS3_RUNTIME_TIMEOUT_SECONDS': value,
-        }),
+        }, anthropicApiKey: null),
         throwsFormatException,
         reason: value,
       );
@@ -49,9 +53,10 @@ void main() {
   });
 
   test('toString never shows the key', () {
-    final config = RuntimeConfig.fromEnvironment({
-      'PULS3_ANTHROPIC_API_KEY': 'secret-key',
-    });
+    final config = RuntimeConfig.fromEnvironment(
+      {},
+      anthropicApiKey: 'secret-key',
+    );
 
     expect(config.toString(), isNot(contains('secret-key')));
     expect(config.toString(), contains('enabled'));
