@@ -127,7 +127,11 @@ class HireEndpoint extends Endpoint {
     call,
   ) async {
     final wallet = await _wallet.requireLogin(session);
-    return call(_servicesOn(session).relay, wallet);
+    try {
+      return await call(_servicesOn(session).relay, wallet);
+    } on AgentUnavailable {
+      throw Puls3ApiException(code: 'AgentNotFound');
+    }
   }
 
   /// Fails with `InvalidStellarAddress` or `WalletMismatch` unless [address]

@@ -270,11 +270,15 @@ final class EscrowRelayService {
     final signed = _verify(prepared, wallet, signedTransactionXdr);
 
     final existing = await _submissions.findByPreparation(preparationId);
-    if (existing != null) return _detail(hire, existing);
+    if (existing != null) return _detail(hire, existing, await _agentOf(hire));
     if (!_allows(prepared.purpose, hire.status)) {
       throw _invalidTransition(hire, prepared.purpose);
     }
 
+    // `HireDetail.agent` is required, so the catalog is read before anything
+    // is stored or sent: once the envelope is on its way the answer must not
+    // depend on a read that can fail.
+    final agent = await _agentOf(hire);
     final StoredSubmission? stored;
     try {
       stored = await _preparations.inTransaction(
@@ -298,10 +302,10 @@ final class EscrowRelayService {
       }
       final winner = await _submissions.findByPreparation(preparationId);
       if (winner == null) throw _api('InternalError');
-      return _detail(hire, winner);
+      return _detail(hire, winner, agent);
     }
     if (stored == null) throw _expired('superseded');
-    return _detail(hire, await _send(stored));
+    return _detail(hire, await _send(stored), agent);
   }
 
   /// Checks [signedXdr] against [prepared] in the order the contract fixes:
@@ -369,16 +373,23 @@ final class EscrowRelayService {
     SubmissionOutcomeCode.submissionRejected,
   );
 
-  Future<HireDetail> _detail(HireRow hire, StoredSubmission record) async {
-    final AgentSummary? agent;
+  /// The catalog entry of the hire's agent.
+  Future<AgentSummary> _agentOf(HireRow hire) async {
     try {
-      agent = await _agents(hire.agentId);
+      return await _agents(hire.agentId) ??
+          (throw _api('ChainDataUnavailable'));
     } on LedgerException {
       throw _api('ChainDataUnavailable');
     } on AgentCatalogUnavailable {
       throw _api('ChainDataUnavailable');
     }
-    if (agent == null) throw _api('ChainDataUnavailable');
+  }
+
+  HireDetail _detail(
+    HireRow hire,
+    StoredSubmission record,
+    AgentSummary agent,
+  ) {
     final jobId = hire.jobId;
     return HireDetail(
       hire: hire.toProtocol(),
@@ -504,7 +515,7 @@ final class EscrowRelayService {
     HireRow hire,
     SubmissionPurpose purpose,
   ) => _api('InvalidHireTransition', {
-    'status': hire.status?.name ?? 'none',
+    if (hire.status case final status?) 'status': status.name,
     'purpose': purpose.wireName,
   });
 

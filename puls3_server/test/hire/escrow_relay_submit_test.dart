@@ -8,6 +8,7 @@ import 'package:puls3_server/src/chain/submission_ledger.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/escrow_preparation_store.dart';
+import 'package:puls3_server/src/hire/escrow_relay_service.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/ledger/envelope_codec.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
@@ -736,5 +737,68 @@ void main() {
         expect((await rig.hires.findHire(hire.id))!.status, HireStatus.open);
       },
     );
+  });
+
+  group('agent catalog outage', () {
+    var calls = 0;
+    var down = false;
+    late EscrowRelayService service;
+
+    setUp(() {
+      calls = 0;
+      down = false;
+      service = rig.build(
+        agents: (id) async {
+          calls++;
+          if (down) throw AgentCatalogUnavailable(message: 'catalog down');
+          return agentSummary;
+        },
+      );
+    });
+
+    Future<HireDetail> submitOn(_Prepared p, String xdr) => service
+        .submitEscrowCall(_wallet, p.hire.id, p.prepared.preparationId, xdr);
+
+    test('an outage before anything happened stores and sends nothing, and '
+        'the retry relays once', () async {
+      final p = await prepareFund();
+      final xdr = signed(p.prepared);
+      down = true;
+
+      await expectLater(
+        submitOn(p, xdr),
+        throwsA(api('ChainDataUnavailable')),
+      );
+      await expectUntouched(p);
+
+      down = false;
+      final detail = await submitOn(p, xdr);
+      expect(detail.escrowSubmission!.state, 'submitted');
+      expect(detail.agent.registryId, 7);
+      expect(rig.sender.resent, [xdr]);
+    });
+
+    test('the catalog is read once, before the claim, so the sent answer never '
+        'depends on it; a retry returns the same record', () async {
+      final p = await prepareFund();
+      final xdr = signed(p.prepared);
+
+      final first = await submitOn(p, xdr);
+      expect(calls, 1);
+      expect(first.escrowSubmission!.state, 'submitted');
+
+      down = true;
+      await expectLater(
+        submitOn(p, xdr),
+        throwsA(api('ChainDataUnavailable')),
+      );
+      expect(rig.sender.resent, [xdr]);
+
+      down = false;
+      final retry = await submitOn(p, xdr);
+      expect(retry.escrowSubmission!.id, first.escrowSubmission!.id);
+      expect(rig.sender.resent, [xdr]);
+      expect(await rig.submissions.listByHire(p.hire.id), hasLength(1));
+    });
   });
 }

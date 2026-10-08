@@ -6,6 +6,7 @@ import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/escrow_relay_service.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/hire/hire_relay_config.dart';
+import 'package:puls3_server/src/ledger/envelope_codec.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
@@ -54,19 +55,22 @@ final class RelayRig {
   final Map<String, String> _environment;
 
   /// A service over the rig's stores and fakes. [submissions] and [sender]
-  /// replace the rig's own to inject a fault.
+  /// replace the rig's own to inject a fault, and [codec] and [agents] to
+  /// compose the real codec or a failing catalog.
   EscrowRelayService build({
     ChainSubmissionStore? submissions,
     SubmissionLedger? sender,
+    EnvelopeCodec? codec,
+    AgentSummaryLookup? agents,
   }) => EscrowRelayService(
     preparations: preparations,
     submissions: submissions ?? this.submissions,
     hires: hires,
     accounts: accounts,
-    codec: codec,
+    codec: codec ?? this.codec,
     sender: sender ?? this.sender,
     agentWallets: ledger,
-    agents: (id) async => id == 7 ? agentSummary : null,
+    agents: agents ?? (id) async => id == 7 ? agentSummary : null,
     stellar: StellarConfig.testnet,
     config: HireRelayConfig(_environment),
     now: () => clock,

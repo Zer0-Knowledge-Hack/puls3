@@ -382,6 +382,37 @@ void main() {
       });
     }
 
+    test('a hire without a status carries no details.status', () async {
+      final none = await rig.hire();
+
+      await expectLater(
+        rig.service.prepareFund(rig.wallet, none.id),
+        throwsA(
+          isA<Puls3ApiException>()
+              .having((e) => e.details!.containsKey('status'), 'has key', false)
+              .having((e) => e.details!['status'], 'status', isNull)
+              .having((e) => e.details!['purpose'], 'purpose', 'fund'),
+        ),
+      );
+    });
+
+    test('a hire with a status names it in details.status', () async {
+      final hire = await rig.hire(status: HireStatus.open);
+
+      await expectLater(
+        rig.service.prepareComplete(rig.wallet, hire.id),
+        throwsA(
+          api(
+            'InvalidHireTransition',
+            details: {
+              'status': 'open',
+              'purpose': 'complete',
+            },
+          ),
+        ),
+      );
+    });
+
     test(
       'every prepare is SubmissionInProgress while an escrow record is submitted',
       () async {

@@ -289,6 +289,20 @@ void main() {
       expect(rig.hires.all, isEmpty);
     });
 
+    test(
+      'prepareCreateJob for an agent without a wallet is AgentNotFound',
+      () async {
+        final hire = (await rig.hire()).id;
+        rig.ledger.wallets.clear();
+
+        await expectLater(
+          endpoint.prepareCreateJob(session, hire),
+          throwsA(api('AgentNotFound')),
+        );
+        expect(rig.preparations.all, isEmpty);
+      },
+    );
+
     test('a blank request id is InvalidHire', () async {
       await expectLater(
         endpoint.createHire(session, 7, alice, 'hi', '  '),
