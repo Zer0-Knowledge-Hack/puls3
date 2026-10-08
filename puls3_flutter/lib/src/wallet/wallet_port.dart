@@ -82,6 +82,12 @@ final class WalletAccountChanged extends WalletException {
 /// The payload is not one the connected account can safely sign: malformed
 /// XDR, an unsupported envelope, another account's transaction, or a wallet
 /// answer that changed it. Rejected before the wallet prompt when possible.
+/// The wallet did not answer a prompt in time (ignored, blocked or stuck
+/// popup). Nothing was signed.
+final class WalletTimedOut extends WalletException {
+  const WalletTimedOut();
+}
+
 final class WalletInvalidPayload extends WalletException {
   const WalletInvalidPayload(this.reason);
 

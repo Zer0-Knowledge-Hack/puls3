@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../state/app_scope.dart';
+import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/organisms/wallet_panel.dart';
 
@@ -25,7 +26,8 @@ class WalletSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wallet = AppScope.of(context).wallet;
-    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final narrow =
+        MediaQuery.sizeOf(context).width < Puls3Breakpoints.narrowGutter;
     final gutter = narrow ? Puls3Spacing.md : Puls3Spacing.lg;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Puls3Spacing.lg),

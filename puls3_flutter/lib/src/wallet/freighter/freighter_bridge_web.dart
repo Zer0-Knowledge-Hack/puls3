@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:js_interop';
 
+import 'package:flutter/foundation.dart';
+
 import '../wallet_port.dart';
 import 'freighter_bridge.dart';
 
@@ -121,6 +123,10 @@ final class _FreighterWebBridge implements FreighterBridge {
       return const WalletInvalidPayload('Freighter returned bad data.');
     }
     // Freighter reports a declined prompt as an error result ("rejected:").
-    return const WalletSignatureRejected();
+    if (message.contains('rejected:')) return const WalletSignatureRejected();
+    // Anything else (a JS error, an extension crash) is not the user saying
+    // no. Log only that it happened: messages may carry payload data.
+    debugPrint('Freighter bridge failed with an unexpected error.');
+    return const WalletUnavailable();
   }
 }

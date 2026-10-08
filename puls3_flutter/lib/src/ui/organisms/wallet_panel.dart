@@ -171,15 +171,25 @@ class _Connecting extends StatelessWidget {
           color: Puls3Colors.accent,
         ),
         const SizedBox(height: Puls3Spacing.md),
-        const ClipRRect(
-          borderRadius: Puls3Radius.pillAll,
-          child: LinearProgressIndicator(
-            minHeight: 3,
-            color: Puls3Colors.accent,
-            backgroundColor: Puls3Colors.hairline,
-          ),
-        ),
+        const _WaitingBar(),
       ],
+    );
+  }
+}
+
+/// Progress shown while a wallet prompt is open.
+class _WaitingBar extends StatelessWidget {
+  const _WaitingBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ClipRRect(
+      borderRadius: Puls3Radius.pillAll,
+      child: LinearProgressIndicator(
+        minHeight: 3,
+        color: Puls3Colors.accent,
+        backgroundColor: Puls3Colors.hairline,
+      ),
     );
   }
 }
@@ -204,14 +214,7 @@ class _Signing extends StatelessWidget {
           color: Puls3Colors.accent,
         ),
         const SizedBox(height: Puls3Spacing.md),
-        const ClipRRect(
-          borderRadius: Puls3Radius.pillAll,
-          child: LinearProgressIndicator(
-            minHeight: 3,
-            color: Puls3Colors.accent,
-            backgroundColor: Puls3Colors.hairline,
-          ),
-        ),
+        const _WaitingBar(),
       ],
     );
   }
@@ -363,6 +366,13 @@ class _Error extends StatelessWidget {
         Icons.manage_accounts_outlined,
         'Account changed',
         'The account in $walletName changed. Connect again to continue.',
+      ),
+      WalletTimedOut() => (
+        'timed-out',
+        Icons.hourglass_disabled_rounded,
+        'No answer from $walletName',
+        'The $walletName window was closed or never opened. Open '
+            '$walletName, then try again.',
       ),
       WalletInvalidPayload() => (
         'invalid-payload',

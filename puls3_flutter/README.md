@@ -20,7 +20,8 @@ To run the project, first make sure that the server is running, then do:
 UI (WalletPanel, WalletChip, deploy/hire flows)
   -> WalletController   one WalletStatus: disconnected, connecting, connected,
                         signing, signed, rejected, wrongNetwork, error
-  -> WalletPort         connect, disconnect, address, network, signTransaction
+  -> WalletPort         connect, disconnect, address, network, signTransaction,
+                        signAuthEntry
      |- FreighterWallet  real extension, via web/freighter_bridge.js
      |- MockWallet       tests and demo console
      '- (another wallet: implement WalletPort)
@@ -32,6 +33,10 @@ UI (WalletPanel, WalletChip, deploy/hire flows)
   returns the signed XDR; the server submits it. Before the prompt it refuses
   a wallet not on Stellar Testnet, fee-bump envelopes, trailing bytes and
   transactions for another account (#69). Mainnet is not supported.
+- `signAuthEntry` signs a Soroban authorization entry for the connected
+  account (non-zero expiration, address credentials only).
+- A wallet prompt that never answers times out (connect: 2 minutes), so a
+  blocked or ignored popup never traps the user.
 
 Freighter is the default on the web. To use the mock wallet instead:
 

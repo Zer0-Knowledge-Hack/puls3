@@ -20,9 +20,14 @@ const _walletKind = String.fromEnvironment(
   defaultValue: kIsWeb ? 'freighter' : 'mock',
 );
 
-WalletPort _createWallet() => _walletKind == 'freighter'
-    ? FreighterWallet(createFreighterBridge())
-    : MockWallet();
+WalletPort _createWallet() => switch (_walletKind) {
+  'freighter' => FreighterWallet(createFreighterBridge()),
+  'mock' => MockWallet(),
+  // A typo must not silently ship the mock wallet.
+  _ => throw StateError(
+    'Unknown WALLET "$_walletKind": use "freighter" or "mock".',
+  ),
+};
 
 /// Starts the demo shell and verifies the generated Serverpod client connection.
 Future<void> main() async {

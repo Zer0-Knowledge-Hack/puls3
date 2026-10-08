@@ -29,9 +29,20 @@ enum WalletStatus {
 /// connection state (#25). Presentational widgets get its values through
 /// their constructors. It knows nothing about deploys, hires or escrow.
 class WalletController extends ChangeNotifier {
-  WalletController(this._wallet);
+  WalletController(
+    this._wallet, {
+    this.connectTimeout = const Duration(minutes: 2),
+  });
 
   final WalletPort _wallet;
+
+  /// Upper bound for the connect prompt, so a popup that is ignored,
+  /// blocked or stuck never leaves a flow waiting forever. Null disables it.
+  final Duration? connectTimeout;
+
+  /// Bumped by [disconnect], so a connect that finishes afterwards is
+  /// dropped instead of reconnecting behind the user's back.
+  int _session = 0;
 
   /// [WalletStatus.connecting] or [WalletStatus.signing] while the wallet
   /// is busy; null otherwise.
@@ -73,17 +84,31 @@ class WalletController extends ChangeNotifier {
   Future<String> connect() async {
     final existing = _wallet.address;
     if (existing != null) return existing;
+    final session = _session;
     _busy = WalletStatus.connecting;
     _lastError = null;
     _signed = false;
     notifyListeners();
     try {
-      return await _wallet.connect();
+      final timeout = connectTimeout;
+      final attempt = _wallet.connect();
+      final address = await (timeout == null
+          ? attempt
+          : attempt.timeout(
+              timeout,
+              onTimeout: () => throw const WalletTimedOut(),
+            ));
+      if (session != _session) {
+        // Disconnected while the prompt was open: do not stay connected.
+        await _wallet.disconnect();
+        throw const WalletSignatureRejected();
+      }
+      return address;
     } on WalletException catch (e) {
-      _lastError = e;
+      if (session == _session) _lastError = e;
       rethrow;
     } finally {
-      _busy = null;
+      if (session == _session) _busy = null;
       notifyListeners();
     }
   }
@@ -108,6 +133,8 @@ class WalletController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _session++;
+    _busy = null;
     await _wallet.disconnect();
     _lastError = null;
     _signed = false;

@@ -125,11 +125,15 @@ void main() {
       expect(wallet.name, 'Freighter');
     });
 
-    test('refuses a wallet on another network and stays disconnected', () {
-      bridge.network = Network.PUBLIC.networkPassphrase;
-      expect(wallet.connect(), throwsA(isA<WalletWrongNetwork>()));
-      expect(wallet.address, isNull);
-    });
+    test(
+      'refuses a wallet on another network and stays disconnected',
+      () async {
+        bridge.network = Network.PUBLIC.networkPassphrase;
+        // Settle the future before checking the state it leaves behind.
+        await expectLater(wallet.connect(), throwsA(isA<WalletWrongNetwork>()));
+        expect(wallet.address, isNull);
+      },
+    );
 
     test('a declined connection is a typed, recoverable error', () async {
       bridge.failure = const WalletSignatureRejected();
@@ -180,8 +184,8 @@ void main() {
       );
     });
 
-    test('refuses before the prompt when not connected', () {
-      expect(
+    test('refuses before the prompt when not connected', () async {
+      await expectLater(
         wallet.signTransaction(_payment(key.accountId).toEnvelopeXdrBase64()),
         throwsA(isA<WalletUnavailable>()),
       );

@@ -368,4 +368,73 @@ void main() {
       expect(find.text('Try again'), findsOneWidget);
     });
   });
+
+  group('wallet prompts that never settle (#113 review)', () {
+    test('a connect that never answers times out instead of hanging', () async {
+      // The prompt answers after 1 s; the limit is 20 ms.
+      final controller = WalletController(
+        MockWallet(connectDelay: const Duration(seconds: 1)),
+        connectTimeout: const Duration(milliseconds: 20),
+      );
+      await expectLater(controller.connect(), throwsA(isA<WalletTimedOut>()));
+      expect(controller.status, WalletStatus.error);
+      expect(controller.isConnecting, isFalse);
+    });
+
+    test('disconnecting during a pending connect stays disconnected', () async {
+      final wallet = MockWallet(
+        connectDelay: const Duration(milliseconds: 20),
+      );
+      final controller = WalletController(wallet);
+      final connecting = controller.connect();
+      expect(controller.status, WalletStatus.connecting);
+
+      await controller.disconnect();
+      await expectLater(connecting, throwsA(isA<WalletException>()));
+      expect(wallet.address, isNull);
+      expect(controller.status, WalletStatus.disconnected);
+    });
+
+    test('an account switch while signing forgets the session', () async {
+      final wallet = MockWallet(
+        connectDelay: Duration.zero,
+        signDelay: Duration.zero,
+      );
+      final controller = WalletController(wallet);
+      await controller.connect();
+      wallet.failure = const WalletAccountChanged();
+
+      await expectLater(
+        controller.signTransaction('AAAA-unsigned'),
+        throwsA(isA<WalletAccountChanged>()),
+      );
+      expect(controller.status, WalletStatus.error);
+      expect(controller.lastError, isA<WalletAccountChanged>());
+      // The next attempt must connect again.
+      expect(controller.address, isNull);
+    });
+
+    testWidgets('a timed-out prompt says so and offers a retry', (
+      tester,
+    ) async {
+      Puls3Fonts.useGoogleFonts = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: Puls3Theme.dark(),
+          home: Scaffold(
+            body: WalletPanel(
+              status: WalletStatus.error,
+              walletName: 'Freighter',
+              error: const WalletTimedOut(),
+              onConnect: () {},
+              onDisconnect: () {},
+            ),
+          ),
+        ),
+      );
+      expect(_state('timed-out'), findsOneWidget);
+      expect(find.text('No answer from Freighter'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+    });
+  });
 }

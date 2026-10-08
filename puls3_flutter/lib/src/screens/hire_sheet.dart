@@ -107,6 +107,8 @@ String walletErrorMessage(WalletException e) => switch (e) {
     'Switch your wallet to Stellar Testnet, then try again.',
   WalletNotInstalled() => 'No wallet found. Install Freighter, then try again.',
   WalletUnavailable() => 'Open or unlock your wallet, then try again.',
+  WalletTimedOut() =>
+    'Your wallet did not answer. Open it, then try again. No funds moved.',
   WalletAccountChanged() =>
     'Your wallet account changed. Reconnect, then try again.',
   WalletInvalidPayload() =>
