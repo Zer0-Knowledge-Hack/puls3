@@ -5,8 +5,10 @@ import 'package:serverpod_auth_idp_server/core.dart';
 import 'package:serverpod_auth_idp_server/providers/email.dart';
 
 import 'src/chain/chain_tracker_wiring.dart';
+import 'src/cors/allowed_origins.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
+import 'src/health/health_endpoint.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -14,6 +16,21 @@ import 'src/web/routes/root.dart';
 void run(List<String> args) async {
   // Initialize Serverpod and connect it with your generated code.
   final pod = Serverpod(args, Protocol(), Endpoints());
+
+  // Resolve the reported version now, so an invalid PULS3_GIT_SHA stops the
+  // server at startup instead of failing the first health call.
+  stdout.writeln('puls3 server version ${HealthEndpoint.appVersion}');
+
+  // Only the origins in PULS3_ALLOWED_ORIGINS (plus loopback in development)
+  // may call the API server from a browser (see README). An invalid list
+  // stops startup.
+  pod.server.addMiddleware(
+    originGateFromEnvironment(
+      Platform.environment,
+      runMode: pod.runMode,
+      log: stdout.writeln,
+    ),
+  );
 
   // Initialize authentication services for the server.
   // Token managers will be used to validate and issue authentication keys,
