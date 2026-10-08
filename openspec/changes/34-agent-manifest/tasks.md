@@ -48,10 +48,10 @@ Notes:
 ## PR 2: Draft and validate (split into 2a and 2b)
 
 Split at 2.8 (auto-chain, no size exception): PR 2 reached ~720 lines.
-- PR 2a `feat/34-agent-manifest-02a-draft` (base PR 1): R.1, R.2, 2.1-2.5.
+- PR 2a `feat/34-agent-manifest-02a-draft` (base PR 1): 2.1-2.5.
 - PR 2b `feat/34-agent-manifest-02b-validate` (base 2a): 2.6-2.8.
 
-PR 1 review follow-ups (PR 2a, done first, commit `fix(domain): cap manifest version and word manifest problems readably`):
+PR 1 review follow-ups (moved to PR 1, commit `cfe0dc2` `fix(domain): cap manifest version and word manifest problems readably` on `feat/34-agent-manifest-01-values`):
 
 - [x] R.1 REL-001: `ManifestVersion` capped at 2^53-1 (`maxValue`); `next()` at the cap throws `InvalidManifest([versionInvalid])`. Tests: cap, cap+1, `next()` at and below the cap.
 - [x] R.2 REL-002: `InvalidManifest.message` maps each `ManifestProblem` through a `switch` to readable text; test updated (no raw enum names) and a test checks every problem has a unique readable text.
