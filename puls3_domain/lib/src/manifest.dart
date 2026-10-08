@@ -31,3 +31,76 @@ final class ManifestVersion implements Comparable<ManifestVersion> {
   @override
   String toString() => 'v$value';
 }
+
+/// The model one agent runs on: a provider and a provider-specific id.
+///
+/// It never holds a credential. A paid provider's key is a reference in the
+/// server's deploy record, so rotating it needs no new manifest version.
+final class ModelId {
+  const ModelId._(this.provider, this.id);
+
+  /// [provider] is kebab-case of at most 32 characters. [id] is non-blank,
+  /// has no whitespace and is at most 128 runes.
+  factory ModelId({required String provider, required String id}) {
+    if (provider.length > _maxProviderLength ||
+        !_kebabCase.hasMatch(provider) ||
+        id.isEmpty ||
+        id.runes.length > _maxIdRunes ||
+        _whitespace.hasMatch(id)) {
+      throw InvalidManifest([ManifestProblem.modelMalformed]);
+    }
+    return ModelId._(provider, id);
+  }
+
+  final String provider;
+  final String id;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ModelId && other.provider == provider && other.id == id;
+
+  @override
+  int get hashCode => Object.hash(provider, id);
+
+  @override
+  String toString() => '$provider/$id';
+}
+
+const _maxProviderLength = 32;
+const _maxIdRunes = 128;
+final _kebabCase = RegExp(r'^[a-z0-9]+(-[a-z0-9]+)*$');
+final _whitespace = RegExp(r'\s');
+
+/// Which models agents may use. It is injected into validation, never a
+/// domain constant: the lists are configuration.
+///
+/// `workers-ai` (free) passes only for ids in [workersAiModels]. A paid
+/// provider (BYOK) passes when it is in [paidProviders], with any id.
+final class ModelPolicy {
+  /// Throws [ArgumentError] if [paidProviders] contains [freeProvider].
+  ModelPolicy({
+    required Set<String> workersAiModels,
+    required Set<String> paidProviders,
+  }) : workersAiModels = Set.unmodifiable(workersAiModels),
+       paidProviders = Set.unmodifiable(paidProviders) {
+    if (paidProviders.contains(freeProvider)) {
+      throw ArgumentError.value(
+        paidProviders,
+        'paidProviders',
+        '$freeProvider is the free provider, not a paid one',
+      );
+    }
+  }
+
+  static const freeProvider = 'workers-ai';
+
+  final Set<String> workersAiModels;
+  final Set<String> paidProviders;
+
+  bool allows(ModelId model) => model.provider == freeProvider
+      ? workersAiModels.contains(model.id)
+      : paidProviders.contains(model.provider);
+
+  /// Whether [provider] needs the builder's own API key.
+  bool isPaid(String provider) => provider != freeProvider;
+}

@@ -35,15 +35,15 @@ Notes:
 
 ## PR 1: Values and errors (~200 lines)
 
-- [ ] 1.1 Reconcile `specs/agent-manifest/spec.md`: add scenarios S41 (ModelId: provider kebab <=32, id non-blank, no whitespace, <=128 runes), S42 (`ModelPolicy` throws `ArgumentError` if `paidProviders` contains `workers-ai`), S43 (`inputMaxChars`/`outputMaxChars` < 1 -> `...TooLow`, restating S20/S21). Resolves design open question on 32/128 caps. Done: spec lists S1-S43.
-- [ ] 1.2 Add `openspec/config.yaml` and the `openspec/changes/34-agent-manifest/` artifacts to the PR 1 commit. Done: files tracked.
-- [ ] 1.3 RED: `manifest_test.dart` skeleton + group I25 `ManifestVersion`: 0/-1 rejected with `InvalidManifest`, 1 ok, `first`, `next()`, ordering (S27, S28, S29 next part). Files: `puls3_domain/test/manifest_test.dart`. Done: fails (symbols missing).
-- [ ] 1.4 GREEN: `ManifestProblem` enum (full list from design Problems table) and `InvalidManifest(List<ManifestProblem>)` (`DomainError`, non-empty, readable message) in `puls3_domain/lib/src/errors.dart`; create `lib/src/manifest.dart` with `ManifestVersion`; export in `lib/puls3_domain.dart`. Done: 1.3 green (S25 list shape, S27-S29).
-- [ ] 1.5 RED: group I23 `ModelId` (S41): shape, kebab provider, 32/33, id 128/129 runes, blank/whitespace id, no credential field (S19 type-level), equality. Done: fails.
-- [ ] 1.6 GREEN: `ModelId` factory throwing `InvalidManifest([modelMalformed])` (D12). Done: 1.5 green.
-- [ ] 1.7 RED: group I24 `ModelPolicy` (S15-S18, S42): `allows` hit/miss for `workers-ai`, paid enabled/disabled/unknown, `isPaid`, `ArgumentError` for `workers-ai` in paid set. Done: fails.
-- [ ] 1.8 GREEN: `ModelPolicy` with `freeProvider`, `allows`, `isPaid`, unmodifiable sets. Done: 1.7 green.
-- [ ] 1.9 REFACTOR: tidy, `dart format`, run gate; commit `feat(domain): add manifest values, model policy and problems`. Done: gate green, diff <=~400.
+- [x] 1.1 Reconcile `specs/agent-manifest/spec.md`: add scenarios S41 (ModelId: provider kebab <=32, id non-blank, no whitespace, <=128 runes), S42 (`ModelPolicy` throws `ArgumentError` if `paidProviders` contains `workers-ai`), S43 (`inputMaxChars`/`outputMaxChars` < 1 -> `...TooLow`, restating S20/S21). Resolves design open question on 32/128 caps. Done: spec lists S1-S43.
+- [x] 1.2 Add `openspec/config.yaml` and the `openspec/changes/34-agent-manifest/` artifacts to the PR 1 commit. Done: files tracked.
+- [x] 1.3 RED: `manifest_test.dart` skeleton + group I25 `ManifestVersion`: 0/-1 rejected with `InvalidManifest`, 1 ok, `first`, `next()`, ordering (S27, S28, S29 next part). Files: `puls3_domain/test/manifest_test.dart`. Done: fails (symbols missing).
+- [x] 1.4 GREEN: `ManifestProblem` enum (full list from design Problems table) and `InvalidManifest(List<ManifestProblem>)` (`DomainError`, non-empty, readable message) in `puls3_domain/lib/src/errors.dart`; create `lib/src/manifest.dart` with `ManifestVersion`; export in `lib/puls3_domain.dart`. Done: 1.3 green (S25 list shape, S27-S29).
+- [x] 1.5 RED: group I23 `ModelId` (S41): shape, kebab provider, 32/33, id 128/129 runes, blank/whitespace id, no credential field (S19 type-level), equality. Done: fails.
+- [x] 1.6 GREEN: `ModelId` factory throwing `InvalidManifest([modelMalformed])` (D12). Done: 1.5 green.
+- [x] 1.7 RED: group I24 `ModelPolicy` (S15-S18, S42): `allows` hit/miss for `workers-ai`, paid enabled/disabled/unknown, `isPaid`, `ArgumentError` for `workers-ai` in paid set. Done: fails.
+- [x] 1.8 GREEN: `ModelPolicy` with `freeProvider`, `allows`, `isPaid`, unmodifiable sets. Done: 1.7 green.
+- [x] 1.9 REFACTOR: tidy, `dart format`, run gate; commit `feat(domain): add manifest values, model policy and problems`. Done: gate green, diff <=~400.
 
 ## PR 2: Draft and validate (~400 lines)
 
