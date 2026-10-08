@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:test/test.dart';
 
@@ -1069,6 +1071,102 @@ void main() {
       expect(
         () => AgentManifest.fromJson(doc, policy),
         problems([ManifestProblem.modelProviderNotEnabled]),
+      );
+    });
+  });
+
+  group('Canonical JSON', () {
+    AgentManifest manifest({String? name, ModelId? model}) => complete(
+      name: name,
+      model: model,
+      skills: [skill('zeta'), skill('alpha')],
+    ).validate(policy, ManifestVersion.first);
+
+    void expectSorted(Object? node) {
+      if (node is Map) {
+        final keys = node.keys.cast<String>().toList();
+        expect(keys, [...keys]..sort());
+        node.values.forEach(expectSorted);
+      } else if (node is List) {
+        node.forEach(expectSorted);
+      }
+    }
+
+    Object? reversed(Object? node) => switch (node) {
+      Map() => {
+        for (final k in node.keys.toList().reversed) k: reversed(node[k]),
+      },
+      List() => [for (final e in node) reversed(e)],
+      _ => node,
+    };
+
+    test('S34 has no whitespace outside strings and sorts every level', () {
+      final text = manifest().toCanonicalJson();
+      final withoutStrings = text.replaceAll(RegExp(r'"(?:[^"\\]|\\.)*"'), '');
+      expect(withoutStrings, isNot(matches(RegExp(r'\s'))));
+      expectSorted(jsonDecode(text));
+      expect(
+        text.indexOf('"description"'),
+        lessThan(text.indexOf('"input"')),
+      );
+      expect(text.indexOf('"schema"'), lessThan(text.indexOf('"skills"')));
+      expect(text.indexOf('"amount"'), lessThan(text.indexOf('"asset"')));
+    });
+
+    test('array order is preserved', () {
+      final text = manifest().toCanonicalJson();
+      expect(text.indexOf('"zeta"'), lessThan(text.indexOf('"alpha"')));
+    });
+
+    test('S35 key order and spacing of the input do not matter', () {
+      final json = manifest().toJson();
+      final shuffled = jsonDecode(
+        const JsonEncoder.withIndent('  ').convert(reversed(json)),
+      );
+      expect(
+        AgentManifest.fromJson(shuffled, policy).toCanonicalJson(),
+        manifest().toCanonicalJson(),
+      );
+    });
+
+    test('S36 non-ASCII text is kept and encodes as UTF-8', () {
+      final text = manifest(name: 'Café \u{1F600}').toCanonicalJson();
+      expect(text, contains('Café \u{1F600}'));
+      final decoded = jsonDecode(utf8.decode(utf8.encode(text))) as Map;
+      expect(decoded['name'], 'Café \u{1F600}');
+    });
+
+    test('S37 a one-field edit changes the bytes', () {
+      final other = manifest(
+        model: ModelId(provider: 'anthropic', id: 'claude-sonnet-5'),
+      );
+      expect(other.toCanonicalJson(), isNot(manifest().toCanonicalJson()));
+      expect(manifest().toCanonicalJson(), manifest().toCanonicalJson());
+    });
+
+    test('canonicalJson rejects any double with StateError', () {
+      for (final value in <Object?>[
+        1.5,
+        3.0,
+        {'a': 1.5},
+        [
+          1,
+          {
+            'b': [2.0],
+          },
+        ],
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+    });
+
+    test('canonicalJson encodes integers, strings, bools and null', () {
+      expect(
+        canonicalJson({
+          'b': [1, null, true, 'x'],
+          'a': -2,
+        }),
+        '{"a":-2,"b":[1,null,true,"x"]}',
       );
     });
   });

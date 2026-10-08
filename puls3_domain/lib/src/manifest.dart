@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'errors.dart';
 import 'entities.dart';
 import 'values.dart';
@@ -429,6 +431,10 @@ final class AgentManifest {
     ...toDraft().toJson(),
   };
 
+  /// The canonical form: see [canonicalJson]. Encode it as UTF-8 to hash it
+  /// (hashing and salting belong to the server, #18).
+  String toCanonicalJson() => canonicalJson(toJson());
+
   /// The editable form, without a version. This manifest is not changed.
   AgentManifestDraft toDraft() => AgentManifestDraft(
     name: name,
@@ -740,3 +746,22 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
     version,
   );
 }
+
+/// The canonical JSON text of [value]: object keys sorted at every depth, no
+/// whitespace, array order kept, and integers only.
+///
+/// The same data always gives the same text, whatever the key order it was
+/// built with. Non-ASCII text is kept as is, so UTF-8 encoding the result gives
+/// the canonical bytes. Throws [StateError] on any `double`, because floats have
+/// no single textual form.
+String canonicalJson(Object? value) => jsonEncode(_sortKeysDeep(value));
+
+Object? _sortKeysDeep(Object? node) => switch (node) {
+  Map() => {
+    for (final key in (node.keys.cast<String>().toList()..sort()))
+      key: _sortKeysDeep(node[key]),
+  },
+  List() => [for (final item in node) _sortKeysDeep(item)],
+  double() => throw StateError('canonical JSON has no floats: $node'),
+  _ => node,
+};
