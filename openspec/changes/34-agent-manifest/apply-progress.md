@@ -45,6 +45,14 @@ PR 3 was split at 3.4/3.5 (the JSON part alone passed ~400 authored lines: 336 c
 - Carried deviation resolved: S14 per-skill problems (`skillIdNotKebabCase`, `skillNameLength`) and wrong-type problems are now reachable and tested through JSON.
 - Deviations: one `unknownKey` per document (deduplicated, no key name or path in the enum); `schema` in a draft is `unknownKey`; `price` without a valid `USDC` asset is `priceAssetUnsupported`; a skill with a missing `id`/`name` reports the skill rule, not malformed; explicit JSON `null` counts as absent.
 
+## PR 3b (feat/34-agent-manifest-03b-canonical): DONE, 3.5-3.9
+
+- 3.5/3.6 `AgentManifest.toCanonicalJson()` over a public `canonicalJson(Object?)` (sorted keys at every depth via `_sortKeysDeep`, `jsonEncode`, `StateError` on any double, `dart:convert` only). `canonicalJson` is public so the double rule is testable and the server (#18) can reuse it.
+- 3.7 `docs/architecture/examples/agent-manifest.workers-ai.example.json` (Brief Bot, `workers-ai`, `@cf/meta/llama-3.1-8b-instruct`, v1).
+- 3.8 Fixture tests (S38-S40 and `toJson` equals source) read `../docs/architecture/examples/*.json` from `puls3_domain`. Mutation check: adding a `credential` key to the workers-ai example failed the group, then was restored. The Copy Forge example needed no change.
+- 3.9 `.github/workflows/ci.yml`: `docs/architecture/examples/*` sets `domain=true` only.
+- Deviation: the example file (3.7) existed before the fixture tests ran, so the 3.8 RED was verified by mutation rather than by a missing file.
+
 ## Remaining
 
-PR 3b (3.5-3.9), PR 4 (4.1-4.4).
+PR 4 (4.1-4.4).

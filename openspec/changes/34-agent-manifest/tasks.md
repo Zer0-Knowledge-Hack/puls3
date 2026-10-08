@@ -73,11 +73,11 @@ Notes: `problemsForDeploy` landed in 2a (2.3) and is tested there (one line over
 - [x] 3.2 GREEN: `AgentManifestDraft.fromJson(Object?)` and `toJson()` (snake_case mapping, nulls omitted, no throw on type errors; parse problems merged with `_check`; D7, D8, D11). Done: 3.1 green.
 - [x] 3.3 RED: round trips and manifest JSON: draft round trip with partial fields (S31), manifest round trip (S30), wrong `schema` (S33), missing/invalid `version` -> `versionInvalid`, `schema` always emitted. Done: fails.
 - [x] 3.4 GREEN: `AgentManifest.fromJson(json, policy)` and `toJson()`. Done: 3.3 green.
-- [ ] 3.5 RED: group Canonical: no whitespace, sorted keys at every depth (S34), key-order independence (S35), UTF-8 non-ASCII (S36), one-field edit changes bytes (S37), any double throws `StateError`. Done: fails.
-- [ ] 3.6 GREEN: `toCanonicalJson()` via `_sortKeysDeep` + `jsonEncode`; `dart:convert` only. Done: 3.5 green.
-- [ ] 3.7 Create `docs/architecture/examples/agent-manifest.workers-ai.example.json` (`workers-ai`, `@cf/meta/llama-3.1-8b-instruct`, version 1). Done: file valid JSON, no credential key.
-- [ ] 3.8 RED then GREEN: fixture tests read `../docs/architecture/examples/*.json`: Copy Forge validates with `anthropic` enabled (S38), workers-ai validates and `isPaid` false (S39), restrictive policy yields exactly one model problem each (S40), `toJson` equals source doc. Adjust `agent-manifest.example.json` only if needed. Done: green.
-- [ ] 3.9 Edit `.github/workflows/ci.yml` path filter: `docs/architecture/examples/*` -> `domain=true`. REFACTOR, gate, commit `feat(domain): add manifest JSON, canonical form and example fixtures`. Check line count; split contingency here.
+- [x] 3.5 RED: group Canonical: no whitespace, sorted keys at every depth (S34), key-order independence (S35), UTF-8 non-ASCII (S36), one-field edit changes bytes (S37), any double throws `StateError`. Done: fails.
+- [x] 3.6 GREEN: `toCanonicalJson()` via `_sortKeysDeep` + `jsonEncode`; `dart:convert` only. Done: 3.5 green.
+- [x] 3.7 Create `docs/architecture/examples/agent-manifest.workers-ai.example.json` (`workers-ai`, `@cf/meta/llama-3.1-8b-instruct`, version 1). Done: file valid JSON, no credential key.
+- [x] 3.8 RED then GREEN: fixture tests read `../docs/architecture/examples/*.json`: Copy Forge validates with `anthropic` enabled (S38), workers-ai validates and `isPaid` false (S39), restrictive policy yields exactly one model problem each (S40), `toJson` equals source doc. Adjust `agent-manifest.example.json` only if needed. Done: green.
+- [x] 3.9 Edit `.github/workflows/ci.yml` path filter: `docs/architecture/examples/*` -> `domain=true`. REFACTOR, gate, commit `feat(domain): add manifest JSON, canonical form and example fixtures`. Check line count; split contingency here.
 
 ## PR 4: Docs (~120 lines, docs only)
 
