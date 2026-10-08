@@ -399,6 +399,38 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(unchanged.state, SubmissionState.submitted);
   });
 
+  test(
+    'listByHire returns every record of the hire in insertion order',
+    () async {
+      create();
+      final first = await insert();
+      final other = await insert(
+        transactionHash: _txB,
+        preparationId: 'prep-2',
+        hireId: 8,
+      );
+      final second = await insert(
+        transactionHash: _txC,
+        preparationId: 'prep-3',
+        purpose: SubmissionPurpose.createJob,
+      );
+      await repo.markFailed(first.id, SubmissionOutcomeCode.submissionRejected);
+
+      final seven = await repo.listByHire(7);
+
+      expect(seven.map((r) => r.id), [first.id, second.id]);
+      expect(seven.first.state, SubmissionState.failed);
+      expect((await repo.listByHire(8)).map((r) => r.id), [other.id]);
+    },
+  );
+
+  test('listByHire is empty for a hire without records', () async {
+    create();
+    await insert();
+
+    expect(await repo.listByHire(99), isEmpty);
+  });
+
   test('toProtocol exposes the client fields with wire names', () async {
     create();
     final stored = await insert();
