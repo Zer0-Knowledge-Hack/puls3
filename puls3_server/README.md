@@ -81,6 +81,38 @@ are not usable against a running server yet. Tests inject a fake with
 `HireEndpoint.sessionWallet`. `InputTooLong` has no documented limit, so the
 hire `input` length is not checked.
 
+### End-to-end proof on testnet
+
+`tool/e2e_relay_testnet.dart` creates and funds a hire on **testnet** using
+only `createHire`, `prepareFund` and `submitEscrowCall`, signing the unsigned
+XDR unchanged with a consumer key. It composes the real `HireEndpoint`, wiring,
+codec, Soroban RPC client and chain tracker over the test PostgreSQL (test
+mode, migrations applied), checks that a second submit of one preparation
+returns the existing record, and that an envelope with altered time bounds
+(a copy, never broadcast) is rejected with `EnvelopeMismatch`. It prints the
+hire and job ids, both transaction hashes with Stellar Expert links and the
+final status, and exits non-zero on any failed step.
+
+The secret is read from `PULS3_E2E_CONSUMER_SECRET` and is never printed or
+stored; feed it from the Stellar CLI in the same command. The relay values
+below are for this run only (they are not defaults of the server); the chain
+ids default to testnet and can be overridden with the `PULS3_STELLAR_*` keys.
+The consumer needs XLM and testnet USDC of the allowed token, and the registry
+needs an agent with a wallet (`PULS3_E2E_AGENT_ID` picks one; the cheapest
+otherwise).
+
+```bash
+docker start puls3_server-postgres_test-1 puls3_server-redis_test-1
+cd puls3_server
+PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" \
+PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_PLATFORM_FEE_BPS=0 \
+PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+dart run tool/e2e_relay_testnet.dart
+```
+
 ## Prerequisites
 
 - Dart 3.8 or newer
