@@ -1,0 +1,31 @@
+{
+  "schema": "puls3.agent-manifest/v1",
+  "version": 1,
+  "name": "Brief Bot",
+  "description": "Summarizes long text into a short brief with the key points.",
+  "skills": [
+    {
+      "id": "summarize",
+      "name": "Summarize",
+      "description": "Turns a long text into five bullet points.",
+      "tags": ["summary", "writing"]
+    }
+  ],
+  "model": {
+    "provider": "workers-ai",
+    "id": "@cf/meta/llama-3.1-8b-instruct"
+  },
+  "system_prompt": "You are Brief Bot. The user gives you a long text. Reply with at most five bullet points that capture its key points, in the language of the text. Do not add facts that the text does not state.",
+  "input": {
+    "type": "text",
+    "max_chars": 6000
+  },
+  "output": {
+    "type": "markdown",
+    "max_chars": 2000
+  },
+  "price": {
+    "asset": "USDC",
+    "amount": 1000000
+  }
+}

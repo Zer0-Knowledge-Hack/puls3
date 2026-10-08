@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:test/test.dart';
@@ -1168,6 +1169,51 @@ void main() {
         }),
         '{"a":-2,"b":[1,null,true,"x"]}',
       );
+    });
+  });
+
+  group('Reference examples', () {
+    const dir = '../docs/architecture/examples';
+    Object? load(String file) =>
+        jsonDecode(File('$dir/$file').readAsStringSync());
+    const copyForge = 'agent-manifest.example.json';
+    const workersAi = 'agent-manifest.workers-ai.example.json';
+    final restrictive = ModelPolicy(workersAiModels: {}, paidProviders: {});
+
+    test('S38 Copy Forge validates with anthropic enabled', () {
+      final m = AgentManifest.fromJson(load(copyForge), policy);
+      expect(m.version, ManifestVersion.first);
+      expect(m.model.provider, 'anthropic');
+      expect(policy.isPaid(m.model.provider), isTrue);
+    });
+
+    test('S39 the workers-ai example validates and is free', () {
+      final m = AgentManifest.fromJson(load(workersAi), policy);
+      expect(m.model, llama);
+      expect(policy.isPaid(m.model.provider), isFalse);
+    });
+
+    test(
+      'S40 each example fails with only a model problem when unsupported',
+      () {
+        expect(
+          () => AgentManifest.fromJson(load(copyForge), restrictive),
+          problems([ManifestProblem.modelProviderNotEnabled]),
+        );
+        expect(
+          () => AgentManifest.fromJson(load(workersAi), restrictive),
+          problems([ManifestProblem.modelNotAllowed]),
+        );
+      },
+    );
+
+    test('toJson gives back the source document, with no credential', () {
+      for (final file in [copyForge, workersAi]) {
+        final doc = load(file);
+        final json = AgentManifest.fromJson(doc, policy).toJson();
+        expect(json, doc, reason: file);
+        expect(canonicalJson(json), isNot(contains('credential')));
+      }
     });
   });
 }
