@@ -1,6 +1,6 @@
 import 'errors.dart';
 
-/// The version of a deployed agent manifest: an integer of at least 1.
+/// The version of a deployed agent manifest: an integer from 1 to 2^53-1.
 ///
 /// Drafts have no version. The caller passes `latest?.next() ?? first` when it
 /// validates a draft, because only storage knows the latest version.
@@ -8,15 +8,22 @@ final class ManifestVersion implements Comparable<ManifestVersion> {
   const ManifestVersion._(this.value);
 
   factory ManifestVersion(int value) {
-    if (value < 1) throw InvalidManifest([ManifestProblem.versionInvalid]);
+    if (value < 1 || value > maxValue) {
+      throw InvalidManifest([ManifestProblem.versionInvalid]);
+    }
     return ManifestVersion._(value);
   }
 
   static const first = ManifestVersion._(1);
 
+  /// The largest version: 2^53-1, so it stays exact when serialized as JSON.
+  static const maxValue = 9007199254740991;
+
   final int value;
 
-  ManifestVersion next() => ManifestVersion._(value + 1);
+  /// The following version. Fails with [ManifestProblem.versionInvalid] at
+  /// [maxValue].
+  ManifestVersion next() => ManifestVersion(value + 1);
 
   @override
   int compareTo(ManifestVersion other) => value.compareTo(other.value);

@@ -33,6 +33,20 @@ void main() {
       expect(v3.value, 3);
     });
 
+    test('caps at 2^53-1 and next() at the cap fails with a typed problem', () {
+      const cap = 9007199254740991;
+      expect(ManifestVersion(cap).value, cap);
+      expect(
+        () => ManifestVersion(cap + 1),
+        problems([ManifestProblem.versionInvalid]),
+      );
+      expect(
+        () => ManifestVersion(cap).next(),
+        problems([ManifestProblem.versionInvalid]),
+      );
+      expect(ManifestVersion(cap - 1).next(), ManifestVersion(cap));
+    });
+
     test('orders by value and has value equality', () {
       expect(ManifestVersion(2).compareTo(ManifestVersion(3)), lessThan(0));
       expect(ManifestVersion(3).compareTo(ManifestVersion(2)), greaterThan(0));
@@ -189,8 +203,19 @@ void main() {
         ManifestProblem.nameMissing,
         ManifestProblem.priceMissing,
       ]);
-      expect(e.message, contains('nameMissing'));
-      expect(e.message, contains('priceMissing'));
+      expect(e.message, contains('name is required'));
+      expect(e.message, contains('price is required'));
+      expect(e.message, isNot(contains('nameMissing')));
+    });
+
+    test('every problem has its own readable text', () {
+      final texts = {
+        for (final p in ManifestProblem.values) InvalidManifest([p]).message: p,
+      };
+      expect(texts.length, ManifestProblem.values.length);
+      for (final p in ManifestProblem.values) {
+        expect(InvalidManifest([p]).message, isNot(contains(p.name)));
+      }
     });
 
     test('problems list is unmodifiable', () {

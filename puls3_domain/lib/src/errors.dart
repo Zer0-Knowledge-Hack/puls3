@@ -271,5 +271,58 @@ final class InvalidManifest extends DomainError {
 
   @override
   String get message =>
-      'invalid agent manifest: ${problems.map((p) => p.name).join(', ')}';
+      'invalid agent manifest: ${problems.map(_describe).join('; ')}';
+
+  static String _describe(ManifestProblem p) => switch (p) {
+    ManifestProblem.notAnObject => 'the manifest must be a JSON object',
+    ManifestProblem.unknownKey => 'it has a key the manifest does not allow',
+    ManifestProblem.toolsNotSupported => 'tools are not supported yet',
+    ManifestProblem.versionInDraft => 'a draft must not have a version',
+    ManifestProblem.schemaUnsupported => 'the schema is not supported',
+    ManifestProblem.versionInvalid =>
+      'the version must be from 1 to 9007199254740991',
+    ManifestProblem.nameMalformed => 'name must be text',
+    ManifestProblem.nameMissing => 'name is required',
+    ManifestProblem.nameTooShort => 'name must be at least 3 characters',
+    ManifestProblem.nameTooLong => 'name must be at most 48 characters',
+    ManifestProblem.descriptionMalformed => 'description must be text',
+    ManifestProblem.descriptionMissing => 'description is required',
+    ManifestProblem.descriptionTooShort =>
+      'description must be at least 10 characters',
+    ManifestProblem.descriptionTooLong =>
+      'description must be at most 280 characters',
+    ManifestProblem.skillsMalformed => 'skills must be a list of skills',
+    ManifestProblem.skillsMissing => 'at least one skill is required',
+    ManifestProblem.skillsTooMany => 'at most 5 skills are allowed',
+    ManifestProblem.skillIdNotKebabCase => 'a skill id must be kebab-case',
+    ManifestProblem.skillNameLength =>
+      'a skill name must be 1 to 48 characters',
+    ManifestProblem.skillIdDuplicate => 'skill ids must be unique',
+    ManifestProblem.modelMalformed => 'model must be a provider and an id',
+    ManifestProblem.modelMissing => 'model is required',
+    ManifestProblem.modelProviderNotEnabled =>
+      'the model provider is not enabled',
+    ManifestProblem.modelNotAllowed => 'the model is not allowed',
+    ManifestProblem.systemPromptMalformed => 'system prompt must be text',
+    ManifestProblem.systemPromptMissing => 'system prompt is required',
+    ManifestProblem.systemPromptTooShort =>
+      'system prompt must be at least 20 characters',
+    ManifestProblem.systemPromptTooLong =>
+      'system prompt must be at most 8000 characters',
+    ManifestProblem.inputMalformed => 'input must be a type and a size',
+    ManifestProblem.inputMissing => 'input is required',
+    ManifestProblem.inputTypeUnsupported => 'the input type is not supported',
+    ManifestProblem.inputMaxCharsTooLow => 'input size must be at least 1',
+    ManifestProblem.inputMaxCharsTooHigh => 'input size must be at most 8000',
+    ManifestProblem.outputMalformed => 'output must be a type and a size',
+    ManifestProblem.outputMissing => 'output is required',
+    ManifestProblem.outputTypeUnsupported => 'the output type is not supported',
+    ManifestProblem.outputMaxCharsTooLow => 'output size must be at least 1',
+    ManifestProblem.outputMaxCharsTooHigh =>
+      'output size must be at most 16000',
+    ManifestProblem.priceMalformed => 'price must be a whole number of stroops',
+    ManifestProblem.priceMissing => 'price is required',
+    ManifestProblem.priceAssetUnsupported => 'the price asset must be USDC',
+    ManifestProblem.priceNotPositive => 'price must be greater than zero',
+  };
 }
