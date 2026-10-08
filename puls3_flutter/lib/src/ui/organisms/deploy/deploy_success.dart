@@ -185,7 +185,7 @@ class _DemoResult extends StatelessWidget {
         ),
         const SizedBox(height: Puls3Spacing.md),
         Text(
-          'Real deploys arrive with the deploy endpoint (#18). The steps '
+          'Real deploys arrive with the deploy endpoint. The steps '
           'above show the flow your wallet will go through.',
           style: DeployText.caption,
         ),

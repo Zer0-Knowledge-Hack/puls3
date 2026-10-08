@@ -127,9 +127,14 @@ class DeployFlowController extends ChangeNotifier {
   /// may take their time to read and sign. Null disables it.
   final Duration? stepTimeout;
 
-  /// Upper bound for the wallet prompt, so a popup that never answers does
-  /// not leave the flow stuck. Null disables it.
+  /// Upper bound for each wallet prompt (connect and sign), so a popup that
+  /// never answers does not leave the flow stuck. Null disables it.
   final Duration? signatureTimeout;
+
+  /// True while a wallet prompt (connect or sign) is open. The user may
+  /// leave then: a wallet that never answers must not trap them.
+  bool get isWaitingForWallet => _waitingForWallet;
+  bool _waitingForWallet = false;
 
   /// The gateway is a stand-in: the flow and its result are a demo.
   bool get isDemo => _gateway.isDemo;
@@ -186,7 +191,7 @@ class DeployFlowController extends ChangeNotifier {
       final prepared =
           _prepared ??
           await _attempt<PreparedDeploy>(DeployStep.preparing, () async {
-            final builder = await _wallet.connect();
+            final builder = await _waitForWallet(_wallet.connect());
             _builder = builder;
             return _verifyPrepared(
               await _backend(_gateway.prepare(draft, builder: builder)),
@@ -200,16 +205,9 @@ class DeployFlowController extends ChangeNotifier {
             // The transaction names the account it was prepared for. If the
             // wallet switched account since, it cannot sign it.
             if (_wallet.address != _builder) throw const _AccountChanged();
-            final signing = _wallet.signTransaction(
-              prepared.unsignedTransaction,
+            return _waitForWallet(
+              _wallet.signTransaction(prepared.unsignedTransaction),
             );
-            final timeout = signatureTimeout;
-            return timeout == null
-                ? signing
-                : signing.timeout(
-                    timeout,
-                    onTimeout: () => throw const _WalletTimeout(),
-                  );
           });
       _signed = signed;
 
@@ -242,6 +240,24 @@ class DeployFlowController extends ChangeNotifier {
       return;
     } finally {
       _running = false;
+      _notify();
+    }
+  }
+
+  /// Marks a wallet prompt as open and applies [signatureTimeout] to it.
+  Future<T> _waitForWallet<T>(Future<T> prompt) async {
+    _waitingForWallet = true;
+    _notify();
+    try {
+      final timeout = signatureTimeout;
+      return await (timeout == null
+          ? prompt
+          : prompt.timeout(
+              timeout,
+              onTimeout: () => throw const _WalletTimeout(),
+            ));
+    } finally {
+      _waitingForWallet = false;
       _notify();
     }
   }
@@ -317,7 +333,10 @@ class DeployFlowController extends ChangeNotifier {
     TimeoutException() => DeployError(
       kind: DeployErrorKind.connection,
       step: step,
-      detail: 'No answer from the server in ${stepTimeout?.inSeconds} s.',
+      detail: switch (stepTimeout) {
+        final limit? => 'No answer from the server in ${limit.inSeconds} s.',
+        null => 'No answer from the server.',
+      },
     ),
     _InvalidResponse(:final reason) => DeployError(
       kind: DeployErrorKind.invalidResponse,

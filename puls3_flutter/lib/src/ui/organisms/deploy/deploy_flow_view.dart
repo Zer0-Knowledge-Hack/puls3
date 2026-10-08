@@ -212,7 +212,7 @@ class _DemoBanner extends StatelessWidget {
           Expanded(
             child: Text(
               'Demo: nothing is registered on Stellar until the deploy '
-              'endpoint (#18) is live.',
+              'endpoint is live.',
               style: DeployText.caption.copyWith(color: Puls3Colors.text),
             ),
           ),

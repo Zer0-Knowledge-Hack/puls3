@@ -74,17 +74,24 @@ class ScriptedGateway implements DeployGateway {
 }
 
 class _Harness {
-  _Harness(this.tester, {this.stepTimeout, this.signatureTimeout});
+  _Harness(
+    this.tester, {
+    this.stepTimeout,
+    this.signatureTimeout,
+    MockWallet? wallet,
+  }) : wallet =
+           wallet ??
+           MockWallet(
+             connectDelay: Duration.zero,
+             signDelay: const Duration(seconds: 1),
+           );
 
   final WidgetTester tester;
   final Duration? stepTimeout;
   final Duration? signatureTimeout;
   bool mounted = true;
   final gateway = ScriptedGateway();
-  final wallet = MockWallet(
-    connectDelay: Duration.zero,
-    signDelay: const Duration(seconds: 1),
-  );
+  final MockWallet wallet;
   final opened = <Uri>[];
   final viewed = <DeployResult>[];
   final live = <DeployResult>[];
@@ -585,6 +592,31 @@ void main() {
       // Let the pending mock timers finish.
       await h.settle(const Duration(seconds: 2));
       expect(h.gateway.prepares, hasLength(1));
+    });
+
+    testWidgets('a wallet connection that never answers times out and the '
+        'user can leave', (tester) async {
+      // The connect prompt never answers in practice: 10 minutes against a
+      // 0.5 s limit.
+      final h = _Harness(
+        tester,
+        signatureTimeout: const Duration(milliseconds: 500),
+        wallet: MockWallet(connectDelay: const Duration(minutes: 10)),
+      );
+      await h.pump();
+      expect(h.statusOf(DeployStep.preparing), StepStatus.active);
+      expect(h.gateway.prepares, isEmpty);
+      // While the connect prompt is open, the user can still leave.
+      expect(find.byTooltip('Close'), findsOneWidget);
+      await tester.tap(find.byTooltip('Close'));
+      expect(h.closed, 1);
+
+      await h.settle(const Duration(milliseconds: 600));
+      expect(h.errorPanel(DeployErrorKind.walletTimeout), findsOneWidget);
+      expect(find.text('No answer from your wallet'), findsOneWidget);
+      expect(h.gateway.prepares, isEmpty);
+      // Let the pending mock timer finish.
+      await h.settle(const Duration(minutes: 10));
     });
 
     testWidgets('a closed flow stops instead of running the next steps', (

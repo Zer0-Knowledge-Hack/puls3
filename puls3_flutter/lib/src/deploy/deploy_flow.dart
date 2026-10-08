@@ -104,11 +104,10 @@ class _DeployFlowState extends State<DeployFlow> {
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) {
-        // While the wallet prompt is open the user may still leave: a wallet
-        // that never answers must not trap them. Other steps are server-side.
-        final busy =
-            _controller.isRunning &&
-            _controller.step != DeployStep.awaitingSignature;
+        // While a wallet prompt (connect or sign) is open the user may still
+        // leave: a wallet that never answers must not trap them. Other steps
+        // are server-side and bounded by the step timeout.
+        final busy = _controller.isRunning && !_controller.isWaitingForWallet;
         final registration = _controller.registration;
         return PopScope(
           canPop: !busy,
