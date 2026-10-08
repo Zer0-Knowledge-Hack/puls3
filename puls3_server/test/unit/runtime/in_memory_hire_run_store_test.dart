@@ -23,6 +23,7 @@ void main() {
                 agentId: agentId,
                 manifestVersion: manifestVersion,
                 input: input,
+                expiredAt: 1800000000,
               ),
               DateTime.utc(2026, 10, 8),
             );

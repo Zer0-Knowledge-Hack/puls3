@@ -30,6 +30,35 @@ final class ServerpodHireRunStore implements HireRunStore {
     transaction: transaction,
   );
 
+  /// Queues a run for every paid hire that has none, and returns how many it
+  /// queued. Hires paid before the `hire_run` table existed have a payment
+  /// but no run; new payments queue their run in the same transaction. The
+  /// runtime calls it once at startup.
+  Future<int> enqueueMissing(DateTime at) async {
+    final paid = {
+      for (final payment in await HirePaymentRecord.db.find(session))
+        payment.hireId,
+    };
+    if (paid.isEmpty) return 0;
+    final withRun = {
+      for (final run in await HireRunRecord.db.find(
+        session,
+        where: (t) => t.hireId.inSet(paid),
+      ))
+        run.hireId,
+    };
+    var queued = 0;
+    for (final hireId in paid.difference(withRun).toList()..sort()) {
+      try {
+        await enqueue(session, hireId, at.toUtc());
+        queued++;
+      } on DatabaseQueryException {
+        // Another instance queued it first: the unique index kept one run.
+      }
+    }
+    return queued;
+  }
+
   @override
   Future<HireRun?> find(int hireId) async {
     final record = await HireRunRecord.db.findFirstRow(
@@ -63,6 +92,7 @@ final class ServerpodHireRunStore implements HireRunStore {
             agentId: hire.agentId,
             manifestVersion: hire.manifestVersion,
             input: hire.input ?? '',
+            expiredAt: hire.expiredAt,
           ),
     ];
   }

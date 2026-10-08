@@ -55,6 +55,7 @@ final class QueuedRun {
     required this.agentId,
     required this.manifestVersion,
     required this.input,
+    required this.expiredAt,
   });
 
   final int hireId;
@@ -65,6 +66,10 @@ final class QueuedRun {
 
   /// The consumer's task input. Empty for a hire that predates the column.
   final String input;
+
+  /// The escrow job's `expired_at`, in unix seconds. A run that cannot end
+  /// before it can never be submitted.
+  final int expiredAt;
 }
 
 /// Persists agent runs. Every transition is one conditional write, so a

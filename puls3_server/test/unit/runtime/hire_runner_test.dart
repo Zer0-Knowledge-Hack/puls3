@@ -70,7 +70,11 @@ void main() {
 
   /// A funded hire for agent 13 with [input], queued like the repository
   /// queues it when the payment is recorded.
-  int fundedHire({String input = 'My invoice is wrong', int version = 1}) {
+  int fundedHire({
+    String input = 'My invoice is wrong',
+    int version = 1,
+    int expiredAt = 1800000000,
+  }) {
     final id = hires.hires.length + 1;
     final open = Hire(
       id: HireId(id),
@@ -95,6 +99,7 @@ void main() {
         agentId: 13,
         manifestVersion: version,
         input: input,
+        expiredAt: expiredAt,
       ),
       clock,
     );
@@ -239,17 +244,90 @@ void main() {
     },
   );
 
-  test('a hire that is not funded is never run', () async {
+  test('a hire that is not funded is never run and leaves the queue', () async {
     final id = fundedHire();
+    final next = fundedHire();
     final funded = hires.hires[id]!;
     hires.hires[id] = funded.reject();
+
+    final summary = await pass();
+
+    expect(model.tasks.single.input, 'My invoice is wrong');
+    final run = await runs.find(id);
+    expect(run!.state, HireRunState.failed);
+    expect(run.failureReason, runNotRunnable);
+    expect((await runs.find(next))!.state, HireRunState.succeeded);
+    expect(summary.failed, 1);
+    expect(logs.first, startsWith('error: Hire $id cannot run'));
+  });
+
+  test('a missing hire leaves the queue too', () async {
+    final id = fundedHire();
+    hires.hires.remove(id);
 
     await pass();
 
     expect(model.tasks, isEmpty);
-    expect((await runs.find(id))!.state, HireRunState.queued);
-    expect(logs.single, startsWith('error: Hire $id cannot run'));
+    expect((await runs.find(id))!.failureReason, runNotRunnable);
   });
+
+  test(
+    'a run that cannot end before the job expires never calls the model',
+    () async {
+      final expiresSoon =
+          clock.add(const Duration(milliseconds: 30)).millisecondsSinceEpoch ~/
+          1000;
+      final id = fundedHire(expiredAt: expiresSoon);
+
+      await pass();
+
+      expect(model.tasks, isEmpty);
+      final run = await runs.find(id);
+      expect(run!.state, HireRunState.failed);
+      expect(run.failureReason, runJobExpired);
+    },
+  );
+
+  test('an unexpected error fails the run and the batch goes on', () async {
+    var calls = 0;
+    model.answer = (task) async {
+      if (calls++ == 0) throw StateError('TLS handshake failed');
+      return 'ok: ${task.input}';
+    };
+    final first = fundedHire(input: 'a');
+    final second = fundedHire(input: 'b');
+
+    final summary = await pass();
+
+    expect(summary.failed, 1);
+    expect(summary.succeeded, 1);
+    final failed = await runs.find(first);
+    expect(failed!.state, HireRunState.failed);
+    expect(failed.failureReason, runInternalError);
+    expect((await runs.find(second))!.result, 'ok: b');
+    expect(logs.join(' '), isNot(contains('TLS handshake failed')));
+  });
+
+  test(
+    'an output for a run that already ended is not stored or counted',
+    () async {
+      late int id;
+      model.answer = (_) async {
+        // Another pass ends the run while the model is still answering.
+        await runs.markFailed(id, runInterrupted, clock);
+        return 'late output';
+      };
+      id = fundedHire();
+
+      final summary = await pass();
+
+      expect(summary.succeeded, 0);
+      final run = await runs.find(id);
+      expect(run!.state, HireRunState.failed);
+      expect(run.failureReason, runInterrupted);
+      expect(run.result, isNull);
+    },
+  );
 
   test('a run left running past staleAfter fails as interrupted', () async {
     final id = fundedHire();

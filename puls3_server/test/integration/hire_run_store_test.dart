@@ -1,4 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_server/src/generated/protocol.dart'
+    show HirePaymentRecord;
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/hire/serverpod_hire_repository.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
@@ -93,6 +95,45 @@ void main() {
         hasLength(1),
       );
     });
+
+    test(
+      'enqueueMissing queues a run for a paid hire that has none, once',
+      () async {
+        final session = sessionBuilder.build();
+        final repo = ServerpodHireRepository(session);
+        final runs = ServerpodHireRunStore(session);
+        final withRun = await _fundedHire(session, seq: ++seq);
+        // A hire paid before hire_run existed: a payment row and no run.
+        final row = await repo.insertHire(
+          NewHire(
+            consumer: _alice,
+            agentId: 13,
+            price: 1000000,
+            manifestVersion: 1,
+            expiredAt: 1800000000,
+            requestId: 'legacy-$seq',
+            input: 'old hire',
+          ),
+        );
+        await HirePaymentRecord.db.insertRow(
+          session,
+          HirePaymentRecord(
+            hireId: row.id,
+            transactionHash: 'f${(++seq).toRadixString(16).padLeft(63, '0')}',
+            jobId: 5000 + seq,
+            payer: _alice,
+            payee: _provider,
+            amount: 1000000,
+          ),
+        );
+        final now = DateTime.utc(2026, 10, 8, 12);
+
+        expect(await runs.enqueueMissing(now), 1);
+        expect((await runs.find(row.id))!.state, HireRunState.queued);
+        expect((await runs.find(withRun))!.state, HireRunState.queued);
+        expect(await runs.enqueueMissing(now), 0);
+      },
+    );
 
     test('findById replays the run through the domain', () async {
       final session = sessionBuilder.build();

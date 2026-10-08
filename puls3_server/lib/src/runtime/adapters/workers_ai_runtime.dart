@@ -32,9 +32,11 @@ final class WorkersAiRuntime implements ModelRuntime {
   /// most answers short, so the runtime always sets it.
   static const maxTokensCeiling = 4096;
 
-  /// `max_tokens` for [task]: its `output.max_chars` (a token is at least
-  /// about one character), capped at [maxTokensCeiling]. `AgentRunner`
-  /// still enforces the limit on the text.
+  /// `max_tokens` for [task]: its `output.max_chars`, capped at
+  /// [maxTokensCeiling]. For most text a token covers one or more
+  /// characters; some scripts and emoji take more, so such an output near
+  /// the limit can be cut short. `AgentRunner` enforces the limit on the
+  /// text.
   static int maxTokensFor(RuntimeTask task) =>
       min(maxTokensCeiling, task.maxOutputChars);
 

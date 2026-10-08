@@ -14,6 +14,18 @@ const manifestUnavailable = 'manifest_unavailable';
 /// ended, for example because the server restarted mid-run.
 const runInterrupted = 'interrupted';
 
+/// Failure code for a queued run whose hire can no longer run (not funded,
+/// or missing), so it leaves the queue instead of blocking it.
+const runNotRunnable = 'not_runnable';
+
+/// Failure code for a run that could not end before the job's `expired_at`:
+/// its result could never be submitted, so the model is not called.
+const runJobExpired = 'job_expired';
+
+/// Failure code for an unexpected error during the run, for example a TLS
+/// failure that is not a `RuntimeFailure`. The detail goes to the log only.
+const runInternalError = 'internal_error';
+
 /// What one [HireRunner.pass] did.
 final class RunPassSummary {
   const RunPassSummary({
@@ -116,23 +128,32 @@ final class HireRunner {
     HireRepository hires,
   ) async {
     final hire = await hires.findById(HireId(queued.hireId));
-    final Hire running;
-    try {
-      if (hire == null) throw StateError('hire ${queued.hireId} is missing');
-      running = hire.startRun();
-    } on Object catch (e) {
-      // Not funded, or the run already moved: never call the model.
-      _log(ChainLogLevel.error, 'Hire ${queued.hireId} cannot run: $e');
-      return _Outcome.skipped;
+    if (hire == null ||
+        hire.status != HireStatus.funded ||
+        hire.runtimeStatus != RuntimeStatus.queued) {
+      // Not funded, missing, or the run already moved: never call the model,
+      // and take the run out of the queue so it does not block later hires.
+      _log(
+        ChainLogLevel.error,
+        'Hire ${queued.hireId} cannot run (status ${hire?.status.name}, '
+        'run ${hire?.runtimeStatus?.name})',
+      );
+      return await runs.markFailed(queued.hireId, runNotRunnable, _now())
+          ? _Outcome.failed
+          : _Outcome.skipped;
     }
+    final running = hire.startRun();
 
     final RunManifest? manifest;
     try {
       manifest = await _manifests.find(queued.agentId, queued.manifestVersion);
-    } on LedgerException catch (e) {
+    } on Object catch (e) {
+      // An unreadable registry, or any other lookup error: the run stays
+      // queued for a later pass.
       _log(
-        ChainLogLevel.warning,
-        'Run of hire ${queued.hireId} deferred, the registry is unreadable: $e',
+        e is LedgerException ? ChainLogLevel.warning : ChainLogLevel.error,
+        'Run of hire ${queued.hireId} deferred, its manifest is unreadable: '
+        '${e.runtimeType}',
       );
       return _Outcome.deferred;
     }
@@ -143,14 +164,38 @@ final class HireRunner {
     if (manifest == null) {
       return _fail(running, runs, manifestUnavailable);
     }
+    final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+      queued.expiredAt * 1000,
+      isUtc: true,
+    );
+    if (!_now().add(_runner.timeout).isBefore(expiresAt)) {
+      return _fail(running, runs, runJobExpired);
+    }
 
+    final String output;
     try {
-      final output = await _runner.run(manifest.task(queued.input));
-      await runs.markSucceeded(queued.hireId, output, _now());
-      return _Outcome.succeeded;
+      output = await _runner.run(manifest.task(queued.input));
     } on RuntimeFailure catch (failure) {
       return _fail(running, runs, failure.code);
+    } on Object catch (e) {
+      // Never leave the run `running` until it is reported as interrupted.
+      _log(
+        ChainLogLevel.error,
+        'Run of hire ${queued.hireId} hit an unexpected ${e.runtimeType}',
+      );
+      return _fail(running, runs, runInternalError);
     }
+    if (!await runs.markSucceeded(queued.hireId, output, _now())) {
+      // Another pass already ended the run (for example as interrupted); its
+      // state wins and this output is dropped.
+      _log(
+        ChainLogLevel.warning,
+        'Run of hire ${queued.hireId} had already ended; its output was not '
+        'stored',
+      );
+      return _Outcome.skipped;
+    }
+    return _Outcome.succeeded;
   }
 
   Future<_Outcome> _fail(Hire running, HireRunStore runs, String code) async {

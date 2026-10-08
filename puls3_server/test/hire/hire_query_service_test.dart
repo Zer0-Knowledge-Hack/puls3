@@ -39,6 +39,7 @@ void main() {
       agentId: 7,
       manifestVersion: 1,
       input: 'summarise this',
+      expiredAt: 1800000000,
     ),
     rig.clock,
   );

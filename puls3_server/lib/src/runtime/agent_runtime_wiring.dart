@@ -88,13 +88,14 @@ const workersAiAccountVariable = 'PULS3_WORKERS_AI_ACCOUNT_ID';
 /// Each pass opens its own session and runs at most one batch, one hire at a
 /// time.
 TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
-  final loopConfig = RuntimeLoopConfig.fromEnvironment(env);
-  if (!loopConfig.enabled) return null;
   const ChainLog log = _consoleLog;
-  final config = RuntimeConfig.fromEnvironment(
+  final settings = runtimeSettingsOrNull(
     env,
     anthropicApiKey: pod.getPassword(anthropicApiKeyPassword),
+    log: log,
   );
+  if (settings == null) return null;
+  final (loopConfig, config) = settings;
   final httpClient = http.Client();
   final runtimes = <String, ModelRuntime>{};
   final accountId = env[workersAiAccountVariable];
@@ -152,6 +153,7 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     log: log,
     batchSize: _batchSize,
   );
+  var backfilled = false;
   final loop = TrackerLoop(
     interval: loopConfig.interval,
     passTimeout: config.timeout * _batchSize + const Duration(minutes: 1),
@@ -159,6 +161,14 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     runPass: () async {
       final session = await pod.createSession();
       try {
+        if (!backfilled) {
+          // Hires paid before hire_run existed get their run once.
+          final queued = await ServerpodHireRunStore(
+            session,
+          ).enqueueMissing(DateTime.now());
+          if (queued > 0) log(ChainLogLevel.info, 'Queued $queued missed runs');
+          backfilled = true;
+        }
         final summary = await runner.pass(
           runs: ServerpodHireRunStore(session),
           hires: ServerpodHireRepository(session),
@@ -177,6 +187,29 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     'timeout ${config.timeout.inSeconds}s',
   );
   return loop;
+}
+
+/// The loop and runtime settings from [env], or `null` when the runtime is
+/// disabled or a setting is invalid. An invalid `PULS3_RUNTIME_*` value is
+/// logged and leaves the runtime off; it never stops the server.
+(RuntimeLoopConfig, RuntimeConfig)? runtimeSettingsOrNull(
+  Map<String, String> env, {
+  required String? anthropicApiKey,
+  required ChainLog log,
+}) {
+  try {
+    final loop = RuntimeLoopConfig.fromEnvironment(env);
+    if (!loop.enabled) return null;
+    return (
+      loop,
+      RuntimeConfig.fromEnvironment(env, anthropicApiKey: anthropicApiKey),
+    );
+  } on ArgumentError catch (e) {
+    log(ChainLogLevel.error, 'Agent runtime not started: ${e.message}');
+  } on FormatException catch (e) {
+    log(ChainLogLevel.error, 'Agent runtime not started: ${e.message}');
+  }
+  return null;
 }
 
 void _consoleLog(ChainLogLevel level, String message) {
