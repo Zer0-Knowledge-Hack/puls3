@@ -170,6 +170,31 @@ final class AgentManifestDraft {
     return draft;
   }
 
+  static const _wireKeys = {
+    'name',
+    'description',
+    'skills',
+    'model',
+    'system_prompt',
+    'input',
+    'output',
+    'price',
+    'version',
+  };
+
+  /// Reads the wire document (snake_case, nested) without ever throwing a type
+  /// error: every mismatch becomes a problem. Throws [InvalidManifest] listing
+  /// the parse problems together with the draft rules the fields break.
+  factory AgentManifestDraft.fromJson(Object? json) {
+    final parsed = _parseDocument(json, manifest: false);
+    final problems = _merge(
+      parsed.problems,
+      parsed.draft._check(forDeploy: false),
+    );
+    if (problems.isNotEmpty) throw InvalidManifest(problems);
+    return parsed.draft;
+  }
+
   final String? name;
   final String? description;
   final List<Skill>? skills;
@@ -180,6 +205,41 @@ final class AgentManifestDraft {
   final OutputType? outputType;
   final int? outputMaxChars;
   final UsdcAmount? price;
+
+  /// The wire document: snake_case and nested, missing fields omitted, no
+  /// `schema` and no version.
+  Map<String, Object?> toJson() {
+    final skills = this.skills, model = this.model, price = this.price;
+    final inType = inputType, inMax = inputMaxChars;
+    final outType = outputType, outMax = outputMaxChars;
+    return {
+      'name': ?name,
+      'description': ?description,
+      if (skills != null)
+        'skills': [
+          for (final s in skills)
+            {
+              'id': s.id,
+              'name': s.name,
+              'description': s.description,
+              'tags': [...s.tags],
+            },
+        ],
+      if (model != null) 'model': {'provider': model.provider, 'id': model.id},
+      'system_prompt': ?systemPrompt,
+      if (inType != null || inMax != null)
+        'input': {
+          'type': ?inType?.name,
+          'max_chars': ?inMax,
+        },
+      if (outType != null || outMax != null)
+        'output': {
+          'type': ?outType?.name,
+          'max_chars': ?outMax,
+        },
+      if (price != null) 'price': {'asset': _asset, 'amount': price.stroops},
+    };
+  }
 
   /// Every rule this draft breaks as a deployable manifest, in field order.
   /// The Studio's test run uses it before the deploy.
@@ -404,3 +464,258 @@ bool _sameSkills(List<Skill> a, List<Skill> b) =>
             a[i].tags.length == b[i].tags.length &&
             a[i].tags.indexed.every((t) => b[i].tags[t.$1] == t.$2),
     ].every((same) => same);
+
+const _asset = 'USDC';
+
+/// A parsed document: the problems found while reading it and the draft built
+/// from the fields that did parse.
+final class _Parsed {
+  _Parsed(this.problems, this.draft, [this.version]);
+
+  final List<ManifestProblem> problems;
+  final AgentManifestDraft draft;
+  final ManifestVersion? version;
+}
+
+/// Deduplicates in order and drops a "missing" problem when the same field
+/// already has a "malformed" one, so one bad field is reported once.
+List<ManifestProblem> _merge(
+  List<ManifestProblem> parse,
+  List<ManifestProblem> check,
+) {
+  final all = {...parse, ...check};
+  return [
+    for (final p in all)
+      if (!(_supersededBy[p] ?? const {}).any(all.contains)) p,
+  ];
+}
+
+const _supersededBy = <ManifestProblem, Set<ManifestProblem>>{
+  ManifestProblem.nameMissing: {ManifestProblem.nameMalformed},
+  ManifestProblem.descriptionMissing: {ManifestProblem.descriptionMalformed},
+  ManifestProblem.skillsMissing: {
+    ManifestProblem.skillsMalformed,
+    ManifestProblem.skillIdNotKebabCase,
+    ManifestProblem.skillNameLength,
+  },
+  ManifestProblem.modelMissing: {ManifestProblem.modelMalformed},
+  ManifestProblem.systemPromptMissing: {ManifestProblem.systemPromptMalformed},
+  ManifestProblem.inputMissing: {ManifestProblem.inputMalformed},
+  ManifestProblem.outputMissing: {ManifestProblem.outputMalformed},
+  ManifestProblem.priceMissing: {
+    ManifestProblem.priceMalformed,
+    ManifestProblem.priceAssetUnsupported,
+  },
+};
+
+_Parsed _parseDocument(Object? json, {required bool manifest}) {
+  final found = <ManifestProblem>[];
+
+  Map<Object?, Object?>? object(
+    Object? value,
+    Set<String> keys,
+    ManifestProblem malformed,
+  ) {
+    if (value == null) return null;
+    if (value is! Map) {
+      found.add(malformed);
+      return null;
+    }
+    for (final key in value.keys) {
+      if (key == 'tools') {
+        found.add(ManifestProblem.toolsNotSupported);
+      } else if (!keys.contains(key)) {
+        found.add(ManifestProblem.unknownKey);
+      }
+    }
+    return value;
+  }
+
+  String? text(Map<Object?, Object?> from, String key, ManifestProblem bad) {
+    final value = from[key];
+    if (value == null) return null;
+    if (value is String) return value;
+    found.add(bad);
+    return null;
+  }
+
+  int? whole(Map<Object?, Object?> from, String key, ManifestProblem bad) {
+    final value = from[key];
+    if (value == null) return null;
+    if (value is int) return value;
+    found.add(bad);
+    return null;
+  }
+
+  (T?, int?) section<T extends Enum>(
+    Object? value,
+    List<T> types,
+    ManifestProblem malformed,
+    ManifestProblem unsupported,
+  ) {
+    final map = object(value, {'type', 'max_chars'}, malformed);
+    if (map == null) return (null, null);
+    final name = text(map, 'type', malformed);
+    final type = types.where((t) => t.name == name).firstOrNull;
+    if (name != null && type == null) found.add(unsupported);
+    return (type, whole(map, 'max_chars', malformed));
+  }
+
+  if (json is! Map) {
+    return _Parsed(
+      [
+        ManifestProblem.notAnObject,
+      ],
+      AgentManifestDraft._(
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ),
+    );
+  }
+  final doc = object(json, {
+    ...AgentManifestDraft._wireKeys,
+    if (manifest) 'schema',
+  }, ManifestProblem.notAnObject)!;
+  ManifestVersion? version;
+  if (manifest) {
+    final schema = doc['schema'];
+    if (schema != null && schema != AgentManifest.schemaId) {
+      found.add(ManifestProblem.schemaUnsupported);
+    }
+    final raw = doc['version'];
+    try {
+      version = raw is int ? ManifestVersion(raw) : null;
+    } on InvalidManifest {
+      version = null;
+    }
+    if (version == null) found.add(ManifestProblem.versionInvalid);
+  } else if (doc.containsKey('version')) {
+    found.add(ManifestProblem.versionInDraft);
+  }
+
+  final name = text(doc, 'name', ManifestProblem.nameMalformed);
+  final description = text(
+    doc,
+    'description',
+    ManifestProblem.descriptionMalformed,
+  );
+
+  List<Skill>? skills;
+  final rawSkills = doc['skills'];
+  if (rawSkills is List) {
+    skills = [];
+    for (final item in rawSkills) {
+      final map = object(item ?? 0, {
+        'id',
+        'name',
+        'description',
+        'tags',
+      }, ManifestProblem.skillsMalformed);
+      if (map == null) continue;
+      final id = map['id'] ?? '', skillName = map['name'] ?? '';
+      final about = map['description'] ?? '', tags = map['tags'] ?? [];
+      if (id is! String ||
+          skillName is! String ||
+          about is! String ||
+          tags is! List ||
+          !tags.every((t) => t is String)) {
+        found.add(ManifestProblem.skillsMalformed);
+        continue;
+      }
+      try {
+        skills.add(
+          Skill(
+            id: id,
+            name: skillName,
+            description: about,
+            tags: tags.cast<String>(),
+          ),
+        );
+      } on InvalidSkill catch (e) {
+        found.add(switch (e.problem) {
+          SkillProblem.idNotKebabCase => ManifestProblem.skillIdNotKebabCase,
+          SkillProblem.nameLength => ManifestProblem.skillNameLength,
+        });
+      }
+    }
+  } else if (rawSkills != null) {
+    found.add(ManifestProblem.skillsMalformed);
+  }
+
+  ModelId? model;
+  final modelMap = object(doc['model'], {
+    'provider',
+    'id',
+  }, ManifestProblem.modelMalformed);
+  if (modelMap != null) {
+    final provider = modelMap['provider'], id = modelMap['id'];
+    try {
+      if (provider is! String || id is! String) {
+        throw InvalidManifest([ManifestProblem.modelMalformed]);
+      }
+      model = ModelId(provider: provider, id: id);
+    } on InvalidManifest {
+      found.add(ManifestProblem.modelMalformed);
+    }
+  }
+
+  final systemPrompt = text(
+    doc,
+    'system_prompt',
+    ManifestProblem.systemPromptMalformed,
+  );
+  final (inputType, inputMax) = section(
+    doc['input'],
+    InputType.values,
+    ManifestProblem.inputMalformed,
+    ManifestProblem.inputTypeUnsupported,
+  );
+  final (outputType, outputMax) = section(
+    doc['output'],
+    OutputType.values,
+    ManifestProblem.outputMalformed,
+    ManifestProblem.outputTypeUnsupported,
+  );
+
+  UsdcAmount? price;
+  final priceMap = object(doc['price'], {
+    'asset',
+    'amount',
+  }, ManifestProblem.priceMalformed);
+  if (priceMap != null) {
+    if (priceMap['asset'] != _asset) {
+      found.add(ManifestProblem.priceAssetUnsupported);
+    }
+    final amount = whole(priceMap, 'amount', ManifestProblem.priceMalformed);
+    try {
+      price = amount == null ? null : UsdcAmount.stroops(amount);
+    } on InvalidAmount {
+      found.add(ManifestProblem.priceMalformed);
+    }
+  }
+
+  return _Parsed(
+    found,
+    AgentManifestDraft._(
+      name,
+      description,
+      skills == null ? null : List.unmodifiable(skills),
+      model,
+      systemPrompt,
+      inputType,
+      inputMax,
+      outputType,
+      outputMax,
+      price,
+    ),
+    version,
+  );
+}

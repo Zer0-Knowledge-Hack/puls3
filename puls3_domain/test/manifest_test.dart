@@ -729,4 +729,246 @@ void main() {
       );
     });
   });
+  group('Draft JSON', () {
+    test('parses the wire shape into the Dart fields', () {
+      final d = AgentManifestDraft.fromJson(draftDoc());
+      expect(d.name, 'Copy Forge');
+      expect(d.skills!.single.id, 'rewrite');
+      expect(d.skills!.single.tags, ['copy']);
+      expect(d.model, llama);
+      expect(d.systemPrompt, 'You rewrite copy in a clear voice.');
+      expect(d.inputType, InputType.text);
+      expect(d.inputMaxChars, 4000);
+      expect(d.outputType, OutputType.markdown);
+      expect(d.outputMaxChars, 8000);
+      expect(d.price, UsdcAmount.stroops(3000000));
+      expect(deploy(d), isEmpty);
+    });
+
+    test('S4 wrong types become problems, never exceptions', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['name'] = 7
+            ..['description'] = true
+            ..['skills'] = 'rewrite'
+            ..['model'] = 'x'
+            ..['system_prompt'] = []
+            ..['input'] = 3
+            ..['output'] = {'type': 'markdown', 'max_chars': '8000'}
+            ..['price'] = {'asset': 'USDC', 'amount': '3000000'},
+        ),
+        problems([
+          ManifestProblem.nameMalformed,
+          ManifestProblem.descriptionMalformed,
+          ManifestProblem.skillsMalformed,
+          ManifestProblem.modelMalformed,
+          ManifestProblem.systemPromptMalformed,
+          ManifestProblem.inputMalformed,
+          ManifestProblem.outputMalformed,
+          ManifestProblem.priceMalformed,
+        ]),
+      );
+    });
+
+    test('S4 a float or out-of-range price amount is malformed', () {
+      for (final amount in [1.5, 3000000.0, -1, UsdcAmount.maxStroops + 1]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['price'] = {'asset': 'USDC', 'amount': amount},
+          ),
+          problems([ManifestProblem.priceMalformed]),
+          reason: '$amount',
+        );
+      }
+    });
+
+    test('a non-object is notAnObject', () {
+      for (final value in [null, 'x', 3, <Object?>[]]) {
+        expect(
+          () => AgentManifestDraft.fromJson(value),
+          problems([ManifestProblem.notAnObject]),
+          reason: '$value',
+        );
+      }
+    });
+
+    test('S24 tools has its own problem, apart from unknownKey', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['tools'] = []),
+        problems([ManifestProblem.toolsNotSupported]),
+      );
+    });
+
+    test('a version in a draft is versionInDraft', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['version'] = 1),
+        problems([ManifestProblem.versionInDraft]),
+      );
+    });
+
+    test('S19/S32 unknown keys are rejected at every level', () {
+      final cases = <String, void Function(Map<String, Object?>)>{
+        'top': (d) => d['credential'] = 'x',
+        'skill': (d) => ((d['skills']! as List).first as Map)['x'] = 1,
+        'model': (d) => (d['model']! as Map)['api_key'] = 'sk',
+        'input': (d) => (d['input']! as Map)['x'] = 1,
+        'output': (d) => (d['output']! as Map)['x'] = 1,
+        'price': (d) => (d['price']! as Map)['x'] = 1,
+        'schema in a draft': (d) => d['schema'] = 'puls3.agent-manifest/v1',
+      };
+      cases.forEach((label, mutate) {
+        final doc = draftDoc();
+        mutate(doc);
+        expect(
+          () => AgentManifestDraft.fromJson(doc),
+          problems([ManifestProblem.unknownKey]),
+          reason: label,
+        );
+      });
+    });
+
+    test('S14 per-skill problems arrive through JSON', () {
+      final doc = draftDoc()
+        ..['skills'] = [
+          {'id': 'Not Kebab', 'name': 'Fine'},
+          {'id': 'ok-id', 'name': ''},
+        ];
+      expect(
+        () => AgentManifestDraft.fromJson(doc),
+        problems([
+          ManifestProblem.skillIdNotKebabCase,
+          ManifestProblem.skillNameLength,
+        ]),
+      );
+    });
+
+    test('skill items of the wrong type are skillsMalformed', () {
+      final bad = <List<Object?>>[
+        ['x'],
+        [
+          {'id': 3, 'name': 'A'},
+        ],
+        [
+          {'id': 'a', 'name': 'A', 'tags': 'x'},
+        ],
+        [
+          {
+            'id': 'a',
+            'name': 'A',
+            'tags': [1],
+          },
+        ],
+        [
+          {'id': 'a', 'name': 'A', 'description': 1},
+        ],
+      ];
+      for (final skills in bad) {
+        expect(
+          () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills),
+          problems([ManifestProblem.skillsMalformed]),
+          reason: '$skills',
+        );
+      }
+    });
+
+    test('unsupported input/output types and assets are named', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['input'] = {'type': 'image', 'max_chars': 1}
+            ..['output'] = {'type': 'html', 'max_chars': 1}
+            ..['price'] = {'asset': 'XLM', 'amount': 1},
+        ),
+        problems([
+          ManifestProblem.inputTypeUnsupported,
+          ManifestProblem.outputTypeUnsupported,
+          ManifestProblem.priceAssetUnsupported,
+        ]),
+      );
+    });
+
+    test('a malformed model is modelMalformed', () {
+      final bad = <Map<String, Object?>>[
+        {'provider': 'Bad Name', 'id': 'x'},
+        {'provider': 'a'},
+        {'provider': 1, 'id': 'x'},
+      ];
+      for (final model in bad) {
+        expect(
+          () => AgentManifestDraft.fromJson(draftDoc()..['model'] = model),
+          problems([ManifestProblem.modelMalformed]),
+          reason: '$model',
+        );
+      }
+    });
+
+    test('draft rules still apply: above-maximum is rejected', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()..['input'] = {'type': 'text', 'max_chars': 8001},
+        ),
+        problems([ManifestProblem.inputMaxCharsTooHigh]),
+      );
+    });
+
+    test('S31 a partial draft round-trips with the same fields set', () {
+      final partial = AgentManifestDraft(
+        name: 'Copy Forge',
+        inputType: InputType.text,
+        price: UsdcAmount.stroops(5),
+      );
+      final json = partial.toJson();
+      expect(json, {
+        'name': 'Copy Forge',
+        'input': {'type': 'text'},
+        'price': {'asset': 'USDC', 'amount': 5},
+      });
+      final again = AgentManifestDraft.fromJson(json);
+      expect(again.name, 'Copy Forge');
+      expect(again.inputType, InputType.text);
+      expect(again.inputMaxChars, isNull);
+      expect(again.price, UsdcAmount.stroops(5));
+      expect(again.skills, isNull);
+      expect(again.model, isNull);
+      expect(again.toJson(), json);
+      expect(AgentManifestDraft().toJson(), isEmpty);
+    });
+
+    test('toJson is the snake_case wire shape and never has a version', () {
+      expect(complete().toJson(), {
+        'name': 'Copy Forge',
+        'description': 'Rewrites marketing copy.',
+        'skills': [
+          {'id': 'rewrite', 'name': 'Rewrite', 'description': '', 'tags': []},
+        ],
+        'model': {
+          'provider': 'workers-ai',
+          'id': '@cf/meta/llama-3.1-8b-instruct',
+        },
+        'system_prompt': 'You rewrite copy in a clear voice.',
+        'input': {'type': 'text', 'max_chars': 4000},
+        'output': {'type': 'markdown', 'max_chars': 8000},
+        'price': {'asset': 'USDC', 'amount': 3000000},
+      });
+    });
+  });
 }
+
+Map<String, Object?> draftDoc() => {
+  'name': 'Copy Forge',
+  'description': 'Rewrites marketing copy.',
+  'skills': [
+    {
+      'id': 'rewrite',
+      'name': 'Rewrite',
+      'description': 'Rewrites copy.',
+      'tags': ['copy'],
+    },
+  ],
+  'model': {'provider': 'workers-ai', 'id': '@cf/meta/llama-3.1-8b-instruct'},
+  'system_prompt': 'You rewrite copy in a clear voice.',
+  'input': {'type': 'text', 'max_chars': 4000},
+  'output': {'type': 'markdown', 'max_chars': 8000},
+  'price': {'asset': 'USDC', 'amount': 3000000},
+};
