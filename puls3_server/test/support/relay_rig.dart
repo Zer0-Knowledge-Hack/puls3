@@ -1,5 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/chain/chain_submission_store.dart';
+import 'package:puls3_server/src/chain/submission_ledger.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/escrow_relay_service.dart';
@@ -12,6 +13,7 @@ import 'package:test/test.dart';
 import '../unit/hire/hire_test_fakes.dart';
 import 'fake_chain_accounts.dart';
 import 'fake_envelope_codec.dart';
+import 'fake_submission_ledger.dart';
 import 'in_memory_chain_submission_store.dart';
 import 'in_memory_escrow_preparation_store.dart';
 import 'in_memory_hire_lifecycle_store.dart';
@@ -52,18 +54,23 @@ final class RelayRig {
 
   final Map<String, String> _environment;
 
-  /// A service over the rig's stores and fakes. [submissions] replaces the
-  /// rig's own to inject a fault, and [codec] composes the real codec.
+  /// A service over the rig's stores and fakes. [submissions] and [sender]
+  /// replace the rig's own to inject a fault, and [codec] and [agents] to
+  /// compose the real codec or a failing catalog.
   EscrowRelayService build({
     ChainSubmissionStore? submissions,
+    SubmissionLedger? sender,
     EnvelopeCodec? codec,
+    AgentSummaryLookup? agents,
   }) => EscrowRelayService(
     preparations: preparations,
     submissions: submissions ?? this.submissions,
     hires: hires,
     accounts: accounts,
     codec: codec ?? this.codec,
+    sender: sender ?? this.sender,
     agentWallets: ledger,
+    agents: agents ?? (id) async => id == 7 ? agentSummary : null,
     stellar: StellarConfig.testnet,
     config: HireRelayConfig(_environment),
     now: () => clock,
@@ -80,6 +87,7 @@ final class RelayRig {
   final InMemoryHireLifecycleStore hires;
   final accounts = FakeChainAccounts();
   final codec = FakeEnvelopeCodec();
+  final sender = FakeSubmissionLedger();
   final ledger = FakeLedger();
   late final EscrowRelayService service;
   var _serial = 0;

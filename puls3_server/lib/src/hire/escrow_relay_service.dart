@@ -5,11 +5,14 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
+import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
+import '../chain/submission_ledger.dart';
 import '../chain/submission_values.dart';
 import '../generated/protocol.dart';
 import '../ledger/envelope_codec.dart';
 import '../ledger/ledger_errors.dart';
+import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import '../ledger/xdr_invoke_encoder.dart' show ScArg;
 import 'chain_accounts.dart';
@@ -61,32 +64,41 @@ final class EscrowRelayService {
     required HireLifecycleStore hires,
     required ChainAccounts accounts,
     required EnvelopeCodec codec,
+    required SubmissionLedger sender,
     required LedgerPort agentWallets,
+    required AgentSummaryLookup agents,
     required StellarConfig stellar,
     required HireRelayConfig config,
     DateTime Function()? now,
     String Function()? newPreparationId,
+    ChainLog log = ignoreChainLog,
   }) : _preparations = preparations,
        _submissions = submissions,
        _hires = hires,
        _accounts = accounts,
        _codec = codec,
+       _sender = sender,
        _agentWallets = agentWallets,
+       _agents = agents,
        _stellar = stellar,
        _config = config,
        _now = now ?? DateTime.now,
-       _newPreparationId = newPreparationId ?? _randomPreparationId;
+       _newPreparationId = newPreparationId ?? _randomPreparationId,
+       _log = log;
 
   final EscrowPreparationStore _preparations;
   final ChainSubmissionStore _submissions;
   final HireLifecycleStore _hires;
   final ChainAccounts _accounts;
   final EnvelopeCodec _codec;
+  final SubmissionLedger _sender;
   final LedgerPort _agentWallets;
+  final AgentSummaryLookup _agents;
   final StellarConfig _stellar;
   final HireRelayConfig _config;
   final DateTime Function() _now;
   final String Function() _newPreparationId;
+  final ChainLog _log;
 
   int get _nowSeconds => _now().toUtc().millisecondsSinceEpoch ~/ 1000;
 
@@ -237,6 +249,163 @@ final class EscrowRelayService {
     return prepareCreateJob(wallet, hire.id);
   }
 
+  Future<HireDetail> submitEscrowCall(
+    StellarAddress wallet,
+    int hireId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) async {
+    final hire = await _ownedHire(wallet, hireId);
+    final prepared = await _preparations.findByPreparationId(preparationId);
+    if (prepared == null ||
+        prepared.hireId != hire.id ||
+        prepared.signer != wallet.value) {
+      throw _api('PreparationNotFound');
+    }
+    if (prepared.supersededAt != null) throw _expired('superseded');
+    if (!_now().toUtc().isBefore(prepared.validUntil)) {
+      throw _expired('timeBounds');
+    }
+
+    final signed = _verify(prepared, wallet, signedTransactionXdr);
+
+    final existing = await _submissions.findByPreparation(preparationId);
+    if (existing != null) return _detail(hire, existing, await _agentOf(hire));
+    if (!_allows(prepared.purpose, hire.status)) {
+      throw _invalidTransition(hire, prepared.purpose);
+    }
+
+    // `HireDetail.agent` is required, so the catalog is read before anything
+    // is stored or sent: once the envelope is on its way the answer must not
+    // depend on a read that can fail.
+    final agent = await _agentOf(hire);
+    final StoredSubmission? stored;
+    try {
+      stored = await _preparations.inTransaction(
+        (transaction) async =>
+            await _preparations.claim(preparationId, transaction: transaction)
+            ? await _submissions.insertSubmitted(
+                purpose: prepared.purpose,
+                transactionHash: signed.hashHex,
+                signedEnvelopeXdr: signedTransactionXdr,
+                validUntil: prepared.validUntil,
+                preparationId: preparationId,
+                hireId: hire.id,
+                transaction: transaction,
+              )
+            : null,
+      );
+    } on ChainSubmissionConflict catch (conflict) {
+      // The claim rolled back with the failed insert.
+      if (conflict.index != ChainSubmissionIndex.preparationId) {
+        throw _api('InternalError');
+      }
+      final winner = await _submissions.findByPreparation(preparationId);
+      if (winner == null) throw _api('InternalError');
+      return _detail(hire, winner, agent);
+    }
+    if (stored == null) throw _expired('superseded');
+    return _detail(hire, await _send(stored), agent);
+  }
+
+  /// Checks [signedXdr] against [prepared] in the order the contract fixes:
+  /// well-formed, same body, signed by [wallet].
+  SignedEnvelope _verify(
+    StoredPreparation prepared,
+    StellarAddress wallet,
+    String signedXdr,
+  ) {
+    final SignedEnvelope signed;
+    try {
+      signed = _codec.parse(signedXdr);
+    } on InvalidSignedEnvelope catch (e) {
+      throw _api('InvalidSignedEnvelope', {'reason': e.reason.name});
+    }
+    final expected = _codec.parse(prepared.unsignedEnvelopeXdr).body;
+    if (!_sameBytes(expected, signed.body)) {
+      throw _api('EnvelopeMismatch', {
+        'field':
+            _codec.firstDifference(expected, signed.body) ??
+            EnvelopeField.other,
+      });
+    }
+    final check = _codec.verify(signed, wallet, signed.hash);
+    if (check != SignatureCheck.valid) {
+      throw _api('InvalidTransactionSignature', {'reason': check.name});
+    }
+    return signed;
+  }
+
+  /// Sends the stored envelope once and returns the record as it is after.
+  Future<StoredSubmission> _send(StoredSubmission record) async {
+    try {
+      final result = await _sender.resend(record.signedEnvelopeXdr);
+      switch (result.status) {
+        case SendTransactionStatus.pending || SendTransactionStatus.duplicate:
+          await _submissions.recordSend(record.id, _now());
+        case SendTransactionStatus.tryAgainLater:
+          break;
+        case SendTransactionStatus.error:
+          _log(
+            ChainLogLevel.warning,
+            'The node refused submission ${record.id}: ${result.errorResultXdr}',
+          );
+          await _reject(record);
+      }
+    } on RpcRequestRejected catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'The node rejected the envelope of submission ${record.id}: $e',
+      );
+      await _reject(record);
+    } on LedgerException catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Submission ${record.id} stays submitted, the node is unreachable: $e',
+      );
+    }
+    return (await _submissions.findByPreparation(record.preparationId!)) ??
+        record;
+  }
+
+  Future<void> _reject(StoredSubmission record) => _submissions.markFailed(
+    record.id,
+    SubmissionOutcomeCode.submissionRejected,
+  );
+
+  /// The catalog entry of the hire's agent.
+  Future<AgentSummary> _agentOf(HireRow hire) async {
+    try {
+      return await _agents(hire.agentId) ??
+          (throw _api('ChainDataUnavailable'));
+    } on LedgerException {
+      throw _api('ChainDataUnavailable');
+    } on AgentCatalogUnavailable {
+      throw _api('ChainDataUnavailable');
+    }
+  }
+
+  HireDetail _detail(
+    HireRow hire,
+    StoredSubmission record,
+    AgentSummary agent,
+  ) {
+    final jobId = hire.jobId;
+    return HireDetail(
+      hire: hire.toProtocol(),
+      agent: agent,
+      input: hire.input ?? '',
+      jobId: jobId,
+      expiresAt: jobId == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              hire.expiredAt * 1000,
+              isUtc: true,
+            ),
+      escrowSubmission: record.toProtocol(),
+    );
+  }
+
   Future<PreparationDraft> _draft({
     required StellarAddress wallet,
     required SubmissionPurpose purpose,
@@ -350,8 +519,19 @@ final class EscrowRelayService {
     'purpose': purpose.wireName,
   });
 
+  static Puls3ApiException _expired(String reason) =>
+      _api('PreparationExpired', {'reason': reason});
+
   static Puls3ApiException _api(String code, [Map<String, String>? details]) =>
       Puls3ApiException(code: code, details: details);
+
+  static bool _sameBytes(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 }
 
 String _randomPreparationId() {
