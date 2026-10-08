@@ -1,96 +1,60 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../deploy/deploy_flow.dart';
+import '../deploy/deploy_flow_controller.dart';
 import '../domain/agent.dart';
-import '../state/app_scope.dart';
-import '../theme/puls3_theme.dart';
-import '../ui/organisms/deploy_progress_view.dart';
 import '../domain/agent_draft.dart';
+import '../state/app_scope.dart';
+import '../theme/breakpoints.dart';
+import '../theme/puls3_theme.dart';
 
-/// Opens the staged mock deploy flow for [draft].
+/// Opens the deploy flow for [draft] in a bottom sheet. It is not
+/// dismissible by tapping outside or dragging: [DeployFlow] decides when
+/// leaving is safe.
 Future<void> showDeploySheet(BuildContext context, AgentDraft draft) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: false,
     enableDrag: false,
+    backgroundColor: Puls3Colors.background,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(Puls3Radius.lg),
+      ),
+    ),
     builder: (_) => DeploySheet(draft: draft),
   );
 }
 
-/// Container that fakes the deploy pipeline (about 2.5 s in total) and
-/// publishes the agent to the in-memory catalog when it goes live.
-class DeploySheet extends StatefulWidget {
+/// Hosts [DeployFlow] for the Studio and publishes the agent to the catalog
+/// when it goes live.
+class DeploySheet extends StatelessWidget {
   const DeploySheet({super.key, required this.draft});
 
   final AgentDraft draft;
 
-  static const steps = [
-    'Creating wallet…',
-    'Registering identity on Soroban…',
-    'Live',
-  ];
-
-  static const _stepDurations = [
-    Duration(milliseconds: 900),
-    Duration(milliseconds: 1000),
-    Duration(milliseconds: 600),
-  ];
-
-  @override
-  State<DeploySheet> createState() => _DeploySheetState();
-}
-
-class _DeploySheetState extends State<DeploySheet> {
-  int _completed = 0;
-  String? _contractId;
-  String? _txHash;
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_started) {
-      _started = true;
-      unawaited(_run());
-    }
-  }
-
-  Future<void> _run() async {
-    final scope = AppScope.of(context);
-    final ids = scope.ids;
-    final catalog = scope.catalog;
-
-    final agentWallet = ids.accountAddress();
-    for (final duration in DeploySheet._stepDurations) {
-      await Future<void>.delayed(duration);
-      if (!mounted) return;
-      setState(() => _completed++);
-    }
-
-    final contractId = ids.contractId();
-    final draft = widget.draft;
-    catalog.publish(
+  void _publish(BuildContext context, DeployResult result) {
+    // A demo deploy created nothing: never list it as a real agent.
+    if (result.isDemo) return;
+    AppScope.of(context).catalog.publish(
       Agent(
-        id: contractId.toLowerCase().substring(0, 12),
+        id: '${result.agentId}',
         name: draft.name,
         description: draft.description,
         skills: draft.skills,
         priceUsdcStroops: draft.priceUsdcStroops,
-        rating: 5.0,
-        stellarAddress: agentWallet,
+        // No reviews yet: RatingBadge hides a 0.0 rating.
+        rating: 0.0,
+        stellarAddress: result.agentWallet,
         model: draft.model,
       ),
     );
-    setState(() {
-      _contractId = contractId;
-      _txHash = ids.txHash();
-    });
   }
 
-  void _close(String? goTo) {
+  void _close(BuildContext context, {String? goTo}) {
     final router = GoRouter.of(context);
     Navigator.of(context).pop();
     if (goTo != null) router.go(goTo);
@@ -98,26 +62,23 @@ class _DeploySheetState extends State<DeploySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final live = _completed >= DeploySheet.steps.length && _txHash != null;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          Puls3Spacing.lg,
-          0,
-          Puls3Spacing.lg,
-          Puls3Spacing.lg,
-        ),
+    final scope = AppScope.of(context);
+    final narrow =
+        MediaQuery.sizeOf(context).width < Puls3Breakpoints.narrowGutter;
+    final gutter = narrow ? Puls3Spacing.md : Puls3Spacing.lg;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(gutter, gutter, gutter, gutter),
+      child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: DeployProgressView(
-            agentName: widget.draft.name,
-            steps: DeploySheet.steps,
-            // Hold the last step active until ids are ready.
-            completedSteps: live ? _completed : _completed.clamp(0, 2),
-            contractId: _contractId,
-            txHash: _txHash,
-            onViewInMarketplace: () => _close('/market'),
-            onBackToStudio: () => _close(null),
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: DeployFlow(
+            draft: draft,
+            gateway: scope.deployGateway,
+            wallet: scope.wallet,
+            onLive: (result) => _publish(context, result),
+            onViewAgent: (result) =>
+                _close(context, goTo: '/agent/${result.agentId}'),
+            onClose: () => _close(context),
           ),
         ),
       ),

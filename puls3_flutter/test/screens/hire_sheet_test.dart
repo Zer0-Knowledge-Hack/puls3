@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
-import 'package:puls3_flutter/src/domain/stellar_format.dart';
+import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/screens/hire_sheet.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
 import 'package:puls3_flutter/src/state/app_scope.dart';
@@ -44,7 +44,7 @@ Widget buildTestSheet({
     home: AppScope(
       catalog: catalog,
       wallet: walletController,
-      ids: FakeLedgerIds(),
+      deployGateway: FakeDeployGateway(),
       child: Scaffold(
         body: HireSheet(agent: agent),
       ),
