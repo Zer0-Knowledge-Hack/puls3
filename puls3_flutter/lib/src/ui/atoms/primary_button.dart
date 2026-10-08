@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/breakpoints.dart';
 import '../../theme/puls3_theme.dart';
 
 enum PrimaryButtonVariant { filled, outline }
@@ -27,10 +28,16 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final filled = variant == PrimaryButtonVariant.filled;
     final foreground = filled ? Puls3Colors.onAccent : Puls3Colors.text;
+    // Phones: 44 px keeps a comfortable touch target without bulky buttons.
+    final compact = isCompactLayout(context);
     final style = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(0, 52)),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: Puls3Spacing.lg),
+      // The theme's compact density would take 4 px off; keep 44/52.
+      visualDensity: VisualDensity.standard,
+      minimumSize: WidgetStatePropertyAll(Size(0, compact ? 44 : 52)),
+      padding: WidgetStatePropertyAll(
+        EdgeInsets.symmetric(
+          horizontal: compact ? Puls3Spacing.md : Puls3Spacing.lg,
+        ),
       ),
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: Puls3Radius.pillAll),
@@ -73,7 +80,7 @@ class PrimaryButton extends StatelessWidget {
               ),
             )
           else if (icon != null)
-            Icon(icon, size: 18),
+            Icon(icon, size: compact ? 16 : 18),
           if (isLoading || icon != null) const SizedBox(width: Puls3Spacing.xs),
           Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
         ],

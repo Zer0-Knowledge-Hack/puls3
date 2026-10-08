@@ -81,7 +81,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
     final rows = await ChainSubmission.db.find(
       _session,
       where: (t) => t.state.equals(SubmissionState.submitted.wireName),
-      orderByList: (t) => [Order(column: t.lastCheckedAt), Order(column: t.id)],
+      orderByList: (t) => [t.lastCheckedAt.asc(), t.id.asc()],
       limit: limit,
     );
     final listed = <StoredSubmission>[];

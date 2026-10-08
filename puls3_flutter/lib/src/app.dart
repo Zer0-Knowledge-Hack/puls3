@@ -11,6 +11,7 @@ import 'screens/studio_screen.dart';
 import 'state/agent_catalog.dart';
 import 'state/app_scope.dart';
 import 'state/wallet_controller.dart';
+import 'theme/breakpoints.dart';
 import 'theme/puls3_theme.dart';
 import 'wallet/wallet_port.dart';
 
@@ -80,6 +81,9 @@ class _Puls3AppState extends State<Puls3App> {
 
   @override
   Widget build(BuildContext context) {
+    // Phones get the compact type scale; set before the theme is built.
+    Puls3Text.compact =
+        MediaQuery.sizeOf(context).width < Puls3Breakpoints.compact;
     return AppScope(
       catalog: _catalog,
       wallet: _wallet,

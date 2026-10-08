@@ -182,7 +182,7 @@ address_of() { stellar keys address "$1" 2>/dev/null || true; }
 ADMIN_ADDRESS="$(address_of "$IDENTITY")"
 if [ -z "$ADMIN_ADDRESS" ]; then
   echo "error: Stellar identity '$IDENTITY' does not exist or has no address." >&2
-  echo "Create or fund it first: stellar keys generate $IDENTITY --network $NETWORK" >&2
+  echo "Create and fund it first: stellar keys generate $IDENTITY --fund --network $NETWORK" >&2
   exit 1
 fi
 WALLET_IDENTITY="${AGENT_WALLET_ACCOUNT:-$IDENTITY}"

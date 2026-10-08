@@ -8,6 +8,7 @@ import '../ui/atoms/content_width.dart';
 import '../ui/atoms/skill_chip.dart';
 import '../ui/organisms/agent_grid.dart';
 import '../ui/organisms/site_footer.dart';
+import '../theme/breakpoints.dart';
 
 /// `/market`: searchable, filterable grid of agents.
 class MarketScreen extends StatefulWidget {
@@ -58,7 +59,9 @@ class _MarketScreenState extends State<MarketScreen> {
                       children: [
                         Text(
                           'Marketplace',
-                          style: MediaQuery.sizeOf(context).width < 700
+                          style:
+                              MediaQuery.sizeOf(context).width <
+                                  Puls3Breakpoints.compactHeadline
                               ? Puls3Text.h2Compact
                               : Puls3Text.h1,
                         ),
