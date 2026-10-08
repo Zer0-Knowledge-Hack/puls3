@@ -51,13 +51,19 @@ class Puls3App extends StatefulWidget {
     super.key,
     required this.repository,
     required this.wallet,
+    this.demoRepository,
     this.deployGateway,
     this.healthCheck,
     this.initialLocation = '/',
   });
 
+  /// The catalog: the server catalog in the app.
   final AgentRepository repository;
   final WalletPort wallet;
+
+  /// Shown, labelled as a demo, when [repository] fails. Null shows the
+  /// error state instead.
+  final AgentRepository? demoRepository;
 
   /// The deploy backend. Until the register/deploy endpoint (#18) exists
   /// it defaults to [FakeDeployGateway], which the flow labels as a demo.
@@ -70,7 +76,10 @@ class Puls3App extends StatefulWidget {
 }
 
 class _Puls3AppState extends State<Puls3App> {
-  late final AgentCatalog _catalog = AgentCatalog(widget.repository)..load();
+  late final AgentCatalog _catalog = AgentCatalog(
+    widget.repository,
+    fallback: widget.demoRepository,
+  )..load();
   late final WalletController _wallet = WalletController(widget.wallet);
   late final GoRouter _router = buildRouter(
     initialLocation: widget.initialLocation,
