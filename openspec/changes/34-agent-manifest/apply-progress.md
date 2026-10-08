@@ -53,6 +53,26 @@ PR 3 was split at 3.4/3.5 (the JSON part alone passed ~400 authored lines: 336 c
 - 3.9 `.github/workflows/ci.yml`: `docs/architecture/examples/*` sets `domain=true` only.
 - Deviation: the example file (3.7) existed before the fixture tests ran, so the 3.8 RED was verified by mutation rather than by a missing file.
 
+
+## Delivery change and PR 3 fixes (single PR `feat/34-agent-manifest-03-json-docs`)
+
+User decision: everything after PR 2b ships as one PR (base `feat/34-agent-manifest-02b-validate`), as separate commits (3a JSON, 3b canonical and examples, fixes, docs, SDD records) with a `size:exception`. The branch is the renamed `feat/34-agent-manifest-03b-canonical`.
+
+Fixes F.1-F.5 (strict TDD: 7 new or changed tests failed first, then the code; see tasks.md):
+- F.1 REL-002 integral numbers are integers (`_integer`, `_wireInteger`; `canonicalJson(3.0) == '3'`); non-integral, NaN, infinite and beyond 2^53-1 are rejected. On the web `3.0` and `3` are indistinguishable (documented).
+- F.2 REL-001 `_merge` sorts the deduplicated problems by enum (field) order. `unknownKey` now comes before `toolsNotSupported`.
+- F.3 REL-003 `canonicalJson` throws `StateError` for non-string keys.
+- F.4 REL-004 new group `JSON edge cases` (15 tests). Decision: `tools` at any depth is `toolsNotSupported` (the parser's `object()` checks every object).
+- F.5 REL-005 fixtures resolved via `Isolate.resolvePackageUriSync`; `dart test puls3_domain/test/manifest_test.dart` passes from the repo root.
+- Known limit: per-skill problems are deduplicated, so "skill index" order only holds between different skill problem kinds, not between two skills with the same problem.
+
+## PR 4 tasks (4.1-4.4): DONE (same PR, commit `docs: document agent manifest model and amend ADR-0004`)
+
+- 4.1 ADR-0004 amendment: one model chosen once (free `workers-ai` or BYOK), credential ref in the deploy record, `ModelPolicy` injected, drafts have no version, canonical JSON in the domain and the salted SHA-256 moved to #18 (explicit deviation from decision 3), integers on the web, design follows bnb-chain/bnbagent-sdk adapted to Stellar with ERC-8004/8183.
+- 4.2 `docs/domain/model.md`: glossary (Manifest, Draft, ModelId, ModelPolicy, ManifestVersion), class diagram nodes, invariants I23-I32 (I28-I31 are the four tests of the `I28-I31 Field rules` group: skills, model, input/output, price).
+- 4.3 `docs/architecture/api.md`: `version` removed from `AgentManifestDraft`, wire mapping note added, `DraftVersionConflict` kept as a storage concern.
+- 4.4 Links and invariant ids checked against the tests.
+
 ## Remaining
 
-PR 4 (4.1-4.4).
+Verify (`sdd-verify`), then open the single PR.
