@@ -10,7 +10,7 @@ Defines, in the pure-Dart `puls3_domain` package, the one shared model of what a
 
 ### Requirement: Draft shape and tolerance
 
-`AgentManifestDraft` MUST have nullable fields named as in `docs/architecture/api.md` (`name`, `description`, `skills`, `model`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price`) and MUST NOT have a version. Building a draft (directly or through `fromJson`) MUST accept missing fields and texts below their minimum length. It MUST reject wrong types or shapes, values above a maximum, a `tools` key, and unknown keys. Required fields and minimums MUST be enforced only by validate-for-deploy.
+`AgentManifestDraft` MUST have nullable fields named as in `docs/architecture/api.md` (`name`, `description`, `skills`, `model`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price`) and MUST NOT have a version. Building a draft (directly or through `fromJson`) MUST accept missing fields and texts below their minimum length. It MUST reject wrong types or shapes, values above a maximum, a non-positive `inputMaxChars` or `outputMaxChars` (malformed, not incomplete), a `tools` key, and unknown keys. Required fields and minimums MUST be enforced only by validate-for-deploy.
 
 #### Scenario: S1 Empty draft is accepted
 
@@ -196,8 +196,8 @@ At deploy: `input.type` MUST be `text` and `input.max_chars` MUST be an integer 
 #### Scenario: S43 Max chars below one
 
 - GIVEN `inputMaxChars` or `outputMaxChars` of 0 or a negative number
-- WHEN validated for deploy
-- THEN validation fails with the matching max-chars-too-low problem (restates S20 and S21)
+- WHEN a draft is built or validated for deploy (draft and deploy modes both reject it)
+- THEN it fails with the matching max-chars-too-low problem (restates S20 and S21)
 
 ### Requirement: Tools are reserved
 
@@ -216,7 +216,7 @@ A `tools` key MUST be rejected in every JSON input, draft or manifest, with its 
 
 #### Scenario: S25 All problems at once
 
-- GIVEN a draft with a 2-rune name, a 5-rune description, 0 skills, a disallowed model, a zero price and `inputMaxChars` of 0 (below its minimum; a value above the maximum is already rejected when the draft is built, see S3)
+- GIVEN a draft with a 2-rune name, a 5-rune description, 0 skills, a disallowed model, a zero price and `inputMaxChars` of 0 (a non-positive or above-maximum limit is already rejected when a draft is built, see S3 and S43, so this case is reached through `AgentManifest.fromJson`)
 - WHEN `validate` is called
 - THEN the thrown `InvalidManifest` lists all six problems in one list
 

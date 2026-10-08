@@ -323,10 +323,41 @@ void main() {
         deploy(complete(inputMaxChars: 8000, outputMaxChars: 16000)),
         isEmpty,
       );
-      expect(deploy(complete(inputMaxChars: 0, outputMaxChars: -1)), [
-        ManifestProblem.inputMaxCharsTooLow,
-        ManifestProblem.outputMaxCharsTooLow,
-      ]);
+    });
+
+    test('S43 non-positive max chars are rejected in draft and deploy', () {
+      for (final (input, output) in [(0, 1), (1, 0), (-1, 1), (1, -5)]) {
+        final inLow = input < 1, outLow = output < 1;
+        final expected = [
+          if (inLow) ManifestProblem.inputMaxCharsTooLow,
+          if (outLow) ManifestProblem.outputMaxCharsTooLow,
+        ];
+        expect(
+          () =>
+              AgentManifestDraft(inputMaxChars: input, outputMaxChars: output),
+          problems(expected),
+          reason: '$input $output',
+        );
+        expect(
+          () => AgentManifestDraft.fromJson({
+            'input': {'type': 'text', 'max_chars': input},
+            'output': {'type': 'markdown', 'max_chars': output},
+          }),
+          problems(expected),
+          reason: '$input $output',
+        );
+        expect(
+          () => AgentManifest.fromJson(
+            draftDoc()
+              ..['version'] = 1
+              ..['input'] = {'type': 'text', 'max_chars': input}
+              ..['output'] = {'type': 'markdown', 'max_chars': output},
+            policy,
+          ),
+          problems(expected),
+          reason: '$input $output',
+        );
+      }
     });
 
     test('input and output are missing when unset', () {
@@ -446,13 +477,16 @@ void main() {
     });
 
     test('six problems come at once, in field order, and are stable', () {
-      AgentManifestDraft bad() => complete(
-        name: 'ab',
-        description: 'short',
-        skills: [],
-        model: ModelId(provider: 'workers-ai', id: 'other'),
-        inputMaxChars: 0,
-        price: UsdcAmount.zero,
+      AgentManifest bad() => AgentManifest.fromJson(
+        draftDoc()
+          ..['version'] = 1
+          ..['name'] = 'ab'
+          ..['description'] = 'short'
+          ..['skills'] = []
+          ..['model'] = {'provider': 'workers-ai', 'id': 'other'}
+          ..['input'] = {'type': 'text', 'max_chars': 0}
+          ..['price'] = {'asset': 'USDC', 'amount': 0},
+        policy,
       );
       const expected = [
         ManifestProblem.nameTooShort,
@@ -462,12 +496,8 @@ void main() {
         ManifestProblem.inputMaxCharsTooLow,
         ManifestProblem.priceNotPositive,
       ];
-      expect(
-        () => bad().validate(policy, ManifestVersion.first),
-        problems(expected),
-      );
-      expect(bad().problemsForDeploy(policy), expected);
-      expect(bad().problemsForDeploy(policy), expected);
+      expect(bad, problems(expected));
+      expect(bad, problems(expected));
     });
 
     test('the same input gives equal manifests', () {

@@ -82,3 +82,9 @@ User decision (binding): integral numbers written with a decimal point (3000000.
 ## Remaining
 
 Verify (`sdd-verify`), then open the single PR.
+
+## Reviewer follow-ups (#138/#139)
+
+Commit `fix(domain): count agent and skill text in runes and reject non-positive max chars` (strict TDD: 5 tests failed first, then the code).
+- R.1 `Agent` name (3-48), description (10-280) and `Skill` name (1-48) use `runes.length`; 48/49 and 2-emoji boundaries tested; a manifest valid under rune counting builds an `Agent` with the same name, description and skills. Whitespace/empty semantics unchanged. entities.dart change kept to the length checks (PR #120 overlap).
+- R.2 `inputMaxChars`/`outputMaxChars` < 1 give `*MaxCharsTooLow` in draft and deploy modes. A draft can no longer carry 0, so the deploy-only tests moved to `AgentManifest.fromJson` (S25 six-problem test still lists `inputMaxCharsTooLow`). Spec (draft requirement, S43, S25) and model.md (I26, I30) updated.

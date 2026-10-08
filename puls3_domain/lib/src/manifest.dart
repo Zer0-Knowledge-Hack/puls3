@@ -341,14 +341,13 @@ final class AgentManifestDraft {
       ManifestProblem tooLow,
       ManifestProblem tooHigh,
     ) {
+      // A non-positive limit is malformed, not incomplete: both modes reject.
       if (max != null && max > limit) {
         found.add(tooHigh);
-      } else if (forDeploy) {
-        if (!present || max == null) {
-          found.add(missing);
-        } else if (max < 1) {
-          found.add(tooLow);
-        }
+      } else if (max != null && max < 1) {
+        found.add(tooLow);
+      } else if (forDeploy && (!present || max == null)) {
+        found.add(missing);
       }
     }
 

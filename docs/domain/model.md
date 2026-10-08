@@ -164,11 +164,11 @@ Each invariant has at least one test named after it (`I1`, `I2`, …) that fails
 | I23 | A `ModelId` has a kebab-case provider of at most 32 characters and an id that is not blank, has no whitespace and is at most 128 characters (runes). It holds no credential | `InvalidManifest` (`modelMalformed`) |
 | I24 | A `ModelPolicy` never lists `workers-ai` as a paid provider. `workers-ai` passes only for the ids in `workersAiModels`; a paid provider passes when it is in `paidProviders`, with any id; `isPaid` is true for every provider except `workers-ai` | `ArgumentError` (policy), `InvalidManifest` (`modelNotAllowed`, `modelProviderNotEnabled`) |
 | I25 | A `ManifestVersion` is an integer from 1 to 2⁵³−1; `next()` past the maximum fails. Drafts have no version | `InvalidManifest` (`versionInvalid`) |
-| I26 | An `AgentManifestDraft` may have any field missing or below its minimum, but never above a maximum, with duplicate skill ids, with `tools`, unknown keys or a `version` | `InvalidManifest` |
+| I26 | An `AgentManifestDraft` may have any field missing or a text below its minimum, but never above a maximum, a `max_chars` below 1, with duplicate skill ids, with `tools`, unknown keys or a `version` | `InvalidManifest` |
 | I27 | Manifest texts count runes, a blank text counts as missing, and stored text is never trimmed. Name 3 to 48, description 10 to 280, system prompt 20 to 8,000 | `InvalidManifest` (`nameTooShort`, …) |
 | I28 | A manifest has 1 to 5 skills with unique ids, each a valid `Skill` (I6) | `InvalidManifest` (`skillsMissing`, `skillsTooMany`, `skillIdDuplicate`, …) |
 | I29 | A deployable manifest's model passes the injected `ModelPolicy` (I24) | `InvalidManifest` (`modelNotAllowed`, `modelProviderNotEnabled`) |
-| I30 | `input.max_chars` is 1 to 8,000 and `output.max_chars` is 1 to 16,000; input type is `text`, output type is `text` or `markdown` | `InvalidManifest` (`inputMaxCharsTooLow`, `outputMaxCharsTooHigh`, …) |
+| I30 | `input.max_chars` is 1 to 8,000 and `output.max_chars` is 1 to 16,000 (a value below 1 is rejected in drafts too); input type is `text`, output type is `text` or `markdown` | `InvalidManifest` (`inputMaxCharsTooLow`, `outputMaxCharsTooHigh`, …) |
 | I31 | A manifest price is a positive `UsdcAmount` in `USDC` | `InvalidManifest` (`priceNotPositive`, `priceAssetUnsupported`) |
 | I32 | `validate` turns a complete draft into an immutable `AgentManifest` or throws one `InvalidManifest` listing every broken rule once, in field order (then skill order). The same input gives the same result | `InvalidManifest` |
 

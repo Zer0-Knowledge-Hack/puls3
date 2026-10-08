@@ -107,3 +107,8 @@ Notes: `problemsForDeploy` landed in 2a (2.3) and is tested there (one line over
 
 - [x] E.1 RED then GREEN: `_integer` applies the +-(2^53-1) range to the `int` branch (dart2js: every integral double is an `int`); test rejects `9007199254740992` in `canonicalJson`. Commit d6595f7.
 - [x] E.2 Spec amended (W1-W3 of the verify report): integral numbers accepted, non-integral/NaN/infinite/out-of-range rejected; S4, S14, S25, S32 and the canonical requirement updated; IDs unchanged.
+
+## Reviewer follow-ups (#138/#139)
+
+- [x] R.1 RED then GREEN: `Agent` name/description and `Skill` name count runes (not UTF-16), matching the manifest (D10); cross-layer test builds an `Agent` from a validated emoji manifest.
+- [x] R.2 RED then GREEN: `inputMaxChars` / `outputMaxChars` below 1 rejected in draft and deploy modes (S43); S25 test reaches the case through `AgentManifest.fromJson`. Spec S43/draft requirement and model.md I26/I30 updated.
