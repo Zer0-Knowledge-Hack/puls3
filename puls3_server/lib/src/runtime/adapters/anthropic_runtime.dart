@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -8,8 +9,9 @@ import '../runtime_task.dart';
 /// [ModelRuntime] for `model.provider: anthropic`: one non-streaming call to
 /// the Claude Messages API over HTTP (there is no official Dart SDK).
 ///
-/// The timeout is applied by `AgentRunner`, for every provider. The API key
-/// is sent only in the `x-api-key` header and never appears in a failure.
+/// The timeout is applied by `AgentRunner`, for every provider; when it fires,
+/// the request is aborted through its `abortTrigger`. The API key is sent only
+/// in the `x-api-key` header and never appears in a failure.
 final class AnthropicRuntime implements ModelRuntime {
   AnthropicRuntime({required http.Client httpClient, required String apiKey})
     : _http = httpClient,
@@ -24,9 +26,21 @@ final class AnthropicRuntime implements ModelRuntime {
     'https://api.anthropic.com/v1/messages',
   );
 
-  /// Non-streaming requests stay under HTTP timeouts at this size; the
-  /// manifest's `output.max_chars` is enforced on the text afterwards.
-  static const _maxTokens = 16000;
+  /// Upper bound for `max_tokens`: non-streaming requests stay under HTTP
+  /// timeouts at this size.
+  static const maxTokensCeiling = 16000;
+
+  /// Room for adaptive thinking, which counts toward `max_tokens` and cannot
+  /// be turned off on the current Opus and Sonnet models.
+  static const thinkingHeadroom = 4000;
+
+  /// `max_tokens` for [task]: its `output.max_chars` plus [thinkingHeadroom],
+  /// capped at [maxTokensCeiling]. A token is at least about one character, so
+  /// any output within the manifest limit fits, and a small limit no longer
+  /// pays for 16000 tokens. `AgentRunner` still enforces the limit on the
+  /// text.
+  static int maxTokensFor(RuntimeTask task) =>
+      min(maxTokensCeiling, task.maxOutputChars + thinkingHeadroom);
 
   /// Models that accept server-side fallbacks on a refusal.
   static const _fallbackModels = {
@@ -38,31 +52,36 @@ final class AnthropicRuntime implements ModelRuntime {
   static const _fallbackBeta = 'server-side-fallback-2026-07-01';
 
   @override
-  Future<String> complete(RuntimeTask task) async {
+  Future<String> complete(
+    RuntimeTask task, {
+    Future<void>? abortTrigger,
+  }) async {
     if (task.provider != provider) {
       throw RuntimeUnsupportedProvider(task.provider);
     }
     final fallbacks = _fallbackModels.contains(task.modelId);
+    final request =
+        http.AbortableRequest('POST', _messagesUrl, abortTrigger: abortTrigger)
+          ..headers.addAll({
+            'content-type': 'application/json',
+            'x-api-key': _apiKey,
+            'anthropic-version': '2023-06-01',
+            if (fallbacks) 'anthropic-beta': _fallbackBeta,
+          })
+          ..body = jsonEncode({
+            'model': task.modelId,
+            'max_tokens': maxTokensFor(task),
+            'system': task.systemPrompt,
+            'messages': [
+              {'role': 'user', 'content': task.input},
+            ],
+            if (fallbacks) 'fallbacks': 'default',
+          });
     final http.Response response;
     try {
-      response = await _http.post(
-        _messagesUrl,
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-          if (fallbacks) 'anthropic-beta': _fallbackBeta,
-        },
-        body: jsonEncode({
-          'model': task.modelId,
-          'max_tokens': _maxTokens,
-          'system': task.systemPrompt,
-          'messages': [
-            {'role': 'user', 'content': task.input},
-          ],
-          if (fallbacks) 'fallbacks': 'default',
-        }),
-      );
+      response = await http.Response.fromStream(await _http.send(request));
+    } on http.RequestAbortedException {
+      throw const RuntimeProviderFailed(status: null, errorType: 'aborted');
     } on SocketException {
       throw const RuntimeProviderFailed(status: null, errorType: null);
     } on http.ClientException {

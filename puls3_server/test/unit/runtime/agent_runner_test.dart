@@ -25,10 +25,12 @@ final class _FakeRuntime implements ModelRuntime {
 
   final Future<String> Function(RuntimeTask task) answer;
   final calls = <RuntimeTask>[];
+  final abortTriggers = <Future<void>?>[];
 
   @override
-  Future<String> complete(RuntimeTask task) {
+  Future<String> complete(RuntimeTask task, {Future<void>? abortTrigger}) {
     calls.add(task);
+    abortTriggers.add(abortTrigger);
     return answer(task);
   }
 }
@@ -66,6 +68,49 @@ void main() {
     );
 
     await expectLater(runner.run(_task()), _failsWith('timeout'));
+  });
+
+  test('a timeout aborts the provider call instead of abandoning it', () async {
+    final never = Completer<String>();
+    final runtime = _FakeRuntime((_) => never.future);
+    final runner = AgentRunner(runtime: runtime, timeout: _timeout);
+
+    await expectLater(runner.run(_task()), _failsWith('timeout'));
+
+    final trigger = runtime.abortTriggers.single;
+    expect(trigger, isNotNull);
+    var aborted = false;
+    await trigger!.then((_) => aborted = true);
+    expect(aborted, isTrue);
+  });
+
+  test(
+    'an aborted call that fails afterwards is not an unhandled error',
+    () async {
+      late final _FakeRuntime failing;
+      failing = _FakeRuntime((_) async {
+        // Fails only once the runner has aborted it, like a real HTTP client.
+        await failing.abortTriggers.single;
+        throw const RuntimeProviderFailed(status: null, errorType: 'aborted');
+      });
+      final runner = AgentRunner(runtime: failing, timeout: _timeout);
+
+      await expectLater(runner.run(_task()), _failsWith('timeout'));
+      // Let the aborted call settle; an unhandled error would fail this test.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(failing.calls, hasLength(1));
+    },
+  );
+
+  test('a call that finishes in time is never aborted', () async {
+    final runtime = _FakeRuntime((_) async => 'ok');
+    final runner = AgentRunner(runtime: runtime, timeout: _timeout);
+
+    expect(await runner.run(_task()), 'ok');
+    var aborted = false;
+    unawaited(runtime.abortTriggers.single!.then((_) => aborted = true));
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(aborted, isFalse);
   });
 
   test('the timeout comes from the runner, so it is configurable', () async {
@@ -164,6 +209,7 @@ void main() {
       expect(retryable(400, 'invalid_request_error'), isFalse);
       expect(retryable(401, 'authentication_error'), isFalse);
       expect(retryable(404, 'not_found_error'), isFalse);
+      expect(retryable(null, 'aborted'), isFalse);
     });
   });
 }

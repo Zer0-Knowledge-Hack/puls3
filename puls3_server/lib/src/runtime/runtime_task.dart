@@ -37,7 +37,11 @@ final class RuntimeTask {
 /// `lib/src/runtime/adapters/`; nothing outside it knows the provider's API.
 abstract interface class ModelRuntime {
   /// The model's text output for [task], or a [RuntimeFailure].
-  Future<String> complete(RuntimeTask task);
+  ///
+  /// When [abortTrigger] completes, the adapter must cancel the provider call
+  /// (not just stop waiting for it), so an abandoned run is not billed to the
+  /// end.
+  Future<String> complete(RuntimeTask task, {Future<void>? abortTrigger});
 }
 
 /// Why a run produced no result.
@@ -75,8 +79,9 @@ final class RuntimeProviderFailed extends RuntimeFailure {
   final String? errorType;
 
   /// Whether the same task may succeed on a retry: no response, rate limits
-  /// and server-side errors.
+  /// and server-side errors. A call the runner aborted is not retried.
   bool get retryable {
+    if (errorType == 'aborted') return false;
     final status = this.status;
     return status == null || status == 429 || status >= 500;
   }

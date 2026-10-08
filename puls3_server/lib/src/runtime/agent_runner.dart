@@ -19,15 +19,21 @@ final class AgentRunner {
   final Duration _timeout;
 
   /// The output for [task], or a [RuntimeFailure]. Input over the limit fails
-  /// before the model is called.
+  /// before the model is called. On timeout the provider call is aborted, not
+  /// just abandoned, so it stops being billed.
   Future<String> run(RuntimeTask task) async {
     if (task.input.length > task.maxInputChars) {
       throw RuntimeInputTooLong(task.input.length, task.maxInputChars);
     }
+    final abort = Completer<void>();
+    final call = _runtime.complete(task, abortTrigger: abort.future);
     final String output;
     try {
-      output = await _runtime.complete(task).timeout(_timeout);
+      output = await call.timeout(_timeout);
     } on TimeoutException {
+      // The aborted call then fails on its own; `timeout` already listens to
+      // it, so that late error is not unhandled.
+      abort.complete();
       throw RuntimeTimedOut(_timeout);
     }
     if (output.trim().isEmpty) throw const RuntimeEmptyOutput();

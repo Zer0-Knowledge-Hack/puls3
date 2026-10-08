@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -100,7 +101,7 @@ void main() {
       expect(body['messages'], [
         {'role': 'user', 'content': 'The release adds escrow payments.'},
       ]);
-      expect(body['max_tokens'], 16000);
+      expect(body['max_tokens'], 8000 + AnthropicRuntime.thinkingHeadroom);
       expect(body.containsKey('temperature'), isFalse);
       expect(body.containsKey('thinking'), isFalse);
     });
@@ -140,6 +141,61 @@ void main() {
       expect(body.containsKey('fallbacks'), isFalse);
       expect(seen.headers.containsKey('anthropic-beta'), isFalse);
     });
+  });
+
+  group('max_tokens follows the manifest output limit', () {
+    RuntimeTask withOutput(int maxOutputChars) => RuntimeTask(
+      provider: 'anthropic',
+      modelId: 'claude-opus-5-5',
+      systemPrompt: 'p',
+      input: 'i',
+      maxInputChars: 10,
+      maxOutputChars: maxOutputChars,
+    );
+
+    test('output limit plus thinking headroom', () {
+      expect(AnthropicRuntime.maxTokensFor(withOutput(500)), 4500);
+      expect(AnthropicRuntime.maxTokensFor(withOutput(8000)), 12000);
+    });
+
+    test('never above the ceiling', () {
+      expect(AnthropicRuntime.maxTokensFor(withOutput(12000)), 16000);
+      expect(AnthropicRuntime.maxTokensFor(withOutput(50000)), 16000);
+    });
+  });
+
+  group('abort', () {
+    test(
+      'the request carries the abort trigger and stops when it fires',
+      () async {
+        final trigger = Completer<void>();
+        Future<void>? seenTrigger;
+        final runtime = _runtime(
+          MockClient.streaming((request, _) async {
+            seenTrigger = request is http.Abortable
+                ? request.abortTrigger
+                : null;
+            // A real client aborts the request when the trigger completes.
+            await trigger.future;
+            throw http.RequestAbortedException(request.url);
+          }),
+        );
+
+        final call = runtime.complete(_task(), abortTrigger: trigger.future);
+        await Future<void>.delayed(Duration.zero);
+        expect(seenTrigger, same(trigger.future));
+        trigger.complete();
+
+        await expectLater(
+          call,
+          throwsA(
+            isA<RuntimeProviderFailed>()
+                .having((e) => e.errorType, 'errorType', 'aborted')
+                .having((e) => e.retryable, 'retryable', isFalse),
+          ),
+        );
+      },
+    );
   });
 
   group('response', () {
