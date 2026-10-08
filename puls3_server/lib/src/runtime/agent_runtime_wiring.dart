@@ -10,9 +10,11 @@ import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'adapters/anthropic_runtime.dart';
+import 'adapters/workers_ai_runtime.dart';
 import 'agent_runner.dart';
 import 'demo_manifests.dart';
 import 'hire_runner.dart';
+import 'provider_router.dart';
 import 'run_manifest.dart';
 import 'runtime_config.dart';
 import 'serverpod_hire_run_store.dart';
@@ -62,12 +64,26 @@ const _defaultIntervalSeconds = 5;
 const _rpcTimeout = Duration(seconds: 8);
 const _batchSize = 10;
 
-/// Name of the Serverpod password that holds the Anthropic API key.
+/// Name of the Serverpod password that holds the Anthropic API key (BYOK).
 const anthropicApiKeyPassword = 'anthropicApiKey';
 
+/// Name of the Serverpod password that holds the Cloudflare API token for
+/// Workers AI, the free provider.
+const workersAiTokenPassword = 'workersAiApiToken';
+
+/// The public Cloudflare account id that Workers AI runs under.
+const workersAiAccountVariable = 'PULS3_WORKERS_AI_ACCOUNT_ID';
+
 /// Starts the agent runtime when [env] enables it (see [RuntimeLoopConfig])
-/// and the `anthropicApiKey` password is set, and returns its loop, or
+/// and at least one provider has credentials, and returns its loop, or
 /// returns `null`. Stopping the loop also closes its HTTP client.
+///
+/// - `workers-ai`: the `PULS3_WORKERS_AI_ACCOUNT_ID` variable and the
+///   `workersAiApiToken` password.
+/// - `anthropic`: the `anthropicApiKey` password.
+///
+/// A manifest whose provider has no credentials fails its run as
+/// `unsupported_provider`.
 ///
 /// Each pass opens its own session and runs at most one batch, one hire at a
 /// time.
@@ -79,18 +95,41 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     env,
     anthropicApiKey: pod.getPassword(anthropicApiKeyPassword),
   );
+  final httpClient = http.Client();
+  final runtimes = <String, ModelRuntime>{};
+  final accountId = env[workersAiAccountVariable];
+  final workersAiToken = pod.getPassword(workersAiTokenPassword);
+  if (accountId != null &&
+      accountId.isNotEmpty &&
+      workersAiToken != null &&
+      workersAiToken.isNotEmpty) {
+    runtimes[WorkersAiRuntime.provider] = WorkersAiRuntime(
+      httpClient: httpClient,
+      accountId: accountId,
+      apiToken: workersAiToken,
+    );
+  }
   final apiKey = config.anthropicApiKey;
-  if (apiKey == null) {
+  if (apiKey != null) {
+    runtimes[AnthropicRuntime.provider] = AnthropicRuntime(
+      httpClient: httpClient,
+      apiKey: apiKey,
+    );
+  }
+  if (runtimes.isEmpty) {
+    httpClient.close();
     log(
       ChainLogLevel.error,
-      'PULS3_RUNTIME_ENABLED is true but the "$anthropicApiKeyPassword" '
-      'password is not set; the agent runtime is not started',
+      'PULS3_RUNTIME_ENABLED is true but no model provider has credentials '
+      '($workersAiAccountVariable with the "$workersAiTokenPassword" '
+      'password, or the "$anthropicApiKeyPassword" password); the agent '
+      'runtime is not started',
     );
     return null;
   }
+  final router = ProviderRouter(runtimes);
 
   final stellar = StellarConfig.fromEnvironment(env);
-  final httpClient = http.Client();
   final registry = SorobanLedger(
     SorobanRpcClient(
       httpClient: httpClient,
@@ -105,7 +144,7 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
       manifests: demoManifests,
     ),
     runner: AgentRunner(
-      runtime: AnthropicRuntime(httpClient: httpClient, apiKey: apiKey),
+      runtime: router,
       timeout: config.timeout,
     ),
     // A run still `running` a minute past the timeout was interrupted.
@@ -134,7 +173,8 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
   log(
     ChainLogLevel.info,
     'Agent runtime started, every ${loopConfig.interval.inSeconds}s, '
-    '$config',
+    'providers ${router.providers.join(', ')}, '
+    'timeout ${config.timeout.inSeconds}s',
   );
   return loop;
 }

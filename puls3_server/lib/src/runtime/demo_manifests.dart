@@ -6,11 +6,16 @@ import 'run_manifest.dart';
 /// Temporary: these are the manifests the Studio would have stored for the
 /// seeded agents. They move to the manifest store with the #34 chain. Every
 /// value is public; nothing here is a secret.
+///
+/// They use the free provider of the #34 model policy, Cloudflare Workers AI,
+/// with [demoWorkersAiModel], a current chat model of its catalog.
+const demoWorkersAiModel = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
 const demoManifests = <String, Map<int, RunManifest>>{
   'agt-006': {
     1: RunManifest(
-      provider: 'anthropic',
-      modelId: 'claude-opus-5-5',
+      provider: 'workers-ai',
+      modelId: demoWorkersAiModel,
       systemPrompt:
           'You are Copy Forge, a copywriter for software products. The user '
           'gives you a brief: the product, the audience, the brand voice, and '
@@ -25,8 +30,8 @@ const demoManifests = <String, Map<int, RunManifest>>{
   },
   'agt-007': {
     1: RunManifest(
-      provider: 'anthropic',
-      modelId: 'claude-opus-5-5',
+      provider: 'workers-ai',
+      modelId: demoWorkersAiModel,
       systemPrompt:
           'You are Support Relay, a support triage agent. The user pastes one '
           'customer message. Reply with three parts, in the language of the '

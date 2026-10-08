@@ -76,14 +76,22 @@ A successful run leaves the hire `funded` with its result: the server-signed
 escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
 deployed manifests, the demo agents' manifests are seeded in
 `lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
-(`agt-006` Copy Forge, `agt-007` Support Relay).
+(`agt-006` Copy Forge, `agt-007` Support Relay). Both run on Cloudflare
+Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`), the free provider of
+the #34 model policy. `ProviderRouter` sends each run to its manifest's
+provider; a provider without credentials fails the run as
+`unsupported_provider`.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `PULS3_RUNTIME_ENABLED` | `false` | Only `true` starts the loop |
 | `PULS3_RUNTIME_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
 | `PULS3_RUNTIME_TIMEOUT_SECONDS` | `120` | Longest one run may take; it must end before the job's `expired_at` |
-| Serverpod password `anthropicApiKey` | none | The Anthropic API key. Locally, `shared: anthropicApiKey:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set anthropicApiKey --from-file <file>`. Without it the loop does not start, even when enabled |
+| `PULS3_WORKERS_AI_ACCOUNT_ID` | none | Cloudflare account id for Workers AI (public) |
+| Serverpod password `workersAiApiToken` | none | Cloudflare API token for Workers AI. Locally, `shared: workersAiApiToken:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set workersAiApiToken --from-file <file>` |
+| Serverpod password `anthropicApiKey` | none | Optional Anthropic API key, for manifests with provider `anthropic` (BYOK) |
+
+With neither provider configured the loop does not start, even when enabled.
 
 It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr

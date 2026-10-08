@@ -80,7 +80,9 @@ void main() {
       for (final versions in demoManifests.values) {
         for (final manifest in versions.values) {
           // The same rules the domain draft validation enforces (#34).
-          expect(manifest.provider, 'anthropic');
+          // The free provider of the #34 model policy.
+          expect(manifest.provider, 'workers-ai');
+          expect(manifest.modelId, demoWorkersAiModel);
           expect(manifest.modelId, isNotEmpty);
           expect(manifest.modelId, isNot(contains(' ')));
           expect(
