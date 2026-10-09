@@ -119,8 +119,10 @@ void main() {
           payee: StellarAddress.parse(_provider),
           amount: UsdcAmount.stroops(5000000),
         );
-        expect(
-          () => repo.recordPayment(hire1, payment1DiffTx, 102),
+        // Awaited: each call runs a transaction, and the test database
+        // does not allow concurrent ones while it rolls back.
+        await expectLater(
+          repo.recordPayment(hire1, payment1DiffTx, 102),
           throwsA(
             isA<HirePaymentConflict>().having(
               (e) => e.index,
@@ -138,8 +140,10 @@ void main() {
           payee: StellarAddress.parse(_provider),
           amount: UsdcAmount.stroops(5000000),
         );
-        expect(
-          () => repo.recordPayment(hire2, payment2SameTx, 103),
+        // Awaited: each call runs a transaction, and the test database
+        // does not allow concurrent ones while it rolls back.
+        await expectLater(
+          repo.recordPayment(hire2, payment2SameTx, 103),
           throwsA(
             isA<HirePaymentConflict>().having(
               (e) => e.index,
@@ -157,8 +161,10 @@ void main() {
           payee: StellarAddress.parse(_provider),
           amount: UsdcAmount.stroops(5000000),
         );
-        expect(
-          () => repo.recordPayment(hire2, payment2SameJob, 101),
+        // Awaited: each call runs a transaction, and the test database
+        // does not allow concurrent ones while it rolls back.
+        await expectLater(
+          repo.recordPayment(hire2, payment2SameJob, 101),
           throwsA(
             isA<HirePaymentConflict>().having(
               (e) => e.index,

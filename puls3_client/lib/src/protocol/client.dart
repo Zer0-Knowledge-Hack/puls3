@@ -182,7 +182,7 @@ class EndpointHealth extends _isc.EndpointRef {
 /// (`WalletMismatch`), and ownership of a hire is checked against the session
 /// wallet by the services.
 ///
-/// `getHire` and `listHires` are not part of this endpoint yet.
+/// `listHires` is not part of this endpoint yet.
 ///
 /// Follow-ups: `InputTooLong` has no documented limit, so the input length is
 /// not checked here; `PersistenceUnavailable` is not mapped, so a database
@@ -246,6 +246,20 @@ class EndpointHire extends _isc.EndpointRef {
     {
       'hireId': hireId,
       'reason': reason,
+    },
+  );
+
+  /// The hire [hireId] as its [consumer] sees it: escrow status, run
+  /// progress and result (F6). Read-only, so the app polls it.
+  _ida.Future<_iytku71p.HireDetail> getHire(
+    int hireId,
+    String consumer,
+  ) => caller.callServerEndpoint<_iytku71p.HireDetail>(
+    'hire',
+    'getHire',
+    {
+      'hireId': hireId,
+      'consumer': consumer,
     },
   );
 
