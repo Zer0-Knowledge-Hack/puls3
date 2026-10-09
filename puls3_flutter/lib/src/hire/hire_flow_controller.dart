@@ -184,7 +184,9 @@ class HireFlowController extends ChangeNotifier {
     HireGatewayException(:final message) => message,
     // Unknown failures can happen after the payment was relayed: never
     // claim that no funds moved.
-    _ => 'The hire could not be completed. Try again.',
+    _ =>
+      'The operation could not be completed. Check the transaction '
+          'status before trying again.',
   };
 
   static String _newRequestId() {

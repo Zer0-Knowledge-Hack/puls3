@@ -78,6 +78,10 @@ class ScriptedHireGateway implements HireGateway {
   /// When set, the next `fund` submission fails with it once.
   HireGatewayException? failFundSubmit;
 
+  /// When set, the next `fund` submission throws it once after relaying:
+  /// an unexpected failure once funds may have moved.
+  Object? crashAfterFundRelay;
+
   @override
   bool get isDemo => false;
 
@@ -119,6 +123,12 @@ class ScriptedHireGateway implements HireGateway {
     if (failure != null) {
       failNextSubmit = null;
       throw failure;
+    }
+    final crash = crashAfterFundRelay;
+    if (crash != null && preparation.purpose == 'fund') {
+      crashAfterFundRelay = null;
+      submitted.add(signedTransaction);
+      throw crash;
     }
     final fundFailure = failFundSubmit;
     if (fundFailure != null && preparation.purpose == 'fund') {
@@ -310,6 +320,28 @@ void main() {
       // A fresh fund was prepared and signed instead of resending the old one.
       expect(gateway.fundPreparations, 2);
       expect(wallet.signed, ['AAAA-createJob', 'AAAA-fund', 'AAAA-fund']);
+    });
+
+    testWidgets('an unexpected failure after the payment relay never says '
+        'no funds moved', (tester) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..crashAfterFundRelay = StateError('lost response');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      // The fund was relayed before the failure.
+      expect(gateway.submitted.last, 'signed:AAAA-fund');
+      expect(find.text('Payment failed'), findsOneWidget);
+      expect(
+        find.text(
+          'The operation could not be completed. Check the transaction '
+          'status before trying again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('No funds moved'), findsNothing);
+      expect(find.textContaining('held by the escrow'), findsNothing);
     });
 
     testWidgets('without a wallet session the error says so; nothing is '
