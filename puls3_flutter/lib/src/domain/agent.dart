@@ -12,6 +12,7 @@ class Agent {
     required this.rating,
     required this.stellarAddress,
     required this.model,
+    this.registryId,
   });
 
   factory Agent.fromJson(Map<String, dynamic> json) => Agent(
@@ -35,6 +36,10 @@ class Agent {
   final double rating;
   final String stellarAddress;
   final String model;
+
+  /// The agent's integer id in the on-chain Identity Registry, when the
+  /// agent comes from the chain. Null for the bundled demo catalog.
+  final int? registryId;
 
   String get topSkill => skills.isEmpty ? 'Generalist' : skills.first;
 }

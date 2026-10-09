@@ -17,20 +17,31 @@ void main() {
     expect(find.text('Agent not found'), findsOneWidget);
   });
 
-  testWidgets('Hire flow ends in the demo result without claiming a payment',
-      (tester) async {
+  testWidgets('Hire flow ends in the demo result without claiming a payment', (
+    tester,
+  ) async {
     await pumpApp(tester, location: '/agent/agt-001');
 
     await tester.tap(find.text('Hire'));
     await advance(tester, const Duration(milliseconds: 500));
     expect(find.text('Confirm & sign'), findsOneWidget);
 
+    // The hire needs a task, then two demo prompts (create_job and fund).
+    await tester.enterText(
+      find.byKey(const ValueKey('hire-input')),
+      'Summarize my account',
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.text('Confirm & sign'));
+    await tester.pump();
     await tester.tap(find.text('Confirm & sign'));
-    await advance(tester, const Duration(milliseconds: 2200));
+    await advance(tester, const Duration(seconds: 6));
 
     expect(find.text('Demo signature only'), findsOneWidget);
     expect(find.text('Payment confirmed'), findsNothing);
 
+    await tester.ensureVisible(find.text('Back to Marketplace'));
+    await tester.pump();
     await tester.tap(find.text('Back to Marketplace'));
     await advance(tester, const Duration(milliseconds: 600));
     expect(find.text('Soroban Auditor'), findsOneWidget);
