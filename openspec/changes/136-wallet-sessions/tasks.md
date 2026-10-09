@@ -20,8 +20,8 @@ size:exception: accepted (design delivery + the preference for few PRs with one 
 Notes:
 - Strict TDD: each GREEN task is preceded by its RED task. Tests land in the same commit as the behavior they verify.
 - `puls3_domain` does not change (ADR-0001). SEP-10 stays in server and Flutter adapters.
-- The spec prose still says `AuthEndpoint`. Design D1 renames it to `WalletAuthEndpoint` (`client.walletAuth`). Commit 10 amends the spec prose to that name. Behavior tasks follow D1 from the start.
-- W18: a wrong-network client signature leaves the body unchanged, so it is not `tampered`. The server signature still verifies. The client signature does not. Pin the reason as `noClientSignature`. Commit 10 amends the W18 parenthetical to that reason.
+- Design D1 names the endpoint `WalletAuthEndpoint` (`client.walletAuth`). Commit 10 amends the spec prose to that name. Behavior tasks follow D1 from the start.
+- W18: a wrong-network client signature leaves the body unchanged, so it is not `tampered`. The server signature still verifies. The client signature does not. The reason is `noClientSignature`. Commit 10 amends the W18 parenthetical to that reason.
 - Endpoint name, parameter `signedChallengeXdr`, 15-minute expiry, and `WalletChallenge.networkPassphrase` follow the design. `api.md` is updated in commit 10 (W47).
 - Gate, server (every PR 1 commit): `cd puls3_server && dart analyze --fatal-infos && dart test && dart format --set-exit-if-changed .` then `serverpod generate` and `git diff --exit-code -- puls3_server puls3_client` when models or endpoints changed.
 - Gate, Flutter (every PR 2 commit): `cd puls3_flutter && flutter analyze --fatal-infos && flutter test && dart format --set-exit-if-changed .`
@@ -120,10 +120,10 @@ Commit: `feat(server): require a wallet session on every hire method`
 
 ### Commit 10: Docs and app config
 
-- [ ] 10.1 Amend `specs/wallet-auth/spec.md` prose: `WalletAuthEndpoint` (D1) and W18 reason `noClientSignature`. Leave scenario ids unchanged.
-- [ ] 10.2 Update `docs/architecture/api.md`: lifecycle step 2, `verifyChallenge(challengeId, wallet, signedChallengeXdr)`, expiry 15 minutes, `WalletChallenge` fields, the endpoint name `walletAuth` (W47).
-- [ ] 10.3 RED then GREEN: `AppConfigRoute` includes `auth.serverSigningKey`, `auth.homeDomain`, `auth.webAuthDomain` and `auth.networkPassphrase` from public config. The signing key in that payload is the public address (G…), never the S… secret. A test reads the route output and asserts the secret is absent.
-- [ ] 10.4 Run the server gate. Confirm the PR body carries `size:exception` and the work-unit list.
+- [x] 10.1 Amend `specs/wallet-auth/spec.md` prose: `WalletAuthEndpoint` (D1) and W18 reason `noClientSignature`. Leave scenario ids unchanged. Done: spec prose says `WalletAuthEndpoint`; W18's reason is `noClientSignature`.
+- [x] 10.2 Update `docs/architecture/api.md`: lifecycle step 2, `verifyChallenge(challengeId, wallet, signedChallengeXdr)`, expiry 15 minutes, `WalletChallenge` fields, the endpoint name `walletAuth` (W47). Done: `api.md` names `walletAuth`, `signedChallengeXdr`, and a 900-second expiry.
+- [x] 10.3 RED then GREEN: `AppConfigRoute` includes `auth.serverSigningKey`, `auth.homeDomain`, `auth.webAuthDomain` and `auth.networkPassphrase` from public config. The signing key in that payload is the public address (G…), never the S… secret. A test reads the route output and asserts the secret is absent. Done: `app_config_route_test.dart` is green. An `S…` value is refused and the error omits it.
+- [x] 10.4 Run the server gate. Confirm the PR body carries `size:exception` and the work-unit list. Done: `dart analyze --fatal-infos` is clean. `dart test` had two 30s timeouts under parallel load (`chain_submission_store` REL-002 and the preparation race); both files passed on a re-run. `dart format` reflowed `relay_protocol_test.dart`. The PR body uses `size:exception` and the ten work units in `design.md`.
 
 Commit: `docs: describe SEP-10 wallet sessions and publish the auth config`
 

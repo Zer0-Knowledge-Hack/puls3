@@ -4,13 +4,13 @@
 
 A Stellar wallet proves control of its account with a SEP-10 (v3.4.1) challenge transaction. The server verifies it and issues a Serverpod `AuthSuccess` session bound to that wallet. `docs/architecture/api.md` is authoritative for error codes. Deviation from SEP-10, recorded: the response is Serverpod `AuthSuccess` (access + refresh), not the SEP-10 JWT.
 
-> Scope: `AuthEndpoint.createChallenge` / `verifyChallenge`, the `WalletIdp` identity provider, the `wallet_account` mapping, and the Flutter session lifecycle. Out of scope: contract accounts (SEP-45), M accounts, `client_domain`, `stellar.toml` publication, the Pollar adapter, web token hardening (#116).
+> Scope: `WalletAuthEndpoint.createChallenge` / `verifyChallenge`, the `WalletIdp` identity provider, the `wallet_account` mapping, and the Flutter session lifecycle. Out of scope: contract accounts (SEP-45), M accounts, `client_domain`, `stellar.toml` publication, the Pollar adapter, web token hardening (#116).
 
 ## ADDED Requirements
 
 ### Requirement: Create a SEP-10 challenge
 
-`AuthEndpoint.createChallenge(wallet)` MUST validate `wallet` as a Stellar G-address (`InvalidStellarAddress` otherwise), apply the rate limit, build a SEP-10 challenge transaction signed by the server, persist a single-use challenge record, and return `WalletChallenge{challengeId, wallet, payload (challenge XDR), networkPassphrase, expiresAt}`. The transaction MUST have: source = the server signing key, sequence number 0, time bounds `min = now` and `max = now + 900` seconds, a first operation `manage_data` named `<home_domain> auth` sourced by `wallet` with a value of 48 random bytes base64-encoded (64 bytes), and a `manage_data` operation named `web_auth_domain` sourced by the server key. The server MUST sign it. `expiresAt` MUST equal the time-bounds end. The nonce MUST come from a cryptographically secure source and differ per challenge. The rate limit is 5 challenges per minute per wallet (`DatabaseRateLimiter`), exceeding it MUST raise `ChallengeRateLimited`. A missing signing key, home domain or auth configuration MUST raise `AuthenticationUnavailable` before persisting anything. The endpoint MUST NOT require a session (`@unauthenticatedClientCall`).
+`WalletAuthEndpoint.createChallenge(wallet)` MUST validate `wallet` as a Stellar G-address (`InvalidStellarAddress` otherwise), apply the rate limit, build a SEP-10 challenge transaction signed by the server, persist a single-use challenge record, and return `WalletChallenge{challengeId, wallet, payload (challenge XDR), networkPassphrase, expiresAt}`. The transaction MUST have: source = the server signing key, sequence number 0, time bounds `min = now` and `max = now + 900` seconds, a first operation `manage_data` named `<home_domain> auth` sourced by `wallet` with a value of 48 random bytes base64-encoded (64 bytes), and a `manage_data` operation named `web_auth_domain` sourced by the server key. The server MUST sign it. `expiresAt` MUST equal the time-bounds end. The nonce MUST come from a cryptographically secure source and differ per challenge. The rate limit is 5 challenges per minute per wallet (`DatabaseRateLimiter`), exceeding it MUST raise `ChallengeRateLimited`. A missing signing key, home domain or auth configuration MUST raise `AuthenticationUnavailable` before persisting anything. The endpoint MUST NOT require a session (`@unauthenticatedClientCall`).
 
 #### Scenario: W1 Challenge shape
 - GIVEN a valid wallet `G...` and a configured server key, home domain and network
@@ -54,7 +54,7 @@ A Stellar wallet proves control of its account with a SEP-10 (v3.4.1) challenge 
 
 ### Requirement: Verify a signed challenge
 
-`AuthEndpoint.verifyChallenge(challengeId, wallet, signedChallengeXdr)` MUST load the challenge and verify the signed transaction. Checks, with the first failure winning in this order:
+`WalletAuthEndpoint.verifyChallenge(challengeId, wallet, signedChallengeXdr)` MUST load the challenge and verify the signed transaction. Checks, with the first failure winning in this order:
 
 1. Challenge exists (`ChallengeNotFound`), `wallet` equals the challenge wallet and is a valid address.
 2. Not consumed (`ChallengeConsumed`), not expired by server time (`ChallengeExpired`).
@@ -124,7 +124,7 @@ On success the server MUST consume the challenge atomically and return `AuthSucc
 #### Scenario: W18 Wrong network
 - GIVEN a challenge signed by the client over a hash for another network passphrase
 - WHEN `verifyChallenge` is called
-- THEN it fails with `InvalidWalletSignature` (`wrongNetwork` or `doesNotVerify`) and the challenge stays unconsumed
+- THEN it fails with `InvalidWalletSignature` (`details.reason = noClientSignature`) and the challenge stays unconsumed
 
 #### Scenario: W19 Tampered body
 - GIVEN a signed XDR whose transaction source, sequence, time bounds, first-operation name, source or value, or operation list differs from the stored challenge (including an added operation or a changed extra-operation source)

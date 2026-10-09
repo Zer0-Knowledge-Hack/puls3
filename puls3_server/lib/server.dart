@@ -54,7 +54,14 @@ void run(List<String> args) async {
   // We build this configuration based on the servers api url and serve it to
   // the flutter app.
   pod.webServer.addRoute(
-    AppConfigRoute(apiConfig: pod.config.apiServer),
+    AppConfigRoute(
+      apiConfig: pod.config.apiServer,
+      auth: publishedAuth(
+        environment: Platform.environment,
+        signingKey: pod.getPassword('walletAuthSigningKey'),
+        runMode: pod.runMode,
+      ),
+    ),
     '/app/assets/assets/config.json',
   );
 
