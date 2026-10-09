@@ -1,0 +1,26 @@
+### One issued SEP-10 challenge. Server-only: the stored XDR and hash never
+### cross an endpoint. The client receives [WalletChallenge] instead.
+class: WalletChallengeRecord
+table: wallet_challenge
+serverOnly: true
+fields:
+  ### Opaque id returned to the client.
+  challengeId: String
+  ### Stellar G-address the challenge was issued for.
+  wallet: String
+  ### Base64 unsigned server-signed challenge XDR.
+  challengeXdr: String
+  ### Hex transaction hash of the challenge.
+  transactionHash: String
+  ### End of the time bounds. A challenge past this instant is expired.
+  expiresAt: DateTime
+  ### When the challenge was issued.
+  createdAt: DateTime
+  ### Set when a verification consumes the challenge.
+  consumedAt: DateTime?
+indexes:
+  wallet_challenge_id_idx:
+    fields: challengeId
+    unique: true
+  wallet_challenge_wallet_idx:
+    fields: wallet

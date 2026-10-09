@@ -1,197 +1,183 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/agent.dart';
+import '../domain/stellar_explorer.dart';
 import '../state/app_scope.dart';
 import '../theme/puls3_theme.dart';
-import '../ui/atoms/address_badge.dart';
-import '../ui/atoms/agent_avatar.dart';
 import '../ui/atoms/content_width.dart';
-import '../ui/atoms/price_tag.dart';
-import '../ui/atoms/primary_button.dart';
-import '../ui/atoms/rating_badge.dart';
-import '../ui/atoms/section_label.dart';
-import '../ui/atoms/skill_chip.dart';
+import '../ui/molecules/empty_state.dart';
+import '../ui/molecules/error_banner.dart';
+import '../ui/organisms/agent_detail_view.dart';
 import '../ui/organisms/site_footer.dart';
 import 'hire_sheet.dart';
-import '../theme/breakpoints.dart';
 
-/// `/agent/:id`: agent profile with a Hire call to action.
-class AgentDetailScreen extends StatelessWidget {
-  const AgentDetailScreen({super.key, required this.agentId});
+/// Opens a URL outside the app; replaceable in tests.
+typedef UrlOpener = Future<void> Function(Uri url);
 
-  final String agentId;
-
-  @override
-  Widget build(BuildContext context) {
-    final catalog = AppScope.of(context).catalog;
-    return ListenableBuilder(
-      listenable: catalog,
-      builder: (context, _) {
-        final agent = catalog.byId(agentId);
-        if (agent == null) {
-          if (catalog.isLoading || !catalog.isLoaded) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return _NotFound(onBack: () => context.go('/market'));
-        }
-        return SingleChildScrollView(
-          child: Column(
-            children: [
-              ContentWidth(
-                child: _AgentDetailBody(
-                  agent: agent,
-                  onBack: () => context.go('/market'),
-                  onHire: () => showHireSheet(context, agent),
-                ),
-              ),
-              const SiteFooter(),
-            ],
-          ),
-        );
-      },
-    );
-  }
+Future<void> _launch(Uri url) async {
+  await launchUrl(url, mode: LaunchMode.externalApplication);
 }
 
-class _AgentDetailBody extends StatelessWidget {
-  const _AgentDetailBody({
-    required this.agent,
-    required this.onBack,
-    required this.onHire,
+enum _DetailStatus { loading, ready, notFound, error }
+
+/// `/agent/:id` (S03, flow F3): the container. It reads the agent from the
+/// server catalog (`agent.get`) and picks the state: loading, success, not
+/// found, or an error with Retry. A cached copy is shown while it loads and,
+/// with a warning, when the server cannot be reached; Hire stays disabled
+/// until the agent is confirmed (docs/blueprints/flows.md, F3).
+class AgentDetailScreen extends StatefulWidget {
+  const AgentDetailScreen({
+    super.key,
+    required this.agentId,
+    this.openUrl = _launch,
   });
 
-  final Agent agent;
-  final VoidCallback onBack;
-  final VoidCallback onHire;
+  final String agentId;
+  final UrlOpener openUrl;
 
   @override
-  Widget build(BuildContext context) {
-    final wide =
-        MediaQuery.sizeOf(context).width >= Puls3Breakpoints.detailTwoColumn;
-
-    final profile = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            AgentAvatar(name: agent.name, size: 72),
-            const SizedBox(width: Puls3Spacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    agent.name,
-                    style: wide ? Puls3Text.h2 : Puls3Text.h2Compact,
-                  ),
-                  const SizedBox(height: Puls3Spacing.xxs),
-                  Wrap(
-                    spacing: Puls3Spacing.sm,
-                    runSpacing: Puls3Spacing.xs,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      RatingBadge(rating: agent.rating),
-                      Text(agent.model, style: Puls3Text.bodyMuted),
-                      AddressBadge(address: agent.stellarAddress),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Puls3Spacing.xl),
-        const SectionLabel('About'),
-        const SizedBox(height: Puls3Spacing.sm),
-        Text(agent.description, style: Puls3Text.lead),
-        const SizedBox(height: Puls3Spacing.xl),
-        const SectionLabel('Skills'),
-        const SizedBox(height: Puls3Spacing.sm),
-        Wrap(
-          spacing: Puls3Spacing.xs,
-          runSpacing: Puls3Spacing.xs,
-          children: [for (final s in agent.skills) SkillChip(label: s)],
-        ),
-      ],
-    );
-
-    final hireCard = Container(
-      padding: const EdgeInsets.all(Puls3Spacing.lg),
-      decoration: BoxDecoration(
-        color: Puls3Colors.surface,
-        borderRadius: Puls3Radius.lgAll,
-        border: Border.all(color: Puls3Colors.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SectionLabel('Price'),
-          const SizedBox(height: Puls3Spacing.sm),
-          PriceTag(stroops: agent.priceUsdcStroops, large: true),
-          const SizedBox(height: Puls3Spacing.xs),
-          Text(
-            'Paid in USDC on Stellar. Settles in about 5 seconds.',
-            style: Puls3Text.bodyMuted,
-          ),
-          const SizedBox(height: Puls3Spacing.lg),
-          PrimaryButton(
-            label: 'Hire',
-            icon: Icons.handshake_outlined,
-            expand: true,
-            onPressed: onHire,
-          ),
-        ],
-      ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: Puls3Spacing.lg),
-        TextButton.icon(
-          onPressed: onBack,
-          icon: const Icon(Icons.arrow_back_rounded, size: 18),
-          label: const Text('Marketplace'),
-          style: TextButton.styleFrom(foregroundColor: Puls3Colors.muted),
-        ),
-        const SizedBox(height: Puls3Spacing.lg),
-        if (wide)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 3, child: profile),
-              const SizedBox(width: Puls3Spacing.xxl),
-              Expanded(flex: 2, child: hireCard),
-            ],
-          )
-        else ...[
-          profile,
-          const SizedBox(height: Puls3Spacing.xl),
-          hireCard,
-        ],
-        const SizedBox(height: Puls3Spacing.xxl),
-      ],
-    );
-  }
+  State<AgentDetailScreen> createState() => _AgentDetailScreenState();
 }
 
-class _NotFound extends StatelessWidget {
-  const _NotFound({required this.onBack});
+class _AgentDetailScreenState extends State<AgentDetailScreen> {
+  _DetailStatus _status = _DetailStatus.loading;
+  Agent? _agent;
+  bool _started = false;
 
-  final VoidCallback onBack;
+  /// Bumped per request, so a stale answer never overwrites a newer one.
+  int _request = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(AgentDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.agentId != widget.agentId) {
+      _agent = null;
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _load() async {
+    final catalog = AppScope.of(context).catalog;
+    final id = widget.agentId;
+    final request = ++_request;
+    setState(() {
+      _status = _DetailStatus.loading;
+      _agent ??= catalog.byId(id);
+    });
+    try {
+      final agent = await catalog.fetchAgent(id);
+      if (!mounted || request != _request) return;
+      setState(() {
+        _agent = agent;
+        _status = agent == null ? _DetailStatus.notFound : _DetailStatus.ready;
+      });
+    } catch (e) {
+      if (!mounted || request != _request) return;
+      debugPrint('Agent detail: server load failed: $e');
+      setState(() {
+        _agent ??= catalog.byId(id);
+        _status = _DetailStatus.error;
+      });
+    }
+  }
+
+  void _back() => context.go('/market');
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    final agent = _agent;
+    final Widget body = switch (_status) {
+      _DetailStatus.notFound => EmptyState(
+        key: const ValueKey('detail-not-found'),
+        icon: Icons.person_search_outlined,
+        title: 'Agent not found',
+        message:
+            'No agent with this id is registered. It may have been '
+            'removed, or the link is wrong.',
+        actionLabel: 'Back to Marketplace',
+        onAction: _back,
+      ),
+      _DetailStatus.loading when agent == null => AgentDetailSkeleton(
+        key: const ValueKey('detail-loading'),
+        onBack: _back,
+      ),
+      _DetailStatus.error when agent == null => Column(
+        key: const ValueKey('detail-error'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Agent not found', style: Puls3Text.h2),
-          const SizedBox(height: Puls3Spacing.lg),
-          PrimaryButton(label: 'Back to Marketplace', onPressed: onBack),
+          const SizedBox(height: Puls3Spacing.xl),
+          ErrorBanner(
+            title: 'Could not load this agent',
+            message:
+                'The puls3 server did not answer. Check your '
+                'connection and try again.',
+            onRetry: () => unawaited(_load()),
+          ),
+          const SizedBox(height: Puls3Spacing.md),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _back,
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Marketplace'),
+            ),
+          ),
+          const SizedBox(height: Puls3Spacing.xxl),
         ],
       ),
+      _ => _view(agent!),
+    };
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          ContentWidth(child: body),
+          const SiteFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _view(Agent agent) {
+    final status = _status;
+    return AgentDetailView(
+      key: ValueKey('detail-$status'),
+      agent: agent,
+      onBack: _back,
+      onHire: status == _DetailStatus.ready
+          ? () => showHireSheet(context, agent)
+          : null,
+      hireNote: switch (status) {
+        _DetailStatus.loading => 'Checking the agent on the server…',
+        _DetailStatus.error => 'Hire is disabled until the agent loads.',
+        _ => null,
+      },
+      onOpenExplorer: () => unawaited(
+        widget.openUrl(
+          Uri.parse(stellarExpertContractUrl(testnetIdentityRegistryAddress)),
+        ),
+      ),
+      banner: status == _DetailStatus.error
+          ? ErrorBanner(
+              key: const ValueKey('detail-stale'),
+              title: 'Showing the last known data',
+              message:
+                  'The puls3 server did not answer, so this agent '
+                  'could not be confirmed.',
+              onRetry: () => unawaited(_load()),
+            )
+          : null,
     );
   }
 }

@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
+
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:test/test.dart';
 
@@ -7,13 +11,13 @@ Matcher problems(List<ManifestProblem> expected) => throwsA(
 );
 
 final policy = ModelPolicy(
-  workersAiModels: {'@cf/meta/llama-3.1-8b-instruct'},
+  workersAiModels: {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},
   paidProviders: {'anthropic'},
 );
 
 final llama = ModelId(
   provider: 'workers-ai',
-  id: '@cf/meta/llama-3.1-8b-instruct',
+  id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
 );
 
 Skill skill([String id = 'rewrite']) => Skill(id: id, name: 'Rewrite');
@@ -115,9 +119,9 @@ void main() {
     test('accepts a workers-ai id with slashes, dots and at sign', () {
       final m = ModelId(
         provider: 'workers-ai',
-        id: '@cf/meta/llama-3.1-8b-instruct',
+        id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       );
-      expect(m.id, '@cf/meta/llama-3.1-8b-instruct');
+      expect(m.id, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     });
 
     test('provider must be kebab-case', () {
@@ -162,10 +166,12 @@ void main() {
   group('I24 ModelPolicy', () {
     final llama = ModelId(
       provider: 'workers-ai',
-      id: '@cf/meta/llama-3.1-8b-instruct',
+      id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     );
     ModelPolicy policy({
-      Set<String> workersAiModels = const {'@cf/meta/llama-3.1-8b-instruct'},
+      Set<String> workersAiModels = const {
+        '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      },
       Set<String> paidProviders = const {'anthropic'},
     }) => ModelPolicy(
       workersAiModels: workersAiModels,
@@ -221,7 +227,7 @@ void main() {
     });
 
     test('copies its sets so later changes do not leak in', () {
-      final models = {'@cf/meta/llama-3.1-8b-instruct'};
+      final models = {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'};
       final paid = {'anthropic'};
       final p = policy(workersAiModels: models, paidProviders: paid);
       models.clear();
@@ -317,10 +323,41 @@ void main() {
         deploy(complete(inputMaxChars: 8000, outputMaxChars: 16000)),
         isEmpty,
       );
-      expect(deploy(complete(inputMaxChars: 0, outputMaxChars: -1)), [
-        ManifestProblem.inputMaxCharsTooLow,
-        ManifestProblem.outputMaxCharsTooLow,
-      ]);
+    });
+
+    test('S43 non-positive max chars are rejected in draft and deploy', () {
+      for (final (input, output) in [(0, 1), (1, 0), (-1, 1), (1, -5)]) {
+        final inLow = input < 1, outLow = output < 1;
+        final expected = [
+          if (inLow) ManifestProblem.inputMaxCharsTooLow,
+          if (outLow) ManifestProblem.outputMaxCharsTooLow,
+        ];
+        expect(
+          () =>
+              AgentManifestDraft(inputMaxChars: input, outputMaxChars: output),
+          problems(expected),
+          reason: '$input $output',
+        );
+        expect(
+          () => AgentManifestDraft.fromJson({
+            'input': {'type': 'text', 'max_chars': input},
+            'output': {'type': 'markdown', 'max_chars': output},
+          }),
+          problems(expected),
+          reason: '$input $output',
+        );
+        expect(
+          () => AgentManifest.fromJson(
+            draftDoc()
+              ..['version'] = 1
+              ..['input'] = {'type': 'text', 'max_chars': input}
+              ..['output'] = {'type': 'markdown', 'max_chars': output},
+            policy,
+          ),
+          problems(expected),
+          reason: '$input $output',
+        );
+      }
     });
 
     test('input and output are missing when unset', () {
@@ -440,13 +477,16 @@ void main() {
     });
 
     test('six problems come at once, in field order, and are stable', () {
-      AgentManifestDraft bad() => complete(
-        name: 'ab',
-        description: 'short',
-        skills: [],
-        model: ModelId(provider: 'workers-ai', id: 'other'),
-        inputMaxChars: 0,
-        price: UsdcAmount.zero,
+      AgentManifest bad() => AgentManifest.fromJson(
+        draftDoc()
+          ..['version'] = 1
+          ..['name'] = 'ab'
+          ..['description'] = 'short'
+          ..['skills'] = []
+          ..['model'] = {'provider': 'workers-ai', 'id': 'other'}
+          ..['input'] = {'type': 'text', 'max_chars': 0}
+          ..['price'] = {'asset': 'USDC', 'amount': 0},
+        policy,
       );
       const expected = [
         ManifestProblem.nameTooShort,
@@ -456,12 +496,8 @@ void main() {
         ManifestProblem.inputMaxCharsTooLow,
         ManifestProblem.priceNotPositive,
       ];
-      expect(
-        () => bad().validate(policy, ManifestVersion.first),
-        problems(expected),
-      );
-      expect(bad().problemsForDeploy(policy), expected);
-      expect(bad().problemsForDeploy(policy), expected);
+      expect(bad, problems(expected));
+      expect(bad, problems(expected));
     });
 
     test('the same input gives equal manifests', () {
@@ -729,4 +765,762 @@ void main() {
       );
     });
   });
+  group('Draft JSON', () {
+    test('parses the wire shape into the Dart fields', () {
+      final d = AgentManifestDraft.fromJson(draftDoc());
+      expect(d.name, 'Copy Forge');
+      expect(d.skills!.single.id, 'rewrite');
+      expect(d.skills!.single.tags, ['copy']);
+      expect(d.model, llama);
+      expect(d.systemPrompt, 'You rewrite copy in a clear voice.');
+      expect(d.inputType, InputType.text);
+      expect(d.inputMaxChars, 4000);
+      expect(d.outputType, OutputType.markdown);
+      expect(d.outputMaxChars, 8000);
+      expect(d.price, UsdcAmount.stroops(3000000));
+      expect(deploy(d), isEmpty);
+    });
+
+    test('S4 wrong types become problems, never exceptions', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['name'] = 7
+            ..['description'] = true
+            ..['skills'] = 'rewrite'
+            ..['model'] = 'x'
+            ..['system_prompt'] = []
+            ..['input'] = 3
+            ..['output'] = {'type': 'markdown', 'max_chars': '8000'}
+            ..['price'] = {'asset': 'USDC', 'amount': '3000000'},
+        ),
+        problems([
+          ManifestProblem.nameMalformed,
+          ManifestProblem.descriptionMalformed,
+          ManifestProblem.skillsMalformed,
+          ManifestProblem.modelMalformed,
+          ManifestProblem.systemPromptMalformed,
+          ManifestProblem.inputMalformed,
+          ManifestProblem.outputMalformed,
+          ManifestProblem.priceMalformed,
+        ]),
+      );
+    });
+
+    test('S4 a float or out-of-range price amount is malformed', () {
+      for (final amount in [1.5, double.nan, -1, UsdcAmount.maxStroops + 1]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['price'] = {'asset': 'USDC', 'amount': amount},
+          ),
+          problems([ManifestProblem.priceMalformed]),
+          reason: '$amount',
+        );
+      }
+    });
+
+    test('a non-object is notAnObject', () {
+      for (final value in [null, 'x', 3, <Object?>[]]) {
+        expect(
+          () => AgentManifestDraft.fromJson(value),
+          problems([ManifestProblem.notAnObject]),
+          reason: '$value',
+        );
+      }
+    });
+
+    test('S24 tools has its own problem, apart from unknownKey', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['tools'] = []),
+        problems([ManifestProblem.toolsNotSupported]),
+      );
+    });
+
+    test('a version in a draft is versionInDraft', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['version'] = 1),
+        problems([ManifestProblem.versionInDraft]),
+      );
+    });
+
+    test('S19/S32 unknown keys are rejected at every level', () {
+      final cases = <String, void Function(Map<String, Object?>)>{
+        'top': (d) => d['credential'] = 'x',
+        'skill': (d) => ((d['skills']! as List).first as Map)['x'] = 1,
+        'model': (d) => (d['model']! as Map)['api_key'] = 'sk',
+        'input': (d) => (d['input']! as Map)['x'] = 1,
+        'output': (d) => (d['output']! as Map)['x'] = 1,
+        'price': (d) => (d['price']! as Map)['x'] = 1,
+        'schema in a draft': (d) => d['schema'] = 'puls3.agent-manifest/v1',
+      };
+      cases.forEach((label, mutate) {
+        final doc = draftDoc();
+        mutate(doc);
+        expect(
+          () => AgentManifestDraft.fromJson(doc),
+          problems([ManifestProblem.unknownKey]),
+          reason: label,
+        );
+      });
+    });
+
+    test('S14 per-skill problems arrive through JSON', () {
+      final doc = draftDoc()
+        ..['skills'] = [
+          {'id': 'Not Kebab', 'name': 'Fine'},
+          {'id': 'ok-id', 'name': ''},
+        ];
+      expect(
+        () => AgentManifestDraft.fromJson(doc),
+        problems([
+          ManifestProblem.skillIdNotKebabCase,
+          ManifestProblem.skillNameLength,
+        ]),
+      );
+    });
+
+    test('skill items of the wrong type are skillsMalformed', () {
+      final bad = <List<Object?>>[
+        ['x'],
+        [
+          {'id': 3, 'name': 'A'},
+        ],
+        [
+          {'id': 'a', 'name': 'A', 'tags': 'x'},
+        ],
+        [
+          {
+            'id': 'a',
+            'name': 'A',
+            'tags': [1],
+          },
+        ],
+        [
+          {'id': 'a', 'name': 'A', 'description': 1},
+        ],
+      ];
+      for (final skills in bad) {
+        expect(
+          () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills),
+          problems([ManifestProblem.skillsMalformed]),
+          reason: '$skills',
+        );
+      }
+    });
+
+    test('unsupported input/output types and assets are named', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['input'] = {'type': 'image', 'max_chars': 1}
+            ..['output'] = {'type': 'html', 'max_chars': 1}
+            ..['price'] = {'asset': 'XLM', 'amount': 1},
+        ),
+        problems([
+          ManifestProblem.inputTypeUnsupported,
+          ManifestProblem.outputTypeUnsupported,
+          ManifestProblem.priceAssetUnsupported,
+        ]),
+      );
+    });
+
+    test('a malformed model is modelMalformed', () {
+      final bad = <Map<String, Object?>>[
+        {'provider': 'Bad Name', 'id': 'x'},
+        {'provider': 'a'},
+        {'provider': 1, 'id': 'x'},
+      ];
+      for (final model in bad) {
+        expect(
+          () => AgentManifestDraft.fromJson(draftDoc()..['model'] = model),
+          problems([ManifestProblem.modelMalformed]),
+          reason: '$model',
+        );
+      }
+    });
+
+    test('draft rules still apply: above-maximum is rejected', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()..['input'] = {'type': 'text', 'max_chars': 8001},
+        ),
+        problems([ManifestProblem.inputMaxCharsTooHigh]),
+      );
+    });
+
+    test('S31 a partial draft round-trips with the same fields set', () {
+      final partial = AgentManifestDraft(
+        name: 'Copy Forge',
+        inputType: InputType.text,
+        price: UsdcAmount.stroops(5),
+      );
+      final json = partial.toJson();
+      expect(json, {
+        'name': 'Copy Forge',
+        'input': {'type': 'text'},
+        'price': {'asset': 'USDC', 'amount': 5},
+      });
+      final again = AgentManifestDraft.fromJson(json);
+      expect(again.name, 'Copy Forge');
+      expect(again.inputType, InputType.text);
+      expect(again.inputMaxChars, isNull);
+      expect(again.price, UsdcAmount.stroops(5));
+      expect(again.skills, isNull);
+      expect(again.model, isNull);
+      expect(again.toJson(), json);
+      expect(AgentManifestDraft().toJson(), isEmpty);
+    });
+
+    test('toJson is the snake_case wire shape and never has a version', () {
+      expect(complete().toJson(), {
+        'name': 'Copy Forge',
+        'description': 'Rewrites marketing copy.',
+        'skills': [
+          {'id': 'rewrite', 'name': 'Rewrite', 'description': '', 'tags': []},
+        ],
+        'model': {
+          'provider': 'workers-ai',
+          'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+        },
+        'system_prompt': 'You rewrite copy in a clear voice.',
+        'input': {'type': 'text', 'max_chars': 4000},
+        'output': {'type': 'markdown', 'max_chars': 8000},
+        'price': {'asset': 'USDC', 'amount': 3000000},
+      });
+    });
+  });
+
+  group('JSON edge cases', () {
+    AgentManifest deployed() =>
+        complete().validate(policy, ManifestVersion.first);
+
+    List<Object?> skills(int n) => [
+      for (var i = 0; i < n; i++) {'id': 'skill-$i', 'name': 'Skill $i'},
+    ];
+
+    test('skillsTooMany through JSON', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills(6)),
+        problems([ManifestProblem.skillsTooMany]),
+      );
+      expect(
+        AgentManifestDraft.fromJson(draftDoc()..['skills'] = skills(5)).skills,
+        hasLength(5),
+      );
+    });
+
+    test('skillIdDuplicate through JSON', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['skills'] = [
+              {'id': 'same', 'name': 'A'},
+              {'id': 'same', 'name': 'B'},
+            ],
+        ),
+        problems([ManifestProblem.skillIdDuplicate]),
+      );
+    });
+
+    test('tools is toolsNotSupported at every level, never unknownKey', () {
+      final cases = <String, void Function(Map<String, Object?>)>{
+        'skill': (d) => ((d['skills']! as List).first as Map)['tools'] = 'x',
+        'model': (d) => (d['model']! as Map)['tools'] = 'x',
+        'input': (d) => (d['input']! as Map)['tools'] = 'x',
+        'output': (d) => (d['output']! as Map)['tools'] = 'x',
+        'price': (d) => (d['price']! as Map)['tools'] = 'x',
+      };
+      cases.forEach((label, mutate) {
+        final doc = draftDoc();
+        mutate(doc);
+        expect(
+          () => AgentManifestDraft.fromJson(doc),
+          problems([ManifestProblem.toolsNotSupported]),
+          reason: label,
+        );
+      });
+    });
+
+    test('a non-string schema is schemaUnsupported', () {
+      for (final schema in <Object?>[
+        3,
+        true,
+        <Object?>[],
+        <String, Object?>{},
+      ]) {
+        expect(
+          () => AgentManifest.fromJson(
+            deployed().toJson()..['schema'] = schema,
+            policy,
+          ),
+          problems([ManifestProblem.schemaUnsupported]),
+          reason: '$schema',
+        );
+      }
+    });
+
+    test('a null skill item is skillsMalformed', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['skills'] = [null]),
+        problems([ManifestProblem.skillsMalformed]),
+      );
+    });
+
+    test('JSON null counts as absent in a draft', () {
+      final d = AgentManifestDraft.fromJson(
+        {
+          for (final key in draftDoc().keys) key: null,
+        }..remove('version'),
+      );
+      expect(d.toJson(), isEmpty);
+    });
+
+    test('JSON null counts as absent in a manifest', () {
+      final doc = <String, Object?>{
+        for (final key in draftDoc().keys) key: null,
+        'version': 1,
+      };
+      expect(
+        () => AgentManifest.fromJson(doc, policy),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('a null version in a draft is versionInDraft', () {
+      expect(
+        () => AgentManifestDraft.fromJson(draftDoc()..['version'] = null),
+        problems([ManifestProblem.versionInDraft]),
+      );
+    });
+
+    test('several unknown keys give a single unknownKey', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          draftDoc()
+            ..['a'] = 1
+            ..['b'] = 2
+            ..['model'] = {'provider': 'workers-ai', 'id': 'x', 'c': 3},
+        ),
+        problems([ManifestProblem.unknownKey]),
+      );
+    });
+
+    test('a manifest root that is null or a list is notAnObject', () {
+      for (final root in <Object?>[null, <Object?>[], 'x', 3]) {
+        expect(
+          () => AgentManifest.fromJson(root, policy),
+          problems([ManifestProblem.notAnObject]),
+          reason: '$root',
+        );
+      }
+    });
+
+    test('max_chars beyond the exact integer range is malformed', () {
+      for (final huge in <Object?>[ManifestVersion.maxValue + 2, 1e30]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['input'] = {'type': 'text', 'max_chars': huge},
+          ),
+          problems([ManifestProblem.inputMalformed]),
+          reason: '$huge',
+        );
+      }
+    });
+
+    test('max_chars given as text is malformed in a manifest', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()..['output'] = {'type': 'text', 'max_chars': '1'},
+          policy,
+        ),
+        problems([ManifestProblem.outputMalformed]),
+      );
+    });
+
+    test('integral numbers are integers, as on the web', () {
+      final d = AgentManifestDraft.fromJson(
+        draftDoc()
+          ..['input'] = {'type': 'text', 'max_chars': 4000.0}
+          ..['price'] = {'asset': 'USDC', 'amount': 3000000.0},
+      );
+      expect(d.inputMaxChars, 4000);
+      expect(d.price, UsdcAmount.stroops(3000000));
+      final m = AgentManifest.fromJson(
+        deployed().toJson()..['version'] = 2.0,
+        policy,
+      );
+      expect(m.version, ManifestVersion(2));
+    });
+
+    test('non-integral or non-finite numbers are malformed', () {
+      for (final n in <double>[3.5, double.nan, double.infinity]) {
+        expect(
+          () => AgentManifestDraft.fromJson(
+            draftDoc()..['output'] = {'type': 'text', 'max_chars': n},
+          ),
+          problems([ManifestProblem.outputMalformed]),
+          reason: '$n',
+        );
+      }
+    });
+
+    test('problems follow field order across parse and rule problems', () {
+      // name breaks a rule (too short), description is the wrong type and the
+      // price is zero: field order, not all parse problems then all rules.
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['name'] = 'ab'
+            ..['description'] = 5
+            ..['price'] = {'asset': 'USDC', 'amount': 0},
+          policy,
+        ),
+        problems([
+          ManifestProblem.nameTooShort,
+          ManifestProblem.descriptionMalformed,
+          ManifestProblem.priceNotPositive,
+        ]),
+      );
+    });
+  });
+
+  group('Manifest JSON', () {
+    AgentManifest deployed([int version = 1]) =>
+        complete().validate(policy, ManifestVersion(version));
+
+    test('toJson adds schema and version to the draft document', () {
+      final json = deployed(3).toJson();
+      expect(json['schema'], 'puls3.agent-manifest/v1');
+      expect(json['version'], 3);
+      expect(
+        Map.of(json)
+          ..remove('schema')
+          ..remove('version'),
+        complete().toJson(),
+      );
+    });
+
+    test('S30 a manifest round-trips in every field', () {
+      final m = deployed(7);
+      expect(AgentManifest.fromJson(m.toJson(), policy), m);
+    });
+
+    test('schema is optional on input but must match when present', () {
+      final doc = deployed().toJson()..remove('schema');
+      expect(AgentManifest.fromJson(doc, policy), deployed());
+    });
+
+    test('S33 a wrong schema is schemaUnsupported', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()..['schema'] = 'puls3.agent-manifest/v2',
+          policy,
+        ),
+        problems([ManifestProblem.schemaUnsupported]),
+      );
+    });
+
+    test('a missing or invalid version is versionInvalid', () {
+      for (final version in [
+        null,
+        0,
+        -1,
+        1.5,
+        '1',
+        ManifestVersion.maxValue + 1,
+      ]) {
+        final doc = deployed().toJson()..['version'] = version;
+        expect(
+          () => AgentManifest.fromJson(doc, policy),
+          problems([ManifestProblem.versionInvalid]),
+          reason: '$version',
+        );
+      }
+    });
+
+    test('deploy rules apply: a partial document lists what is missing', () {
+      expect(
+        () => AgentManifest.fromJson({'version': 1}, policy),
+        problems([
+          ManifestProblem.nameMissing,
+          ManifestProblem.descriptionMissing,
+          ManifestProblem.skillsMissing,
+          ManifestProblem.modelMissing,
+          ManifestProblem.systemPromptMissing,
+          ManifestProblem.inputMissing,
+          ManifestProblem.outputMissing,
+          ManifestProblem.priceMissing,
+        ]),
+      );
+    });
+
+    test('a malformed field is reported once, not also as missing', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['name'] = 5
+            ..['skills'] = [
+              {'id': 'Bad Id', 'name': 'A'},
+            ],
+          policy,
+        ),
+        problems([
+          ManifestProblem.nameMalformed,
+          ManifestProblem.skillIdNotKebabCase,
+        ]),
+      );
+    });
+
+    test('S24/S19 tools and credentials are rejected in a manifest too', () {
+      expect(
+        () => AgentManifest.fromJson(
+          deployed().toJson()
+            ..['tools'] = []
+            ..['credential'] = 'sk',
+          policy,
+        ),
+        problems([
+          ManifestProblem.unknownKey,
+          ManifestProblem.toolsNotSupported,
+        ]),
+      );
+    });
+
+    test('a non-object is notAnObject', () {
+      expect(
+        () => AgentManifest.fromJson('x', policy),
+        problems([ManifestProblem.notAnObject]),
+      );
+    });
+
+    test('the model policy applies to parsed manifests', () {
+      final doc = deployed().toJson()
+        ..['model'] = {'provider': 'openai', 'id': 'gpt'};
+      expect(
+        () => AgentManifest.fromJson(doc, policy),
+        problems([ManifestProblem.modelProviderNotEnabled]),
+      );
+    });
+  });
+
+  group('Canonical JSON', () {
+    AgentManifest manifest({String? name, ModelId? model}) => complete(
+      name: name,
+      model: model,
+      skills: [skill('zeta'), skill('alpha')],
+    ).validate(policy, ManifestVersion.first);
+
+    void expectSorted(Object? node) {
+      if (node is Map) {
+        final keys = node.keys.cast<String>().toList();
+        expect(keys, [...keys]..sort());
+        node.values.forEach(expectSorted);
+      } else if (node is List) {
+        node.forEach(expectSorted);
+      }
+    }
+
+    Object? reversed(Object? node) => switch (node) {
+      Map() => {
+        for (final k in node.keys.toList().reversed) k: reversed(node[k]),
+      },
+      List() => [for (final e in node) reversed(e)],
+      _ => node,
+    };
+
+    test('S34 has no whitespace outside strings and sorts every level', () {
+      final text = manifest().toCanonicalJson();
+      final withoutStrings = text.replaceAll(RegExp(r'"(?:[^"\\]|\\.)*"'), '');
+      expect(withoutStrings, isNot(matches(RegExp(r'\s'))));
+      expectSorted(jsonDecode(text));
+      expect(
+        text.indexOf('"description"'),
+        lessThan(text.indexOf('"input"')),
+      );
+      expect(text.indexOf('"schema"'), lessThan(text.indexOf('"skills"')));
+      expect(text.indexOf('"amount"'), lessThan(text.indexOf('"asset"')));
+    });
+
+    test('array order is preserved', () {
+      final text = manifest().toCanonicalJson();
+      expect(text.indexOf('"zeta"'), lessThan(text.indexOf('"alpha"')));
+    });
+
+    test('S35 key order and spacing of the input do not matter', () {
+      final json = manifest().toJson();
+      final shuffled = jsonDecode(
+        const JsonEncoder.withIndent('  ').convert(reversed(json)),
+      );
+      expect(
+        AgentManifest.fromJson(shuffled, policy).toCanonicalJson(),
+        manifest().toCanonicalJson(),
+      );
+    });
+
+    test('S36 non-ASCII text is kept and encodes as UTF-8', () {
+      final text = manifest(name: 'Café \u{1F600}').toCanonicalJson();
+      expect(text, contains('Café \u{1F600}'));
+      final decoded = jsonDecode(utf8.decode(utf8.encode(text))) as Map;
+      expect(decoded['name'], 'Café \u{1F600}');
+    });
+
+    test('S37 a one-field edit changes the bytes', () {
+      final other = manifest(
+        model: ModelId(provider: 'anthropic', id: 'claude-sonnet-5'),
+      );
+      expect(other.toCanonicalJson(), isNot(manifest().toCanonicalJson()));
+      expect(manifest().toCanonicalJson(), manifest().toCanonicalJson());
+    });
+
+    test('canonicalJson rejects non-integral numbers with StateError', () {
+      for (final value in <Object?>[
+        1.5,
+        double.nan,
+        double.infinity,
+        double.negativeInfinity,
+        1e30,
+        {'a': 1.5},
+        [
+          1,
+          {
+            'b': [2.5],
+          },
+        ],
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+    });
+
+    test('canonicalJson rejects an int beyond +-(2^53-1) with StateError', () {
+      // On the web every integral double is an int, so 1e30 reaches this
+      // branch there; on the VM this exercises it directly.
+      for (final value in <Object?>[
+        9007199254740992,
+        -9007199254740992,
+        {'a': 9007199254740992},
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+      expect(canonicalJson(9007199254740991), '9007199254740991');
+      expect(canonicalJson(-9007199254740991), '-9007199254740991');
+    });
+
+    test('canonicalJson writes an integral double as an integer', () {
+      // On the web 3.0 and 3 are the same value, so both must give "3".
+      expect(canonicalJson(3.0), '3');
+      expect(
+        canonicalJson({
+          'a': -2.0,
+          'b': [0.0],
+        }),
+        '{"a":-2,"b":[0]}',
+      );
+    });
+
+    test('canonicalJson rejects non-string map keys with StateError', () {
+      for (final value in <Object?>[
+        {1: 'a'},
+        {
+          'a': {null: 1},
+        },
+        [
+          {2.5: 'x'},
+        ],
+      ]) {
+        expect(() => canonicalJson(value), throwsStateError, reason: '$value');
+      }
+    });
+
+    test('canonicalJson encodes integers, strings, bools and null', () {
+      expect(
+        canonicalJson({
+          'b': [1, null, true, 'x'],
+          'a': -2,
+        }),
+        '{"a":-2,"b":[1,null,true,"x"]}',
+      );
+    });
+  });
+
+  group('Reference examples', () {
+    // Resolved from the package location, so the tests do not depend on the
+    // directory `dart test` runs from.
+    final packageRoot = File.fromUri(
+      Isolate.resolvePackageUriSync(
+        Uri.parse('package:puls3_domain/puls3_domain.dart'),
+      )!,
+    ).parent.parent.path;
+    final dir = '$packageRoot/../docs/architecture/examples';
+    Object? load(String file) =>
+        jsonDecode(File('$dir/$file').readAsStringSync());
+    const copyForge = 'agent-manifest.example.json';
+    const workersAi = 'agent-manifest.workers-ai.example.json';
+    final restrictive = ModelPolicy(workersAiModels: {}, paidProviders: {});
+
+    test('S38 Copy Forge validates with anthropic enabled', () {
+      final m = AgentManifest.fromJson(load(copyForge), policy);
+      expect(m.version, ManifestVersion.first);
+      expect(m.model.provider, 'anthropic');
+      expect(policy.isPaid(m.model.provider), isTrue);
+    });
+
+    test('S39 the workers-ai example validates and is free', () {
+      final m = AgentManifest.fromJson(load(workersAi), policy);
+      expect(m.model, llama);
+      expect(policy.isPaid(m.model.provider), isFalse);
+    });
+
+    test(
+      'S40 each example fails with only a model problem when unsupported',
+      () {
+        expect(
+          () => AgentManifest.fromJson(load(copyForge), restrictive),
+          problems([ManifestProblem.modelProviderNotEnabled]),
+        );
+        expect(
+          () => AgentManifest.fromJson(load(workersAi), restrictive),
+          problems([ManifestProblem.modelNotAllowed]),
+        );
+      },
+    );
+
+    test('toJson gives back the source document, with no credential', () {
+      for (final file in [copyForge, workersAi]) {
+        final doc = load(file);
+        final json = AgentManifest.fromJson(doc, policy).toJson();
+        expect(json, doc, reason: file);
+        expect(canonicalJson(json), isNot(contains('credential')));
+      }
+    });
+  });
 }
+
+Map<String, Object?> draftDoc() => {
+  'name': 'Copy Forge',
+  'description': 'Rewrites marketing copy.',
+  'skills': [
+    {
+      'id': 'rewrite',
+      'name': 'Rewrite',
+      'description': 'Rewrites copy.',
+      'tags': ['copy'],
+    },
+  ],
+  'model': {
+    'provider': 'workers-ai',
+    'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  },
+  'system_prompt': 'You rewrite copy in a clear voice.',
+  'input': {'type': 'text', 'max_chars': 4000},
+  'output': {'type': 'markdown', 'max_chars': 8000},
+  'price': {'asset': 'USDC', 'amount': 3000000},
+};

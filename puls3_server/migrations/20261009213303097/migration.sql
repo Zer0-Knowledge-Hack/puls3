@@ -37,9 +37,9 @@ CREATE UNIQUE INDEX "catalog_index_network_idx" ON "catalog_index_state" USING b
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261009170004821', now())
+    VALUES ('puls3', '20261009213303097', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261009170004821', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009213303097', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

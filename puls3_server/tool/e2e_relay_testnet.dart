@@ -152,8 +152,8 @@ Future<void> main(List<String> args) async {
   final session = await pod.createSession();
   final tracker = startChainTracker(pod, env);
   if (tracker == null) _fail('the chain tracker did not start');
-  // The seam is the only way to bind a wallet until #25 provides sessions;
-  // the setter is annotated for tests, and this run plays the wallet.
+  // This run plays the consumer wallet through the test seam. Production
+  // resolves the wallet from the session.
   // ignore: invalid_use_of_visible_for_testing_member
   HireEndpoint.sessionWallet = _ConsumerWallet(consumer);
   final endpoint = HireEndpoint();

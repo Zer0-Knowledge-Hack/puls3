@@ -90,20 +90,29 @@ abstract final class Puls3LogoTokens {
 abstract final class Puls3Fonts {
   static bool useGoogleFonts = true;
 
+  /// The family used when [useGoogleFonts] is off. Tests leave it unloaded
+  /// (the test font draws blocks); the wireframe tool loads it so labels
+  /// read (docs/blueprints/screens.md).
+  static const String offlineFamily = 'Roboto';
+
+  static TextStyle _offline(TextStyle base) =>
+      base.copyWith(fontFamily: offlineFamily);
+
   /// Self-hosted accent face (`assets/fonts/Doto-ROND-wght.ttf`).
   static const String dotoFamily = 'Doto';
 
   /// Unbounded: display and headlines.
   static TextStyle display(TextStyle base) =>
-      useGoogleFonts ? GoogleFonts.unbounded(textStyle: base) : base;
+      useGoogleFonts ? GoogleFonts.unbounded(textStyle: base) : _offline(base);
 
   /// Manrope: UI and body.
   static TextStyle ui(TextStyle base) =>
-      useGoogleFonts ? GoogleFonts.manrope(textStyle: base) : base;
+      useGoogleFonts ? GoogleFonts.manrope(textStyle: base) : _offline(base);
 
   /// JetBrains Mono: addresses, hashes, prices.
-  static TextStyle data(TextStyle base) =>
-      useGoogleFonts ? GoogleFonts.jetBrainsMono(textStyle: base) : base;
+  static TextStyle data(TextStyle base) => useGoogleFonts
+      ? GoogleFonts.jetBrainsMono(textStyle: base)
+      : _offline(base);
 
   /// Doto 900 with ROND 100: accents only (stats, status, big numbers).
   /// Never the logo, never body text, never small UI labels.

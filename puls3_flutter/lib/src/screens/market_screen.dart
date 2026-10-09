@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/agent_filter.dart';
+import '../state/agent_catalog.dart';
 import '../state/app_scope.dart';
+import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/content_width.dart';
 import '../ui/atoms/skill_chip.dart';
+import '../ui/molecules/empty_state.dart';
+import '../ui/molecules/error_banner.dart';
 import '../ui/organisms/agent_grid.dart';
 import '../ui/organisms/site_footer.dart';
-import '../theme/breakpoints.dart';
 
-/// `/market`: searchable, filterable grid of agents.
+/// `/market` (S02, flow F2): searchable, filterable grid of agents.
+///
+/// The container: it reads the [AgentCatalog] and owns the search and skill
+/// selection. Loading, error (with Retry), demo, empty and no-match states
+/// are presentational widgets.
 class MarketScreen extends StatefulWidget {
   const MarketScreen({super.key});
 
@@ -30,6 +37,11 @@ class _MarketScreenState extends State<MarketScreen> {
 
   void _toggleSkill(String skill) => setState(() {
     if (!_selectedSkills.remove(skill)) _selectedSkills.add(skill);
+  });
+
+  void _clearFilters() => setState(() {
+    _search.clear();
+    _selectedSkills.clear();
   });
 
   @override
@@ -66,10 +78,13 @@ class _MarketScreenState extends State<MarketScreen> {
                               : Puls3Text.h1,
                         ),
                         // Doto stat accent (brand guide page 11).
-                        Text(
-                          '${catalog.agents.length} AGENTS LIVE',
-                          style: Puls3Text.accentMd,
-                        ),
+                        if (catalog.status == CatalogStatus.ready)
+                          Text(
+                            '${catalog.agents.length} AGENTS LIVE',
+                            style: Puls3Text.accentMd,
+                          )
+                        else if (catalog.status == CatalogStatus.demo)
+                          Text('DEMO CATALOG', style: Puls3Text.accentMd),
                       ],
                     ),
                     const SizedBox(height: Puls3Spacing.xs),
@@ -81,9 +96,16 @@ class _MarketScreenState extends State<MarketScreen> {
                     TextField(
                       controller: _search,
                       style: Puls3Text.body,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search agents, skills or models',
-                        prefixIcon: Icon(Icons.search_rounded),
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: _search.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear search',
+                                icon: const Icon(Icons.close_rounded),
+                                onPressed: _search.clear,
+                              ),
                       ),
                     ),
                     const SizedBox(height: Puls3Spacing.md),
@@ -105,29 +127,8 @@ class _MarketScreenState extends State<MarketScreen> {
                       ],
                     ),
                     const SizedBox(height: Puls3Spacing.lg),
-                    Text(
-                      'SHOWING ${visible.length} OF ${catalog.agents.length}',
-                      style: Puls3Text.eyebrow,
-                    ),
-                    const SizedBox(height: Puls3Spacing.sm),
-                    if (catalog.isLoading && catalog.agents.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(Puls3Spacing.xxl),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (visible.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: Puls3Spacing.xxl,
-                        ),
-                        child: Center(
-                          child: Text(
-                            'No agents match your filters.',
-                            style: Puls3Text.bodyMuted,
-                          ),
-                        ),
-                      )
-                    else
+                    ..._results(catalog, visible.length),
+                    if (visible.isNotEmpty)
                       AgentGrid(
                         agents: visible,
                         onSelect: (agent) => context.go('/agent/${agent.id}'),
@@ -142,5 +143,67 @@ class _MarketScreenState extends State<MarketScreen> {
         );
       },
     );
+  }
+
+  /// The banner, count and empty states above the grid, by catalog state.
+  List<Widget> _results(AgentCatalog catalog, int visible) {
+    final retry = catalog.retry;
+    return switch (catalog.status) {
+      CatalogStatus.loading => const [
+        AgentGridSkeleton(key: ValueKey('market-loading')),
+      ],
+      CatalogStatus.error => [
+        ErrorBanner(
+          key: const ValueKey('market-error'),
+          title: 'Could not load the agents',
+          message:
+              'The puls3 server did not answer. Check your connection '
+              'and try again.',
+          retrying: catalog.isLoading,
+          onRetry: retry,
+        ),
+      ],
+      CatalogStatus.demo || CatalogStatus.ready => [
+        if (catalog.status == CatalogStatus.demo) ...[
+          ErrorBanner(
+            key: const ValueKey('market-demo'),
+            title: 'Showing the demo catalog',
+            message:
+                'The puls3 server is unreachable, so these agents are '
+                'not read from the chain.',
+            retrying: catalog.isLoading,
+            onRetry: retry,
+          ),
+          const SizedBox(height: Puls3Spacing.md),
+        ],
+        if (catalog.agents.isEmpty)
+          EmptyState(
+            key: const ValueKey('market-empty'),
+            icon: Icons.hub_outlined,
+            title: 'No agents yet',
+            message:
+                'Agents registered on-chain appear here. Be the first '
+                'to publish one.',
+            actionLabel: 'Create an agent',
+            onAction: () => context.go('/studio'),
+          )
+        else ...[
+          Text(
+            'SHOWING $visible OF ${catalog.agents.length}',
+            style: Puls3Text.eyebrow,
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+          if (visible == 0)
+            EmptyState(
+              key: const ValueKey('market-no-match'),
+              icon: Icons.search_off_rounded,
+              title: 'No matching agents',
+              message: 'Try another search or fewer skills.',
+              actionLabel: 'Clear filters',
+              onAction: _clearFilters,
+            ),
+        ],
+      ],
+    };
   }
 }

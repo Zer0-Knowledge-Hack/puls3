@@ -87,6 +87,17 @@ void main() {
       }
     });
 
+    test('name counts runes, not UTF-16 units', () {
+      expect(Skill(id: 'notes', name: '😀' * 48).name.runes, hasLength(48));
+      expect(
+        () => Skill(id: 'notes', name: '😀' * 49),
+        problem<InvalidSkill, SkillProblem>(
+          SkillProblem.nameLength,
+          (e) => e.problem,
+        ),
+      );
+    });
+
     test('rejects an empty or too long name', () {
       expect(
         () => Skill(id: 'notes', name: ''),
@@ -132,6 +143,65 @@ void main() {
           ),
         );
       }
+    });
+
+    test('I7 name counts runes, not UTF-16 units', () {
+      expect(agent(name: '😀' * 48).name.runes, hasLength(48));
+      for (final name in ['😀' * 49, '😀' * 2]) {
+        expect(
+          () => agent(name: name),
+          problem<InvalidAgent, AgentProblem>(
+            AgentProblem.nameLength,
+            (e) => e.problem,
+          ),
+        );
+      }
+    });
+
+    test('I8 description counts runes, not UTF-16 units', () {
+      expect(agent(description: '😀' * 280).description.runes, hasLength(280));
+      expect(agent(description: '😀' * 10).description.runes, hasLength(10));
+      for (final description in ['😀' * 281, '😀' * 5]) {
+        expect(
+          () => agent(description: description),
+          problem<InvalidAgent, AgentProblem>(
+            AgentProblem.descriptionLength,
+            (e) => e.problem,
+          ),
+        );
+      }
+    });
+
+    test('a manifest that validates can always build an Agent', () {
+      final manifest =
+          AgentManifestDraft(
+            name: '😀' * 48,
+            description: '😀' * 280,
+            skills: [Skill(id: 'emoji', name: '😀' * 48)],
+            model: ModelId(
+              provider: 'workers-ai',
+              id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+            ),
+            systemPrompt: 'You rewrite copy in a clear voice.',
+            inputType: InputType.text,
+            inputMaxChars: 4000,
+            outputType: OutputType.markdown,
+            outputMaxChars: 8000,
+            price: UsdcAmount.stroops(3000000),
+          ).validate(
+            ModelPolicy(
+              workersAiModels: {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},
+              paidProviders: {},
+            ),
+            ManifestVersion.first,
+          );
+      final a = agent(
+        name: manifest.name,
+        description: manifest.description,
+        skills: manifest.skills,
+      );
+      expect(a.name, manifest.name);
+      expect(a.skills.single.name, manifest.skills.single.name);
     });
 
     test('I8 description is 10 to 280 characters', () {

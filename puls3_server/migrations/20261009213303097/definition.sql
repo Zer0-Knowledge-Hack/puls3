@@ -151,6 +151,38 @@ CREATE UNIQUE INDEX "transaction_hash" ON "hire_payment" USING btree ("transacti
 CREATE UNIQUE INDEX "job_id" ON "hire_payment" USING btree ("jobId");
 
 --
+-- Class WalletAccount as table wallet_account
+--
+CREATE TABLE "wallet_account" (
+    "id" bigserial PRIMARY KEY,
+    "wallet" text NOT NULL,
+    "authUserId" uuid NOT NULL,
+    "createdAt" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "wallet_account_wallet_idx" ON "wallet_account" USING btree ("wallet");
+CREATE UNIQUE INDEX "wallet_account_auth_user_idx" ON "wallet_account" USING btree ("authUserId");
+
+--
+-- Class WalletChallengeRecord as table wallet_challenge
+--
+CREATE TABLE "wallet_challenge" (
+    "id" bigserial PRIMARY KEY,
+    "challengeId" text NOT NULL,
+    "wallet" text NOT NULL,
+    "challengeXdr" text NOT NULL,
+    "transactionHash" text NOT NULL,
+    "expiresAt" timestamp without time zone NOT NULL,
+    "createdAt" timestamp without time zone NOT NULL,
+    "consumedAt" timestamp without time zone
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "wallet_challenge_id_idx" ON "wallet_challenge" USING btree ("challengeId");
+CREATE INDEX "wallet_challenge_wallet_idx" ON "wallet_challenge" USING btree ("wallet");
+
+--
 -- Class CloudStorageEntry as table serverpod_cloud_storage
 --
 CREATE TABLE "serverpod_cloud_storage" (
@@ -670,6 +702,16 @@ CREATE TABLE "serverpod_auth_core_user" (
 );
 
 --
+-- Foreign relations for "wallet_account" table
+--
+ALTER TABLE ONLY "wallet_account"
+    ADD CONSTRAINT "wallet_account_fk_0"
+    FOREIGN KEY("authUserId")
+    REFERENCES "serverpod_auth_core_user"("id")
+    ON DELETE CASCADE
+    ON UPDATE NO ACTION;
+
+--
 -- Foreign relations for "serverpod_future_call_claim" table
 --
 ALTER TABLE ONLY "serverpod_future_call_claim"
@@ -889,9 +931,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261009170004821', now())
+    VALUES ('puls3', '20261009213303097', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261009170004821', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009213303097', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

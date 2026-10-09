@@ -45,3 +45,14 @@ targetRules = ["generic-api-key"]
 regexTarget = "line"
 paths = ['''puls3_server/test/fixtures/escrow_relay/.*\.json''']
 regexes = ['''"key":\s*"AAAA[A-Za-z0-9+/=]+"''']
+
+# An earlier commit in PR #147 included this deterministic SEP-10 test vector.
+# The current fixture omits it; this exact historical value remains allowlisted
+# so commit-range scans can pass without weakening detection for other seeds.
+[[allowlists]]
+description = "Historical deterministic SEP-10 documentation vector"
+condition = "AND"
+targetRules = ["stellar-secret-seed"]
+regexTarget = "match"
+paths = ['''docs/architecture/examples/sep10/challenge\.json''']
+regexes = ['''^SADQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQP54X$''']
