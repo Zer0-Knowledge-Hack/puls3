@@ -11,7 +11,9 @@ import '../generated/protocol.dart';
 /// a transaction advisory lock, so two concurrent first sign-ins leave one
 /// user. A later sign-in reuses that user and issues a new token pair.
 /// [mergeAuthUsers] is a no-op: the row belongs to one auth user and is
-/// removed with it (`ON DELETE CASCADE`).
+/// removed with it (`ON DELETE CASCADE`). Tokens come from [TokenManager.createToken]
+/// so a caller who already holds another wallet's session still gets this
+/// wallet's user (W31), and the secrets stay in the response body.
 final class WalletIdp implements IdentityProvider {
   WalletIdp({
     required TokenManager tokenManager,
@@ -61,7 +63,7 @@ final class WalletIdp implements IdentityProvider {
             transaction: transaction,
           );
         }
-        return _tokenManager.issueToken(
+        return _tokenManager.createToken(
           session,
           authUserId: authUserId,
           method: method,

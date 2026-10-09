@@ -12,6 +12,9 @@ emailIdp:
   - hasAccount:
 jwtRefresh:
   - refreshAccessToken:
+walletAuth:
+  - createChallenge:
+  - verifyChallenge:
 greeting:
   - hello:
 health:

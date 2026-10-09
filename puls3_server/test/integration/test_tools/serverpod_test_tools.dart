@@ -15,6 +15,8 @@ import 'dart:async' as _ida;
 import 'dart:io' as _idi;
 import 'package:puls3_server/src/generated/agent/agent_summary.dart'
     as _ih3rdrku;
+import 'package:puls3_server/src/generated/auth/wallet_challenge.dart'
+    as _ievkkkll;
 import 'package:puls3_server/src/generated/create_hire_result.dart'
     as _iba6uw0u;
 import 'package:puls3_server/src/generated/greetings/greeting.dart'
@@ -167,6 +169,8 @@ class TestEndpoints {
 
   late final _JwtRefreshEndpoint jwtRefresh;
 
+  late final _WalletAuthEndpoint walletAuth;
+
   late final _GreetingEndpoint greeting;
 
   late final _HealthEndpoint health;
@@ -190,6 +194,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     jwtRefresh = _JwtRefreshEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    walletAuth = _WalletAuthEndpoint(
       endpoints,
       serializationManager,
     );
@@ -582,6 +590,85 @@ class _JwtRefreshEndpoint {
           endpointPath: 'jwtRefresh',
           methodName: 'refreshAccessToken',
           parameters: _ist.testObjectToJson({'refreshToken': refreshToken}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_iacs.AuthSuccess>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _WalletAuthEndpoint {
+  _WalletAuthEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<_ievkkkll.WalletChallenge> createChallenge(
+    _ist.TestSessionBuilder sessionBuilder,
+    String wallet,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'walletAuth',
+            method: 'createChallenge',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'walletAuth',
+          methodName: 'createChallenge',
+          parameters: _ist.testObjectToJson({'wallet': wallet}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ievkkkll.WalletChallenge>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_iacs.AuthSuccess> verifyChallenge(
+    _ist.TestSessionBuilder sessionBuilder,
+    String challengeId,
+    String wallet,
+    String signedChallengeXdr,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'walletAuth',
+            method: 'verifyChallenge',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'walletAuth',
+          methodName: 'verifyChallenge',
+          parameters: _ist.testObjectToJson({
+            'challengeId': challengeId,
+            'wallet': wallet,
+            'signedChallengeXdr': signedChallengeXdr,
+          }),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =

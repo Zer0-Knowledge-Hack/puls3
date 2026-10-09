@@ -14,6 +14,8 @@ import 'dart:async' as _ida;
 import 'package:http/http.dart' as _i85jenna;
 import 'package:puls3_client/src/protocol/agent/agent_summary.dart'
     as _i78wn19p;
+import 'package:puls3_client/src/protocol/auth/wallet_challenge.dart'
+    as _ig3t6cu4;
 import 'package:puls3_client/src/protocol/create_hire_result.dart' as _iyigzt6l;
 import 'package:puls3_client/src/protocol/greetings/greeting.dart' as _igee0kk1;
 import 'package:puls3_client/src/protocol/health/backend_health.dart'
@@ -283,6 +285,43 @@ class EndpointJwtRefresh extends _iacc.EndpointRefreshJwtTokens {
       );
 }
 
+/// SEP-10 wallet sign-in (`client.walletAuth`).
+///
+/// Both calls are open so a signed-out client can start, and a client that
+/// already holds a session can still challenge a different wallet.
+/// {@category Endpoint}
+class EndpointWalletAuth extends _isc.EndpointRef {
+  EndpointWalletAuth(_isc.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'walletAuth';
+
+  /// A single-use challenge for [wallet].
+  _ida.Future<_ig3t6cu4.WalletChallenge> createChallenge(String wallet) =>
+      caller.callServerEndpoint<_ig3t6cu4.WalletChallenge>(
+        'walletAuth',
+        'createChallenge',
+        {'wallet': wallet},
+        authenticated: false,
+      );
+
+  /// A session for the wallet that signed [signedChallengeXdr].
+  _ida.Future<_iacc.AuthSuccess> verifyChallenge(
+    String challengeId,
+    String wallet,
+    String signedChallengeXdr,
+  ) => caller.callServerEndpoint<_iacc.AuthSuccess>(
+    'walletAuth',
+    'verifyChallenge',
+    {
+      'challengeId': challengeId,
+      'wallet': wallet,
+      'signedChallengeXdr': signedChallengeXdr,
+    },
+    authenticated: false,
+  );
+}
+
 /// This is an example endpoint that returns a greeting message through
 /// its [hello] method.
 /// {@category Endpoint}
@@ -450,6 +489,7 @@ class Client extends _isc.ServerpodClientShared {
     agent = EndpointAgent(this);
     emailIdp = EndpointEmailIdp(this);
     jwtRefresh = EndpointJwtRefresh(this);
+    walletAuth = EndpointWalletAuth(this);
     greeting = EndpointGreeting(this);
     health = EndpointHealth(this);
     hire = EndpointHire(this);
@@ -461,6 +501,8 @@ class Client extends _isc.ServerpodClientShared {
   late final EndpointEmailIdp emailIdp;
 
   late final EndpointJwtRefresh jwtRefresh;
+
+  late final EndpointWalletAuth walletAuth;
 
   late final EndpointGreeting greeting;
 
@@ -475,6 +517,7 @@ class Client extends _isc.ServerpodClientShared {
     'agent': agent,
     'emailIdp': emailIdp,
     'jwtRefresh': jwtRefresh,
+    'walletAuth': walletAuth,
     'greeting': greeting,
     'health': health,
     'hire': hire,

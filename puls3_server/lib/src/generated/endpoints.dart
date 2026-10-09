@@ -18,6 +18,7 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
 import '../agent/agent_endpoint.dart' as _i6aufbii;
 import '../auth/email_idp_endpoint.dart' as _iuc1hd5t;
 import '../auth/jwt_refresh_endpoint.dart' as _inwq3ztq;
+import '../auth/wallet_auth_endpoint.dart' as _i3i6b0lz;
 import '../greetings/greeting_endpoint.dart' as _il624ik7;
 import '../health/health_endpoint.dart' as _id9paj9q;
 import '../hire/hire_endpoint.dart' as _icdhibuq;
@@ -42,6 +43,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'jwtRefresh',
+          null,
+        ),
+      'walletAuth': _i3i6b0lz.WalletAuthEndpoint()
+        ..initialize(
+          server,
+          'walletAuth',
           null,
         ),
       'greeting': _il624ik7.GreetingEndpoint()
@@ -299,6 +306,64 @@ class Endpoints extends _is.EndpointDispatch {
                       .refreshAccessToken(
                         session,
                         refreshToken: params['refreshToken'],
+                      ),
+        ),
+      },
+    );
+    connectors['walletAuth'] = _is.EndpointConnector(
+      name: 'walletAuth',
+      endpoint: endpoints['walletAuth']!,
+      methodConnectors: {
+        'createChallenge': _is.MethodConnector(
+          name: 'createChallenge',
+          params: {
+            'wallet': _is.ParameterDescription(
+              name: 'wallet',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['walletAuth'] as _i3i6b0lz.WalletAuthEndpoint)
+                      .createChallenge(
+                        session,
+                        params['wallet'],
+                      ),
+        ),
+        'verifyChallenge': _is.MethodConnector(
+          name: 'verifyChallenge',
+          params: {
+            'challengeId': _is.ParameterDescription(
+              name: 'challengeId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'wallet': _is.ParameterDescription(
+              name: 'wallet',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'signedChallengeXdr': _is.ParameterDescription(
+              name: 'signedChallengeXdr',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['walletAuth'] as _i3i6b0lz.WalletAuthEndpoint)
+                      .verifyChallenge(
+                        session,
+                        params['challengeId'],
+                        params['wallet'],
+                        params['signedChallengeXdr'],
                       ),
         ),
       },
