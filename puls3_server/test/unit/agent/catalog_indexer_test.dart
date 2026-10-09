@@ -5,11 +5,11 @@ import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/agent/agent_index_repository.dart';
 import 'package:puls3_server/src/agent/catalog_indexer.dart';
 import 'package:puls3_server/src/agent/registry_event_reader.dart';
+import 'package:puls3_server/src/agent/registry_events.dart';
 import 'package:puls3_server/src/agent/registry_reader.dart';
 import 'package:puls3_server/src/chain/chain_log.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
-import 'package:puls3_server/src/ledger/registry_events.dart';
 import 'package:test/test.dart';
 
 const _wallet = 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY';
@@ -55,10 +55,15 @@ final class _FakeRegistry implements RegistryReader {
 }
 
 final class _FakeEvents implements RegistryEventReader {
-  _FakeEvents({required this.latest, this.events = const []});
+  _FakeEvents({
+    required this.latest,
+    this.events = const [],
+    this.truncated = false,
+  });
 
   int latest;
   List<RegistryEvent> events;
+  bool truncated;
   LedgerException? latestFailure;
   LedgerException? eventsFailure;
   int? sinceCalled;
@@ -70,10 +75,10 @@ final class _FakeEvents implements RegistryEventReader {
   }
 
   @override
-  Future<List<RegistryEvent>> eventsSince(int startLedger) async {
+  Future<RegistryEventBatch> eventsSince(int startLedger) async {
     sinceCalled = startLedger;
     if (eventsFailure != null) throw eventsFailure!;
-    return events;
+    return RegistryEventBatch(events: events, truncated: truncated);
   }
 }
 
@@ -110,6 +115,9 @@ final class _InMemoryIndex implements AgentIndexRepository {
   Future<Set<int>> registryIds() async => rows.keys.toSet();
 
   @override
+  Future<bool> isEmpty() async => rows.isEmpty;
+
+  @override
   Future<void> upsertAll(List<AgentSummary> agents) async {
     for (final agent in agents) {
       rows[agent.registryId] = agent;
@@ -129,6 +137,15 @@ RegisteredEvent _registered(int agentId) => RegisteredEvent(
   agentId: agentId,
   owner: StellarAddress.parse(_owner),
   uri: 'puls3://demo/agt-00$agentId',
+);
+
+AgentSummary _stale(int registryId, String name) => AgentSummary(
+  id: 'agt-00$registryId',
+  registryId: registryId,
+  name: name,
+  description: 'Does the job number $registryId well.',
+  skills: const ['code-review'],
+  priceUsdcStroops: 1000000,
 );
 
 void main() {
@@ -166,19 +183,9 @@ void main() {
 
   test('a later pass reads only events after the cursor', () async {
     final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
-    final events = _FakeEvents(
-      latest: 600,
-      events: [_registered(1)],
-    );
+    final events = _FakeEvents(latest: 600, events: [_registered(1)]);
     final index = _InMemoryIndex()
-      ..rows[0] = AgentSummary(
-        id: 'agt-001',
-        registryId: 0,
-        name: 'Agent 1',
-        description: 'Does the job number 1 well.',
-        skills: const ['code-review'],
-        priceUsdcStroops: 1000000,
-      )
+      ..rows[0] = _stale(0, 'Agent 1')
       ..checkpoint = 500;
 
     final summary = await indexer(registry, events, index).pass();
@@ -194,14 +201,7 @@ void main() {
     final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
     final events = _FakeEvents(latest: 600);
     final index = _InMemoryIndex()
-      ..rows[0] = AgentSummary(
-        id: 'agt-001',
-        registryId: 0,
-        name: 'Agent 1',
-        description: 'Does the job number 1 well.',
-        skills: const ['code-review'],
-        priceUsdcStroops: 1000000,
-      )
+      ..rows[0] = _stale(0, 'Agent 1')
       ..checkpoint = 500;
 
     final summary = await indexer(registry, events, index).pass();
@@ -243,13 +243,14 @@ void main() {
     expect(index.rows.keys, [0]);
   });
 
-  test('a chain outage aborts the pass and leaves the index untouched', () {
+  test('a chain outage aborts the pass and leaves the index untouched',
+      () async {
     final registry = _FakeRegistry({0: _metadata(1)});
     final index = _InMemoryIndex();
     final events = _FakeEvents(latest: 500)
       ..latestFailure = const LedgerUnavailable('down');
 
-    expect(
+    await expectLater(
       indexer(registry, events, index).pass(),
       throwsA(isA<LedgerUnavailable>()),
     );
@@ -257,15 +258,35 @@ void main() {
     expect(index.checkpoint, isNull);
   });
 
-  test('a retention gap advances the cursor and recovers from state', () async {
+  test('a retention gap re-hydrates every indexed agent, not just missing ones',
+      () async {
     final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
-    final index = _InMemoryIndex()..checkpoint = 1;
+    final index = _InMemoryIndex()
+      ..rows[0] = _stale(0, 'Stale name')
+      ..checkpoint = 1;
     final events = _FakeEvents(latest: 900)
       ..eventsFailure = const RpcRequestRejected(-32602, 'bad', 'out of range');
 
     final summary = await indexer(registry, events, index).pass();
 
+    expect(summary.recoveredAll, isTrue);
     expect(summary.hydrated, 2);
+    expect(index.rows[0]!.name, 'Agent 1', reason: 'refreshed from state');
     expect(index.checkpoint, 900);
+  });
+
+  test('a truncated event batch re-hydrates every indexed agent', () async {
+    final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
+    final index = _InMemoryIndex()
+      ..rows[0] = _stale(0, 'Stale name')
+      ..checkpoint = 500;
+    final events = _FakeEvents(latest: 600, truncated: true);
+
+    final summary = await indexer(registry, events, index).pass();
+
+    expect(summary.recoveredAll, isTrue);
+    expect(index.rows[0]!.name, 'Agent 1');
+    expect(index.rows[1]!.id, 'agt-002');
+    expect(index.checkpoint, 600);
   });
 }

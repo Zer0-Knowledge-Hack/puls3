@@ -18,6 +18,10 @@ abstract interface class AgentIndexRepository {
   /// missing or changed.
   Future<Set<int>> registryIds();
 
+  /// Whether the index has no rows, so a read may fall back to the chain. A
+  /// read must not touch the chain while the index has rows.
+  Future<bool> isEmpty();
+
   /// Inserts or replaces [agents] by registry id. Running it twice with the
   /// same agents leaves the index unchanged.
   Future<void> upsertAll(List<AgentSummary> agents);

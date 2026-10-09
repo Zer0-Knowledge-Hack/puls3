@@ -50,6 +50,12 @@ class ServerpodAgentIndexRepository implements AgentIndexRepository {
   }
 
   @override
+  Future<bool> isEmpty() async {
+    final row = await AgentRecord.db.findFirstRow(session);
+    return row == null;
+  }
+
+  @override
   Future<void> upsertAll(List<AgentSummary> agents) async {
     for (final agent in agents) {
       final existing = await AgentRecord.db.findFirstRow(

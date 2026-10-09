@@ -29,11 +29,15 @@ final class IndexPassSummary {
   /// registrations), which are not indexed.
   int skipped = 0;
 
+  /// Whether the pass re-hydrated every indexed agent because the event stream
+  /// had a gap (retention or truncation).
+  bool recoveredAll = false;
+
   @override
   String toString() =>
       'from ${fromLedger ?? 'bootstrap'} to $toLedger, '
       'events $events, touched $touched, hydrated $hydrated, '
-      'skipped $skipped';
+      'skipped $skipped${recoveredAll ? ', recoveredAll' : ''}';
 }
 
 /// Syncs the catalog index from the identity registry.
@@ -75,21 +79,25 @@ final class CatalogIndexer {
 
     final affected = <int>{};
     var advanceCursor = checkpoint == null;
+    var recoverAll = false;
     if (checkpoint != null) {
       try {
-        final events = await _events.eventsSince(checkpoint + 1);
-        summary.events = events.length;
-        affected.addAll(events.map((event) => event.agentId));
+        final batch = await _events.eventsSince(checkpoint + 1);
+        summary.events = batch.events.length;
+        affected.addAll(batch.events.map((event) => event.agentId));
+        if (batch.truncated) recoverAll = true;
         advanceCursor = true;
       } on RpcRequestRejected catch (e) {
-        // The cursor fell out of the node's retention window. Advance past
-        // the gap; the missing agents are recovered from state below.
+        // The cursor fell out of the node's retention window. Advance past the
+        // gap and re-read every indexed agent, because an agent whose metadata
+        // changed inside the gap would otherwise keep its stale values.
         _log(
           ChainLogLevel.warning,
           'Registry events before the cursor are no longer retained; '
-          'resetting the catalog cursor: $e',
+          'resetting the catalog cursor and re-hydrating every agent: $e',
         );
         advanceCursor = true;
+        recoverAll = true;
       } on LedgerException catch (e) {
         _log(
           ChainLogLevel.warning,
@@ -100,9 +108,11 @@ final class CatalogIndexer {
     }
 
     final indexed = await _repository.registryIds();
+    if (recoverAll) affected.addAll(indexed);
     for (var id = 0; id < total; id++) {
       if (!indexed.contains(id)) affected.add(id);
     }
+    summary.recoveredAll = recoverAll;
 
     final ids = affected.where((id) => id >= 0 && id < total).toList()..sort();
     summary.touched = ids.length;

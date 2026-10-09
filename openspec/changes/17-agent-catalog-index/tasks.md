@@ -72,6 +72,6 @@ Chain strategy: size-exception (user accepted a single branch for the issue)
 
 ## Unit 6: Gates
 
-- [ ] 6.1 `dart analyze --fatal-infos` clean.
-- [ ] 6.2 `dart test` green (unit + integration).
-- [ ] 6.3 `serverpod generate` leaves no diff.
+- [x] 6.1 `dart analyze --fatal-infos` clean.
+- [x] 6.2 `dart test` green (unit + integration).
+- [x] 6.3 `serverpod generate` leaves no diff.

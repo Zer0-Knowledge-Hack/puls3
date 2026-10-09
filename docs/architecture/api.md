@@ -61,7 +61,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 `submitEscrowCall` accepts any client-signed escrow preparation (`createJob`, `fund`, `complete`, `reject`); the preparation's `purpose` selects the domain effect. `prepareReject` hashes `reason` (short display-safe text) into the ERC-8183 `reason` (`bytes32`) and stores the text with the hire.
 
-**Catalog reads (#17).** `listAgents` and `getAgent` are served from the Postgres `agent_record` index, which the server syncs from the identity registry (bootstrap from registry state, then registry events after a stored per-network cursor). While the index is empty the server falls back to reading the registry directly, so `CatalogUnavailable` no longer fires for a chain outage once the index has rows. `listAgents` returns the whole index; Flutter filters by name and skill client-side (F2-3, F2-4). Pagination and server-side search are deferred to a follow-up issue.
+**Catalog reads (#17).** `listAgents` and `getAgent` are served from the Postgres `agent_record` index, which the server syncs from the identity registry (bootstrap from registry state, then registry events after a stored per-network cursor). While the index is empty the server falls back to reading the registry directly, so `AgentCatalogUnavailable` no longer fires for a chain outage once the index has rows. `listAgents` returns the whole index; Flutter filters by name and skill client-side (F2-3, F2-4). Pagination and server-side search are deferred to a follow-up issue.
 
 **Lifecycle error rule.** Hire methods report a wrong hire state with one code per family, so clients can branch on it:
 
@@ -74,7 +74,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 - **Two identifiers.** [`AgentSummary`](models/agent_summary.spy.yaml) carries `id: String`, the metadata id (for example `agt-001`), and `registryId: int`, the on-chain Identity Registry agent id (`u32`, the domain `AgentId`). `get` takes the metadata `id`. `HireEndpoint.createHire(agentId, …)`, `Hire.agentId`, and the escrow use the on-chain id, so the app passes `AgentSummary.registryId` as `agentId`. When orphaned registrations repeat a metadata id, the catalog serves only the newest one (highest `registryId`).
 - **Ordering and skipping.** `list` returns every agent with valid metadata, ordered by `registryId`. An agent whose required metadata (`id`, `name`, `description`, `skills`, `priceUsdcStroops`) is missing or invalid is skipped, not reported as an error.
-- **Outage.** When the chain cannot be read, the last catalog built is served as is, with no freshness flag. Only when nothing is cached do `list` and `get` raise [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) (`message: String`). An outage is never reported as an empty list or `null`.
+- **Outage.** Reads are served from the `agent_record` index, so a chain outage does not affect them while the index has rows. Only when the index is empty and the chain cannot be read do `list` and `get` raise [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) (`message: String`). An outage is never reported as an empty list or `null`.
 - **Typed exception, not `Puls3ApiException`.** The catalog is the one exception to contract rule 7: it raises the typed Serverpod exception `AgentCatalogUnavailable`, not a `Puls3ApiException` code. An unknown metadata id is `null`, not `AgentNotFound`. The catalog codes `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, and `ChainDataUnavailable` are not raised by the catalog; `InvalidAgentId` and `AgentNotFound` remain in use by `createHire`.
 - **Field names.** `AgentSummary` uses `priceUsdcStroops` (USDC stroops, at most 2^53 − 1) for the domain `price`, and `skills` holds kebab-case skill ids only (1 to 5, in stored order).
 
@@ -340,7 +340,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F3-1 | `AgentEndpoint.get(id)`; `null` shows the not-found state. |
-| F3-2 | `AgentEndpoint.get`; during an outage the server serves its last cached catalog with no freshness flag, and raises `AgentCatalogUnavailable` only when nothing is cached. The cached-data warning needs `chainDataFresh`, planned in #17. |
+| F3-2 | `AgentEndpoint.get`; reads come from the index (no chain while it has rows), and `AgentCatalogUnavailable` is raised only when the index is empty and the chain cannot be read. The cached-data warning needs `chainDataFresh`, deferred (not served yet). |
 | F3-3 | Client-only: open the agent's explorer link. Planned: `explorerUrl` is not served yet (#17). |
 | F3-4 | Client-only: open F5 with `registryId` as the hire's `agentId`. Planned: `active` is not served yet (#18), so Hire is not hidden by the catalog. |
 

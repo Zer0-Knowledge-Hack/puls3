@@ -33,6 +33,9 @@ final class _FakeIndex implements AgentIndexRepository {
       {for (final row in rows.values) row.registryId};
 
   @override
+  Future<bool> isEmpty() async => rows.isEmpty;
+
+  @override
   Future<void> upsertAll(List<AgentSummary> agents) async {}
 
   @override
@@ -47,6 +50,7 @@ final class _FakeFallback implements CatalogReader {
 
   final List<AgentSummary> agents;
   int listCalls = 0;
+  int getCalls = 0;
 
   @override
   Future<List<AgentSummary>> list() async {
@@ -56,6 +60,7 @@ final class _FakeFallback implements CatalogReader {
 
   @override
   Future<AgentSummary?> get(String id) async {
+    getCalls++;
     for (final agent in agents) {
       if (agent.id == id) return agent;
     }
@@ -92,15 +97,30 @@ void main() {
     expect(fallback.listCalls, 1);
   });
 
-  test('get serves the index, then the fallback', () async {
+  test('get serves the index and does not fall back while it has rows',
+      () async {
+    final fallback = _FakeFallback([_agent('agt-002', 1)]);
     final service = IndexedAgentCatalogService(
       index: _FakeIndex({'agt-001': _agent('agt-001', 0)}),
-      fallback: _FakeFallback([_agent('agt-002', 1)]),
+      fallback: fallback,
     );
 
     expect((await service.get('agt-001'))?.id, 'agt-001');
+    // An unknown id on a populated index is unknown, not a cold index.
+    expect(await service.get('agt-999'), isNull);
+    expect(fallback.getCalls, 0);
+  });
+
+  test('get falls back to the chain when the index is empty', () async {
+    final fallback = _FakeFallback([_agent('agt-002', 1)]);
+    final service = IndexedAgentCatalogService(
+      index: _FakeIndex({}),
+      fallback: fallback,
+    );
+
     expect((await service.get('agt-002'))?.id, 'agt-002');
     expect(await service.get('agt-999'), isNull);
+    expect(fallback.getCalls, 2);
   });
 
   test('an empty index with no fallback is an empty list', () async {

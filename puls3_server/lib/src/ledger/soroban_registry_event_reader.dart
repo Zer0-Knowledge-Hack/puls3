@@ -6,8 +6,9 @@ import 'stellar_config.dart';
 /// One `getEvents` page holds at most this many events.
 const _pageLimit = 100;
 
-/// A safety bound on pages read for one [SorobanRegistryEventReader.eventsSince]
-/// call, so a node that always returns a cursor cannot loop forever.
+/// A safety bound on pages read for one [eventsSince] call, so a node that
+/// always returns a cursor cannot loop forever. Hitting it reports
+/// [RegistryEventBatch.truncated].
 const _maxPages = 1000;
 
 /// [RegistryEventReader] over Soroban RPC `getEvents` and `getLatestLedger`.
@@ -24,11 +25,12 @@ final class SorobanRegistryEventReader implements RegistryEventReader {
   Future<int> latestLedger() => _rpc.getLatestLedger();
 
   @override
-  Future<List<RegistryEvent>> eventsSince(int startLedger) async {
+  Future<RegistryEventBatch> eventsSince(int startLedger) async {
     final registry = _config.identityRegistry;
     final all = <RegistryEvent>[];
     String? cursor;
     var pages = 0;
+    var truncated = false;
     while (true) {
       final page = await _rpc.getEvents(
         startLedger: cursor == null ? startLedger : null,
@@ -42,8 +44,12 @@ final class SorobanRegistryEventReader implements RegistryEventReader {
       pages++;
       if (page.events.length < _pageLimit) break;
       cursor = page.cursor;
-      if (cursor == null || pages >= _maxPages) break;
+      if (cursor == null) break;
+      if (pages >= _maxPages) {
+        truncated = true;
+        break;
+      }
     }
-    return all;
+    return RegistryEventBatch(events: all, truncated: truncated);
   }
 }

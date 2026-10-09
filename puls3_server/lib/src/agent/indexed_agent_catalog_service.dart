@@ -27,6 +27,8 @@ final class IndexedAgentCatalogService implements CatalogReader {
   Future<AgentSummary?> get(String id) async {
     final indexed = await _index.findByAgentId(id);
     if (indexed != null) return indexed;
+    // The index has rows but not this id: it is unknown, not a cold index.
+    if (!await _index.isEmpty()) return null;
     return _fallback?.get(id);
   }
 }

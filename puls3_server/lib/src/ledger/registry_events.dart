@@ -1,5 +1,5 @@
-/// The identity-registry events the catalog indexer needs, read from a
-/// `getEvents` page (`xdrFormat: "json"`).
+/// Decodes identity-registry events from a `getEvents` page
+/// (`xdrFormat: "json"`).
 ///
 /// The registry publishes each event with the snake_case event name as the
 /// first topic (`contracts/contracts/identity-registry/src/lib.rs`):
@@ -14,55 +14,19 @@
 /// Events of other contracts, failed calls, unknown names and malformed
 /// events are skipped: the indexer only needs the affected agent ids, and a
 /// skipped event is recovered by re-reading the agent's state.
+///
+/// The event types live in `agent/registry_events.dart`, next to the port, so
+/// the agent layer does not depend on the ledger adapter.
 library;
-
-import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart';
 
+import '../agent/registry_events.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
 import 'soroban_rpc_client.dart';
 
-/// One event the identity registry emits about an agent.
-sealed class RegistryEvent {
-  const RegistryEvent(this.agentId);
-
-  /// The on-chain registry id the event is about.
-  final int agentId;
-}
-
-/// `registered`: a new agent was minted for [owner] with [uri].
-final class RegisteredEvent extends RegistryEvent {
-  const RegisteredEvent({
-    required int agentId,
-    required this.owner,
-    required this.uri,
-  }) : super(agentId);
-
-  final StellarAddress owner;
-  final String uri;
-}
-
-/// `metadata_set`: the value of [key] for the agent changed to [value].
-final class MetadataSetEvent extends RegistryEvent {
-  const MetadataSetEvent({
-    required int agentId,
-    required this.key,
-    required this.value,
-  }) : super(agentId);
-
-  final String key;
-  final Uint8List value;
-}
-
-/// `uri_updated`: the agent's metadata uri changed to [uri].
-final class UriUpdatedEvent extends RegistryEvent {
-  const UriUpdatedEvent({required int agentId, required this.uri})
-    : super(agentId);
-
-  final String uri;
-}
+export '../agent/registry_events.dart';
 
 /// Every recognized [registry] event in [events], in order.
 ///

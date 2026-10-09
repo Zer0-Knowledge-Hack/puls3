@@ -1,4 +1,4 @@
-import '../ledger/registry_events.dart';
+import 'registry_events.dart';
 
 /// The identity-registry event reads the catalog indexer needs.
 ///
@@ -13,5 +13,9 @@ abstract interface class RegistryEventReader {
   ///
   /// Events older than the node's retention window (about 7 days) cannot be
   /// read; the catalog bootstraps older agents from state instead.
-  Future<List<RegistryEvent>> eventsSince(int startLedger);
+  ///
+  /// [RegistryEventBatch.truncated] is true when the reader stopped at its page
+  /// bound while more events remained, so the caller must not assume the batch
+  /// is complete.
+  Future<RegistryEventBatch> eventsSince(int startLedger);
 }
