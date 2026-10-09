@@ -38,6 +38,7 @@ Future<void> pumpApp(
   Size size = const Size(1440, 1000),
   Future<String>? healthCheck,
   AgentRepository repository = const InMemoryAgentRepository(testAgents),
+  AgentRepository? demoRepository,
   MockWallet? wallet,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
@@ -48,6 +49,7 @@ Future<void> pumpApp(
   await tester.pumpWidget(
     Puls3App(
       repository: repository,
+      demoRepository: demoRepository,
       wallet: wallet ?? MockWallet(),
       initialLocation: location,
       healthCheck: healthCheck,

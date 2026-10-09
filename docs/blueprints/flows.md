@@ -270,6 +270,8 @@ Covers the five demo criteria of the [vision](../vision.md#7-demo-success-criter
 
 ## Screen IDs
 
+Each screen's data, states, actions and wireframes are in [screens.md](screens.md) (#23).
+
 | ID | Route / kind | Exists in the app today | Used in |
 |---|---|---|---|
 | `S01-landing` | `/` | Yes (`landing_screen.dart`) | F2, demos |
@@ -280,5 +282,5 @@ Covers the five demo criteria of the [vision](../vision.md#7-demo-success-criter
 | `S06-hire-detail` | `/hires/:id` | No, new | F6, F7, demos |
 | `S07-studio` | `/studio` | Yes (`studio_screen.dart`) | F4, demo |
 | `S08-deploy-sheet` | Bottom sheet over S07 | Yes (`deploy_sheet.dart`) | F4, demo |
-| `S09-wallet-connect` | Dialog over any screen | No, new (the app has a mock `WalletPort`) | F1, F4, F5, F6 |
+| `S09-wallet-connect` | Sheet over any screen | Yes (`wallet_sheet.dart`, #25) | F1, F4, F5, F6 |
 | `S10-rate-sheet` | Bottom sheet over S06 | No, new | F7, demo |
