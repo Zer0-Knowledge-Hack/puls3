@@ -6,7 +6,6 @@ import 'package:puls3_client/puls3_client.dart';
 import 'src/app.dart';
 import 'src/data/agent_repository.dart';
 import 'src/data/app_config.dart';
-import 'src/data/fallback_agent_repository.dart';
 import 'src/data/server_agent_repository.dart';
 import 'src/wallet/freighter/create_freighter_bridge.dart';
 import 'src/wallet/freighter/freighter_wallet.dart';
@@ -39,12 +38,13 @@ Future<void> main() async {
 
   runApp(
     Puls3App(
-      // Server catalog first; the bundled demo catalog covers an unreachable
-      // or slow server.
-      repository: FallbackAgentRepository(
-        ServerAgentRepository(() => client.agent.list()),
-        AssetAgentRepository(),
+      // The server catalog (#17). When it is unreachable the bundled demo
+      // catalog is shown, labelled as a demo, with a Retry.
+      repository: ServerAgentRepository(
+        () => client.agent.list(),
+        byId: (id) => client.agent.get(id),
       ),
+      demoRepository: AssetAgentRepository(),
       wallet: _createWallet(),
       healthCheck: client.health.check().then((health) => health.version),
     ),

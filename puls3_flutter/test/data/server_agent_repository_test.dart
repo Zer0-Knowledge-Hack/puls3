@@ -146,4 +146,46 @@ void main() {
       expect(ServerAgentRepository.defaultTimeout, const Duration(seconds: 20));
     });
   });
+
+  group('ServerAgentRepository.fetchAgent', () {
+    test('uses the detail call (agent.get) when given', () async {
+      final asked = <String>[];
+      final repository = ServerAgentRepository(
+        () async => fail('list must not be called'),
+        byId: (id) async {
+          asked.add(id);
+          return summary(id: id);
+        },
+      );
+      final agent = await repository.fetchAgent('a7');
+      expect(asked, ['a7']);
+      expect(agent!.id, 'a7');
+      expect(agent.registryId, 1);
+    });
+
+    test('an unknown id is null, not an error', () async {
+      final repository = ServerAgentRepository(
+        () async => [],
+        byId: (_) async => null,
+      );
+      expect(await repository.fetchAgent('nope'), isNull);
+    });
+
+    test('a server error propagates, so the screen can offer Retry', () async {
+      final error = StateError('down');
+      final repository = ServerAgentRepository(
+        () async => [],
+        byId: (_) async => throw error,
+      );
+      await expectLater(repository.fetchAgent('a1'), throwsA(same(error)));
+    });
+
+    test('without a detail call it searches the list', () async {
+      final repository = ServerAgentRepository(
+        () async => [summary(id: 'a1'), summary(id: 'a2', name: 'Borealis')],
+      );
+      expect((await repository.fetchAgent('a2'))!.name, 'Borealis');
+      expect(await repository.fetchAgent('a3'), isNull);
+    });
+  });
 }

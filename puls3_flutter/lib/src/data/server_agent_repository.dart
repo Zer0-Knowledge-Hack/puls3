@@ -7,17 +7,27 @@ import 'agent_repository.dart';
 /// Fetches the catalog summaries, typically `() => client.agent.list()`.
 typedef AgentSummarySource = Future<List<AgentSummary>> Function();
 
+/// Fetches one summary, typically `client.agent.get`.
+typedef AgentByIdSource = Future<AgentSummary?> Function(String id);
+
 /// Lists the agents served by the server catalog.
 ///
 /// Errors from the source, including the timeout, propagate to the caller;
 /// pair it with a fallback repository to stay usable offline.
 class ServerAgentRepository implements AgentRepository {
-  ServerAgentRepository(this._source, {this.timeout = defaultTimeout});
+  ServerAgentRepository(
+    this._source, {
+    this._byId,
+    this.timeout = defaultTimeout,
+  });
 
   /// Mirrors the Serverpod client's own default connection timeout.
   static const defaultTimeout = Duration(seconds: 20);
 
   final AgentSummarySource _source;
+
+  /// The detail call. Without it, [fetchAgent] searches the list.
+  final AgentByIdSource? _byId;
 
   /// Upper bound for the server call. It does not cancel the HTTP request,
   /// it only stops waiting for it.
@@ -29,6 +39,19 @@ class ServerAgentRepository implements AgentRepository {
     return List<Agent>.unmodifiable(
       summaries.map(fromSummary).whereType<Agent>(),
     );
+  }
+
+  @override
+  Future<Agent?> fetchAgent(String id) async {
+    final byId = _byId;
+    if (byId == null) {
+      for (final agent in await fetchAgents()) {
+        if (agent.id == id) return agent;
+      }
+      return null;
+    }
+    final summary = await byId(id).timeout(timeout);
+    return summary == null ? null : fromSummary(summary);
   }
 
   /// Maps a summary to an [Agent], or returns null when it has no wallet.
@@ -49,6 +72,7 @@ class ServerAgentRepository implements AgentRepository {
       rating: 0.0,
       stellarAddress: wallet,
       model: model == null || model.isEmpty ? 'Unspecified' : model,
+      registryId: s.registryId,
     );
   }
 }

@@ -5,6 +5,10 @@ library;
 const String testnetEscrowContractAddress =
     'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2';
 
+/// Agent Identity Registry contract of the testnet deployment (#13).
+const String testnetIdentityRegistryAddress =
+    'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ';
+
 /// Raw `PULS3_ESCROW_CONTRACT` dart-define. No default on purpose: a define
 /// that is present but empty (`PULS3_ESCROW_CONTRACT=` in a
 /// `--dart-define-from-file` .env) would otherwise yield ''.
@@ -30,6 +34,10 @@ const String stellarExpertTestnetBase =
 
 /// Returns the testnet transaction explorer URL for [hash].
 String stellarExpertTxUrl(String hash) => '$stellarExpertTestnetBase/tx/$hash';
+
+/// Returns the testnet account explorer URL for [address].
+String stellarExpertAccountUrl(String address) =>
+    '$stellarExpertTestnetBase/account/$address';
 
 /// Returns the testnet contract explorer URL for [contractId].
 String stellarExpertContractUrl(String contractId) =>
