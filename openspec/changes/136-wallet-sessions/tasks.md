@@ -99,8 +99,8 @@ Commit: `feat(server): verify SEP-10 challenges against account weight`
 
 ### Commit 7: Wallet identity provider
 
-- [ ] 7.1 RED: `wallet_idp_test.dart` (integration). First sign-in creates one auth user and one `wallet_account` (W27). Second sign-in of the same wallet reuses the user and issues a new token pair (W28). Two wallets create two users (W29). A second insert of the same wallet or auth user is rejected with no partial row (W30). Concurrent first sign-ins for one new wallet, under the advisory lock, leave one user (D7). Done when it fails.
-- [ ] 7.2 GREEN: `WalletIdp` follows the anonymous-idp transaction shape: find-or-create under `pg_advisory_xact_lock` of the wallet, then `TokenManager.issueToken`. `mergeAuthUsers` is unused. Done when 7.1 is green.
+- [x] 7.1 RED: `wallet_idp_test.dart` (integration). First sign-in creates one auth user and one `wallet_account` (W27). Second sign-in of the same wallet reuses the user and issues a new token pair (W28). Two wallets create two users (W29). A second insert of the same wallet or auth user is rejected with no partial row (W30). Concurrent first sign-ins for one new wallet, under the advisory lock, leave one user (D7). Done: failed because `wallet_idp.dart` was missing.
+- [x] 7.2 GREEN: `WalletIdp` follows the anonymous-idp transaction shape: find-or-create under `pg_advisory_xact_lock` of the wallet, then `TokenManager.issueToken`. `mergeAuthUsers` is unused. Done: 5 integration tests green. A duplicate wallet or auth user is SQLSTATE 23505 and the extra user rolls back. Two concurrent first sign-ins leave one user and two token pairs.
 
 Commit: `feat(server): bind one auth user to each wallet`
 
