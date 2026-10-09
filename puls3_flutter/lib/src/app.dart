@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/agent_repository.dart';
-import 'domain/stellar_format.dart';
+import 'deploy/deploy_gateway.dart';
+import 'deploy/fake_deploy_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
 import 'screens/landing_screen.dart';
@@ -50,12 +51,17 @@ class Puls3App extends StatefulWidget {
     super.key,
     required this.repository,
     required this.wallet,
+    this.deployGateway,
     this.healthCheck,
     this.initialLocation = '/',
   });
 
   final AgentRepository repository;
   final WalletPort wallet;
+
+  /// The deploy backend. Until the register/deploy endpoint (#18) exists
+  /// it defaults to [FakeDeployGateway], which the flow labels as a demo.
+  final DeployGateway? deployGateway;
   final Future<String>? healthCheck;
   final String initialLocation;
 
@@ -69,7 +75,8 @@ class _Puls3AppState extends State<Puls3App> {
   late final GoRouter _router = buildRouter(
     initialLocation: widget.initialLocation,
   );
-  final FakeLedgerIds _ids = FakeLedgerIds();
+  late final DeployGateway _deployGateway =
+      widget.deployGateway ?? FakeDeployGateway();
 
   @override
   void dispose() {
@@ -87,7 +94,7 @@ class _Puls3AppState extends State<Puls3App> {
     return AppScope(
       catalog: _catalog,
       wallet: _wallet,
-      ids: _ids,
+      deployGateway: _deployGateway,
       child: MaterialApp.router(
         title: 'puls3: the agent hub on Stellar',
         debugShowCheckedModeBanner: false,

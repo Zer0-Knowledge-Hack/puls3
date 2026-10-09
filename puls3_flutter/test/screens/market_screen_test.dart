@@ -36,8 +36,13 @@ void main() {
   testWidgets('Connect wallet shows a shortened address', (tester) async {
     await pumpApp(tester, location: '/market');
 
+    // The chip opens the wallet sheet (S09); connecting happens there.
     await tester.tap(find.text('Connect wallet'));
+    await advance(tester, const Duration(milliseconds: 400));
+    await tester.tap(find.text('Connect Demo wallet'));
     await advance(tester, const Duration(milliseconds: 700));
+    Navigator.of(tester.element(find.text('Disconnect'))).pop();
+    await advance(tester, const Duration(milliseconds: 400));
 
     expect(find.text('Connect wallet'), findsNothing);
     expect(find.textContaining('…'), findsWidgets);

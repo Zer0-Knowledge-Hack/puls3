@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
 import '../helpers.dart';
 
@@ -31,21 +32,42 @@ void main() {
     expect(find.text('Agent Studio'), findsOneWidget);
   });
 
-  testWidgets('Deploy runs the staged flow and goes live', (tester) async {
+  testWidgets('Deploy runs the staged flow and ends as a labelled demo', (
+    tester,
+  ) async {
     await pumpApp(tester, location: '/studio');
 
     await tester.tap(find.text('Deploy to Stellar'));
     await advance(tester, const Duration(milliseconds: 400));
-    expect(find.text('Creating wallet…'), findsOneWidget);
-    expect(find.text('Registering identity on Soroban…'), findsOneWidget);
+    expect(find.text('Deploy agent'), findsOneWidget);
+    expect(find.byKey(const ValueKey('deploy-demo-banner')), findsOneWidget);
+    expect(find.text('Preparing deployment'), findsOneWidget);
 
-    await advance(tester, const Duration(milliseconds: 2800));
-    expect(find.text('Nomad Concierge is live'), findsOneWidget);
-    expect(find.text('View in Marketplace'), findsOneWidget);
+    // Demo gateway and mock wallet: about 4 s from tap to the end.
+    await advance(tester, const Duration(milliseconds: 4500));
+    expect(find.text('Demo deploy only'), findsOneWidget);
+    expect(find.textContaining('live on Stellar'), findsNothing);
 
-    await tester.tap(find.text('View in Marketplace'));
+    await tester.tap(find.text('Back to Studio'));
     await advance(tester, const Duration(milliseconds: 600));
-    // The freshly deployed agent is listed in the marketplace.
-    expect(find.text('Nomad Concierge'), findsOneWidget);
+    // Nothing was created, so nothing new is listed.
+    expect(find.text('Deploy agent'), findsNothing);
+    expect(find.text('Agent Studio'), findsOneWidget);
+  });
+
+  testWidgets('A rejected signature can be tried again from the sheet', (
+    tester,
+  ) async {
+    final wallet = MockWallet()..rejectSignatures = true;
+    await pumpApp(tester, location: '/studio', wallet: wallet);
+
+    await tester.tap(find.text('Deploy to Stellar'));
+    await advance(tester, const Duration(milliseconds: 2500));
+    expect(find.text('Signature rejected'), findsOneWidget);
+
+    wallet.rejectSignatures = false;
+    await tester.tap(find.text('Try again'));
+    await advance(tester, const Duration(milliseconds: 3500));
+    expect(find.text('Demo deploy only'), findsOneWidget);
   });
 }

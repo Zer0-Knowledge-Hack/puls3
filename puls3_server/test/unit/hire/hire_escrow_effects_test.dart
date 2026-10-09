@@ -5,13 +5,17 @@ import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/chain/chain_submission_store.dart';
 import 'package:puls3_server/src/chain/escrow_effects.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
+import 'package:puls3_server/src/hire/escrow_preparation_store.dart';
 import 'package:puls3_server/src/hire/hire_escrow_effects.dart';
+import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/ledger/escrow_events.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
+import '../../support/in_memory_escrow_preparation_store.dart';
+import '../../support/in_memory_hire_lifecycle_store.dart';
 import 'hire_test_fakes.dart';
 
 final _alice = StellarAddress.parse(
@@ -111,8 +115,12 @@ void main() {
   late FakeLedger ledger;
   late Hire hire;
 
+  late InMemoryHireLifecycleStore lifecycle;
+  late InMemoryEscrowPreparationStore preparations;
+
   HireEscrowEffects effects(FakeHireRepository used) => HireEscrowEffects(
     repositories: <T>(action) => action(used),
+    lifecycle: <T>(action) => action(lifecycle, preparations),
     ledger: ledger,
     jobs: ledger,
     usdc: _usdc,
@@ -136,6 +144,8 @@ void main() {
   }
 
   setUp(() async {
+    lifecycle = InMemoryHireLifecycleStore();
+    preparations = InMemoryEscrowPreparationStore();
     repo = FakeHireRepository();
     ledger = FakeLedger()
       ..wallets[7] = _agentWallet
@@ -369,23 +379,174 @@ void main() {
   });
 
   group('onJobCreated', () {
-    test('has no effect until the hire lifecycle (#96)', () async {
-      final result = await effects(repo).onJobCreated(
-        _submission(purpose: SubmissionPurpose.createJob),
-        JobCreatedEvent(
-          jobId: 3,
-          client: _alice,
-          provider: _agentWallet,
-          evaluator: _alice,
-          agentId: AgentId(7),
-          token: _usdc,
-          budget: BigInt.from(_price),
+    // The job the create_job opened lasts until this instant, which differs
+    // from the hire's own expired_at so the effect must copy it.
+    const preparedExpiry = 1800000500;
+
+    Future<({HireRow row, StoredSubmission submission})> pending({
+      String requestId = 'request-1',
+      int? jobExpiredAt = preparedExpiry,
+    }) async {
+      final row = await lifecycle.insertHire(
+        NewHire(
+          consumer: _alice.value,
+          agentId: 7,
+          price: _price,
+          manifestVersion: 1,
           expiredAt: _expiredAt,
+          requestId: requestId,
+          input: 'input',
         ),
       );
+      final prepared = await preparations.insert(
+        NewPreparation(
+          preparationId: 'prep-$requestId',
+          hireId: row.id,
+          purpose: SubmissionPurpose.createJob,
+          signer: _alice.value,
+          unsignedEnvelopeXdr: 'AAAA',
+          transactionHash: requestId.padLeft(64, '0'),
+          sequence: 1,
+          validUntil: _at,
+          jobExpiredAt: jobExpiredAt,
+        ),
+      );
+      return (
+        row: row,
+        submission: _submission(
+          hireId: row.id,
+          purpose: SubmissionPurpose.createJob,
+        ).with_(preparationId: prepared.preparationId),
+      );
+    }
 
-      expect(result, isA<EffectOk>());
-      expect(repo.recordPaymentCalls, 0);
+    JobCreatedEvent created(int jobId) => JobCreatedEvent(
+      jobId: jobId,
+      client: _alice,
+      provider: _agentWallet,
+      evaluator: _alice,
+      agentId: AgentId(7),
+      token: _usdc,
+      budget: BigInt.from(_price),
+      expiredAt: preparedExpiry,
+    );
+
+    test(
+      'binds the job id, opens the hire and takes the prepared expiry',
+      () async {
+        final p = await pending();
+
+        final result = await effects(
+          repo,
+        ).onJobCreated(p.submission, created(3));
+
+        expect(result, isA<EffectOk>());
+        final stored = (await lifecycle.findHire(p.row.id))!;
+        expect(stored.jobId, 3);
+        expect(stored.status, HireStatus.open);
+        expect(stored.expiredAt, preparedExpiry);
+        expect(repo.recordPaymentCalls, 0);
+      },
+    );
+
+    test('applied twice it succeeds and the job id is stored once', () async {
+      final p = await pending();
+      await effects(repo).onJobCreated(p.submission, created(3));
+
+      final again = await effects(repo).onJobCreated(p.submission, created(3));
+
+      expect(again, isA<EffectOk>());
+      expect(lifecycle.all.where((h) => h.jobId == 3), hasLength(1));
+      expect((await lifecycle.findHire(p.row.id))!.expiredAt, preparedExpiry);
     });
+
+    test(
+      'a job id another hire holds is a mismatch and the hire keeps no status',
+      () async {
+        final first = await pending();
+        final second = await pending(requestId: 'request-2');
+        await effects(repo).onJobCreated(first.submission, created(3));
+
+        final result = await effects(repo).onJobCreated(
+          second.submission,
+          created(3),
+        );
+
+        expect(result, mismatch('job_id'));
+        final stored = (await lifecycle.findHire(second.row.id))!;
+        expect(stored.jobId, isNull);
+        expect(stored.status, isNull);
+      },
+    );
+
+    test('a hire that already holds another job is a mismatch', () async {
+      final p = await pending();
+      await effects(repo).onJobCreated(p.submission, created(3));
+
+      final result = await effects(repo).onJobCreated(p.submission, created(4));
+
+      expect(result, mismatch('job_id'));
+      expect((await lifecycle.findHire(p.row.id))!.jobId, 3);
+    });
+
+    test('a submission without a hire is a terminal mismatch', () async {
+      final result = await effects(repo).onJobCreated(
+        _submission(purpose: SubmissionPurpose.createJob, hireId: null),
+        created(3),
+      );
+
+      expect(result, mismatch(null));
+    });
+
+    test(
+      'an unknown hire or preparation, or none prepared expiry, is thrown for a retry',
+      () async {
+        final p = await pending();
+        final unprepared = await pending(
+          requestId: 'request-3',
+          jobExpiredAt: null,
+        );
+
+        for (final submission in [
+          p.submission.with_(hireId: 999),
+          p.submission.with_(preparationId: 'nope'),
+          p.submission.with_(preparationId: null),
+          unprepared.submission,
+        ]) {
+          await expectLater(
+            effects(repo).onJobCreated(submission, created(3)),
+            throwsStateError,
+          );
+        }
+        expect((await lifecycle.findHire(p.row.id))!.jobId, isNull);
+        expect((await lifecycle.findHire(unprepared.row.id))!.jobId, isNull);
+      },
+    );
   });
 }
+
+extension on StoredSubmission {
+  /// A copy; a `null` [preparationId] argument clears it only when passed.
+  StoredSubmission with_({Object? preparationId = _keep, int? hireId}) =>
+      StoredSubmission(
+        id: id,
+        preparationId: identical(preparationId, _keep)
+            ? this.preparationId
+            : preparationId as String?,
+        purpose: purpose,
+        transactionHash: transactionHash,
+        state: state,
+        errorCode: errorCode,
+        explorerUrl: explorerUrl,
+        hireId: hireId ?? this.hireId,
+        signedEnvelopeXdr: signedEnvelopeXdr,
+        validUntil: validUntil,
+        lastSentAt: lastSentAt,
+        sendAttempts: sendAttempts,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        lastCheckedAt: lastCheckedAt,
+      );
+}
+
+const _keep = Object();

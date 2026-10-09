@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  puls3: agent marketplace on Stellar. Dart pub workspace: puls3_domain (pure Dart, no Serverpod/Flutter/Stellar SDK, ADR-0001),
+  puls3_server (Serverpod 4.0.4), puls3_client (generated, do not hand-edit), puls3_flutter (Flutter 3.44.4 / Dart 3.12.2),
+  plus Rust Soroban contracts under contracts/ (soroban-sdk 28, Stellar CLI 28.0.0).
+  Architecture: hexagonal (docs/adr/0001-system-architecture.md); domain model in docs/domain/model.md.
+  Conventions: conventional commits, NO Co-Authored-By or AI attribution; GitHub comments and artifacts in English.
+  CI (.github/workflows/ci.yml) is path-filtered per component.
+
+strict_tdd: true
+
+testing:
+  strict_tdd: true
+  runner:
+    puls3_domain: "dart test"
+    puls3_server: "dart test  # needs Postgres+Redis (docker-compose) for tag 'integration'; unit: dart test test/unit"
+    puls3_flutter: "flutter test"
+    contracts: "cargo test  # run in contracts/"
+    puls3_client: none (generated code)
+  layers:
+    unit: {available: true, tool: "package:test / flutter_test / cargo test (soroban-sdk testutils)"}
+    integration: {available: true, tool: "serverpod_test + Postgres/Redis (tag integration)"}
+    e2e: {available: false, tool: null}
+  coverage: {available: false, command: null}
+  quality:
+    linter: "dart analyze --fatal-infos (domain, server) | flutter analyze --fatal-infos (flutter) | cargo clippy --all-targets -- -D warnings"
+    type_checker: "dart analyze (same as linter)"
+    formatter: "dart format . | cargo fmt --all -- --check"
+  codegen: "serverpod generate (in puls3_server); CI fails on git diff in puls3_server/puls3_client"
+
+rules:
+  proposal: ["Include rollback plan", "Flag changes crossing the ADR-0001 domain boundary"]
+  specs: ["Use Given/When/Then; existing specs live in openspec/specs/<capability>/"]
+  design: ["Respect hexagonal ports/adapters; puls3_domain must stay dependency-free of Serverpod, Flutter, Stellar SDK"]
+  tasks: ["Forecast against the 400-line review budget", "Test task precedes implementation task (Strict TDD)"]
+  apply: ["Strict TDD: write failing test first", "Conventional commits, no AI attribution", "Run serverpod generate when endpoints/models change"]
+  verify: ["Run per-package analyze + tests listed under testing.runner", "Contracts: cargo fmt/clippy/test"]
+  archive: ["Move to openspec/changes/archive/; do not rewrite existing archived content"]

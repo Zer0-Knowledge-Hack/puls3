@@ -30,16 +30,22 @@ final class Skill {
 
 final _kebabCase = RegExp(r'^[a-z0-9]+(-[a-z0-9]+)*$');
 
-/// The attributes of an agent that do not depend on its identity or wallet:
-/// its name, description, skills and price.
-///
-/// A builder submits these before the agent is registered, so the same rules
-/// guard both a drafted agent and a published one (ADR-0004). `Agent` holds
-/// the validated values.
-final class AgentDetails {
-  AgentDetails._(this.name, this.description, this.skills, this.price);
+/// An AI agent published in puls3.
+final class Agent {
+  Agent._(
+    this.id,
+    this.owner,
+    this.wallet,
+    this.name,
+    this.description,
+    this.skills,
+    this.price,
+  );
 
-  factory AgentDetails({
+  factory Agent({
+    required AgentId id,
+    required StellarAddress owner,
+    required StellarAddress wallet,
     required String name,
     required String description,
     required List<Skill> skills,
@@ -63,57 +69,14 @@ final class AgentDetails {
     if (!price.isPositive) {
       throw const InvalidAgent(AgentProblem.priceNotPositive);
     }
-    return AgentDetails._(
-      name,
-      description,
-      List.unmodifiable(skills),
-      price,
-    );
-  }
-
-  final String name;
-  final String description;
-  final List<Skill> skills;
-
-  /// Price per task.
-  final UsdcAmount price;
-}
-
-/// An AI agent published in puls3.
-final class Agent {
-  Agent._(
-    this.id,
-    this.owner,
-    this.wallet,
-    this.name,
-    this.description,
-    this.skills,
-    this.price,
-  );
-
-  factory Agent({
-    required AgentId id,
-    required StellarAddress owner,
-    required StellarAddress wallet,
-    required String name,
-    required String description,
-    required List<Skill> skills,
-    required UsdcAmount price,
-  }) {
-    final details = AgentDetails(
-      name: name,
-      description: description,
-      skills: skills,
-      price: price,
-    );
     return Agent._(
       id,
       owner,
       wallet,
-      details.name,
-      details.description,
-      details.skills,
-      details.price,
+      name,
+      description,
+      List.unmodifiable(skills),
+      price,
     );
   }
 

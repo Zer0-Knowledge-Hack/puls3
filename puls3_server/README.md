@@ -60,6 +60,58 @@ writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 | Variable | Default | Meaning |
 |---|---|---|
 | `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
+| `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
+| `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
+| `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
+
+The three relay keys have no default, fallback or placeholder. They are read
+when an operation needs them, so a missing, empty, non-integer or out-of-range
+value makes that call fail with `HireConfigurationMissing` naming the key
+(`createHire` and the `prepare*` methods read the keys they need;
+`submitEscrowCall` reads none) and never stops the server or affects the other endpoints.
+
+### Hire endpoint sessions
+
+`HireEndpoint` (`createHire`, `prepareCreateJob`, `prepareFund`,
+`prepareComplete`, `prepareReject`, `submitEscrowCall`) resolves the caller
+through the `SessionWallet` seam before doing any work. Until wallet sessions
+exist (#25) the production binding, `FailClosedSessionWallet`, fails closed:
+every call is rejected with `AuthenticationUnavailable`, so the hire methods
+are not usable against a running server yet. Tests inject a fake with
+`HireEndpoint.sessionWallet`. `InputTooLong` has no documented limit, so the
+hire `input` length is not checked.
+
+### End-to-end proof on testnet
+
+`tool/e2e_relay_testnet.dart` creates and funds a hire on **testnet** using
+only `createHire`, `prepareFund` and `submitEscrowCall`, signing the unsigned
+XDR unchanged with a consumer key. It composes the real `HireEndpoint`, wiring,
+codec, Soroban RPC client and chain tracker over the test PostgreSQL (test
+mode, migrations applied), checks that a second submit of one preparation
+returns the existing record, and that an envelope with altered time bounds
+(a copy, never broadcast) is rejected with `EnvelopeMismatch`. It prints the
+hire and job ids, both transaction hashes with Stellar Expert links and the
+final status, and exits non-zero on any failed step.
+
+The secret is read from `PULS3_E2E_CONSUMER_SECRET` and is never printed or
+stored; feed it from the Stellar CLI in the same command. The relay values
+below are for this run only (they are not defaults of the server); the chain
+ids default to testnet and can be overridden with the `PULS3_STELLAR_*` keys.
+The consumer needs XLM and testnet USDC of the allowed token, and the registry
+needs an agent with a wallet (`PULS3_E2E_AGENT_ID` picks one; the cheapest
+otherwise).
+
+```bash
+docker start puls3_server-postgres_test-1 puls3_server-redis_test-1
+cd puls3_server
+PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" \
+PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_PLATFORM_FEE_BPS=0 \
+PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+dart run tool/e2e_relay_testnet.dart
+```
 
 ## Agent wallet custody
 
@@ -170,7 +222,7 @@ Browsers may call the API server only from an origin listed in
 origin, or with several `Origin` headers, gets `403` before an endpoint runs.
 Requests without an `Origin` header, such as `curl`, are not affected.
 
-Serverpod 3.4.13 answers CORS preflight (`OPTIONS`) requests in its own core
+Serverpod 4.0.4 answers CORS preflight (`OPTIONS`) requests in its own core
 middleware, before added middleware runs, so preflight responses still carry
 `Access-Control-Allow-Origin: *`. The request that follows is still rejected
 when its origin is not allowed.

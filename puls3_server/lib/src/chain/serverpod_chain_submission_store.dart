@@ -32,6 +32,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
     String? preparationId,
     int? hireId,
     String? explorerUrl,
+    Transaction? transaction,
   }) async {
     checkPreparation(purpose, preparationId);
     final now = _now().toUtc();
@@ -52,6 +53,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
           createdAt: now,
           lastCheckedAt: now,
         ),
+        transaction: transaction,
       );
       return _stored(row);
     } on DatabaseQueryException catch (e) {
@@ -70,6 +72,17 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       where: (t) => t.preparationId.equals(preparationId),
     );
     return row == null ? null : _stored(row);
+  }
+
+  @override
+  Future<List<StoredSubmission>> listByHire(int hireId) async {
+    final rows = await ChainSubmission.db.find(
+      _session,
+      where: (t) => t.hireId.equals(hireId),
+      orderBy: (t) => t.id,
+    );
+    // A row this store cannot read is skipped: the tracker fails it.
+    return [for (final row in rows) ?_tryStored(row)];
   }
 
   @override
