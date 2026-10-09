@@ -28,6 +28,8 @@ class HirePaymentView extends StatelessWidget {
     this.isDemo = true,
     this.progressLabel,
     this.inputController,
+    this.inputLocked = false,
+    this.resumeNote,
     this.hireId,
     this.transactionHash,
     this.paymentConfirmed = false,
@@ -55,6 +57,12 @@ class HirePaymentView extends StatelessWidget {
 
   /// The work request for the agent. When given, Confirm needs some text.
   final TextEditingController? inputController;
+
+  /// The task is fixed (the hire was started): shown, not editable.
+  final bool inputLocked;
+
+  /// Shown above the summary when an unfinished hire is resumed.
+  final String? resumeNote;
 
   /// The created hire, once confirmed.
   final int? hireId;
@@ -98,6 +106,35 @@ class HirePaymentView extends StatelessWidget {
             'arrive once wallet sign-in is live on the server.',
             style: Puls3Text.bodyMuted,
           ),
+        if (resumeNote != null) ...[
+          const SizedBox(height: Puls3Spacing.sm),
+          Container(
+            key: const ValueKey('hire-resume-note'),
+            padding: const EdgeInsets.all(Puls3Spacing.sm),
+            decoration: BoxDecoration(
+              color: Puls3Colors.surface,
+              borderRadius: Puls3Radius.mdAll,
+              border: Border.all(color: Puls3Colors.accent),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.history_rounded,
+                  size: 20,
+                  color: Puls3Colors.accent,
+                ),
+                const SizedBox(width: Puls3Spacing.sm),
+                Expanded(
+                  child: Text(
+                    resumeNote!,
+                    style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: Puls3Spacing.sm),
         const _EscrowGuarantee(),
         const SizedBox(height: Puls3Spacing.md),
@@ -106,6 +143,7 @@ class HirePaymentView extends StatelessWidget {
             key: const ValueKey('hire-input'),
             controller: input,
             enabled: !signing,
+            readOnly: inputLocked,
             minLines: 2,
             maxLines: 4,
             style: Puls3Text.body,

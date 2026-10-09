@@ -52,11 +52,19 @@ class _HireSheetState extends State<HireSheet> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final scope = AppScope.of(context);
-    _flow ??= HireFlowController(
-      agent: widget.agent,
-      gateway: scope.hireGateway,
-      wallet: scope.wallet,
-    );
+    if (_flow == null) {
+      final flow = _flow = HireFlowController(
+        agent: widget.agent,
+        gateway: scope.hireGateway,
+        wallet: scope.wallet,
+        store: scope.hireFlowStore,
+      );
+      flow.addListener(_showResumedTask);
+      // A connected wallet: offer to resume an unfinished hire right away.
+      final consumer = scope.wallet.address;
+      if (consumer != null) flow.restore(consumer);
+      _showResumedTask();
+    }
   }
 
   @override
@@ -64,6 +72,12 @@ class _HireSheetState extends State<HireSheet> {
     _flow?.dispose();
     _input.dispose();
     super.dispose();
+  }
+
+  /// Shows the task of the unfinished hire this sheet resumes.
+  void _showResumedTask() {
+    final task = _flow?.resumedInput;
+    if (task != null && _input.text != task) _input.text = task;
   }
 
   void _run() => unawaited(_flow!.run(_input.text.trim()));
@@ -99,6 +113,12 @@ class _HireSheetState extends State<HireSheet> {
                   destinationAddress: widget.agent.stellarAddress,
                   isDemo: flow.isDemo,
                   inputController: _input,
+                  inputLocked: !flow.canEditTask,
+                  resumeNote: flow.resumedInput == null
+                      ? null
+                      : 'You have an unfinished hire with this agent. '
+                            'Confirming resumes it, so you are never charged '
+                            'twice.',
                   progressLabel: _progress(flow.step),
                   errorMessage: flow.error,
                   hireId: flow.hireId,

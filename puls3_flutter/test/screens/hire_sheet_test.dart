@@ -4,6 +4,7 @@ import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/hire/fake_hire_gateway.dart';
+import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
 import 'package:puls3_flutter/src/screens/hire_sheet.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
@@ -64,16 +65,35 @@ class TestWallet implements WalletPort {
   }
 }
 
-/// A non-demo hire backend that records every call.
+/// One hire the scripted backend knows.
+class _ScriptedHire {
+  _ScriptedHire(this.id);
+
+  final int id;
+  bool createJobSubmitted = false;
+  bool fundSubmitted = false;
+}
+
+/// A non-demo hire backend that records every call and, like the server,
+/// returns the same hire for the same request id (api.md, "createHire
+/// idempotency") and refuses a second fund once one was relayed.
 class ScriptedHireGateway implements HireGateway {
   final requestIds = <String>[];
+  final inputs = <String>[];
   final submitted = <String>[];
   var createJobPreparations = 0;
   var fundPreparations = 0;
+  final _byRequest = <String, _ScriptedHire>{};
+  final _byId = <int, _ScriptedHire>{};
+  var _nextHire = 3;
+  var _nextPreparation = 1;
 
   /// When set, the next call to that step fails with it once.
   HireGatewayException? failCreate;
   HireGatewayException? failNextSubmit;
+
+  /// When set, the next `create_job` submission fails with it once.
+  HireGatewayException? failCreateJobSubmit;
 
   /// When set, the next `fund` submission fails with it once.
   HireGatewayException? failFundSubmit;
@@ -81,6 +101,9 @@ class ScriptedHireGateway implements HireGateway {
   /// When set, the next `fund` submission throws it once after relaying:
   /// an unexpected failure once funds may have moved.
   Object? crashAfterFundRelay;
+
+  /// How many distinct hires were created.
+  int get hireCount => _byId.length;
 
   @override
   bool get isDemo => false;
@@ -93,12 +116,22 @@ class ScriptedHireGateway implements HireGateway {
     required String requestId,
   }) async {
     requestIds.add(requestId);
+    inputs.add(input);
     final failure = failCreate;
     if (failure != null) {
       failCreate = null;
       throw failure;
     }
-    return HireStart(hireId: 3, createJob: _prep('createJob'));
+    final hire = _byRequest.putIfAbsent(requestId, () {
+      final created = _ScriptedHire(_nextHire++);
+      _byId[created.id] = created;
+      return created;
+    });
+    return HireStart(
+      hireId: hire.id,
+      // Null once the create_job was submitted, as the server does.
+      createJob: hire.createJobSubmitted ? null : _prep('createJob'),
+    );
   }
 
   @override
@@ -109,6 +142,9 @@ class ScriptedHireGateway implements HireGateway {
 
   @override
   Future<EscrowPreparation> prepareFund(int hireId) async {
+    if (_byId[hireId]!.fundSubmitted) {
+      throw const HirePaymentAlreadySubmitted();
+    }
     fundPreparations++;
     return _prep('fund');
   }
@@ -119,25 +155,38 @@ class ScriptedHireGateway implements HireGateway {
     EscrowPreparation preparation,
     String signedTransaction,
   ) async {
+    final hire = _byId[hireId]!;
+    final fund = preparation.purpose == 'fund';
     final failure = failNextSubmit;
     if (failure != null) {
       failNextSubmit = null;
       throw failure;
     }
+    final createJobFailure = failCreateJobSubmit;
+    if (createJobFailure != null && !fund) {
+      failCreateJobSubmit = null;
+      throw createJobFailure;
+    }
     final crash = crashAfterFundRelay;
-    if (crash != null && preparation.purpose == 'fund') {
+    if (crash != null && fund) {
       crashAfterFundRelay = null;
       submitted.add(signedTransaction);
+      hire.fundSubmitted = true;
       throw crash;
     }
     final fundFailure = failFundSubmit;
-    if (fundFailure != null && preparation.purpose == 'fund') {
+    if (fundFailure != null && fund) {
       failFundSubmit = null;
       throw fundFailure;
     }
     submitted.add(signedTransaction);
+    if (fund) {
+      hire.fundSubmitted = true;
+    } else {
+      hire.createJobSubmitted = true;
+    }
     return EscrowSubmission(
-      transactionHash: preparation.purpose == 'fund'
+      transactionHash: fund
           ? 'fa11ce0000000000000000000000000000000000000000000000000000000001'
           : 'c0ffee',
       state: 'submitted',
@@ -145,7 +194,7 @@ class ScriptedHireGateway implements HireGateway {
   }
 
   EscrowPreparation _prep(String purpose) => EscrowPreparation(
-    preparationId: 'prep-$purpose',
+    preparationId: 'prep-$purpose-${_nextPreparation++}',
     purpose: purpose,
     unsignedTransaction: 'AAAA-$purpose',
   );
@@ -170,6 +219,7 @@ Future<void> pumpSheet(
   required WalletPort wallet,
   HireGateway? gateway,
   Agent agent = _onChainAgent,
+  HireFlowStore? store,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   opened.clear();
@@ -181,6 +231,7 @@ Future<void> pumpSheet(
         wallet: WalletController(wallet),
         deployGateway: FakeDeployGateway(),
         hireGateway: gateway ?? FakeHireGateway(delay: Duration.zero),
+        hireFlowStore: store ?? MemoryHireFlowStore(),
         child: Scaffold(
           body: HireSheet(
             agent: agent,
@@ -385,6 +436,155 @@ void main() {
       await confirm(tester);
       expect(find.textContaining('not registered on chain'), findsOneWidget);
       expect(gateway.requestIds, isEmpty);
+    });
+  });
+  group('HireSheet: final failures prepare again (review of #144)', () {
+    testWidgets('a create_job rejected for good is prepared again', (
+      tester,
+    ) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..failCreateJobSubmit = const HireSubmissionFailed('rejected');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      expect(find.text('Payment failed'), findsOneWidget);
+      expect(gateway.createJobPreparations, 0);
+
+      await tap(tester, 'Try again');
+      // A fresh create_job, signed again; still one hire.
+      expect(gateway.createJobPreparations, 1);
+      expect(wallet.signed.where((x) => x == 'AAAA-createJob'), hasLength(2));
+      expect(gateway.hireCount, 1);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+
+    testWidgets('a fund that failed on chain is prepared again', (
+      tester,
+    ) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..failFundSubmit = const HireSubmissionFailed('TransactionFailed');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      expect(gateway.fundPreparations, 1);
+
+      await tap(tester, 'Try again');
+      expect(gateway.fundPreparations, 2);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+
+    testWidgets('an uncertain failure resends the same fund, never a new '
+        'one', (tester) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..failFundSubmit = const HireBackendUnavailable('no answer');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      await tap(tester, 'Try again');
+      // The same preparation is relayed again (the relay is idempotent).
+      expect(gateway.fundPreparations, 1);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+  });
+
+  group('HireSheet: an unfinished hire is resumed, never paid twice', () {
+    testWidgets('closing the sheet mid-payment and reopening resumes the '
+        'same hire', (tester) async {
+      final store = MemoryHireFlowStore();
+      final gateway = ScriptedHireGateway();
+      final wallet = TestWallet(initialAddress: 'GUSER123')
+        ..rejectPayloadOnce = 'AAAA-fund';
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await confirm(tester, input: 'Audit my token');
+      expect(find.text('Payment failed'), findsOneWidget);
+
+      // The sheet is closed and opened again.
+      await tester.pumpWidget(const SizedBox());
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('hire-resume-note')), findsOneWidget);
+      expect(find.text('Audit my token'), findsOneWidget);
+      await tap(tester, 'Confirm & sign');
+
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+      // One request id, one hire, one create_job, one fund.
+      expect(gateway.requestIds.toSet(), hasLength(1));
+      expect(gateway.hireCount, 1);
+      expect(wallet.signed.where((x) => x == 'AAAA-createJob'), hasLength(1));
+      expect(gateway.submitted.last, 'signed:AAAA-fund');
+    });
+
+    testWidgets('after an app restart the stored hire is resumed with its '
+        'own task', (tester) async {
+      // The browser storage outlives the app: the same backing map.
+      final browser = <String, String>{};
+      final gateway = ScriptedHireGateway();
+      final wallet = TestWallet(initialAddress: 'GUSER123')
+        ..rejectPayloadOnce = 'AAAA-fund';
+      await pumpSheet(
+        tester,
+        wallet: wallet,
+        gateway: gateway,
+        store: MemoryHireFlowStore(browser),
+      );
+      await confirm(tester, input: 'Audit my token');
+
+      await tester.pumpWidget(const SizedBox());
+      await pumpSheet(
+        tester,
+        wallet: wallet,
+        gateway: gateway,
+        store: MemoryHireFlowStore(browser),
+      );
+      await tester.pump();
+      await tap(tester, 'Confirm & sign');
+
+      expect(gateway.hireCount, 1);
+      // The resumed hire keeps its task, so the request id still matches.
+      expect(gateway.inputs.toSet(), {'Audit my token'});
+    });
+
+    testWidgets('a resumed hire that is already paid is never paid again', (
+      tester,
+    ) async {
+      final store = MemoryHireFlowStore();
+      final gateway = ScriptedHireGateway()
+        ..crashAfterFundRelay = StateError('lost response');
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await confirm(tester);
+      expect(gateway.submitted.last, 'signed:AAAA-fund');
+
+      await tester.pumpWidget(const SizedBox());
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await tester.pump();
+      await tap(tester, 'Confirm & sign');
+
+      expect(find.text('A payment for this hire was already sent.'), findsOne);
+      expect(wallet.signed.where((x) => x == 'AAAA-fund'), hasLength(1));
+      expect(gateway.hireCount, 1);
+    });
+
+    testWidgets('a finished hire is cleared: the next one is new', (
+      tester,
+    ) async {
+      final store = MemoryHireFlowStore();
+      final gateway = ScriptedHireGateway();
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await confirm(tester);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await tester.pump();
+      expect(find.byKey(const ValueKey('hire-resume-note')), findsNothing);
+      await confirm(tester, input: 'Another task');
+      expect(gateway.hireCount, 2);
     });
   });
 }

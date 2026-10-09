@@ -119,6 +119,14 @@ final class HirePreparationExpired extends HireGatewayException {
     : super('The transaction expired before it was sent.');
 }
 
+/// The submission of a preparation ended for good (`SubmissionRejected`,
+/// `TransactionFailed`, or a preparation the server no longer has). The
+/// relay is idempotent per preparation, so resending it returns the same
+/// failure: the retry must prepare the call again.
+final class HireSubmissionFailed extends HireGatewayException {
+  const HireSubmissionFailed(super.message);
+}
+
 /// The server could not prepare the payment (`ChainUnavailable` with
 /// `simulationFailed`). The server cannot tell a short balance from an
 /// unreachable node or a missing account, so neither can the app.
@@ -134,6 +142,11 @@ final class HirePaymentNotPrepared extends HireGatewayException {
 final class HirePaymentAlreadySubmitted extends HireGatewayException {
   const HirePaymentAlreadySubmitted()
     : super('A payment for this hire was already sent.');
+}
+
+/// The hire is closed (`rejected` or `expired`): it takes no payment.
+final class HireClosed extends HireGatewayException {
+  const HireClosed() : super('This hire is closed. Start a new hire.');
 }
 
 /// The server or the chain could not answer. Retrying the same step is

@@ -171,6 +171,23 @@ class ServerHireGateway implements HireGateway {
       'InvalidHireTransition' when fund && e.details?['status'] == null =>
         const _JobNotReady(),
       'SubmissionInProgress' when fund => const _JobNotReady(),
+      // A resumed hire that is already paid: never prepare a second fund.
+      'InvalidHireTransition'
+          when fund &&
+              const {
+                'funded',
+                'submitted',
+                'completed',
+              }.contains(e.details?['status']) =>
+        const HirePaymentAlreadySubmitted(),
+      'InvalidHireTransition'
+          when const {'rejected', 'expired'}.contains(e.details?['status']) =>
+        const HireClosed(),
+      // The server no longer has this preparation: prepare it again.
+      'PreparationNotFound' => const HireSubmissionFailed(
+        'The prepared transaction is no longer available. Try again to '
+        'prepare a new one.',
+      ),
       'ChainUnavailable' ||
       'ChainDataUnavailable' ||
       'PersistenceUnavailable' => const HireBackendUnavailable(
@@ -183,6 +200,11 @@ class ServerHireGateway implements HireGateway {
   /// A submission the server tracked and marked `failed`.
   static HireGatewayException _outcome(String? code) => switch (code) {
     'PreparationExpired' => const HirePreparationExpired(),
+    // Final failures of this preparation: the retry prepares a new one.
+    'SubmissionRejected' || 'TransactionFailed' => HireSubmissionFailed(
+      'The network rejected the transaction ($code). Try again to prepare '
+      'a new one.',
+    ),
     // The fund transaction succeeded but does not match this hire: the
     // funds moved and stay in the escrow (api.md F5-5).
     'JobMismatch' || 'JobEvidenceUnavailable' => const HireRejected(

@@ -152,7 +152,10 @@ void main() {
           details: {'status': 'funded'},
         ),
       );
-      await expectLater(gateway.prepareFund(3), throwsA(isA<HireRejected>()));
+      await expectLater(
+        gateway.prepareFund(3),
+        throwsA(isA<HirePaymentAlreadySubmitted>()),
+      );
     });
 
     test('a failed fund simulation does not claim missing funds', () async {
@@ -225,7 +228,7 @@ void main() {
           submit: (_, _, _) async =>
               _detail('failed', errorCode: 'TransactionFailed'),
         ).submit(3, prep, 's'),
-        throwsA(isA<HireRejected>()),
+        throwsA(isA<HireSubmissionFailed>()),
       );
     });
 
@@ -250,6 +253,57 @@ void main() {
         ),
       );
     });
+
+    test('final submission failures ask for a new preparation', () async {
+      const prep = EscrowPreparation(
+        preparationId: 'p',
+        purpose: 'fund',
+        unsignedTransaction: 'x',
+      );
+      for (final code in ['SubmissionRejected', 'TransactionFailed']) {
+        await expectLater(
+          _gateway(
+            submit: (_, _, _) async => _detail('failed', errorCode: code),
+          ).submit(3, prep, 's'),
+          throwsA(isA<HireSubmissionFailed>()),
+          reason: code,
+        );
+      }
+      await expectLater(
+        _gateway(
+          submit: (_, _, _) async =>
+              throw Puls3ApiException(code: 'PreparationNotFound'),
+        ).submit(3, prep, 's'),
+        throwsA(isA<HireSubmissionFailed>()),
+      );
+    });
+
+    test(
+      'a resumed hire that is already funded is never prepared again',
+      () async {
+        for (final status in ['funded', 'submitted', 'completed']) {
+          await expectLater(
+            _gateway(
+              prepareFund: (_) async => throw Puls3ApiException(
+                code: 'InvalidHireTransition',
+                details: {'status': status},
+              ),
+            ).prepareFund(3),
+            throwsA(isA<HirePaymentAlreadySubmitted>()),
+            reason: status,
+          );
+        }
+        await expectLater(
+          _gateway(
+            prepareFund: (_) async => throw Puls3ApiException(
+              code: 'InvalidHireTransition',
+              details: {'status': 'expired'},
+            ),
+          ).prepareFund(3),
+          throwsA(isA<HireClosed>()),
+        );
+      },
+    );
 
     test('a server that does not answer is a retryable error', () async {
       final gateway = ServerHireGateway(

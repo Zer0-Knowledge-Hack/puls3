@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../domain/agent.dart';
 import '../state/wallet_controller.dart';
 import '../wallet/wallet_port.dart';
+import 'hire_flow_store.dart';
 import 'hire_gateway.dart';
 
 /// Where the hire is (api.md F5-3 to F5-5).
@@ -27,21 +28,31 @@ enum HireStep {
 /// unchanged and returns it; the server submits.
 ///
 /// It never runs twice, resumes from the failed step, and keeps one request
-/// id per flow so a retry returns the same hire instead of a second one.
+/// id per hire so a retry returns the same hire instead of a second one.
+/// The request id and the task are kept in [HireFlowStore] until the hire is
+/// paid: a closed sheet or a restarted app resumes the same hire, so the
+/// consumer never pays twice (`createHire` is idempotent per request id).
 class HireFlowController extends ChangeNotifier {
   HireFlowController({
     required this.agent,
     required this._gateway,
     required this._wallet,
+    required this._store,
     String? requestId,
-  }) : requestId = requestId ?? _newRequestId();
+  }) : _requestId = requestId ?? _newRequestId();
 
   final Agent agent;
   final HireGateway _gateway;
   final WalletController _wallet;
+  final HireFlowStore _store;
 
-  /// The `createHire` idempotency key, fixed for this flow.
-  final String requestId;
+  String _requestId;
+  String? _resumedInput;
+  String? _storeKey;
+
+  /// The task sent with `createHire`, fixed once the hire is started: the
+  /// same request id with another task is `IdempotencyKeyReused`.
+  String? _task;
 
   HireStep _step = HireStep.review;
   String? _error;
@@ -53,6 +64,12 @@ class HireFlowController extends ChangeNotifier {
   bool _createJobSent = false;
   EscrowPreparation? _fund;
   EscrowSubmission? _payment;
+
+  /// The `createHire` idempotency key of this hire.
+  String get requestId => _requestId;
+
+  /// Whether the task can still change: not once the hire was started.
+  bool get canEditTask => _task == null;
 
   HireStep get step => _step;
   bool get isRunning => _running;
@@ -66,8 +83,27 @@ class HireFlowController extends ChangeNotifier {
   /// The relayed `fund`, once the flow is done.
   EscrowSubmission? get payment => _payment;
 
+  /// The task of an unfinished hire with this agent that this flow resumes;
+  /// null for a new hire.
+  String? get resumedInput => _resumedInput;
+
+  /// Adopts the unfinished hire of [consumer] with this agent, if any, so
+  /// confirming resumes it. Returns its task.
+  String? restore(String consumer) {
+    final key = _keyFor(consumer);
+    if (_storeKey == key) return _resumedInput;
+    _storeKey = key;
+    final pending = _store.read(key);
+    if (pending != null) {
+      _requestId = pending.requestId;
+      _resumedInput = _task = pending.input;
+      _notify();
+    }
+    return _resumedInput;
+  }
+
   /// Starts the flow, or resumes it after an error, with [input] as the
-  /// work request.
+  /// work request. A resumed hire keeps its own task.
   Future<void> run(String input) async {
     if (_running || _step == HireStep.done) return;
     _running = true;
@@ -82,6 +118,14 @@ class HireFlowController extends ChangeNotifier {
           'This agent is not registered on chain, so it cannot be hired.',
         );
       }
+      // Same request id and task as an unfinished hire, or a new one kept
+      // until this hire is paid.
+      restore(consumer);
+      final task = _task ??= input;
+      _store.write(
+        _storeKey!,
+        PendingHire(requestId: _requestId, input: task),
+      );
 
       var hireId = _hireId;
       if (hireId == null) {
@@ -89,8 +133,8 @@ class HireFlowController extends ChangeNotifier {
         final start = await _gateway.createHire(
           agentId: agentId ?? 0,
           consumer: consumer,
-          input: input,
-          requestId: requestId,
+          input: task,
+          requestId: _requestId,
         );
         hireId = _hireId = start.hireId;
         _createJob = start.createJob;
@@ -112,9 +156,7 @@ class HireFlowController extends ChangeNotifier {
           hireId,
           createJob,
           signed,
-          onExpired: () {
-            _createJob = null;
-          },
+          prepareAgain: () => _createJob = null,
         );
         _createJobSent = true;
       }
@@ -130,13 +172,14 @@ class HireFlowController extends ChangeNotifier {
         hireId,
         fund,
         signed,
-        onExpired: () {
-          _fund = null;
-        },
+        prepareAgain: () => _fund = null,
       );
+      _finish();
       _set(HireStep.done);
     } on Object catch (e) {
       if (_disposed) return;
+      // Paid already, or closed: this hire is over, a new one may start.
+      if (e is HirePaymentAlreadySubmitted || e is HireClosed) _finish();
       _error = _message(e);
       debugPrint('Hire flow stopped at $_step: ${e.runtimeType}');
     } finally {
@@ -153,21 +196,37 @@ class HireFlowController extends ChangeNotifier {
     return prepare();
   }
 
-  /// Relays a signed envelope; an expired preparation is dropped so the
-  /// retry prepares a new one instead of resending it.
+  /// Relays a signed envelope. A final failure of the preparation (expired,
+  /// rejected, failed on chain) drops it so the retry prepares a new one: the
+  /// relay is idempotent per preparation and would return the same failure.
+  /// An uncertain failure (no answer) keeps it, so the retry resends the
+  /// same envelope and the relay never submits it twice.
   Future<EscrowSubmission> _submit(
     int hireId,
     EscrowPreparation preparation,
     String signed, {
-    required VoidCallback onExpired,
+    required VoidCallback prepareAgain,
   }) async {
     try {
       return await _gateway.submit(hireId, preparation, signed);
     } on HirePreparationExpired {
-      onExpired();
+      prepareAgain();
+      rethrow;
+    } on HireSubmissionFailed {
+      prepareAgain();
       rethrow;
     }
   }
+
+  /// The hire needs no resuming any more.
+  void _finish() {
+    final key = _storeKey;
+    if (key != null) _store.remove(key);
+    _resumedInput = null;
+  }
+
+  String _keyFor(String consumer) =>
+      pendingHireKey(consumer, '${agent.registryId ?? agent.id}');
 
   void _set(HireStep step) {
     if (_disposed) throw const _Cancelled();
