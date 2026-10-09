@@ -12,7 +12,12 @@ fields:
   ### The agent's payment account, a G… address.
   address: String
 
-  ### Base64 AES-256-GCM ciphertext of the secret seed.
+  ### The caller's idempotency key (the deploy session/draft id). Creating a
+  ### wallet twice with the same key returns the same wallet.
+  idempotencyKey: String
+
+  ### Base64 AES-256-GCM ciphertext of the secret seed. The wallet address is
+  ### the GCM additional authenticated data, binding the secret to its row.
   ciphertext: String
 
   ### Base64 GCM nonce.
@@ -32,6 +37,9 @@ fields:
 indexes:
   agent_wallet_address_idx:
     fields: address
+    unique: true
+  agent_wallet_idempotency_idx:
+    fields: idempotencyKey
     unique: true
   agent_wallet_owner_idx:
     fields: owner

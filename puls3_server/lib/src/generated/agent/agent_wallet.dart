@@ -22,6 +22,7 @@ abstract class AgentWallet
     this.id,
     required this.owner,
     required this.address,
+    required this.idempotencyKey,
     required this.ciphertext,
     required this.nonce,
     required this.mac,
@@ -34,6 +35,7 @@ abstract class AgentWallet
     int? id,
     required String owner,
     required String address,
+    required String idempotencyKey,
     required String ciphertext,
     required String nonce,
     required String mac,
@@ -47,6 +49,7 @@ abstract class AgentWallet
       id: jsonSerialization['id'] as int?,
       owner: jsonSerialization['owner'] as String,
       address: jsonSerialization['address'] as String,
+      idempotencyKey: jsonSerialization['idempotencyKey'] as String,
       ciphertext: jsonSerialization['ciphertext'] as String,
       nonce: jsonSerialization['nonce'] as String,
       mac: jsonSerialization['mac'] as String,
@@ -71,7 +74,12 @@ abstract class AgentWallet
   /// The agent's payment account, a G… address.
   String address;
 
-  /// Base64 AES-256-GCM ciphertext of the secret seed.
+  /// The caller's idempotency key (the deploy session/draft id). Creating a
+  /// wallet twice with the same key returns the same wallet.
+  String idempotencyKey;
+
+  /// Base64 AES-256-GCM ciphertext of the secret seed. The wallet address is
+  /// the GCM additional authenticated data, binding the secret to its row.
   String ciphertext;
 
   /// Base64 GCM nonce.
@@ -99,6 +107,7 @@ abstract class AgentWallet
     int? id,
     String? owner,
     String? address,
+    String? idempotencyKey,
     String? ciphertext,
     String? nonce,
     String? mac,
@@ -113,6 +122,7 @@ abstract class AgentWallet
       if (id != null) 'id': id,
       'owner': owner,
       'address': address,
+      'idempotencyKey': idempotencyKey,
       'ciphertext': ciphertext,
       'nonce': nonce,
       'mac': mac,
@@ -162,6 +172,7 @@ class _AgentWalletImpl extends AgentWallet {
     int? id,
     required String owner,
     required String address,
+    required String idempotencyKey,
     required String ciphertext,
     required String nonce,
     required String mac,
@@ -172,6 +183,7 @@ class _AgentWalletImpl extends AgentWallet {
          id: id,
          owner: owner,
          address: address,
+         idempotencyKey: idempotencyKey,
          ciphertext: ciphertext,
          nonce: nonce,
          mac: mac,
@@ -188,6 +200,7 @@ class _AgentWalletImpl extends AgentWallet {
     Object? id = _Undefined,
     String? owner,
     String? address,
+    String? idempotencyKey,
     String? ciphertext,
     String? nonce,
     String? mac,
@@ -199,6 +212,7 @@ class _AgentWalletImpl extends AgentWallet {
       id: id is int? ? id : this.id,
       owner: owner ?? this.owner,
       address: address ?? this.address,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       ciphertext: ciphertext ?? this.ciphertext,
       nonce: nonce ?? this.nonce,
       mac: mac ?? this.mac,
@@ -221,6 +235,12 @@ class AgentWalletUpdateTable extends _is.UpdateTable<AgentWalletTable> {
     table.address,
     value,
   );
+
+  _is.ColumnValue<String, String> idempotencyKey(String value) =>
+      _is.ColumnValue(
+        table.idempotencyKey,
+        value,
+      );
 
   _is.ColumnValue<String, String> ciphertext(String value) => _is.ColumnValue(
     table.ciphertext,
@@ -265,6 +285,10 @@ class AgentWalletTable extends _is.Table<int?> {
       'address',
       this,
     );
+    idempotencyKey = _is.ColumnString(
+      'idempotencyKey',
+      this,
+    );
     ciphertext = _is.ColumnString(
       'ciphertext',
       this,
@@ -299,7 +323,12 @@ class AgentWalletTable extends _is.Table<int?> {
   /// The agent's payment account, a G… address.
   late final _is.ColumnString address;
 
-  /// Base64 AES-256-GCM ciphertext of the secret seed.
+  /// The caller's idempotency key (the deploy session/draft id). Creating a
+  /// wallet twice with the same key returns the same wallet.
+  late final _is.ColumnString idempotencyKey;
+
+  /// Base64 AES-256-GCM ciphertext of the secret seed. The wallet address is
+  /// the GCM additional authenticated data, binding the secret to its row.
   late final _is.ColumnString ciphertext;
 
   /// Base64 GCM nonce.
@@ -322,6 +351,7 @@ class AgentWalletTable extends _is.Table<int?> {
     id,
     owner,
     address,
+    idempotencyKey,
     ciphertext,
     nonce,
     mac,

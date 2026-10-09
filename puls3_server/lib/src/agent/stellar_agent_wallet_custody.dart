@@ -13,6 +13,9 @@ import 'secret_cipher.dart';
 /// The secret seed is generated from a secure random source, encrypted with
 /// [cipher] and stored through [wallets]; the plaintext seed never leaves this
 /// method, is never logged and is never returned. Only the public address is.
+///
+/// Creation is idempotent per [AgentWalletCustody.create]'s key: the same key
+/// returns the same wallet, so a retry cannot orphan a funded account.
 final class StellarAgentWalletCustody implements AgentWalletCustody {
   StellarAgentWalletCustody({
     required AgentWalletStore wallets,
@@ -30,20 +33,37 @@ final class StellarAgentWalletCustody implements AgentWalletCustody {
   final DateTime Function() _now;
 
   @override
-  Future<StellarAddress> create({required StellarAddress owner}) async {
+  Future<StellarAddress> create({
+    required StellarAddress owner,
+    required String idempotencyKey,
+  }) async {
+    final existing = await _wallets.findByIdempotencyKey(idempotencyKey);
+    if (existing != null) return existing.address;
+
     final seed = List<int>.generate(_seedLength, (_) => _random.nextInt(256));
     final privateKey = stellar.StellarPrivateKey.fromBytes(seed);
     final address = StellarAddress.parse(
       privateKey.toPublicKey().toAddress().baseAddress,
     );
-    final secret = await _cipher.encrypt(utf8.encode(privateKey.toBase32()));
-    await _wallets.save(
-      owner: owner,
-      address: address,
-      secret: secret,
-      createdAt: _now().toUtc(),
+    final secret = await _cipher.encrypt(
+      utf8.encode(privateKey.toBase32()),
+      aad: utf8.encode(address.value),
     );
-    return address;
+    try {
+      await _wallets.save(
+        owner: owner,
+        address: address,
+        idempotencyKey: idempotencyKey,
+        secret: secret,
+        createdAt: _now().toUtc(),
+      );
+      return address;
+    } on AgentWalletConflict {
+      // A concurrent create won the race; return its wallet.
+      final won = await _wallets.findByIdempotencyKey(idempotencyKey);
+      if (won != null) return won.address;
+      rethrow;
+    }
   }
 }
 

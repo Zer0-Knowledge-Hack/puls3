@@ -17,8 +17,16 @@ final class AgentWalletCustodyUnavailable implements Exception {
 /// The secret is generated and stored encrypted by the adapter; the port only
 /// ever exposes the agent's public [StellarAddress].
 abstract interface class AgentWalletCustody {
-  /// Creates a new agent wallet owned by [owner] and returns its address.
+  /// Returns the wallet for [idempotencyKey], creating it on first use.
+  ///
+  /// [idempotencyKey] identifies the wallet so a retry returns the same
+  /// address instead of a new (and, once funded, orphan) account. It is the
+  /// caller's deploy session/draft id (the wallet is created before
+  /// `register_full` yields the agent id).
   ///
   /// Throws [AgentWalletCustodyUnavailable] when custody is not configured.
-  Future<StellarAddress> create({required StellarAddress owner});
+  Future<StellarAddress> create({
+    required StellarAddress owner,
+    required String idempotencyKey,
+  });
 }

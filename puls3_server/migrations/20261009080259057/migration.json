@@ -38,6 +38,14 @@
           },
           {
             "__className__": "serverpod.ColumnDefinition",
+            "name": "idempotencyKey",
+            "fieldName": "idempotencyKey",
+            "columnType": 0,
+            "isNullable": false,
+            "dartType": "String"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
             "name": "ciphertext",
             "fieldName": "ciphertext",
             "columnType": 0,
@@ -95,6 +103,20 @@
                 "__className__": "serverpod.IndexElementDefinition",
                 "type": 0,
                 "definition": "address"
+              }
+            ],
+            "type": "btree",
+            "isUnique": true,
+            "isPrimary": false
+          },
+          {
+            "__className__": "serverpod.IndexDefinition",
+            "indexName": "agent_wallet_idempotency_idx",
+            "elements": [
+              {
+                "__className__": "serverpod.IndexElementDefinition",
+                "type": 0,
+                "definition": "idempotencyKey"
               }
             ],
             "type": "btree",

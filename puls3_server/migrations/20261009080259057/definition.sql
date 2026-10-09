@@ -36,6 +36,7 @@ CREATE TABLE "agent_wallet" (
     "id" bigserial PRIMARY KEY,
     "owner" text NOT NULL,
     "address" text NOT NULL,
+    "idempotencyKey" text NOT NULL,
     "ciphertext" text NOT NULL,
     "nonce" text NOT NULL,
     "mac" text NOT NULL,
@@ -46,6 +47,7 @@ CREATE TABLE "agent_wallet" (
 
 -- Indexes
 CREATE UNIQUE INDEX "agent_wallet_address_idx" ON "agent_wallet" USING btree ("address");
+CREATE UNIQUE INDEX "agent_wallet_idempotency_idx" ON "agent_wallet" USING btree ("idempotencyKey");
 CREATE INDEX "agent_wallet_owner_idx" ON "agent_wallet" USING btree ("owner");
 
 --
@@ -76,6 +78,31 @@ CREATE INDEX "chain_submission_state_idx" ON "chain_submission" USING btree ("st
 CREATE INDEX "chain_submission_hire_idx" ON "chain_submission" USING btree ("hireId");
 
 --
+-- Class EscrowPreparation as table escrow_preparation
+--
+CREATE TABLE "escrow_preparation" (
+    "id" bigserial PRIMARY KEY,
+    "preparationId" text NOT NULL,
+    "hireId" bigint NOT NULL,
+    "purpose" text NOT NULL,
+    "signer" text NOT NULL,
+    "unsignedEnvelopeXdr" text NOT NULL,
+    "transactionHash" text NOT NULL,
+    "sequence" bigint NOT NULL,
+    "validUntil" timestamp without time zone NOT NULL,
+    "jobExpiredAt" bigint,
+    "rejectReason" text,
+    "createdAt" timestamp without time zone NOT NULL,
+    "supersededAt" timestamp without time zone,
+    "submittedAt" timestamp without time zone
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "escrow_preparation_id_idx" ON "escrow_preparation" USING btree ("preparationId");
+CREATE INDEX "escrow_preparation_hire_idx" ON "escrow_preparation" USING btree ("hireId");
+CREATE INDEX "escrow_preparation_transaction_idx" ON "escrow_preparation" USING btree ("transactionHash");
+
+--
 -- Class HireRecord as table hire
 --
 CREATE TABLE "hire" (
@@ -84,8 +111,15 @@ CREATE TABLE "hire" (
     "agentId" bigint NOT NULL,
     "price" bigint NOT NULL,
     "manifestVersion" bigint NOT NULL,
-    "expiredAt" bigint NOT NULL
+    "expiredAt" bigint NOT NULL,
+    "requestId" text,
+    "input" text,
+    "jobId" bigint
 );
+
+-- Indexes
+CREATE UNIQUE INDEX "hire_consumer_request_idx" ON "hire" USING btree ("consumer", "requestId");
+CREATE UNIQUE INDEX "hire_job_id_idx" ON "hire" USING btree ("jobId");
 
 --
 -- Class HirePaymentRecord as table hire_payment
@@ -844,9 +878,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261008054958966', now())
+    VALUES ('puls3', '20261009080259057', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261008054958966', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009080259057', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

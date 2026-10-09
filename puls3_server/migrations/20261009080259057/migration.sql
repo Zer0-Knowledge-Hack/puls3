@@ -7,6 +7,7 @@ CREATE TABLE "agent_wallet" (
     "id" bigserial PRIMARY KEY,
     "owner" text NOT NULL,
     "address" text NOT NULL,
+    "idempotencyKey" text NOT NULL,
     "ciphertext" text NOT NULL,
     "nonce" text NOT NULL,
     "mac" text NOT NULL,
@@ -17,6 +18,7 @@ CREATE TABLE "agent_wallet" (
 
 -- Indexes
 CREATE UNIQUE INDEX "agent_wallet_address_idx" ON "agent_wallet" USING btree ("address");
+CREATE UNIQUE INDEX "agent_wallet_idempotency_idx" ON "agent_wallet" USING btree ("idempotencyKey");
 CREATE INDEX "agent_wallet_owner_idx" ON "agent_wallet" USING btree ("owner");
 
 
@@ -24,9 +26,9 @@ CREATE INDEX "agent_wallet_owner_idx" ON "agent_wallet" USING btree ("owner");
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261008054958966', now())
+    VALUES ('puls3', '20261009080259057', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261008054958966', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009080259057', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod
