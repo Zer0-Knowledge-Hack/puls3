@@ -5,16 +5,19 @@
 ///     cd puls3_flutter
 ///     flutter test tool/wireframes/wireframes_test.dart --update-goldens
 ///
-/// The test font draws every glyph as a block, so the PNGs read as low to
-/// mid fidelity wireframes: layout, components and states, not final type.
+/// Text uses Roboto and the Material icons from the Flutter SDK (and the
+/// app's Doto accent), not the final brand fonts of #24: the PNGs are low
+/// to mid fidelity wireframes with readable labels.
 /// Screens that exist render the real widgets with fake data; S05, S06 and
 /// S10 are not built yet and are drawn from the same components, after
 /// flows F6 and F7 (docs/blueprints/flows.md).
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
@@ -31,6 +34,31 @@ import 'package:puls3_flutter/src/ui/molecules/progress_step_row.dart';
 import 'package:puls3_flutter/src/ui/molecules/screen_header.dart';
 
 import '../../test/helpers.dart';
+
+/// Loads real fonts so labels read instead of the test font's blocks.
+Future<void> _loadFonts() async {
+  final sdk = Platform.environment['FLUTTER_ROOT'];
+  if (sdk == null) throw StateError('Run with flutter test (FLUTTER_ROOT).');
+  final material = '$sdk/bin/cache/artifacts/material_fonts';
+  Future<void> load(String family, List<String> files) async {
+    final loader = FontLoader(family);
+    for (final file in files) {
+      final bytes = File(file).readAsBytesSync();
+      loader.addFont(Future.value(ByteData.sublistView(bytes)));
+    }
+    await loader.load();
+  }
+
+  final roboto = [
+    '$material/roboto-regular.ttf',
+    '$material/roboto-medium.ttf',
+    '$material/roboto-bold.ttf',
+  ];
+  // Puls3Fonts.offlineFamily, used while Google Fonts are off.
+  await load('Roboto', roboto);
+  await load('MaterialIcons', ['$material/materialicons-regular.otf']);
+  await load('Doto', ['assets/fonts/Doto-ROND-wght.ttf']);
+}
 
 const _desktop = Size(1440, 1000);
 const _mobile = Size(390, 844);
@@ -134,73 +162,125 @@ Widget _myHires() => Column(
   ],
 );
 
+/// The S06 states drawn as wireframes.
+enum _HireView { submitted, runFailed, completed }
+
 /// S06 `/hires/:id`: status, run progress, result and the decision (F6).
-Widget _hireDetail() => Column(
-  crossAxisAlignment: CrossAxisAlignment.stretch,
-  children: [
-    const SizedBox(height: Puls3Spacing.xl),
-    const ScreenHeader(
-      title: 'Hire #3 · Soroban Auditor',
-      subtitle: 'Submitted: review the result before the approval deadline.',
+Widget _hireDetail(_HireView view) {
+  final (subtitle, steps) = switch (view) {
+    _HireView.submitted => (
+      'Submitted: review the result before the approval deadline.',
+      const [
+        ('Funded: price held in escrow', StepStatus.done),
+        ('Agent ran the task', StepStatus.done),
+        ('Submitted: waiting for your decision', StepStatus.active),
+        ('Completed: escrow pays the agent', StepStatus.pending),
+      ],
     ),
-    const SizedBox(height: Puls3Spacing.lg),
-    const ProgressStepRow(
-      label: 'Funded: price held in escrow',
-      status: StepStatus.done,
+    _HireView.runFailed => (
+      'Funded: the agent run failed. Your USDC is still in escrow.',
+      const [
+        ('Funded: price held in escrow', StepStatus.done),
+        ('Run failed: timed out', StepStatus.failed),
+        ('Submitted', StepStatus.pending),
+        ('Completed', StepStatus.pending),
+      ],
     ),
-    const ProgressStepRow(label: 'Agent ran the task', status: StepStatus.done),
-    const ProgressStepRow(
-      label: 'Submitted: waiting for your decision',
-      status: StepStatus.active,
+    _HireView.completed => (
+      'Completed: the approval deadline passed and the escrow paid the agent.',
+      const [
+        ('Funded: price held in escrow', StepStatus.done),
+        ('Agent ran the task', StepStatus.done),
+        ('Submitted', StepStatus.done),
+        ('Completed: released after the deadline', StepStatus.done),
+      ],
     ),
-    const ProgressStepRow(
-      label: 'Completed: escrow pays the agent',
-      status: StepStatus.pending,
-    ),
-    const SizedBox(height: Puls3Spacing.lg),
-    const SectionLabel('Result'),
-    const SizedBox(height: Puls3Spacing.sm),
-    Container(
-      height: 160,
-      padding: const EdgeInsets.all(Puls3Spacing.md),
-      decoration: BoxDecoration(
-        color: Puls3Colors.surface,
-        borderRadius: Puls3Radius.mdAll,
-        border: Border.all(color: Puls3Colors.hairline),
+  };
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SizedBox(height: Puls3Spacing.xl),
+      ScreenHeader(title: 'Hire #3 · Soroban Auditor', subtitle: subtitle),
+      const SizedBox(height: Puls3Spacing.lg),
+      for (final (label, status) in steps)
+        ProgressStepRow(label: label, status: status),
+      const SizedBox(height: Puls3Spacing.lg),
+      if (view != _HireView.runFailed) ...[
+        const SectionLabel('Result'),
+        const SizedBox(height: Puls3Spacing.sm),
+        Container(
+          height: 160,
+          padding: const EdgeInsets.all(Puls3Spacing.md),
+          decoration: BoxDecoration(
+            color: Puls3Colors.surface,
+            borderRadius: Puls3Radius.mdAll,
+            border: Border.all(color: Puls3Colors.hairline),
+          ),
+          child: Text(
+            'The token contract has two findings: an unchecked transfer and '
+            'a missing auth check on set_admin.',
+            style: Puls3Text.body,
+          ),
+        ),
+        const SizedBox(height: Puls3Spacing.md),
+      ],
+      const KeyValueRow(label: 'Price', value: '4.50 USDC'),
+      KeyValueRow(
+        label: view == _HireView.runFailed
+            ? 'Failure reason'
+            : 'Approval deadline',
+        value: switch (view) {
+          _HireView.submitted => '23 h left',
+          _HireView.runFailed => 'Run timed out',
+          _HireView.completed => 'Passed',
+        },
       ),
-      child: Text(
-        'The token contract has two findings: an unchecked transfer and a '
-        'missing auth check on set_admin.',
-        style: Puls3Text.body,
+      const KeyValueRow(
+        label: 'Payment',
+        value: '',
+        valueWidget: AddressBadge(
+          address: 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+        ),
       ),
-    ),
-    const SizedBox(height: Puls3Spacing.md),
-    const KeyValueRow(label: 'Price', value: '4.50 USDC'),
-    const KeyValueRow(label: 'Approval deadline', value: '23 h left'),
-    const KeyValueRow(
-      label: 'Payment',
-      value: '',
-      valueWidget: AddressBadge(
-        address: 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
-      ),
-    ),
-    const SizedBox(height: Puls3Spacing.lg),
-    PrimaryButton(
-      label: 'Approve',
-      icon: Icons.check_rounded,
-      expand: true,
-      onPressed: () {},
-    ),
-    const SizedBox(height: Puls3Spacing.sm),
-    PrimaryButton(
-      label: 'Reject and refund',
-      variant: PrimaryButtonVariant.outline,
-      expand: true,
-      onPressed: () {},
-    ),
-    const SizedBox(height: Puls3Spacing.xxl),
-  ],
-);
+      const SizedBox(height: Puls3Spacing.lg),
+      ...switch (view) {
+        _HireView.submitted => [
+          PrimaryButton(
+            label: 'Approve',
+            icon: Icons.check_rounded,
+            expand: true,
+            onPressed: () {},
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+          PrimaryButton(
+            label: 'Reject and refund',
+            variant: PrimaryButtonVariant.outline,
+            expand: true,
+            onPressed: () {},
+          ),
+        ],
+        _HireView.runFailed => [
+          PrimaryButton(
+            label: 'Reject and refund',
+            icon: Icons.undo_rounded,
+            expand: true,
+            onPressed: () {},
+          ),
+        ],
+        // After the deadline Reject is hidden: the escrow refuses it.
+        _HireView.completed => [
+          PrimaryButton(
+            label: 'Rate',
+            icon: Icons.star_outline_rounded,
+            expand: true,
+            onPressed: () {},
+          ),
+        ],
+      },
+      const SizedBox(height: Puls3Spacing.xxl),
+    ],
+  );
+}
 
 /// S10: rate a completed hire, score 1 to 5 and an optional comment (F7).
 Widget _rateSheet() => Column(
@@ -246,6 +326,8 @@ Widget _rateSheet() => Column(
 );
 
 void main() {
+  setUpAll(_loadFonts);
+
   for (final MapEntry(key: width, value: size) in _viewports.entries) {
     group('$width px', () {
       testWidgets('S01-landing', (tester) async {
@@ -322,8 +404,16 @@ void main() {
       });
 
       testWidgets('S06-hire-detail', (tester) async {
-        await _pumpSketch(tester, size, _hireDetail());
+        await _pumpSketch(tester, size, _hireDetail(_HireView.submitted));
         await _shoot(tester, 'S06-hire-detail-$width');
+      });
+
+      testWidgets('S06-hire-detail states', (tester) async {
+        await _pumpSketch(tester, size, _hireDetail(_HireView.runFailed));
+        await _shoot(tester, 'S06-hire-detail-run-failed-$width');
+
+        await _pumpSketch(tester, size, _hireDetail(_HireView.completed));
+        await _shoot(tester, 'S06-hire-detail-deadline-passed-$width');
       });
 
       testWidgets('S07-studio', (tester) async {

@@ -5,7 +5,7 @@
 
 What each screen shows and how it behaves in every state, so "done" is not a matter of opinion. Each section gives the purpose, the flows it belongs to, the data shown (named exactly as in the domain model), the four states, the actions and where they lead, and the components it uses. The [component inventory](#component-inventory) maps every reusable widget to its screens.
 
-**Wireframes.** Every screen has a desktop (1440 px) and a mobile (390 px) wireframe in [`wireframes/`](wireframes/), named `<screen-id>-<width>.png`. S02 and S03 also have one per state (`-loading`, `-empty`, `-error`). They are low to mid fidelity: the layout and components are the app's, while text is drawn as blocks and colors are only indicative (final visuals are #24). Screens that exist render from the app; S05, S06 and S10 are not built yet and are drawn from the same components after flows F6 and F7. To regenerate them after a UI change:
+**Wireframes.** Every screen has a desktop (1440 px) and a mobile (390 px) wireframe in [`wireframes/`](wireframes/), named `<screen-id>-<width>.png`. S02 and S03 also have one per state (`-loading`, `-empty`, `-error`), and S06 has its failed-run and deadline-passed states. They are low to mid fidelity: the layout, components and labels are the app's, set in Roboto rather than the final brand fonts, and colors are only indicative (final visuals are #24). Screens that exist render from the app; S05, S06 and S10 are not built yet and are drawn from the same components after flows F6 and F7. To regenerate them after a UI change:
 
 ```
 cd puls3_flutter
@@ -130,8 +130,8 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 |---|---|
 | Loading | A skeleton; while the agent works (`funded`, `queued` or `running`) the steps update by polling `getHire`. |
 | Empty | Unknown or someone else's hire: "Hire not found" with **My hires** (→ S05). |
-| Error | Banner with **Retry**. A failed run (`runtimeStatus: failed`) shows `Hire.failureReason` and **Reject and refund**. |
-| Success | Steps (funded, ran, submitted, completed), the result (scrollable, with **Copy**), the deadline, **Approve** and **Reject and refund**. Completed: **Rate** if not rated. |
+| Error | Banner with **Retry**. A failed run (`runtimeStatus: failed`) shows `Hire.failureReason` and **Reject and refund**: [1440](wireframes/S06-hire-detail-run-failed-1440.png) · [390](wireframes/S06-hire-detail-run-failed-390.png). |
+| Success | Steps (funded, ran, submitted, completed), the result (scrollable, with **Copy**), the deadline, **Approve** and **Reject and refund**. After the approval deadline, **Reject** is hidden and the hire is **Completed** by `release`, with **Rate** if not rated: [1440](wireframes/S06-hire-detail-deadline-passed-1440.png) · [390](wireframes/S06-hire-detail-deadline-passed-390.png). |
 
 **Actions:** **Approve** → wallet signs `complete` → **Completed**. **Reject and refund** (optional reason) → wallet signs `reject` → **Rejected**; hidden after the deadline. **Rate** → S10.
 
