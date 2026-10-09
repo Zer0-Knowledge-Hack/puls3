@@ -63,13 +63,14 @@ puls3 is in **early development**. What exists today:
 - ✅ The Agent Identity Registry contract on Soroban, deployed on testnet with 8 current demo agents ([evidence](#on-chain-evidence-testnet))
 - ✅ The Agent Escrow contract on Soroban, deployed on testnet, with a completed escrow job in Circle testnet USDC ([evidence](#on-chain-evidence-testnet))
 - ✅ A direct testnet USDC payment to an agent's muxed address, verified on-chain ([evidence](#on-chain-evidence-testnet))
+- ✅ A hire funded through the puls3 server's escrow relay: the server prepares the envelopes, the consumer signs, and the server verifies, relays and confirms them ([evidence](#server-escrow-relay-hire-1-job-6))
 - ✅ The pure Dart domain model ([`puls3_domain/`](puls3_domain/))
 - 🚧 Reputation Registry contract
 - 🚧 Backend, the app wired to the chain, and agent execution
 
 ### On-chain evidence (testnet)
 
-Everything below can be opened on [stellar.expert](https://stellar.expert/explorer/testnet) (Stellar testnet). All values come from [`contracts/deployments/testnet.json`](contracts/deployments/testnet.json) or from recorded script output, and every transaction was confirmed `"successful": true` on Horizon testnet on 2026-10-04. Step-by-step checks: [`docs/verification/onchain.md`](docs/verification/onchain.md).
+Everything below can be opened on [stellar.expert](https://stellar.expert/explorer/testnet) (Stellar testnet). All values come from [`contracts/deployments/testnet.json`](contracts/deployments/testnet.json) or from recorded script output, and every transaction was confirmed `"successful": true` on Horizon testnet on 2026-10-04 (the server escrow relay transactions on 2026-10-08). Step-by-step checks: [`docs/verification/onchain.md`](docs/verification/onchain.md).
 
 #### Contracts
 
@@ -102,6 +103,22 @@ Two earlier attempts left orphan jobs on the same escrow contract. They are disc
 
 - **Job 1** stopped in `Submitted`: `complete` failed because the provider wallet had no USDC trustline. Transactions: `create_job` [`03600ff311a7a768018ea268012ecc5b1864ee4f2c7da7f578646efccc670dac`](https://stellar.expert/explorer/testnet/tx/03600ff311a7a768018ea268012ecc5b1864ee4f2c7da7f578646efccc670dac), `fund` [`77acf8e634235cb86156f60bbc5ded3c74da7b238e086db8e84c31f405850756`](https://stellar.expert/explorer/testnet/tx/77acf8e634235cb86156f60bbc5ded3c74da7b238e086db8e84c31f405850756), `submit` [`e8b90bfdc98c0a18acda0d40f4bdbbce19389bb12c891e6d79e690621d43a3d0`](https://stellar.expert/explorer/testnet/tx/e8b90bfdc98c0a18acda0d40f4bdbbce19389bb12c891e6d79e690621d43a3d0).
 - **Job 2** completed on-chain, but the deploy script's read-back mis-parsed the numeric job state (a bug, since fixed). Transactions: `create_job` [`08e502bb589a02a27a8ed7b3db618ba9b2042ca94caab3f691186205a3fd9e51`](https://stellar.expert/explorer/testnet/tx/08e502bb589a02a27a8ed7b3db618ba9b2042ca94caab3f691186205a3fd9e51), `fund` [`798c4af76d1fe52f7205b5f8837d6b6365b8d9978082e5e73e022ec56119f9d8`](https://stellar.expert/explorer/testnet/tx/798c4af76d1fe52f7205b5f8837d6b6365b8d9978082e5e73e022ec56119f9d8), `submit` [`1b780b618e1e401b9f2684f962f48f3731f8cb7c4860f0824103cf0f5beda96f`](https://stellar.expert/explorer/testnet/tx/1b780b618e1e401b9f2684f962f48f3731f8cb7c4860f0824103cf0f5beda96f), `complete` [`1b0557b396063569d33cbd8b2efd1c88844a9f43d54695e01173c8b6b29a5fe4`](https://stellar.expert/explorer/testnet/tx/1b0557b396063569d33cbd8b2efd1c88844a9f43d54695e01173c8b6b29a5fe4).
+
+#### Server escrow relay (hire 1, job 6)
+
+The puls3 server prepares the unsigned `create_job` and `fund` envelopes, and the consumer signs them unchanged. The server then verifies each signed envelope byte for byte against what it prepared, relays it, and the chain tracker confirms it (#96, `HireEndpoint`). Recorded on 2026-10-08 by [`puls3_server/tool/e2e_relay_testnet.dart`](puls3_server/tool/e2e_relay_testnet.dart) from `main` at `f799ca5`.
+
+- Agent: registry id 13, "Support Relay", price 0.1 USDC (1000000 stroops).
+- Consumer: `GCJOMHOLKJJUMFCBC56ZIZTINBAFARFQIWNM4MA4GJ6RJZQI4KH3RIB3`.
+- Final hire status: `funded`.
+- The same run also checked two rejections: an envelope with altered time bounds was rejected with `EnvelopeMismatch {field: timeBounds}`, and nothing was stored or sent for it. A second submit of the same preparation returned the existing record.
+
+| Step | Hash | Link |
+|---|---|---|
+| `create_job` (relayed) | `602dfd37e5185020513cb2f6d82879ee317b4bb0f514221d563c4a6b831cf388` | [tx](https://stellar.expert/explorer/testnet/tx/602dfd37e5185020513cb2f6d82879ee317b4bb0f514221d563c4a6b831cf388) |
+| `fund` (relayed, recorded as the hire's payment) | `bb52ff04c07b29bfab10073e641e9d7bd77489db4c4e83d588079762cf5f60ad` | [tx](https://stellar.expert/explorer/testnet/tx/bb52ff04c07b29bfab10073e641e9d7bd77489db4c4e83d588079762cf5f60ad) |
+
+A second run of the same script started concurrently by mistake (hire 2) and also reached `funded`. Its transactions are disclosed here but are not the evidence of record: `create_job` [`eb9df7d7cd72167838d05f9e4e29b226c86cde7ae5cc92111827e63c42158339`](https://stellar.expert/explorer/testnet/tx/eb9df7d7cd72167838d05f9e4e29b226c86cde7ae5cc92111827e63c42158339), `fund` [`5128e27e28e01b17e260ec1d0cf0c41bea00f2054eec391c7d3e49a04ccafd4a`](https://stellar.expert/explorer/testnet/tx/5128e27e28e01b17e260ec1d0cf0c41bea00f2054eec391c7d3e49a04ccafd4a).
 
 #### Direct rail (SAC muxed payment)
 
@@ -181,6 +198,15 @@ design/          Design sources (logo lab)
 ## Hackathon Note (Stellar Odyssey Perú)
 
 Per rules §8.1, this project existed prior to the Stellar Odyssey event. The codebase before the hackathon kickoff (Sep 19, 2026) was established at commit [`8bd23dc26605906683f32e2c177a2c7bde018db6`](https://github.com/Zer0-Knowledge-Hack/puls3/commit/8bd23dc26605906683f32e2c177a2c7bde018db6). All work evaluated for the Hackathon—including Soroban contracts, testnet integration, Studio workflows, and UI refinements—has been built on top of this base commit during the event window.
+
+## Deploy
+
+| Part | Where | Public URL |
+| --- | --- | --- |
+| Server (Serverpod) | Serverpod Cloud | [puls3-hub-on-stellar.api.serverpod.space](https://puls3-hub-on-stellar.api.serverpod.space/) |
+| Web app (Flutter) | Cloudflare Pages | [puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/) |
+
+Server deploy and redeploy, step by step: [`puls3_server/README.md`](puls3_server/README.md#deploy-to-serverpod-cloud). Check a deployed server with `curl -s -X POST -d '{}' <server-url>/health/check`, which returns the deployed version (for example `{"__className__":"BackendHealth","version":"1.0.0+4df3ba4"}`). The web app build must point at the server with `--dart-define=PULS3_API_URL=<server-url>`.
 
 ## Contributing
 

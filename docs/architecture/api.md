@@ -52,7 +52,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 | `HireEndpoint` | `prepareFund` | `hireId: int` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `SubmissionInProgress`, `PaymentAlreadySubmitted`, `ChainUnavailable` |
 | `HireEndpoint` | `prepareComplete` | `hireId: int` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `SubmissionInProgress`, `ChainUnavailable` |
 | `HireEndpoint` | `prepareReject` | `hireId: int`, `reason: String` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `InvalidRejectReason`, `SubmissionInProgress`, `ChainUnavailable` |
-| `HireEndpoint` | `submitEscrowCall` | `hireId: int`, `preparationId: String`, `signedTransactionXdr: String` | `HireDetail` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature` |
+| `HireEndpoint` | `submitEscrowCall` | `hireId: int`, `preparationId: String`, `signedTransactionXdr: String` | `HireDetail` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `ChainDataUnavailable` |
 | `HireEndpoint` | `getHire` | `hireId: int`, `consumer: String` | `HireDetail` | Yes | `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned` |
 | `HireEndpoint` | `listHires` | `consumer: String` | `List<HireSummary>` | Yes | `InvalidStellarAddress`, `WalletMismatch`, `PersistenceUnavailable` |
 | `FeedbackEndpoint` | `getFeedbackEligibility` | `hireId: int`, `client: String` | `FeedbackEligibility` | Yes | `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned`, `HireNotCompleted`, `HireAlreadyRated` |
@@ -65,7 +65,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 **Lifecycle error rule.** Hire methods report a wrong hire state with one code per family, so clients can branch on it:
 
-- Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` and `prepareFund` need `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted` before `approvalDeadline`.
+- Escrow methods raise `InvalidHireTransition` with `details.status` set to the current status when the hire is not in the state the call needs: `prepareCreateJob` needs a hire with no status yet (`details.status` is `null`: only a pending preparation exists, see [hire escrow states](#hire-escrow-states)) or `createJob` `failed`; `prepareFund` needs `open`; `prepareComplete` needs `submitted`; `prepareReject` needs `open` (a cancel before paying), `funded`, or `submitted` before `approvalDeadline`.
 - Feedback methods raise `HireNotCompleted` when the hire is not `completed`, and `HireAlreadyRated` when the hire already has a `feedbackReference`. `HireAlreadyRated` is the only "already rated" code, synchronous or asynchronous.
 
 ### Agent catalog
@@ -110,7 +110,7 @@ Agent runtime failures after funding are not submission outcomes: they set `Hire
 
 This applies to F4-6 (`register_full`), F4-7 (`set_agent_wallet`), F5-4 (escrow `create_job` and `fund`), the evaluator's `complete` and `reject`, and F7-4 (`give_feedback`).
 
-1. **Prepare.** A `prepare…` method (or `createHire` for the first `create_job`) builds the unsigned envelope or authorization entry, simulates it, and returns a `PreparedTransaction` bound to the session wallet (`signer`), the network passphrase, and an expiry.
+1. **Prepare.** A `prepare…` method (or `createHire` for the first `create_job`) builds the unsigned envelope or authorization entry, simulates it, and returns a `PreparedTransaction` bound to the session wallet (`signer`), the network passphrase, and an expiry. When the chain cannot be read or the simulation fails (for example `prepareFund` when the wallet has no USDC balance), the call raises `ChainUnavailable` with `details.reason = simulationFailed`.
    - For transaction envelopes the session wallet is the transaction source, so its envelope signature is the only user signature needed. `transaction` is the envelope hash, fixed at preparation.
    - For `setAgentWallet` the server also fixes, at preparation, the whole `set_agent_wallet` envelope around the entry: agent account as source, sequence number, fee, and time bounds that end no later than `signatureExpirationLedger`. Only the builder's entry signature is missing, so the final hash is determined by the prepared envelope plus that signature.
 2. **Sign (client).** The wallet adapter signs the prepared XDR unchanged. The app sends the signed XDR, with the `preparationId`, to the matching `submit…` method.
@@ -118,7 +118,7 @@ This applies to F4-6 (`register_full`), F4-7 (`set_agent_wallet`), F5-4 (escrow 
    - `PreparationNotFound`: unknown `preparationId`, or it belongs to another resource or wallet.
    - `PreparationExpired`: the preparation can no longer be used (`details.reason`: `timeBounds` when the envelope time bounds have passed, or `superseded` when a newer preparation replaced it). This applies to every purpose, including `setAgentWallet`.
    - `InvalidSignedEnvelope`: the XDR is empty, not base64, truncated, has trailing bytes, or is a fee-bump envelope.
-   - `EnvelopeMismatch`: the transaction body differs in any byte from the prepared body.
+   - `EnvelopeMismatch`: the transaction body differs in any byte from the prepared body. `details.field` names the first differing group: `contract`, `function`, `arguments`, `source`, `timeBounds`, or `other` (fee, sequence number, Soroban data, memo, or envelope type).
    - `InvalidTransactionSignature`: no signature from the session wallet, or a signature that does not verify over the transaction hash for the configured network (`details.reason`: `missing`, `wrongSigner`, or `doesNotVerify`).
    - For authorization entries, `InvalidAuthorizationEntry` replaces the three envelope checks, and `AuthorizationExpired` covers ledger expiry (see F4-7 below).
 4. **Persist, then submit.** Only after verification, the server stores the final signed envelope and its hash as a `ChainSubmission` with `state = submitted`, and then calls RPC `sendTransaction`. For `setAgentWallet` the final envelope is the prepared envelope with the verified entry inserted and the server's agent-account signature added.
@@ -132,7 +132,7 @@ This applies to F4-6 (`register_full`), F4-7 (`set_agent_wallet`), F5-4 (escrow 
    - A new preparation for the same resource supersedes the previous one and reuses the signer's current sequence number, so at most one of them can be included on chain.
    - `HireEndpoint.prepareFund` raises `PaymentAlreadySubmitted` when an earlier `fund` for the hire reached `SUCCESS` on chain, even if verification then failed. A new funding is never prepared once funds may have moved.
 
-Server-side submission through `stellar_dart` is not yet proven (spike #68, recommendation 6). ADR-0003's fallback is a TypeScript sidecar behind the same `LedgerPort` adapter. This is an implementation risk for #18 and #19, not a contract change.
+Server-side envelope handling through `stellar_dart` is proven: the #96 spike passed with stellar_dart 2.3.0 (decode and byte-identical re-encode, network transaction hash, and ed25519 signature verification; tests in `puls3_server/test/spike`). The fallback, if it is ever needed, is pure Dart: `package:crypto` + ed25519 with hand-written XDR behind the same `LedgerPort` adapter. This is not a contract change.
 
 ### Server-signed escrow calls
 
@@ -420,7 +420,7 @@ Both decisions were made by the product owner on 2026-09-30. They resolve the tw
 - New codes: `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `PaymentAlreadySubmitted`, `AuthorizationExpired`.
 - Removed codes, because the client no longer supplies transaction hashes or builds transactions, and pending is data: `InvalidTransactionHash`, `TransactionNotFound`, `TransactionPending`, `RegistrationMismatch`, `FeedbackAuthorizationPending`, `FeedbackDoesNotMatchHire`. ADR-0005 also removed the SAC verification codes and the feedback authorization codes.
 - New shared models: `PreparedTransaction` and `ChainSubmission`.
-- Implementation risk, not a contract change: Serverpod-side submission through `stellar_dart` is not yet proven. ADR-0003's fallback is a TypeScript sidecar behind the `LedgerPort` adapter.
+- Not a contract change: the #96 spike proved `stellar_dart` 2.3.0 for envelope decode, hash, and signature verification (tests in `puls3_server/test/spike`). The pure-Dart fallback (`package:crypto` + ed25519 with hand-written XDR) stays behind the same `LedgerPort` adapter.
 
 ### B. Progress transport: polling for the MVP, Serverpod streaming later
 
@@ -450,6 +450,6 @@ Both decisions were made by the product owner on 2026-09-30. They resolve the tw
 |---|---|---|
 | Escrow interface: function signatures, job id type, events, a job read method, how auto-approval and the D4 invariant are enforced | #55 | Preparation, funding verification, and `approvalDeadline` depend on it |
 | RPC providers other than SDF Testnet returning contract events and state | #30 | Funding verification reads the job and its event |
-| Server-side submission with `stellar_dart` | #18, #19 | Relay implementation path; the fallback is a TypeScript sidecar. |
+| Server-side submission with `stellar_dart` | #18, #19 | Relay implementation path; spike passed (stellar_dart 2.3.0, `puls3_server/test/spike`); the pure-Dart fallback is `package:crypto` + ed25519 with hand-written XDR behind the same adapter. |
 | Wallet challenge signing (`signMessage`) for F1-3 | #25 | Session establishment is not yet proven with Freighter. |
 | `give_feedback` arguments in the Stellar 8004 drop-in | #14 | `prepareFeedback` builds that call |

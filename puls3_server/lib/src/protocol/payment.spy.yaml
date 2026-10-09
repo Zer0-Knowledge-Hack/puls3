@@ -1,0 +1,16 @@
+### Draft transport mirror of the domain Payment entity.
+### Built by the server only after the funded escrow job passes every
+### funding verification check (docs/architecture/api.md, ADR-0005).
+class: Payment
+fields:
+  ### Domain TransactionHash of the `fund` transaction, lowercase hexadecimal.
+  transaction: String
+  ### Domain HireId encoded as an integer.
+  hireId: int
+  ### Domain StellarAddress encoded as a StrKey string. The job's client.
+  payer: String
+  ### Domain StellarAddress encoded as a StrKey string. The job's provider
+  ### (agent wallet); the escrow pays it on complete.
+  payee: String
+  ### Domain UsdcAmount encoded as integer USDC stroops. The job's budget.
+  amount: int

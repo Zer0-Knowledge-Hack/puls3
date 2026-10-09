@@ -1,38 +1,54 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../agent/agent_catalog_service.dart';
 import '../agent/registry_reader.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
-import 'hire_escrow_effects.dart';
+import 'escrow_preparation_store.dart';
+import 'escrow_relay_service.dart';
+import 'hire_lifecycle_store.dart';
+import 'hire_relay_config.dart';
 
-/// Creates hires (ADR-0005). The payment is verified by the escrow effects
-/// ([HireEscrowEffects]) when the chain tracker confirms a `fund` submission.
+/// Creates hires (ADR-0005). It never moves funds or signs: it stores the
+/// hire and hands the consumer's wallet the unsigned `create_job` the relay
+/// prepared. The payment is verified by the escrow effects
+/// (`HireEscrowEffects`) when the chain tracker confirms a `fund` submission.
 class HireService {
   HireService({
-    required this.repo,
+    required this.hires,
+    required this.preparations,
+    required this.relay,
     required this.registry,
     required this.catalog,
-    Map<String, String>? environment,
+    required this.config,
     DateTime Function()? now,
-  }) : _environment = environment ?? Platform.environment,
-       _now = now ?? DateTime.now;
+  }) : _now = now ?? DateTime.now;
 
-  final HireRepository repo;
+  final HireLifecycleStore hires;
+  final EscrowPreparationStore preparations;
+  final EscrowRelayService relay;
   final RegistryReader registry;
   final AgentCatalogService catalog;
-  final Map<String, String> _environment;
+  final HireRelayConfig config;
   final DateTime Function() _now;
 
-  /// Creates an open hire. It has no endpoint yet: payments go through the
-  /// server relay (Decision A in `docs/architecture/api.md`).
-  Future<HireView> createHire({
+  /// Creates the hire of [requestId], or returns the one it already
+  /// created, with the `create_job` envelope to sign.
+  ///
+  /// [requestId] is unique per [consumer]. Repeating it with the same
+  /// [agentId] and [input] returns the existing hire; with anything else it
+  /// is `IdempotencyKeyReused`. The envelope is prepared first and the hire
+  /// and its preparation are stored in one transaction, so a failed
+  /// preparation leaves no hire behind. The caller has already checked that
+  /// [consumer] is the session wallet.
+  Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
+    required String input,
+    required String requestId,
   }) async {
     final StellarAddress consumerAddress;
     try {
@@ -42,8 +58,16 @@ class HireService {
         message: 'Invalid consumer address: $consumer ($e)',
       );
     }
+    if (requestId.trim().isEmpty) {
+      throw HireRequestInvalid(message: 'requestId must not be blank.');
+    }
 
-    final durationSeconds = _durationSeconds();
+    final existing = await hires.findHireByRequest(consumer, requestId);
+    if (existing != null) {
+      return _repeat(existing, consumerAddress, agentId, input);
+    }
+
+    final durationSeconds = config.jobDurationSeconds;
 
     final AgentSummary? agent;
     try {
@@ -55,7 +79,8 @@ class HireService {
     } on LedgerException catch (e) {
       throw HireLedgerUnavailable(message: e.message);
     }
-    if (agent == null || agent.wallet == null) {
+    final agentWallet = agent?.wallet;
+    if (agent == null || agentWallet == null) {
       throw AgentUnavailable(agentId: agentId);
     }
 
@@ -72,38 +97,63 @@ class HireService {
 
     final nowSec = _now().toUtc().millisecondsSinceEpoch ~/ 1000;
     final expiredAt = nowSec + durationSeconds;
-
-    final hire = await repo.create(
-      agentId: AgentId(agentId),
-      consumer: consumerAddress,
-      price: UsdcAmount.stroops(agent.priceUsdcStroops),
-      manifestVersion: manifestVersion,
+    final price = agent.priceUsdcStroops;
+    final draft = await relay.draftCreateJob(
+      wallet: consumerAddress,
+      provider: StellarAddress.parse(agentWallet),
+      agentId: agentId,
+      price: price,
       expiredAt: expiredAt,
     );
 
-    return HireView(
-      hireId: hire.id.value,
-      agentRegistryId: hire.agentId.value,
-      consumer: hire.consumer.value,
-      priceStroops: hire.price.stroops,
-      status: hire.status.name,
-    );
+    try {
+      final (hire, preparation) = await preparations.inTransaction((
+        transaction,
+      ) async {
+        final hire = await hires.insertHire(
+          NewHire(
+            consumer: consumer,
+            agentId: agentId,
+            price: price,
+            manifestVersion: manifestVersion,
+            expiredAt: expiredAt,
+            requestId: requestId,
+            input: input,
+          ),
+          transaction: transaction,
+        );
+        final stored = await preparations.insert(
+          relay.newPreparation(draft, hire.id),
+          transaction: transaction,
+        );
+        return (hire, stored);
+      });
+      return CreateHireResult(
+        hire: hire.toProtocol(),
+        preparedCreateJob: relay.preparedOf(preparation),
+      );
+    } on HireRequestConflict {
+      // A concurrent call with the same request won the insert.
+      final winner = await hires.findHireByRequest(consumer, requestId);
+      if (winner == null) rethrow;
+      return _repeat(winner, consumerAddress, agentId, input);
+    }
   }
 
-  int _durationSeconds() {
-    final raw = _environment['PULS3_HIRE_JOB_DURATION_SECONDS'];
-    if (raw == null || raw.isEmpty) {
-      throw HireConfigurationMissing(
-        setting: 'PULS3_HIRE_JOB_DURATION_SECONDS',
-      );
+  /// The answer to a request that already created [existing].
+  Future<CreateHireResult> _repeat(
+    HireRow existing,
+    StellarAddress consumer,
+    int agentId,
+    String input,
+  ) async {
+    if (existing.agentId != agentId || existing.input != input) {
+      throw Puls3ApiException(code: 'IdempotencyKeyReused');
     }
-    final parsed = int.tryParse(raw);
-    if (parsed == null || parsed <= 0) {
-      throw HireConfigurationMissing(
-        setting: 'PULS3_HIRE_JOB_DURATION_SECONDS',
-      );
-    }
-    return parsed;
+    return CreateHireResult(
+      hire: existing.toProtocol(),
+      preparedCreateJob: await relay.currentCreateJob(existing, consumer),
+    );
   }
 
   int _manifestVersion(Uint8List? raw, int agentId) {

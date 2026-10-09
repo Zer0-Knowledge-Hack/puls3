@@ -27,3 +27,6 @@ secrets/
 .config/stellar/
 *.log
 .DS_Store
+
+# scloud deployment generated files should not be committed to git
+**/.scloud/

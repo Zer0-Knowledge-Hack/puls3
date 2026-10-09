@@ -37,7 +37,7 @@ class WalletChip extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: Puls3Radius.pillAll,
-        onTap: connected || isConnecting ? null : onConnect,
+        onTap: isConnecting ? null : onConnect,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: Puls3Spacing.md,

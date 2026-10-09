@@ -24,29 +24,43 @@ import 'agent/agent_record.dart' as _ia7sdlqn;
 import 'agent/agent_summary.dart' as _ipe500bk;
 import 'agent/catalog_index_state.dart' as _ixu8n9dt;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
+import 'create_hire_result.dart' as _i4si20vg;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
+import 'hire.dart' as _ibbrviw7;
 import 'hire/agent_unavailable.dart' as _i3db3d86;
+import 'hire/escrow_preparation.dart' as _ir9uo1i9;
 import 'hire/hire.dart' as _ikb6z54u;
 import 'hire/hire_configuration_missing.dart' as _izyyjkbb;
 import 'hire/hire_ledger_unavailable.dart' as _izuscvxu;
 import 'hire/hire_payment.dart' as _i7gyvijy;
 import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_view.dart' as _ivruwodq;
+import 'hire_detail.dart' as _ipbsq2gs;
+import 'payment.dart' as _ikmm2vup;
+import 'prepared_transaction.dart' as _i83uy5s0;
+import 'puls3_api_exception.dart' as _i5rj3edu;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
 export 'agent/catalog_index_state.dart';
 export 'chain/chain_submission.dart';
+export 'create_hire_result.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
+export 'hire.dart';
 export 'hire/agent_unavailable.dart';
+export 'hire/escrow_preparation.dart';
 export 'hire/hire.dart';
 export 'hire/hire_configuration_missing.dart';
 export 'hire/hire_ledger_unavailable.dart';
 export 'hire/hire_payment.dart';
 export 'hire/hire_request_invalid.dart';
 export 'hire/hire_view.dart';
+export 'hire_detail.dart';
+export 'payment.dart';
+export 'prepared_transaction.dart';
+export 'puls3_api_exception.dart';
 
 class Protocol extends _is.DatabaseSerializationManager {
   Protocol._();
@@ -364,6 +378,142 @@ class Protocol extends _is.DatabaseSerializationManager {
       managed: true,
     ),
     _isp.TableDefinition(
+      name: 'escrow_preparation',
+      dartName: 'EscrowPreparation',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'preparationId',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'hireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'purpose',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'signer',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'unsignedEnvelopeXdr',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'transactionHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'sequence',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'validUntil',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _isp.ColumnDefinition(
+          name: 'jobExpiredAt',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'rejectReason',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _isp.ColumnDefinition(
+          name: 'supersededAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'submittedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'escrow_preparation_id_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'preparationId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'escrow_preparation_hire_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'hireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'escrow_preparation_transaction_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'transactionHash',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
       name: 'hire',
       dartName: 'HireRecord',
       schema: 'public',
@@ -406,9 +556,58 @@ class Protocol extends _is.DatabaseSerializationManager {
           isNullable: false,
           dartType: 'int',
         ),
+        _isp.ColumnDefinition(
+          name: 'requestId',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'input',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'jobId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
       ],
       foreignKeys: [],
-      indexes: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'hire_consumer_request_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'consumer',
+            ),
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'requestId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'hire_job_id_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'jobId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
       managed: true,
     ),
     _isp.TableDefinition(
@@ -552,14 +751,23 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _iz6hnyrm.ChainSubmission) {
       return _iz6hnyrm.ChainSubmission.fromJson(data) as T;
     }
+    if (t == _i4si20vg.CreateHireResult) {
+      return _i4si20vg.CreateHireResult.fromJson(data) as T;
+    }
     if (t == _izw8z7ou.Greeting) {
       return _izw8z7ou.Greeting.fromJson(data) as T;
     }
     if (t == _ikpil6ki.BackendHealth) {
       return _ikpil6ki.BackendHealth.fromJson(data) as T;
     }
+    if (t == _ibbrviw7.Hire) {
+      return _ibbrviw7.Hire.fromJson(data) as T;
+    }
     if (t == _i3db3d86.AgentUnavailable) {
       return _i3db3d86.AgentUnavailable.fromJson(data) as T;
+    }
+    if (t == _ir9uo1i9.EscrowPreparation) {
+      return _ir9uo1i9.EscrowPreparation.fromJson(data) as T;
     }
     if (t == _ikb6z54u.HireRecord) {
       return _ikb6z54u.HireRecord.fromJson(data) as T;
@@ -578,6 +786,18 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _ivruwodq.HireView) {
       return _ivruwodq.HireView.fromJson(data) as T;
+    }
+    if (t == _ipbsq2gs.HireDetail) {
+      return _ipbsq2gs.HireDetail.fromJson(data) as T;
+    }
+    if (t == _ikmm2vup.Payment) {
+      return _ikmm2vup.Payment.fromJson(data) as T;
+    }
+    if (t == _i83uy5s0.PreparedTransaction) {
+      return _i83uy5s0.PreparedTransaction.fromJson(data) as T;
+    }
+    if (t == _i5rj3edu.Puls3ApiException) {
+      return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
     }
     if (t == _is.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
@@ -599,6 +819,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _iz6hnyrm.ChainSubmission.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_i4si20vg.CreateHireResult?>()) {
+      return (data != null ? _i4si20vg.CreateHireResult.fromJson(data) : null)
+          as T;
+    }
     if (t == _is.getType<_izw8z7ou.Greeting?>()) {
       return (data != null ? _izw8z7ou.Greeting.fromJson(data) : null) as T;
     }
@@ -606,8 +830,15 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _ikpil6ki.BackendHealth.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_ibbrviw7.Hire?>()) {
+      return (data != null ? _ibbrviw7.Hire.fromJson(data) : null) as T;
+    }
     if (t == _is.getType<_i3db3d86.AgentUnavailable?>()) {
       return (data != null ? _i3db3d86.AgentUnavailable.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ir9uo1i9.EscrowPreparation?>()) {
+      return (data != null ? _ir9uo1i9.EscrowPreparation.fromJson(data) : null)
           as T;
     }
     if (t == _is.getType<_ikb6z54u.HireRecord?>()) {
@@ -635,6 +866,22 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ivruwodq.HireView?>()) {
       return (data != null ? _ivruwodq.HireView.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ipbsq2gs.HireDetail?>()) {
+      return (data != null ? _ipbsq2gs.HireDetail.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ikmm2vup.Payment?>()) {
+      return (data != null ? _ikmm2vup.Payment.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_i83uy5s0.PreparedTransaction?>()) {
+      return (data != null
+              ? _i83uy5s0.PreparedTransaction.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _is.getType<_i5rj3edu.Puls3ApiException?>()) {
+      return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
+          as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
@@ -664,15 +911,22 @@ class Protocol extends _is.DatabaseSerializationManager {
       _ipe500bk.AgentSummary => 'AgentSummary',
       _ixu8n9dt.CatalogIndexState => 'CatalogIndexState',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
+      _i4si20vg.CreateHireResult => 'CreateHireResult',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
+      _ibbrviw7.Hire => 'Hire',
       _i3db3d86.AgentUnavailable => 'AgentUnavailable',
+      _ir9uo1i9.EscrowPreparation => 'EscrowPreparation',
       _ikb6z54u.HireRecord => 'HireRecord',
       _izyyjkbb.HireConfigurationMissing => 'HireConfigurationMissing',
       _izuscvxu.HireLedgerUnavailable => 'HireLedgerUnavailable',
       _i7gyvijy.HirePaymentRecord => 'HirePaymentRecord',
       _i1txwkfs.HireRequestInvalid => 'HireRequestInvalid',
       _ivruwodq.HireView => 'HireView',
+      _ipbsq2gs.HireDetail => 'HireDetail',
+      _ikmm2vup.Payment => 'Payment',
+      _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
+      _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _ => null,
     };
   }
@@ -697,12 +951,18 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'CatalogIndexState';
       case _iz6hnyrm.ChainSubmission():
         return 'ChainSubmission';
+      case _i4si20vg.CreateHireResult():
+        return 'CreateHireResult';
       case _izw8z7ou.Greeting():
         return 'Greeting';
       case _ikpil6ki.BackendHealth():
         return 'BackendHealth';
+      case _ibbrviw7.Hire():
+        return 'Hire';
       case _i3db3d86.AgentUnavailable():
         return 'AgentUnavailable';
+      case _ir9uo1i9.EscrowPreparation():
+        return 'EscrowPreparation';
       case _ikb6z54u.HireRecord():
         return 'HireRecord';
       case _izyyjkbb.HireConfigurationMissing():
@@ -715,6 +975,14 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'HireRequestInvalid';
       case _ivruwodq.HireView():
         return 'HireView';
+      case _ipbsq2gs.HireDetail():
+        return 'HireDetail';
+      case _ikmm2vup.Payment():
+        return 'Payment';
+      case _i83uy5s0.PreparedTransaction():
+        return 'PreparedTransaction';
+      case _i5rj3edu.Puls3ApiException():
+        return 'Puls3ApiException';
     }
     className = _iais.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -756,14 +1024,23 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'ChainSubmission') {
       return deserialize<_iz6hnyrm.ChainSubmission>(data['data']);
     }
+    if (dataClassName == 'CreateHireResult') {
+      return deserialize<_i4si20vg.CreateHireResult>(data['data']);
+    }
     if (dataClassName == 'Greeting') {
       return deserialize<_izw8z7ou.Greeting>(data['data']);
     }
     if (dataClassName == 'BackendHealth') {
       return deserialize<_ikpil6ki.BackendHealth>(data['data']);
     }
+    if (dataClassName == 'Hire') {
+      return deserialize<_ibbrviw7.Hire>(data['data']);
+    }
     if (dataClassName == 'AgentUnavailable') {
       return deserialize<_i3db3d86.AgentUnavailable>(data['data']);
+    }
+    if (dataClassName == 'EscrowPreparation') {
+      return deserialize<_ir9uo1i9.EscrowPreparation>(data['data']);
     }
     if (dataClassName == 'HireRecord') {
       return deserialize<_ikb6z54u.HireRecord>(data['data']);
@@ -782,6 +1059,18 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'HireView') {
       return deserialize<_ivruwodq.HireView>(data['data']);
+    }
+    if (dataClassName == 'HireDetail') {
+      return deserialize<_ipbsq2gs.HireDetail>(data['data']);
+    }
+    if (dataClassName == 'Payment') {
+      return deserialize<_ikmm2vup.Payment>(data['data']);
+    }
+    if (dataClassName == 'PreparedTransaction') {
+      return deserialize<_i83uy5s0.PreparedTransaction>(data['data']);
+    }
+    if (dataClassName == 'Puls3ApiException') {
+      return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
@@ -830,6 +1119,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _ixu8n9dt.CatalogIndexState.t;
       case _iz6hnyrm.ChainSubmission:
         return _iz6hnyrm.ChainSubmission.t;
+      case _ir9uo1i9.EscrowPreparation:
+        return _ir9uo1i9.EscrowPreparation.t;
       case _ikb6z54u.HireRecord:
         return _ikb6z54u.HireRecord.t;
       case _i7gyvijy.HirePaymentRecord:
