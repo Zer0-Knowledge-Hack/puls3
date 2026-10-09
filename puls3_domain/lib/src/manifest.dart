@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'errors.dart';
 import 'entities.dart';
 import 'values.dart';
@@ -110,7 +112,10 @@ final class ModelPolicy {
       ? workersAiModels.contains(model.id)
       : paidProviders.contains(model.provider);
 
-  /// Whether [provider] needs the builder's own API key.
+  /// Whether [provider] is a paid provider rather than the Workers AI free
+  /// tier. For display and pricing only: every builder agent runs on the
+  /// builder's own account, so deploy needs a stored credential for any
+  /// provider (ADR-0004 amendment).
   bool isPaid(String provider) => provider != freeProvider;
 }
 
@@ -170,6 +175,31 @@ final class AgentManifestDraft {
     return draft;
   }
 
+  static const _wireKeys = {
+    'name',
+    'description',
+    'skills',
+    'model',
+    'system_prompt',
+    'input',
+    'output',
+    'price',
+    'version',
+  };
+
+  /// Reads the wire document (snake_case, nested) without ever throwing a type
+  /// error: every mismatch becomes a problem. Throws [InvalidManifest] listing
+  /// the parse problems together with the draft rules the fields break.
+  factory AgentManifestDraft.fromJson(Object? json) {
+    final parsed = _parseDocument(json, manifest: false);
+    final problems = _merge(
+      parsed.problems,
+      parsed.draft._check(forDeploy: false),
+    );
+    if (problems.isNotEmpty) throw InvalidManifest(problems);
+    return parsed.draft;
+  }
+
   final String? name;
   final String? description;
   final List<Skill>? skills;
@@ -180,6 +210,41 @@ final class AgentManifestDraft {
   final OutputType? outputType;
   final int? outputMaxChars;
   final UsdcAmount? price;
+
+  /// The wire document: snake_case and nested, missing fields omitted, no
+  /// `schema` and no version.
+  Map<String, Object?> toJson() {
+    final skills = this.skills, model = this.model, price = this.price;
+    final inType = inputType, inMax = inputMaxChars;
+    final outType = outputType, outMax = outputMaxChars;
+    return {
+      'name': ?name,
+      'description': ?description,
+      if (skills != null)
+        'skills': [
+          for (final s in skills)
+            {
+              'id': s.id,
+              'name': s.name,
+              'description': s.description,
+              'tags': [...s.tags],
+            },
+        ],
+      if (model != null) 'model': {'provider': model.provider, 'id': model.id},
+      'system_prompt': ?systemPrompt,
+      if (inType != null || inMax != null)
+        'input': {
+          'type': ?inType?.name,
+          'max_chars': ?inMax,
+        },
+      if (outType != null || outMax != null)
+        'output': {
+          'type': ?outType?.name,
+          'max_chars': ?outMax,
+        },
+      if (price != null) 'price': {'asset': _asset, 'amount': price.stroops},
+    };
+  }
 
   /// Every rule this draft breaks as a deployable manifest, in field order.
   /// The Studio's test run uses it before the deploy.
@@ -279,14 +344,13 @@ final class AgentManifestDraft {
       ManifestProblem tooLow,
       ManifestProblem tooHigh,
     ) {
+      // A non-positive limit is malformed, not incomplete: both modes reject.
       if (max != null && max > limit) {
         found.add(tooHigh);
-      } else if (forDeploy) {
-        if (!present || max == null) {
-          found.add(missing);
-        } else if (max < 1) {
-          found.add(tooLow);
-        }
+      } else if (max != null && max < 1) {
+        found.add(tooLow);
+      } else if (forDeploy && (!present || max == null)) {
+        found.add(missing);
       }
     }
 
@@ -349,6 +413,30 @@ final class AgentManifest {
 
   String get schema => schemaId;
 
+  /// Reads a deployable manifest from the wire document. `schema` is optional
+  /// but must match; `version` is required. Throws [InvalidManifest] listing
+  /// every parse problem and every deploy rule the fields break under [policy].
+  factory AgentManifest.fromJson(Object? json, ModelPolicy policy) {
+    final parsed = _parseDocument(json, manifest: true);
+    final problems = _merge(
+      parsed.problems,
+      parsed.draft._check(forDeploy: true, policy: policy),
+    );
+    if (problems.isNotEmpty) throw InvalidManifest(problems);
+    return parsed.draft.validate(policy, parsed.version!);
+  }
+
+  /// The wire document, `schema` and `version` included.
+  Map<String, Object?> toJson() => {
+    'schema': schema,
+    'version': version.value,
+    ...toDraft().toJson(),
+  };
+
+  /// The canonical form: see [canonicalJson]. Encode it as UTF-8 to hash it
+  /// (hashing and salting belong to the server, #18).
+  String toCanonicalJson() => canonicalJson(toJson());
+
   /// The editable form, without a version. This manifest is not changed.
   AgentManifestDraft toDraft() => AgentManifestDraft(
     name: name,
@@ -404,3 +492,325 @@ bool _sameSkills(List<Skill> a, List<Skill> b) =>
             a[i].tags.length == b[i].tags.length &&
             a[i].tags.indexed.every((t) => b[i].tags[t.$1] == t.$2),
     ].every((same) => same);
+
+const _asset = 'USDC';
+
+/// A parsed document: the problems found while reading it and the draft built
+/// from the fields that did parse.
+final class _Parsed {
+  _Parsed(this.problems, this.draft, [this.version]);
+
+  final List<ManifestProblem> problems;
+  final AgentManifestDraft draft;
+  final ManifestVersion? version;
+}
+
+/// Deduplicates, orders by field (the enum order, so a parse problem and a rule
+/// problem on different fields interleave as the fields do) and drops a "missing" problem when the same field
+/// already has a "malformed" one, so one bad field is reported once.
+List<ManifestProblem> _merge(
+  List<ManifestProblem> parse,
+  List<ManifestProblem> check,
+) {
+  if (parse.contains(ManifestProblem.notAnObject)) return parse;
+  final all = [
+    ...{...parse, ...check},
+  ]..sort((a, b) => a.index.compareTo(b.index));
+  return [
+    for (final p in all)
+      if (!(_supersededBy[p] ?? const {}).any(all.contains)) p,
+  ];
+}
+
+/// A wire number read as an integer: see [_integer]. Anything beyond +-(2^53-1)
+/// is refused, because dart2js cannot hold it exactly. On the web `3.0` and
+/// `3` are one value, so an integral number is accepted whichever way it was
+/// written.
+int? _wireInteger(Object? value) {
+  final n = _integer(value);
+  return n == null || n.abs() > ManifestVersion.maxValue ? null : n;
+}
+
+const _supersededBy = <ManifestProblem, Set<ManifestProblem>>{
+  ManifestProblem.nameMissing: {ManifestProblem.nameMalformed},
+  ManifestProblem.descriptionMissing: {ManifestProblem.descriptionMalformed},
+  ManifestProblem.skillsMissing: {
+    ManifestProblem.skillsMalformed,
+    ManifestProblem.skillIdNotKebabCase,
+    ManifestProblem.skillNameLength,
+  },
+  ManifestProblem.modelMissing: {ManifestProblem.modelMalformed},
+  ManifestProblem.systemPromptMissing: {ManifestProblem.systemPromptMalformed},
+  ManifestProblem.inputMissing: {ManifestProblem.inputMalformed},
+  ManifestProblem.outputMissing: {ManifestProblem.outputMalformed},
+  ManifestProblem.priceMissing: {
+    ManifestProblem.priceMalformed,
+    ManifestProblem.priceAssetUnsupported,
+  },
+};
+
+_Parsed _parseDocument(Object? json, {required bool manifest}) {
+  final found = <ManifestProblem>[];
+
+  Map<Object?, Object?>? object(
+    Object? value,
+    Set<String> keys,
+    ManifestProblem malformed,
+  ) {
+    if (value == null) return null;
+    if (value is! Map) {
+      found.add(malformed);
+      return null;
+    }
+    for (final key in value.keys) {
+      if (key == 'tools') {
+        found.add(ManifestProblem.toolsNotSupported);
+      } else if (!keys.contains(key)) {
+        found.add(ManifestProblem.unknownKey);
+      }
+    }
+    return value;
+  }
+
+  String? text(Map<Object?, Object?> from, String key, ManifestProblem bad) {
+    final value = from[key];
+    if (value == null) return null;
+    if (value is String) return value;
+    found.add(bad);
+    return null;
+  }
+
+  int? whole(Map<Object?, Object?> from, String key, ManifestProblem bad) {
+    final value = from[key];
+    if (value == null) return null;
+    final n = _wireInteger(value);
+    if (n != null) return n;
+    found.add(bad);
+    return null;
+  }
+
+  (T?, int?) section<T extends Enum>(
+    Object? value,
+    List<T> types,
+    ManifestProblem malformed,
+    ManifestProblem unsupported,
+  ) {
+    final map = object(value, {'type', 'max_chars'}, malformed);
+    if (map == null) return (null, null);
+    final name = text(map, 'type', malformed);
+    final type = types.where((t) => t.name == name).firstOrNull;
+    if (name != null && type == null) found.add(unsupported);
+    return (type, whole(map, 'max_chars', malformed));
+  }
+
+  if (json is! Map) {
+    return _Parsed(
+      [
+        ManifestProblem.notAnObject,
+      ],
+      AgentManifestDraft._(
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ),
+    );
+  }
+  final doc = object(json, {
+    ...AgentManifestDraft._wireKeys,
+    if (manifest) 'schema',
+  }, ManifestProblem.notAnObject)!;
+  ManifestVersion? version;
+  if (manifest) {
+    final schema = doc['schema'];
+    if (schema != null && schema != AgentManifest.schemaId) {
+      found.add(ManifestProblem.schemaUnsupported);
+    }
+    final raw = doc['version'];
+    try {
+      final n = _wireInteger(raw);
+      version = n == null ? null : ManifestVersion(n);
+    } on InvalidManifest {
+      version = null;
+    }
+    if (version == null) found.add(ManifestProblem.versionInvalid);
+  } else if (doc.containsKey('version')) {
+    found.add(ManifestProblem.versionInDraft);
+  }
+
+  final name = text(doc, 'name', ManifestProblem.nameMalformed);
+  final description = text(
+    doc,
+    'description',
+    ManifestProblem.descriptionMalformed,
+  );
+
+  List<Skill>? skills;
+  final rawSkills = doc['skills'];
+  if (rawSkills is List) {
+    skills = [];
+    for (final item in rawSkills) {
+      final map = object(item ?? 0, {
+        'id',
+        'name',
+        'description',
+        'tags',
+      }, ManifestProblem.skillsMalformed);
+      if (map == null) continue;
+      final id = map['id'] ?? '', skillName = map['name'] ?? '';
+      final about = map['description'] ?? '', tags = map['tags'] ?? [];
+      if (id is! String ||
+          skillName is! String ||
+          about is! String ||
+          tags is! List ||
+          !tags.every((t) => t is String)) {
+        found.add(ManifestProblem.skillsMalformed);
+        continue;
+      }
+      try {
+        skills.add(
+          Skill(
+            id: id,
+            name: skillName,
+            description: about,
+            tags: tags.cast<String>(),
+          ),
+        );
+      } on InvalidSkill catch (e) {
+        found.add(switch (e.problem) {
+          SkillProblem.idNotKebabCase => ManifestProblem.skillIdNotKebabCase,
+          SkillProblem.nameLength => ManifestProblem.skillNameLength,
+        });
+      }
+    }
+  } else if (rawSkills != null) {
+    found.add(ManifestProblem.skillsMalformed);
+  }
+
+  ModelId? model;
+  final modelMap = object(doc['model'], {
+    'provider',
+    'id',
+  }, ManifestProblem.modelMalformed);
+  if (modelMap != null) {
+    final provider = modelMap['provider'], id = modelMap['id'];
+    try {
+      if (provider is! String || id is! String) {
+        throw InvalidManifest([ManifestProblem.modelMalformed]);
+      }
+      model = ModelId(provider: provider, id: id);
+    } on InvalidManifest {
+      found.add(ManifestProblem.modelMalformed);
+    }
+  }
+
+  final systemPrompt = text(
+    doc,
+    'system_prompt',
+    ManifestProblem.systemPromptMalformed,
+  );
+  final (inputType, inputMax) = section(
+    doc['input'],
+    InputType.values,
+    ManifestProblem.inputMalformed,
+    ManifestProblem.inputTypeUnsupported,
+  );
+  final (outputType, outputMax) = section(
+    doc['output'],
+    OutputType.values,
+    ManifestProblem.outputMalformed,
+    ManifestProblem.outputTypeUnsupported,
+  );
+
+  UsdcAmount? price;
+  final priceMap = object(doc['price'], {
+    'asset',
+    'amount',
+  }, ManifestProblem.priceMalformed);
+  if (priceMap != null) {
+    if (priceMap['asset'] != _asset) {
+      found.add(ManifestProblem.priceAssetUnsupported);
+    }
+    final amount = whole(priceMap, 'amount', ManifestProblem.priceMalformed);
+    try {
+      price = amount == null ? null : UsdcAmount.stroops(amount);
+    } on InvalidAmount {
+      found.add(ManifestProblem.priceMalformed);
+    }
+  }
+
+  return _Parsed(
+    found,
+    AgentManifestDraft._(
+      name,
+      description,
+      skills == null ? null : List.unmodifiable(skills),
+      model,
+      systemPrompt,
+      inputType,
+      inputMax,
+      outputType,
+      outputMax,
+      price,
+    ),
+    version,
+  );
+}
+
+/// The canonical JSON text of [value]: object keys sorted at every depth, no
+/// whitespace, array order kept, and integers only.
+///
+/// The same data always gives the same text, whatever the key order it was
+/// built with. Non-ASCII text is kept as is, so UTF-8 encoding the result gives
+/// the canonical bytes.
+///
+/// Numbers must be integers. An integral `double` such as `3.0` is written as
+/// `3`: on the web (dart2js) `3.0` and `3` are the same value, so they cannot
+/// be told apart. Throws [StateError] on a non-integral or non-finite number, on
+/// an integral `double` outside +-(2^53-1), and on any map key that is not a
+/// `String`.
+String canonicalJson(Object? value) => jsonEncode(_sortKeysDeep(value));
+
+Object? _sortKeysDeep(Object? node) => switch (node) {
+  Map() => {
+    for (final key in (_stringKeys(node)..sort()))
+      key: _sortKeysDeep(node[key]),
+  },
+  List() => [for (final item in node) _sortKeysDeep(item)],
+  num() =>
+    _integer(node) ??
+        (throw StateError('canonical JSON allows integers only: $node')),
+  _ => node,
+};
+
+List<String> _stringKeys(Map<Object?, Object?> map) {
+  for (final key in map.keys) {
+    if (key is! String) {
+      throw StateError('canonical JSON keys must be strings: $key');
+    }
+  }
+  return map.keys.cast<String>().toList();
+}
+
+/// [value] as an `int` when it is an integer: an `int`, or a finite integral
+/// `double` within +-(2^53-1) (the range a double holds exactly). Otherwise
+/// null. The range applies to `int` too: on dart2js every integral double is
+/// an `int`, so the check must not depend on the platform.
+int? _integer(Object? value) {
+  if (value is int) {
+    return value.abs() <= ManifestVersion.maxValue ? value : null;
+  }
+  if (value is double &&
+      value.isFinite &&
+      value == value.truncateToDouble() &&
+      value.abs() <= ManifestVersion.maxValue) {
+    return value.toInt();
+  }
+  return null;
+}

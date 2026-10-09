@@ -16,7 +16,7 @@ final class Skill {
     if (!_kebabCase.hasMatch(id)) {
       throw const InvalidSkill(SkillProblem.idNotKebabCase);
     }
-    if (name.isEmpty || name.length > 48) {
+    if (name.isEmpty || name.runes.length > 48) {
       throw const InvalidSkill(SkillProblem.nameLength);
     }
     return Skill._(id, name, description, List.unmodifiable(tags));
@@ -51,10 +51,10 @@ final class Agent {
     required List<Skill> skills,
     required UsdcAmount price,
   }) {
-    if (name.length < 3 || name.length > 48) {
+    if (name.runes.length < 3 || name.runes.length > 48) {
       throw const InvalidAgent(AgentProblem.nameLength);
     }
-    if (description.length < 10 || description.length > 280) {
+    if (description.runes.length < 10 || description.runes.length > 280) {
       throw const InvalidAgent(AgentProblem.descriptionLength);
     }
     if (skills.isEmpty || skills.length > 5) {
