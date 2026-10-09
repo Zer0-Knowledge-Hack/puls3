@@ -155,7 +155,7 @@ void main() {
       await expectLater(gateway.prepareFund(3), throwsA(isA<HireRejected>()));
     });
 
-    test('a failed fund simulation reads as missing funds', () async {
+    test('a failed fund simulation does not claim missing funds', () async {
       final gateway = _gateway(
         prepareFund: (_) async => throw Puls3ApiException(
           code: 'ChainUnavailable',
@@ -164,7 +164,13 @@ void main() {
       );
       await expectLater(
         gateway.prepareFund(3),
-        throwsA(isA<HireInsufficientFunds>()),
+        throwsA(
+          isA<HirePaymentNotPrepared>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('USDC and XLM'), contains('could not be prepared')),
+          ),
+        ),
       );
     });
 
@@ -220,6 +226,28 @@ void main() {
               _detail('failed', errorCode: 'TransactionFailed'),
         ).submit(3, prep, 's'),
         throwsA(isA<HireRejected>()),
+      );
+    });
+
+    test('a payment that does not match the hire never claims that no '
+        'funds moved', () async {
+      const prep = EscrowPreparation(
+        preparationId: 'p',
+        purpose: 'fund',
+        unsignedTransaction: 'x',
+      );
+      await expectLater(
+        _gateway(
+          submit: (_, _, _) async =>
+              _detail('failed', errorCode: 'JobMismatch'),
+        ).submit(3, prep, 's'),
+        throwsA(
+          isA<HireRejected>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('stay in the escrow'), isNot(contains('No funds'))),
+          ),
+        ),
       );
     });
 

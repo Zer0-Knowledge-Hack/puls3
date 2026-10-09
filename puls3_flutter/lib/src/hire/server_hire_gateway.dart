@@ -165,7 +165,7 @@ class ServerHireGateway implements HireGateway {
       'PreparationExpired' => const HirePreparationExpired(),
       'PaymentAlreadySubmitted' => const HirePaymentAlreadySubmitted(),
       'ChainUnavailable' when fund && reason == 'simulationFailed' =>
-        const HireInsufficientFunds(),
+        const HirePaymentNotPrepared(),
       // The create_job is still confirming (no status yet, or its
       // submission in flight): prepareFund asks again.
       'InvalidHireTransition' when fund && e.details?['status'] == null =>
@@ -183,9 +183,15 @@ class ServerHireGateway implements HireGateway {
   /// A submission the server tracked and marked `failed`.
   static HireGatewayException _outcome(String? code) => switch (code) {
     'PreparationExpired' => const HirePreparationExpired(),
+    // The fund transaction succeeded but does not match this hire: the
+    // funds moved and stay in the escrow (api.md F5-5).
+    'JobMismatch' || 'JobEvidenceUnavailable' => const HireRejected(
+      'The payment does not match this hire. The funds stay in the escrow '
+      'and return to you after the job expires.',
+    ),
     _ => HireRejected(
-      'The network rejected the transaction${code == null ? '' : ' ($code)'}. '
-      'No funds moved.',
+      'The network rejected the transaction'
+      '${code == null ? '' : ' ($code)'}.',
     ),
   };
 }

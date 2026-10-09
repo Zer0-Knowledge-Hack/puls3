@@ -103,6 +103,7 @@ class _HireSheetState extends State<HireSheet> {
                   errorMessage: flow.error,
                   hireId: flow.hireId,
                   transactionHash: hash,
+                  paymentConfirmed: flow.payment?.isConfirmed ?? false,
                   onConfirm: _run,
                   onRetry: _run,
                   onBackToMarketplace: _backToMarketplace,

@@ -182,7 +182,9 @@ class HireFlowController extends ChangeNotifier {
   static String _message(Object e) => switch (e) {
     WalletException() => walletErrorMessage(e),
     HireGatewayException(:final message) => message,
-    _ => 'The hire could not be completed. No funds moved.',
+    // Unknown failures can happen after the payment was relayed: never
+    // claim that no funds moved.
+    _ => 'The hire could not be completed. Try again.',
   };
 
   static String _newRequestId() {

@@ -163,11 +163,45 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Payment sent to the escrow'), findsOneWidget);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       expect(find.text('Demo signature only'), findsNothing);
       expect(find.text('Tx hash'), findsOneWidget);
       await tester.tap(find.text('View on StellarExpert'));
       expect(opened, 1);
+    });
+    testWidgets('only a confirmed payment says the escrow holds it', (
+      tester,
+    ) async {
+      Widget view({required bool confirmed}) => MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HirePaymentView(
+              phase: HirePhase.confirmed,
+              isDemo: false,
+              agentName: 'Ledger Scout',
+              priceUsdcStroops: 5000000,
+              destinationAddress:
+                  'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+              transactionHash: 'abc123',
+              paymentConfirmed: confirmed,
+              onOpenExplorer: () {},
+              onConfirm: () {},
+              onBackToMarketplace: () {},
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(view(confirmed: false));
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+      expect(find.textContaining('held by the escrow'), findsNothing);
+      // The transaction can be followed while it confirms.
+      expect(find.text('View on StellarExpert'), findsOneWidget);
+
+      await tester.pumpWidget(view(confirmed: true));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('Payment held by the escrow'), findsOneWidget);
+      expect(find.textContaining('confirming'), findsNothing);
     });
   });
 }

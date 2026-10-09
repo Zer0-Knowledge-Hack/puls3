@@ -217,7 +217,7 @@ void main() {
       await confirm(tester);
 
       expect(find.text('Demo signature only'), findsOneWidget);
-      expect(find.text('Payment sent to the escrow'), findsNothing);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsNothing);
       expect(find.text('View on StellarExpert'), findsNothing);
       // Two prompts: create_job and fund.
       expect(wallet.signed, hasLength(2));
@@ -243,7 +243,7 @@ void main() {
 
       expect(wallet.signed, ['AAAA-createJob', 'AAAA-fund']);
       expect(gateway.submitted, ['signed:AAAA-createJob', 'signed:AAAA-fund']);
-      expect(find.text('Payment sent to the escrow'), findsOneWidget);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       expect(find.text('#3'), findsOneWidget);
 
       await tap(tester, 'View on StellarExpert');
@@ -263,7 +263,7 @@ void main() {
       expect(gateway.submitted, ['signed:AAAA-createJob']);
 
       await tap(tester, 'Try again');
-      expect(find.text('Payment sent to the escrow'), findsOneWidget);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       expect(gateway.submitted, ['signed:AAAA-createJob', 'signed:AAAA-fund']);
       expect(gateway.requestIds, hasLength(1));
       expect(gateway.fundPreparations, 1);
@@ -284,7 +284,7 @@ void main() {
       );
 
       await tap(tester, 'Try again');
-      expect(find.text('Payment sent to the escrow'), findsOneWidget);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       // One hire, one request id: the retry did not create another.
       expect(gateway.requestIds, hasLength(1));
       expect(gateway.createJobPreparations, 0);
@@ -306,7 +306,7 @@ void main() {
       expect(gateway.fundPreparations, 1);
 
       await tap(tester, 'Try again');
-      expect(find.text('Payment sent to the escrow'), findsOneWidget);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       // A fresh fund was prepared and signed instead of resending the old one.
       expect(gateway.fundPreparations, 2);
       expect(wallet.signed, ['AAAA-createJob', 'AAAA-fund', 'AAAA-fund']);

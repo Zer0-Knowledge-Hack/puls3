@@ -30,6 +30,7 @@ class HirePaymentView extends StatelessWidget {
     this.inputController,
     this.hireId,
     this.transactionHash,
+    this.paymentConfirmed = false,
     this.onOpenExplorer,
   });
 
@@ -58,8 +59,12 @@ class HirePaymentView extends StatelessWidget {
   /// The created hire, once confirmed.
   final int? hireId;
 
-  /// The `fund` transaction, once confirmed (not for a demo).
+  /// The `fund` transaction, once relayed (not for a demo).
   final String? transactionHash;
+
+  /// The chain confirmed the payment and the server verified it. Until
+  /// then the payment is only sent, and the view says so.
+  final bool paymentConfirmed;
 
   /// Opens [transactionHash] on StellarExpert.
   final VoidCallback? onOpenExplorer;
@@ -222,21 +227,33 @@ class HirePaymentView extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.verified_user_outlined,
-              color: Puls3Colors.success,
+            Icon(
+              paymentConfirmed
+                  ? Icons.verified_user_outlined
+                  : Icons.hourglass_top_rounded,
+              color: paymentConfirmed
+                  ? Puls3Colors.success
+                  : Puls3Colors.accent,
               size: 28,
             ),
             const SizedBox(width: Puls3Spacing.sm),
             Expanded(
-              child: Text('Payment sent to the escrow', style: Puls3Text.h3),
+              child: Text(
+                paymentConfirmed
+                    ? 'Payment held by the escrow'
+                    : 'Payment sent, confirming on Stellar…',
+                style: Puls3Text.h3,
+              ),
             ),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),
         Text(
-          'Your USDC is held by the escrow contract until you approve the '
-          "result. puls3 confirms the payment on Stellar and starts the agent.",
+          paymentConfirmed
+              ? 'Your USDC is held by the escrow contract until you approve '
+                    'the result. The agent starts working.'
+              : 'puls3 is confirming the transaction and checking that it '
+                    'matches this hire. You can follow it on StellarExpert.',
           style: Puls3Text.bodyMuted,
         ),
         const SizedBox(height: Puls3Spacing.md),

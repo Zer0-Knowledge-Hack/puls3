@@ -78,6 +78,10 @@ class EscrowSubmission {
   /// `submitted`, `confirmed` or `failed`.
   final String state;
 
+  /// The chain confirmed it and, for `fund`, the server checked that the
+  /// job matches the hire (api.md, "Funding verification").
+  bool get isConfirmed => state == 'confirmed';
+
   /// StellarExpert link the server built, when it has one.
   final String? explorerUrl;
 }
@@ -115,11 +119,15 @@ final class HirePreparationExpired extends HireGatewayException {
     : super('The transaction expired before it was sent.');
 }
 
-/// The wallet probably has no USDC (or XLM) for the payment: the server's
-/// simulation of `fund` failed.
-final class HireInsufficientFunds extends HireGatewayException {
-  const HireInsufficientFunds()
-    : super('Your wallet needs enough USDC on Testnet for this hire.');
+/// The server could not prepare the payment (`ChainUnavailable` with
+/// `simulationFailed`). The server cannot tell a short balance from an
+/// unreachable node or a missing account, so neither can the app.
+final class HirePaymentNotPrepared extends HireGatewayException {
+  const HirePaymentNotPrepared()
+    : super(
+        'The payment could not be prepared. Check that your wallet has '
+        'enough testnet USDC and XLM, then try again.',
+      );
 }
 
 /// An earlier payment for this hire may have moved funds; never pay again.
