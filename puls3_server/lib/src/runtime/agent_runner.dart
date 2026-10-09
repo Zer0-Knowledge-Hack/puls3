@@ -18,6 +18,9 @@ final class AgentRunner {
   final ModelRuntime _runtime;
   final Duration _timeout;
 
+  /// The longest one run may take.
+  Duration get timeout => _timeout;
+
   /// The output for [task], or a [RuntimeFailure]. Input over the limit fails
   /// before the model is called. On timeout the provider call is aborted, not
   /// just abandoned, so it stops being billed.

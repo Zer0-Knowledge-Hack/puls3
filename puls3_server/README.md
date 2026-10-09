@@ -13,11 +13,15 @@ the agent catalog from the on-chain identity registry.
 for example `agt-001`, or `null` when there is none. There is no rating: the
 registry does not store one.
 
-The registry has no list function, so the server reads `total_agents` and then
-the metadata of ids `0` to `total - 1` through Soroban RPC simulations (four
-agents at a time). An agent whose metadata is missing or invalid, such as a
-superseded registration, is skipped. The endpoint never signs or submits a
-transaction.
+The endpoint reads from the Postgres index (`agent_record`), which the
+**agent catalog indexer** below syncs from the identity registry. While the
+index is empty the endpoint falls back to reading the registry directly: the
+registry has no list function, so it reads `total_agents` and then the metadata
+of ids `0` to `total - 1` through Soroban RPC simulations (four agents at a
+time). An agent whose metadata is missing or invalid, such as a superseded
+registration, is skipped. Reads never touch the chain while the index has rows,
+so a chain outage does not take the catalog down. The endpoint never signs or
+submits a transaction.
 
 The chain is read from the testnet values unless these variables override
 them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
@@ -25,11 +29,30 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
-The built list is cached in memory for 60 seconds, and concurrent callers share
-one refresh. If a refresh fails because the chain cannot be read, the last list
-is served. With no cached list, `list` and `get` throw the serializable
-`AgentCatalogUnavailable` exception; an outage is never an empty list, and an
-unknown id is never reported as an outage.
+With no indexed rows and a chain that cannot be read, the on-chain fallback
+throws the serializable `AgentCatalogUnavailable` exception; an outage is never
+an empty list, and an unknown id is never reported as an outage.
+
+## Agent catalog indexer
+
+A background loop keeps the `agent_record` index in sync with the identity
+registry. The first pass bootstraps from registry state, because the RPC keeps
+only about 7 days of events. Later passes read the registry events after the
+stored cursor (`catalog_index_state`) to find the agents that changed, then
+hydrate them from state; any agent missing from the index is always hydrated,
+so a registration is never lost. Writes are idempotent (upsert by registry id),
+so re-running a pass never creates duplicates. The chain stays the source of
+truth; the index keeps serving reads while the chain is down.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_INDEXER_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_INDEXER_INTERVAL_SECONDS` | `30` | Seconds between passes; a positive whole number |
+
+It is off by default so tests, CI and existing deployments do not read the
+chain unless asked to. It uses the same `PULS3_STELLAR_*` variables as the
+agent catalog, and writes `[catalog-indexer]` lines to stdout (info) and stderr
+(warnings).
 
 ## Chain submission tracker
 
@@ -54,6 +77,52 @@ lifecycle lands (#96).
 It is off by default so tests, CI and existing deployments do not poll the
 chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
 writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
+
+## Agent runtime
+
+A second background loop runs the agent of every funded hire once (#20).
+When the tracker records a hire's payment, it queues a run (`hire_run`) in
+the same transaction. Each pass:
+1. fails runs still `running` past the timeout plus a minute (`interrupted`);
+2. takes up to 10 queued runs, one at a time, with a conditional update, so
+   two runners never run the same hire;
+3. loads the manifest the hire pinned and calls the model through
+   `AgentRunner` (input and output limits, timeout that aborts the call);
+4. stores the result, or a safe failure code such as `timeout`,
+   `provider_error:<type>` or `manifest_unavailable`.
+
+Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
+`HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
+`running`, `failed`), with the `result` and `failureReason`.
+
+A successful run leaves the hire `funded` with its result: the server-signed
+escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
+deployed manifests, the demo agents' manifests are seeded in
+`lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
+(`agt-006` Copy Forge, `agt-007` Support Relay). Both run on Cloudflare
+Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`), the free provider of
+the #34 model policy. `ProviderRouter` sends each run to its manifest's
+provider; a provider without credentials fails the run as
+`unsupported_provider`.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PULS3_RUNTIME_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_RUNTIME_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
+| `PULS3_RUNTIME_TIMEOUT_SECONDS` | `120` | Longest one run may take; it must end before the job's `expired_at` |
+| `PULS3_WORKERS_AI_ACCOUNT_ID` | none | Cloudflare account id for Workers AI (public) |
+| Serverpod password `workersAiApiToken` | none | Cloudflare API token for Workers AI. Locally, `shared: workersAiApiToken:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set workersAiApiToken --from-file <file>` |
+| Serverpod password `anthropicApiKey` | none | Optional Anthropic API key, for manifests with provider `anthropic` (BYOK) |
+
+With neither provider configured the loop does not start, even when enabled.
+
+The server-wide `workersAiApiToken` is for the seeded demo agents only. Builder
+agents run on the builder's own provider account (ADR-0004 amendment, #142),
+resolved from the deploy record once #18/#35 land.
+
+It is off by default so tests, CI and existing deployments never call a paid
+model. It writes `[agent-runtime]` lines to stdout (info) and stderr
+(warnings).
 
 ### Hire configuration
 

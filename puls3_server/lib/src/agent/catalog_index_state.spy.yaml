@@ -1,0 +1,18 @@
+### The catalog indexer's resume cursor, one row per network. It lets a pass
+### read only the registry events after the last ledger it processed.
+class: CatalogIndexState
+table: catalog_index_state
+serverOnly: true
+fields:
+  ### The network the cursor is for (the Stellar network passphrase).
+  network: String
+
+  ### The last ledger the indexer fully processed.
+  lastProcessedLedger: int
+
+  ### When the cursor last advanced.
+  updatedAt: DateTime
+indexes:
+  catalog_index_network_idx:
+    fields: network
+    unique: true
