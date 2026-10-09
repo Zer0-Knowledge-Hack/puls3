@@ -1,0 +1,13 @@
+### A SEP-10 challenge the client signs. The payload is the challenge XDR.
+class: WalletChallenge
+fields:
+  ### Opaque id the client sends back to verifyChallenge.
+  challengeId: String
+  ### Stellar G-address the challenge was issued for.
+  wallet: String
+  ### Base64 challenge transaction XDR.
+  payload: String
+  ### Network passphrase the signature must cover.
+  networkPassphrase: String
+  ### End of the challenge time bounds.
+  expiresAt: DateTime
