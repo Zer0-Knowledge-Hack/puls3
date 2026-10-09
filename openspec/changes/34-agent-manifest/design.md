@@ -6,7 +6,7 @@ Exploration approach A. The change adds types to a new `puls3_domain/lib/src/man
 
 - **Protocol**: ERC-8004 identity and ERC-8183 jobs (contracts, `Agent`, `Hire`).
 - **Product**: the declarative manifest, which holds no secrets.
-- **Serving**: the server deploy record, which holds the BYOK credential ref, salt and hash (#18, #35).
+- **Serving**: the server deploy record, which holds the builder credential ref (any provider), salt and hash (#18, #35).
 
 The domain stays pure Dart and uses only `dart:convert` (ADR-0001).
 
@@ -17,7 +17,7 @@ The domain stays pure Dart and uses only `dart:convert` (ADR-0001).
 | D1 | Draft vs deployable | `AgentManifestDraft` (nullable, no version) → `validate(policy, version)` → immutable `AgentManifest` | One class with a status | Each type states what is guaranteed. Matches `api.md:277` minus `version` |
 | D2 | One check pass | A private `_check(fields, {forDeploy, policy})` walks the fields in a fixed order and collects problems into an ordered, deduplicated list | Fail-fast factories (the `Agent` style) | All problems are reported together, the order is deterministic, and draft and deploy share one code path |
 | D3 | Draft tolerance | `forDeploy:false` skips only *missing* and *below-minimum*. Wrong type or value, above-maximum, duplicates, `tools`, unknown keys and `version` are always rejected | Lenient drafts | Proposal rule; a draft can still be stored as long as it has the right shape |
-| D4 | Model | `ModelId{provider,id}` sits in the manifest. The `ModelPolicy` is injected. There is no credential field | A credential ref in the manifest | Rotating the key needs no new version. Follows the bnbagent rule "no secrets in config". `isPaid(provider)` is used by the deploy-time credential check (#18/#35) |
+| D4 | Model | `ModelId{provider,id}` sits in the manifest. The `ModelPolicy` is injected. There is no credential field | A credential ref in the manifest | Rotating the key needs no new version. Follows the bnbagent rule "no secrets in config". `isPaid(provider)` is for display and pricing; the deploy-time credential check (#18/#35) applies to every provider, since builders always use their own account (ADR-0004 amendment) |
 | D5 | Policy semantics | `workers-ai` passes only if the id is in `workersAiModels`. A paid provider passes if it is in `paidProviders`, with any id (BYOK) | An allowlist for paid model ids | The builder owns the paid model choice. The config is still "not code" |
 | D6 | Versioning | `ManifestVersion` (>=1, `first`, `next()`). `AgentManifest.toDraft()`. The caller passes `latest?.next() ?? ManifestVersion.first` | The domain assigns versions | Only storage knows the latest version. "No skips" stays a server invariant |
 | D7 | Dart vs wire names | Dart fields are flat camelCase, as in `api.md`. The JSON is nested snake_case, as in the example file | A flat wire format | The wire matches the spike and the example (hash input). Dart matches the Serverpod models. See the mapping below |
@@ -96,7 +96,7 @@ final class AgentManifest { // same fields, non-null, plus version; value equali
 | `puls3_domain/lib/puls3_domain.dart` | Modify: export |
 | `puls3_domain/test/manifest_test.dart` | Create |
 | `docs/architecture/examples/agent-manifest.example.json` | Keep: it already uses `{provider,id}` and `version`. It is used as a fixture for `AgentManifest.fromJson` |
-| `docs/architecture/examples/agent-manifest.workers-ai.example.json` | Create: `@cf/meta/llama-3.1-8b-instruct` (illustrative, set by config) |
+| `docs/architecture/examples/agent-manifest.workers-ai.example.json` | Create: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (illustrative, set by config) |
 | `.github/workflows/ci.yml` | Modify: `docs/architecture/examples/*` → domain=true |
 | `docs/adr/0004-*.md`, `docs/domain/model.md`, `docs/architecture/api.md` | Modify |
 

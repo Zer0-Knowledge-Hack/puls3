@@ -136,10 +136,10 @@ final class SorobanRpcClient {
     );
   }
 
-  /// The sequence number of [account] through `getLedgerEntries`, or `null`
-  /// when the account does not exist on the ledger. An unreachable node or an
-  /// entry that is not an account is a [LedgerUnavailable], never `null`.
-  Future<int?> accountSequence(StellarAddress account) async {
+  /// The raw `LedgerEntryData` XDR of [account] through `getLedgerEntries`,
+  /// or `null` when the account does not exist. An unreachable node or an
+  /// entry that is not base64 is a [LedgerUnavailable], never `null`.
+  Future<Uint8List?> accountEntry(StellarAddress account) async {
     const method = 'getLedgerEntries';
     final key = XdrWriter()
       ..uint32(_ledgerKeyAccount)
@@ -159,12 +159,20 @@ final class SorobanRpcClient {
     if (xdr is! String) {
       throw const LedgerUnavailable('$method answered an entry without xdr');
     }
-    final Uint8List data;
     try {
-      data = base64Decode(xdr);
+      return base64Decode(xdr);
     } on FormatException {
       throw const LedgerUnavailable('$method answered an entry not in base64');
     }
+  }
+
+  /// The sequence number of [account], or `null` when the account does not
+  /// exist on the ledger. An unreachable node or an entry that is not an
+  /// account is a [LedgerUnavailable], never `null`.
+  Future<int?> accountSequence(StellarAddress account) async {
+    const method = 'getLedgerEntries';
+    final data = await accountEntry(account);
+    if (data == null) return null;
     if (data.length < _accountEntrySequenceEnd ||
         ByteData.sublistView(data).getUint32(0) != _ledgerKeyAccount) {
       throw const LedgerUnavailable(

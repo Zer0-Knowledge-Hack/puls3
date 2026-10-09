@@ -39,7 +39,16 @@ class AddressBadge extends StatelessWidget {
               children: [
                 Icon(icon, size: 14, color: Puls3Colors.lavender),
                 const SizedBox(width: Puls3Spacing.xs),
-                Text(shortenAddress(address), style: Puls3Text.data),
+                // Shrinks with an ellipsis instead of overflowing a narrow
+                // row (390 px phones).
+                Flexible(
+                  child: Text(
+                    shortenAddress(address),
+                    style: Puls3Text.data,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),

@@ -1,17 +1,11 @@
 agent:
   - list:
   - get:
-emailIdp:
-  - login:
-  - startRegistration:
-  - verifyRegistrationCode:
-  - finishRegistration:
-  - startPasswordReset:
-  - verifyPasswordResetCode:
-  - finishPasswordReset:
-  - hasAccount:
 jwtRefresh:
   - refreshAccessToken:
+walletAuth:
+  - createChallenge:
+  - verifyChallenge:
 greeting:
   - hello:
 health:
@@ -22,4 +16,5 @@ hire:
   - prepareFund:
   - prepareComplete:
   - prepareReject:
+  - getHire:
   - submitEscrowCall:

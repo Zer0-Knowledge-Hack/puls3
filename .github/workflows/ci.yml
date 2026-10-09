@@ -36,6 +36,8 @@ jobs:
                 domain=true; server=true; app=true; docker=true ;;
               puls3_domain/*)
                 domain=true; server=true; docker=true ;;
+              docs/architecture/examples/*)
+                domain=true ;;
               puls3_server/*)
                 server=true; docker=true ;;
               .dockerignore)

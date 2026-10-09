@@ -20,6 +20,7 @@ import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
 import 'greetings/greeting.dart' as _izw8z7ou;
@@ -36,6 +37,7 @@ import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
+export 'auth/wallet_challenge.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
 export 'greetings/greeting.dart';
@@ -92,6 +94,9 @@ class Protocol extends _isc.SerializationManager {
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
     }
+    if (t == _idvb5xlo.WalletChallenge) {
+      return _idvb5xlo.WalletChallenge.fromJson(data) as T;
+    }
     if (t == _iz6hnyrm.ChainSubmission) {
       return _iz6hnyrm.ChainSubmission.fromJson(data) as T;
     }
@@ -142,6 +147,10 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _isc.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _isc.getType<_idvb5xlo.WalletChallenge?>()) {
+      return (data != null ? _idvb5xlo.WalletChallenge.fromJson(data) : null)
+          as T;
     }
     if (t == _isc.getType<_iz6hnyrm.ChainSubmission?>()) {
       return (data != null ? _iz6hnyrm.ChainSubmission.fromJson(data) : null)
@@ -222,6 +231,7 @@ class Protocol extends _isc.SerializationManager {
     return switch (type) {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _idvb5xlo.WalletChallenge => 'WalletChallenge',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
       _izw8z7ou.Greeting => 'Greeting',
@@ -254,6 +264,8 @@ class Protocol extends _isc.SerializationManager {
         return 'AgentCatalogUnavailable';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _idvb5xlo.WalletChallenge():
+        return 'WalletChallenge';
       case _iz6hnyrm.ChainSubmission():
         return 'ChainSubmission';
       case _i4si20vg.CreateHireResult():
@@ -309,6 +321,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'WalletChallenge') {
+      return deserialize<_idvb5xlo.WalletChallenge>(data['data']);
     }
     if (dataClassName == 'ChainSubmission') {
       return deserialize<_iz6hnyrm.ChainSubmission>(data['data']);

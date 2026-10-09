@@ -16,6 +16,8 @@ Chained PRs recommended: Yes
 Chain strategy: stacked-to-main
 400-line budget risk: High
 
+Delivery change (user decision, 2026-10): everything after PR 2b ships as ONE PR on `feat/34-agent-manifest-03-json-docs` (base PR 2b `feat/34-agent-manifest-02b-validate`), as separate work-unit commits: 3a JSON, 3b canonical and examples, the PR 3 review fixes (F.1-F.5), and the docs (PR 4 tasks 4.1-4.4). It carries a `size:exception` (reviewed commit by commit; each commit is one rollback boundary). This replaces the 3a/3b/4 split below.
+
 Notes:
 - Stacked-to-main: PR n targets PR n-1's branch until it merges, then main. Each PR carries a dependency diagram marking itself with the pin marker. Every PR stays <= ~400 authored lines.
 - Contingency (no size exception): if PR 2 passes ~400, split at 2.8 into PR 2a (draft + `_check`) and PR 2b (`AgentManifest` + `validate` + `toDraft`). If PR 3 passes ~400, split at 3.9 into PR 3a (JSON) and PR 3b (canonical + examples + CI).
@@ -69,22 +71,30 @@ Notes: `problemsForDeploy` landed in 2a (2.3) and is tested there (one line over
 
 ## PR 3: JSON, canonical form, examples (~380 lines)
 
-- [ ] 3.1 RED: group Draft/JSON: wrong types (S4), `tools` -> `toolsNotSupported` distinct from `unknownKey` (S24), `version` in draft -> `versionInDraft`, unknown key at top/`skills[0]`/`input`/`price`/`model` (S19, S32), non-object -> `notAnObject`. Done: fails.
-- [ ] 3.2 GREEN: `AgentManifestDraft.fromJson(Object?)` and `toJson()` (snake_case mapping, nulls omitted, no throw on type errors; parse problems merged with `_check`; D7, D8, D11). Done: 3.1 green.
-- [ ] 3.3 RED: round trips and manifest JSON: draft round trip with partial fields (S31), manifest round trip (S30), wrong `schema` (S33), missing/invalid `version` -> `versionInvalid`, `schema` always emitted. Done: fails.
-- [ ] 3.4 GREEN: `AgentManifest.fromJson(json, policy)` and `toJson()`. Done: 3.3 green.
-- [ ] 3.5 RED: group Canonical: no whitespace, sorted keys at every depth (S34), key-order independence (S35), UTF-8 non-ASCII (S36), one-field edit changes bytes (S37), any double throws `StateError`. Done: fails.
-- [ ] 3.6 GREEN: `toCanonicalJson()` via `_sortKeysDeep` + `jsonEncode`; `dart:convert` only. Done: 3.5 green.
-- [ ] 3.7 Create `docs/architecture/examples/agent-manifest.workers-ai.example.json` (`workers-ai`, `@cf/meta/llama-3.1-8b-instruct`, version 1). Done: file valid JSON, no credential key.
-- [ ] 3.8 RED then GREEN: fixture tests read `../docs/architecture/examples/*.json`: Copy Forge validates with `anthropic` enabled (S38), workers-ai validates and `isPaid` false (S39), restrictive policy yields exactly one model problem each (S40), `toJson` equals source doc. Adjust `agent-manifest.example.json` only if needed. Done: green.
-- [ ] 3.9 Edit `.github/workflows/ci.yml` path filter: `docs/architecture/examples/*` -> `domain=true`. REFACTOR, gate, commit `feat(domain): add manifest JSON, canonical form and example fixtures`. Check line count; split contingency here.
+- [x] 3.1 RED: group Draft/JSON: wrong types (S4), `tools` -> `toolsNotSupported` distinct from `unknownKey` (S24), `version` in draft -> `versionInDraft`, unknown key at top/`skills[0]`/`input`/`price`/`model` (S19, S32), non-object -> `notAnObject`. Done: fails.
+- [x] 3.2 GREEN: `AgentManifestDraft.fromJson(Object?)` and `toJson()` (snake_case mapping, nulls omitted, no throw on type errors; parse problems merged with `_check`; D7, D8, D11). Done: 3.1 green.
+- [x] 3.3 RED: round trips and manifest JSON: draft round trip with partial fields (S31), manifest round trip (S30), wrong `schema` (S33), missing/invalid `version` -> `versionInvalid`, `schema` always emitted. Done: fails.
+- [x] 3.4 GREEN: `AgentManifest.fromJson(json, policy)` and `toJson()`. Done: 3.3 green.
+- [x] 3.5 RED: group Canonical: no whitespace, sorted keys at every depth (S34), key-order independence (S35), UTF-8 non-ASCII (S36), one-field edit changes bytes (S37), any double throws `StateError`. Done: fails.
+- [x] 3.6 GREEN: `toCanonicalJson()` via `_sortKeysDeep` + `jsonEncode`; `dart:convert` only. Done: 3.5 green.
+- [x] 3.7 Create `docs/architecture/examples/agent-manifest.workers-ai.example.json` (`workers-ai`, `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, version 1). Done: file valid JSON, no credential key.
+- [x] 3.8 RED then GREEN: fixture tests read `../docs/architecture/examples/*.json`: Copy Forge validates with `anthropic` enabled (S38), workers-ai validates and `isPaid` false (S39), restrictive policy yields exactly one model problem each (S40), `toJson` equals source doc. Adjust `agent-manifest.example.json` only if needed. Done: green.
+- [x] 3.9 Edit `.github/workflows/ci.yml` path filter: `docs/architecture/examples/*` -> `domain=true`. REFACTOR, gate, commit `feat(domain): add manifest JSON, canonical form and example fixtures`. Check line count; split contingency here.
 
-## PR 4: Docs (~120 lines, docs only)
+## PR 3 review fixes (commit `fix(domain): accept integral numbers, order manifest problems by field and harden JSON tests`)
 
-- [ ] 4.1 Amend `docs/adr/0004-*.md`: one `{provider,id}` model per agent (free `workers-ai` or BYOK), injected `ModelPolicy`, credential ref in the deploy record with `isPaid` -> stored-credential check, model change = new version, hash/salt move to #18 (supersedes line 32), drafts have no version.
-- [ ] 4.2 Update `docs/domain/model.md`: glossary (Manifest, Draft, ModelId, ModelPolicy, ManifestVersion), diagram node, invariants I23-I32 matching test groups.
-- [ ] 4.3 Update `docs/architecture/api.md:277`: remove `version` from `AgentManifestDraft`; add the wire mapping note (D7); keep `DraftVersionConflict` as storage concern.
-- [ ] 4.4 Verify links and invariant ids against tests; commit `docs: document agent manifest model and amend ADR-0004`. Done: `rg "I2[3-9]|I3[0-2]" docs/domain/model.md` shows I23-I32.
+- [x] F.1 REL-002: `canonicalJson` and the wire reader (`max_chars`, price amount, version) accept integral numbers (also `double`, as dart2js cannot tell `3.0` from `3`) within +-(2^53-1) and reject non-integral, NaN, infinite and out-of-range ones. `canonicalJson(3.0)` is `3`.
+- [x] F.2 REL-001: problems are ordered by field (enum order) then skill, across parse and rule problems (`_merge` sorts). Side effect: `unknownKey` now precedes `toolsNotSupported` (test updated).
+- [x] F.3 REL-003: `canonicalJson` throws `StateError` on non-string map keys (doc updated).
+- [x] F.4 REL-004: tests through JSON for `skillIdDuplicate`, `skillsTooMany`, `tools` at every nesting level (`toolsNotSupported`, per D3), non-string `schema`, null skill item, JSON null as absent (draft and manifest), several unknown keys, null/list manifest roots, huge `max_chars`, string `max_chars`, `"version": null` in a draft, integral and non-integral numbers.
+- [x] F.5 REL-005: fixture tests resolve the examples dir from the package location (`Isolate.resolvePackageUriSync`), so `dart test` works from the repo root and from `puls3_domain`.
+
+## PR 4: Docs (shipped in the single PR, docs only)
+
+- [x] 4.1 Amend `docs/adr/0004-*.md`: one `{provider,id}` model per agent (free `workers-ai` or BYOK), injected `ModelPolicy`, credential ref in the deploy record with `isPaid` -> stored-credential check, model change = new version, hash/salt move to #18 (supersedes line 32), drafts have no version.
+- [x] 4.2 Update `docs/domain/model.md`: glossary (Manifest, Draft, ModelId, ModelPolicy, ManifestVersion), diagram node, invariants I23-I32 matching test groups.
+- [x] 4.3 Update `docs/architecture/api.md:277`: remove `version` from `AgentManifestDraft`; add the wire mapping note (D7); keep `DraftVersionConflict` as storage concern.
+- [x] 4.4 Verify links and invariant ids against tests; commit `docs: document agent manifest model and amend ADR-0004`. Done: `rg "I2[3-9]|I3[0-2]" docs/domain/model.md` shows I23-I32.
 
 ## Risks
 
@@ -92,3 +102,13 @@ Notes: `problemsForDeploy` landed in 2a (2.3) and is tested there (one line over
 - Docs lag code until PR 4 merges; PR 3 CI filter keeps fixture tests re-running when examples change.
 - Spec edit (1.1) introduces S41-S43; verify must check them.
 - `Skill` still counts UTF-16 length (left as is because of PR #120).
+
+## Escalation resolution
+
+- [x] E.1 RED then GREEN: `_integer` applies the +-(2^53-1) range to the `int` branch (dart2js: every integral double is an `int`); test rejects `9007199254740992` in `canonicalJson`. Commit d6595f7.
+- [x] E.2 Spec amended (W1-W3 of the verify report): integral numbers accepted, non-integral/NaN/infinite/out-of-range rejected; S4, S14, S25, S32 and the canonical requirement updated; IDs unchanged.
+
+## Reviewer follow-ups (#138/#139)
+
+- [x] R.1 RED then GREEN: `Agent` name/description and `Skill` name count runes (not UTF-16), matching the manifest (D10); cross-layer test builds an `Agent` from a validated emoji manifest.
+- [x] R.2 RED then GREEN: `inputMaxChars` / `outputMaxChars` below 1 rejected in draft and deploy modes (S43); S25 test reaches the case through `AgentManifest.fromJson`. Spec S43/draft requirement and model.md I26/I30 updated.
