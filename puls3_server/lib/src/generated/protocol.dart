@@ -22,6 +22,7 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
 import 'agent/agent_record.dart' as _ia7sdlqn;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'agent/agent_wallet.dart' as _ickya0iq;
 import 'agent/catalog_index_state.dart' as _ixu8n9dt;
 import 'auth/wallet_account.dart' as _izqstcym;
 import 'auth/wallet_challenge.dart' as _idvb5xlo;
@@ -47,6 +48,7 @@ import 'runtime/hire_run.dart' as _iw9spjs5;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
+export 'agent/agent_wallet.dart';
 export 'agent/catalog_index_state.dart';
 export 'auth/wallet_account.dart';
 export 'auth/wallet_challenge.dart';
@@ -162,6 +164,118 @@ class Protocol extends _is.DatabaseSerializationManager {
             _isp.IndexElementDefinition(
               type: _isp.IndexElementDefinitionType.column,
               definition: 'agentId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'agent_wallet',
+      dartName: 'AgentWallet',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'address',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'idempotencyKey',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'ciphertext',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'nonce',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'mac',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'keyVersion',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'agent_wallet_address_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'address',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'agent_wallet_idempotency_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'idempotencyKey',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'agent_wallet_owner_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'owner',
             ),
           ],
           type: 'btree',
@@ -1020,6 +1134,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
     }
+    if (t == _ickya0iq.AgentWallet) {
+      return _ickya0iq.AgentWallet.fromJson(data) as T;
+    }
     if (t == _ixu8n9dt.CatalogIndexState) {
       return _ixu8n9dt.CatalogIndexState.fromJson(data) as T;
     }
@@ -1097,6 +1214,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ickya0iq.AgentWallet?>()) {
+      return (data != null ? _ickya0iq.AgentWallet.fromJson(data) : null) as T;
     }
     if (t == _is.getType<_ixu8n9dt.CatalogIndexState?>()) {
       return (data != null ? _ixu8n9dt.CatalogIndexState.fromJson(data) : null)
@@ -1214,6 +1334,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _ia7sdlqn.AgentRecord => 'AgentRecord',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _ickya0iq.AgentWallet => 'AgentWallet',
       _ixu8n9dt.CatalogIndexState => 'CatalogIndexState',
       _izqstcym.WalletAccount => 'WalletAccount',
       _idvb5xlo.WalletChallenge => 'WalletChallenge',
@@ -1256,6 +1377,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'AgentRecord';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _ickya0iq.AgentWallet():
+        return 'AgentWallet';
       case _ixu8n9dt.CatalogIndexState():
         return 'CatalogIndexState';
       case _izqstcym.WalletAccount():
@@ -1334,6 +1457,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'AgentWallet') {
+      return deserialize<_ickya0iq.AgentWallet>(data['data']);
     }
     if (dataClassName == 'CatalogIndexState') {
       return deserialize<_ixu8n9dt.CatalogIndexState>(data['data']);
@@ -1444,6 +1570,8 @@ class Protocol extends _is.DatabaseSerializationManager {
     switch (t) {
       case _ia7sdlqn.AgentRecord:
         return _ia7sdlqn.AgentRecord.t;
+      case _ickya0iq.AgentWallet:
+        return _ickya0iq.AgentWallet.t;
       case _ixu8n9dt.CatalogIndexState:
         return _ixu8n9dt.CatalogIndexState.t;
       case _izqstcym.WalletAccount:
