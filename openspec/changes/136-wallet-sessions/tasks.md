@@ -70,9 +70,9 @@ Commit: `feat(server): fail closed without the wallet auth signing key`
 
 ### Commit 3: SEP-10 codec and known vector
 
-- [ ] 3.1 Add `docs/architecture/examples/sep10/` with a committed test-only server secret, a fixed clock, a fixed 48-byte nonce, the expected XDR and the expected transaction hash. The secret is a test vector, not a credential.
-- [ ] 3.2 RED: `sep10_codec_test.dart`. `build` matches the vector bytes and hash (W1 shape: source, sequence 0, time bounds `[now, now+900]`, first op `<home_domain> auth` sourced by the wallet with 48 decoded bytes, `web_auth_domain` sourced by the server key). Two builds with different nonces differ (W3). `parse` rejects empty, non-base64, truncated, trailing bytes and fee-bump as the existing envelope codec does (W21). `verifies` accepts the vector's server signature and rejects a corrupted one. Done when it fails.
-- [ ] 3.3 GREEN: `Sep10Codec` port and `StellarSep10Codec` on `stellar_dart` (`ManageDataOperation`, `StellarPrivateKey.sign`). `parse` delegates to `StellarEnvelopeCodec.parse`. Done when 3.2 is green.
+- [x] 3.1 Add `docs/architecture/examples/sep10/` with a committed test-only server secret, a fixed clock, a fixed 48-byte nonce, the expected XDR and the expected transaction hash. The secret is a test vector, not a credential. Done: `challenge.json` uses 32 bytes of `0x07`, clock `2026-10-09T12:00:00Z`, nonce bytes 1..48.
+- [x] 3.2 RED: `sep10_codec_test.dart`. `build` matches the vector bytes and hash (W1 shape: source, sequence 0, time bounds `[now, now+900]`, first op `<home_domain> auth` sourced by the wallet with 48 decoded bytes, `web_auth_domain` sourced by the server key). Two builds with different nonces differ (W3). `parse` rejects empty, non-base64, truncated, trailing bytes and fee-bump as the existing envelope codec does (W21). `verifies` accepts the vector's server signature and rejects a corrupted one. Done: failed because `stellar_sep10_codec.dart` and the vector file were missing.
+- [x] 3.3 GREEN: `Sep10Codec` port and `StellarSep10Codec` on `stellar_dart` (`ManageDataOperation`, `StellarPrivateKey.sign`). `parse` delegates to `StellarEnvelopeCodec.parse`. Done: 5 tests green. A corrupted signature that is not a valid ed25519 scalar returns false instead of throwing.
 
 Commit: `feat(server): build and parse SEP-10 challenge transactions`
 
