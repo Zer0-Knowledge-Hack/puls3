@@ -105,7 +105,7 @@ void run(List<String> args) async {
   }
 
   // Run the agent of every funded hire, when PULS3_RUNTIME_ENABLED=true and
-  // the anthropicApiKey password is set (#20, see README).
+  // at least one model provider has credentials (#20, see README).
   final runtime = startAgentRuntime(pod, Platform.environment);
   if (runtime != null) {
     pod.experimental.shutdownTasks.addTask('agent-runtime', runtime.stop);

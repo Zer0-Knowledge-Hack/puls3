@@ -93,6 +93,10 @@ provider; a provider without credentials fails the run as
 
 With neither provider configured the loop does not start, even when enabled.
 
+The server-wide `workersAiApiToken` is for the seeded demo agents only. Builder
+agents run on the builder's own provider account (ADR-0004 amendment, #142),
+resolved from the deploy record once #18/#35 land.
+
 It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 (warnings).
