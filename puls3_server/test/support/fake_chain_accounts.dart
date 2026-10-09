@@ -16,6 +16,9 @@ final class FakeChainAccounts implements ChainAccounts {
   Object? sequenceFailure;
   Object? simulationFailure;
 
+  /// Signer thresholds, or `null` when the account is not on the ledger.
+  AccountAuthority? authority;
+
   final sequenceReads = <StellarAddress>[];
   final simulated = <EnvelopeSpec>[];
 
@@ -26,6 +29,10 @@ final class FakeChainAccounts implements ChainAccounts {
     if (failure != null) throw failure;
     return sequence;
   }
+
+  @override
+  Future<AccountAuthority?> authorityOf(StellarAddress account) async =>
+      authority;
 
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
