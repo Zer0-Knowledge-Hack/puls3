@@ -92,6 +92,8 @@ class HireFlowController extends ChangeNotifier {
   String? restore(String consumer) {
     final key = _keyFor(consumer);
     if (_storeKey == key) return _resumedInput;
+    // Another account: nothing of the previous account's hire carries over.
+    if (_storeKey != null) _resetHire();
     _storeKey = key;
     final pending = _store.read(key);
     if (pending != null) {
@@ -216,6 +218,18 @@ class HireFlowController extends ChangeNotifier {
       prepareAgain();
       rethrow;
     }
+  }
+
+  void _resetHire() {
+    _requestId = _newRequestId();
+    _resumedInput = null;
+    _task = null;
+    _hireId = null;
+    _createJob = null;
+    _createJobSent = false;
+    _fund = null;
+    _payment = null;
+    _step = HireStep.review;
   }
 
   /// The hire needs no resuming any more.
