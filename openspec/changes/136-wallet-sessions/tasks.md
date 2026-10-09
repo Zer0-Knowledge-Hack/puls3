@@ -78,8 +78,8 @@ Commit: `feat(server): build and parse SEP-10 challenge transactions`
 
 ### Commit 4: Account authority
 
-- [ ] 4.1 RED: `account_authority_test.dart`. A fixture account entry decodes master weight (`thresholds[0]`), medium threshold (`thresholds[2]`) and ed25519 signers. A missing account is `null`. `accountSequence` still returns the sequence after the refactor. An RPC failure surfaces as `ChainUnavailable`. Done when it fails.
-- [ ] 4.2 GREEN: `SorobanRpcClient.accountEntry` returns the raw entry XDR. Refactor `accountSequence` onto it. `ChainAccounts.authorityOf` → `AccountAuthority?`. `RpcChainAccounts` decodes `AccountEntry` thresholds and signers. Existing sequence callers stay green. Done when 4.1 is green.
+- [x] 4.1 RED: `account_authority_test.dart`. A fixture account entry decodes master weight (`thresholds[0]`), medium threshold (`thresholds[2]`) and ed25519 signers. A missing account is `null`. `accountSequence` still returns the sequence after the refactor. An RPC failure surfaces as `ChainUnavailable`. Done: failed because `authorityOf` was missing.
+- [x] 4.2 GREEN: `SorobanRpcClient.accountEntry` returns the raw entry XDR. Refactor `accountSequence` onto it. `ChainAccounts.authorityOf` → `AccountAuthority?`. `RpcChainAccounts` decodes `AccountEntry` thresholds and signers. Existing sequence callers stay green. Done: 4 tests green, plus the recorded `accountSequence` and `sequenceOf` suites. A pre-auth signer is omitted.
 
 Commit: `feat(server): read account signer thresholds for SEP-10`
 
