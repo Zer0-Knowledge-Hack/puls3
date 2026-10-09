@@ -56,6 +56,7 @@ final class QueuedRun {
     required this.manifestVersion,
     required this.input,
     required this.expiredAt,
+    this.attempts = 0,
   });
 
   final int hireId;
@@ -70,6 +71,9 @@ final class QueuedRun {
   /// The escrow job's `expired_at`, in unix seconds. A run that cannot end
   /// before it can never be submitted.
   final int expiredAt;
+
+  /// Retries already made after a retryable provider failure.
+  final int attempts;
 }
 
 /// Persists agent runs. Every transition is one conditional write, so a
@@ -78,8 +82,9 @@ abstract interface class HireRunStore {
   /// The run of hire [hireId], or `null` when it has none.
   Future<HireRun?> find(int hireId);
 
-  /// Up to [limit] queued runs, oldest first.
-  Future<List<QueuedRun>> listQueued({int limit = 10});
+  /// Up to [limit] queued runs, oldest first. With [now], runs waiting for a
+  /// retry (`notBefore` after [now]) are left out.
+  Future<List<QueuedRun>> listQueued({int limit = 10, DateTime? now});
 
   /// The hire ids of runs still `running` that started before [before].
   Future<List<int>> listRunningStartedBefore(DateTime before);
@@ -87,6 +92,16 @@ abstract interface class HireRunStore {
   /// `queued` → `running`. False when the run is not queued (another runner
   /// took it, or it does not exist).
   Future<bool> markRunning(int hireId, DateTime at);
+
+  /// `running` → `queued` again after a retryable failure: one more attempt,
+  /// not taken before [notBefore], with [reason] as the last error. False
+  /// when it is not running.
+  Future<bool> markRetry(
+    int hireId,
+    String reason, {
+    required DateTime notBefore,
+    required DateTime at,
+  });
 
   /// `running` → `succeeded` with [result]. False when it is not running.
   Future<bool> markSucceeded(int hireId, String result, DateTime at);

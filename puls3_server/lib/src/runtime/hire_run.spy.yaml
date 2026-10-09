@@ -16,6 +16,14 @@ fields:
   result: String?
   ### A safe RuntimeFailure code (for example timeout), set when it failed.
   failureReason: String?
+  ### Retries already made after a retryable provider failure (429, 5xx,
+  ### network, missing credentials). Bounded by the runner.
+  attempts: int, default=0
+  ### A retried run is not taken before this time (backoff).
+  notBefore: DateTime?
+  ### The safe code of the last retryable failure; failureReason stays empty
+  ### until the run really fails.
+  lastError: String?
 indexes:
   hire_run_hire_idx:
     fields: hireId

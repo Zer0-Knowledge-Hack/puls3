@@ -26,6 +26,24 @@ const runJobExpired = 'job_expired';
 /// failure that is not a `RuntimeFailure`. The detail goes to the log only.
 const runInternalError = 'internal_error';
 
+/// Waits before each retry of a run after a retryable provider failure
+/// (rate limit, server error, no response, provider without credentials).
+/// One entry per retry: after these, the next such failure is final.
+const retryBackoff = [
+  Duration(seconds: 30),
+  Duration(minutes: 2),
+  Duration(minutes: 8),
+];
+
+/// Whether [failure] may pass on a later attempt: the provider was rate
+/// limited, failed on its side, did not answer, or has no credentials
+/// configured right now. A timeout, a refusal or a limit is final.
+bool isRetryable(RuntimeFailure failure) => switch (failure) {
+  RuntimeProviderFailed() => failure.retryable,
+  RuntimeUnsupportedProvider() => true,
+  _ => false,
+};
+
 /// What one [HireRunner.pass] did.
 final class RunPassSummary {
   const RunPassSummary({
@@ -33,6 +51,7 @@ final class RunPassSummary {
     required this.failed,
     required this.interrupted,
     required this.deferred,
+    this.retried = 0,
   });
 
   final int succeeded;
@@ -42,12 +61,15 @@ final class RunPassSummary {
   /// Queued runs left for a later pass (the chain could not be read).
   final int deferred;
 
-  int get total => succeeded + failed + interrupted + deferred;
+  /// Runs put back in the queue after a retryable provider failure.
+  final int retried;
+
+  int get total => succeeded + failed + interrupted + deferred + retried;
 
   @override
   String toString() =>
       'succeeded $succeeded, failed $failed, interrupted $interrupted, '
-      'deferred $deferred';
+      'deferred $deferred, retried $retried';
 }
 
 /// Runs the agent of every funded hire once (#20, ADR-0004).
@@ -102,23 +124,34 @@ final class HireRunner {
     var succeeded = 0;
     var failed = 0;
     var deferred = 0;
-    for (final queued in await runs.listQueued(limit: _batchSize)) {
-      switch (await _runOne(queued, runs, hires)) {
+    var retried = 0;
+    for (final queued in await runs.listQueued(
+      limit: _batchSize,
+      now: _now(),
+    )) {
+      final outcome = await _runOne(queued, runs, hires);
+      switch (outcome) {
         case _Outcome.succeeded:
           succeeded++;
         case _Outcome.failed:
           failed++;
         case _Outcome.deferred:
           deferred++;
+        case _Outcome.retried || _Outcome.rateLimited:
+          retried++;
         case _Outcome.skipped:
           break;
       }
+      // The provider is rate limited: the rest of the batch would only hit
+      // the same limit, so it waits for a later pass.
+      if (outcome == _Outcome.rateLimited) break;
     }
     return RunPassSummary(
       succeeded: succeeded,
       failed: failed,
       interrupted: interrupted,
       deferred: deferred,
+      retried: retried,
     );
   }
 
@@ -176,6 +209,9 @@ final class HireRunner {
     try {
       output = await _runner.run(manifest.task(queued.input));
     } on RuntimeFailure catch (failure) {
+      if (isRetryable(failure) && queued.attempts < retryBackoff.length) {
+        return _retry(queued, runs, failure);
+      }
       return _fail(running, runs, failure.code);
     } on Object catch (e) {
       // Never leave the run `running` until it is reported as interrupted.
@@ -198,11 +234,52 @@ final class HireRunner {
     return _Outcome.succeeded;
   }
 
+  /// Puts the run back in the queue for its next attempt, after the backoff
+  /// of that attempt. The hire stays `funded` and its run `queued`.
+  Future<_Outcome> _retry(
+    QueuedRun queued,
+    HireRunStore runs,
+    RuntimeFailure failure,
+  ) async {
+    final wait = retryBackoff[queued.attempts];
+    final now = _now();
+    if (!await runs.markRetry(
+      queued.hireId,
+      failure.code,
+      notBefore: now.add(wait),
+      at: now,
+    )) {
+      _log(
+        ChainLogLevel.warning,
+        'Run of hire ${queued.hireId} had already ended; its retry was not '
+        'stored',
+      );
+      return _Outcome.skipped;
+    }
+    _log(
+      ChainLogLevel.warning,
+      'Run of hire ${queued.hireId} will retry in ${wait.inSeconds}s '
+      '(attempt ${queued.attempts + 2} of ${retryBackoff.length + 1}): '
+      '${failure.code}',
+    );
+    final rateLimited =
+        failure is RuntimeProviderFailed && failure.status == 429;
+    return rateLimited ? _Outcome.rateLimited : _Outcome.retried;
+  }
+
   Future<_Outcome> _fail(Hire running, HireRunStore runs, String code) async {
     // The domain rule (a funded hire, a non-blank reason) holds before the
     // failure is stored.
     running.failRun(reason: code);
-    await runs.markFailed(running.id.value, code, _now());
+    if (!await runs.markFailed(running.id.value, code, _now())) {
+      // Another pass already ended the run; its state wins.
+      _log(
+        ChainLogLevel.warning,
+        'Run of hire ${running.id.value} had already ended; its failure '
+        '($code) was not stored',
+      );
+      return _Outcome.skipped;
+    }
     _log(
       ChainLogLevel.warning,
       'Run of hire ${running.id.value} failed: $code',
@@ -211,4 +288,4 @@ final class HireRunner {
   }
 }
 
-enum _Outcome { succeeded, failed, deferred, skipped }
+enum _Outcome { succeeded, failed, deferred, retried, rateLimited, skipped }

@@ -27,7 +27,10 @@ abstract class HireRunRecord
     this.finishedAt,
     this.result,
     this.failureReason,
-  });
+    int? attempts,
+    this.notBefore,
+    this.lastError,
+  }) : attempts = attempts ?? 0;
 
   factory HireRunRecord({
     int? id,
@@ -38,6 +41,9 @@ abstract class HireRunRecord
     DateTime? finishedAt,
     String? result,
     String? failureReason,
+    int? attempts,
+    DateTime? notBefore,
+    String? lastError,
   }) = _HireRunRecordImpl;
 
   factory HireRunRecord.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -56,6 +62,11 @@ abstract class HireRunRecord
           : _is.DateTimeJsonExtension.fromJson(jsonSerialization['finishedAt']),
       result: jsonSerialization['result'] as String?,
       failureReason: jsonSerialization['failureReason'] as String?,
+      attempts: jsonSerialization['attempts'] as int?,
+      notBefore: jsonSerialization['notBefore'] == null
+          ? null
+          : _is.DateTimeJsonExtension.fromJson(jsonSerialization['notBefore']),
+      lastError: jsonSerialization['lastError'] as String?,
     );
   }
 
@@ -83,6 +94,17 @@ abstract class HireRunRecord
   /// A safe RuntimeFailure code (for example timeout), set when it failed.
   String? failureReason;
 
+  /// Retries already made after a retryable provider failure (429, 5xx,
+  /// network, missing credentials). Bounded by the runner.
+  int attempts;
+
+  /// A retried run is not taken before this time (backoff).
+  DateTime? notBefore;
+
+  /// The safe code of the last retryable failure; failureReason stays empty
+  /// until the run really fails.
+  String? lastError;
+
   @override
   _is.Table<int?> get table => t;
 
@@ -98,6 +120,9 @@ abstract class HireRunRecord
     DateTime? finishedAt,
     String? result,
     String? failureReason,
+    int? attempts,
+    DateTime? notBefore,
+    String? lastError,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -111,6 +136,9 @@ abstract class HireRunRecord
       if (finishedAt != null) 'finishedAt': finishedAt?.toJson(),
       if (result != null) 'result': result,
       if (failureReason != null) 'failureReason': failureReason,
+      'attempts': attempts,
+      if (notBefore != null) 'notBefore': notBefore?.toJson(),
+      if (lastError != null) 'lastError': lastError,
     };
   }
 
@@ -159,6 +187,9 @@ class _HireRunRecordImpl extends HireRunRecord {
     DateTime? finishedAt,
     String? result,
     String? failureReason,
+    int? attempts,
+    DateTime? notBefore,
+    String? lastError,
   }) : super._(
          id: id,
          hireId: hireId,
@@ -168,6 +199,9 @@ class _HireRunRecordImpl extends HireRunRecord {
          finishedAt: finishedAt,
          result: result,
          failureReason: failureReason,
+         attempts: attempts,
+         notBefore: notBefore,
+         lastError: lastError,
        );
 
   /// Returns a shallow copy of this [HireRunRecord]
@@ -183,6 +217,9 @@ class _HireRunRecordImpl extends HireRunRecord {
     Object? finishedAt = _Undefined,
     Object? result = _Undefined,
     Object? failureReason = _Undefined,
+    int? attempts,
+    Object? notBefore = _Undefined,
+    Object? lastError = _Undefined,
   }) {
     return HireRunRecord(
       id: id is int? ? id : this.id,
@@ -195,6 +232,9 @@ class _HireRunRecordImpl extends HireRunRecord {
       failureReason: failureReason is String?
           ? failureReason
           : this.failureReason,
+      attempts: attempts ?? this.attempts,
+      notBefore: notBefore is DateTime? ? notBefore : this.notBefore,
+      lastError: lastError is String? ? lastError : this.lastError,
     );
   }
 }
@@ -240,6 +280,22 @@ class HireRunRecordUpdateTable extends _is.UpdateTable<HireRunRecordTable> {
         table.failureReason,
         value,
       );
+
+  _is.ColumnValue<int, int> attempts(int value) => _is.ColumnValue(
+    table.attempts,
+    value,
+  );
+
+  _is.ColumnValue<DateTime, DateTime> notBefore(DateTime? value) =>
+      _is.ColumnValue(
+        table.notBefore,
+        value,
+      );
+
+  _is.ColumnValue<String, String> lastError(String? value) => _is.ColumnValue(
+    table.lastError,
+    value,
+  );
 }
 
 class HireRunRecordTable extends _is.Table<int?> {
@@ -273,6 +329,19 @@ class HireRunRecordTable extends _is.Table<int?> {
       'failureReason',
       this,
     );
+    attempts = _is.ColumnInt(
+      'attempts',
+      this,
+      hasDefault: true,
+    );
+    notBefore = _is.ColumnDateTime(
+      'notBefore',
+      this,
+    );
+    lastError = _is.ColumnString(
+      'lastError',
+      this,
+    );
   }
 
   late final HireRunRecordUpdateTable updateTable;
@@ -294,6 +363,17 @@ class HireRunRecordTable extends _is.Table<int?> {
   /// A safe RuntimeFailure code (for example timeout), set when it failed.
   late final _is.ColumnString failureReason;
 
+  /// Retries already made after a retryable provider failure (429, 5xx,
+  /// network, missing credentials). Bounded by the runner.
+  late final _is.ColumnInt attempts;
+
+  /// A retried run is not taken before this time (backoff).
+  late final _is.ColumnDateTime notBefore;
+
+  /// The safe code of the last retryable failure; failureReason stays empty
+  /// until the run really fails.
+  late final _is.ColumnString lastError;
+
   @override
   List<_is.Column> get columns => [
     id,
@@ -304,6 +384,9 @@ class HireRunRecordTable extends _is.Table<int?> {
     finishedAt,
     result,
     failureReason,
+    attempts,
+    notBefore,
+    lastError,
   ];
 }
 

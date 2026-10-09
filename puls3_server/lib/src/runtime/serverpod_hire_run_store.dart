@@ -69,10 +69,15 @@ final class ServerpodHireRunStore implements HireRunStore {
   }
 
   @override
-  Future<List<QueuedRun>> listQueued({int limit = 10}) async {
+  Future<List<QueuedRun>> listQueued({int limit = 10, DateTime? now}) async {
     final runs = await HireRunRecord.db.find(
       session,
-      where: (t) => t.state.equals(HireRunState.queued.name),
+      where: (t) {
+        final queued = t.state.equals(HireRunState.queued.name);
+        if (now == null) return queued;
+        return queued &
+            (t.notBefore.equals(null) | (t.notBefore <= now.toUtc()));
+      },
       orderBy: (t) => t.id,
       limit: limit,
     );
@@ -93,6 +98,7 @@ final class ServerpodHireRunStore implements HireRunStore {
             manifestVersion: hire.manifestVersion,
             input: hire.input ?? '',
             expiredAt: hire.expiredAt,
+            attempts: run.attempts,
           ),
     ];
   }
@@ -118,6 +124,37 @@ final class ServerpodHireRunStore implements HireRunStore {
       ],
       where: (t) =>
           t.hireId.equals(hireId) & t.state.equals(HireRunState.queued.name),
+    );
+    return updated.isNotEmpty;
+  }
+
+  @override
+  Future<bool> markRetry(
+    int hireId,
+    String reason, {
+    required DateTime notBefore,
+    required DateTime at,
+  }) async {
+    final run = await HireRunRecord.db.findFirstRow(
+      session,
+      where: (t) =>
+          t.hireId.equals(hireId) & t.state.equals(HireRunState.running.name),
+    );
+    if (run == null) return false;
+    // Conditional on the attempts read, so two writers count one retry.
+    final updated = await HireRunRecord.db.updateWhere(
+      session,
+      columnValues: (t) => [
+        t.state(HireRunState.queued.name),
+        t.attempts(run.attempts + 1),
+        t.notBefore(notBefore.toUtc()),
+        t.lastError(reason),
+        t.startedAt(null),
+      ],
+      where: (t) =>
+          t.hireId.equals(hireId) &
+          t.state.equals(HireRunState.running.name) &
+          t.attempts.equals(run.attempts),
     );
     return updated.isNotEmpty;
   }
