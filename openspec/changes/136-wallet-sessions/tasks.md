@@ -85,8 +85,8 @@ Commit: `feat(server): read account signer thresholds for SEP-10`
 
 ### Commit 5: Challenge store
 
-- [ ] 5.1 RED: one contract, two adapters (`challenge_store_test.dart` in-memory, `test/integration/challenge_store_test.dart` Postgres). Insert, find, consume-once, expired consume, unknown id (W26). A consume inside a transaction that throws leaves the row unconsumed. Done when it fails.
-- [ ] 5.2 GREEN: `ChallengeStore` port, in-memory fake, and `ServerpodChallengeStore`. `consume` is a conditional update (`consumedAt` null and `expiresAt > now`) and accepts an optional transaction. Outcomes: consumed, alreadyConsumed, expired, notFound. Done when both adapters pass the same contract.
+- [x] 5.1 RED: one contract, two adapters (`challenge_store_test.dart` in-memory, `test/integration/challenge_store_test.dart` Postgres). Insert, find, consume-once, expired consume, unknown id (W26). A consume inside a transaction that throws leaves the row unconsumed. Done: failed because `challenge_store.dart` and the in-memory store were missing.
+- [x] 5.2 GREEN: `ChallengeStore` port, in-memory fake, and `ServerpodChallengeStore`. `consume` is a conditional update (`consumedAt` null and `expiresAt > now`) and accepts an optional transaction. Outcomes: consumed, alreadyConsumed, expired, notFound. Done: the same 5 tests pass on both adapters. `expiresAt == now` is expired. A thrown transaction rolls the consume back.
 
 Commit: `feat(server): store single-use wallet challenges`
 
