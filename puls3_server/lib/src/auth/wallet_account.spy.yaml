@@ -1,0 +1,23 @@
+### Maps one Stellar wallet to one Serverpod auth user. Server-only.
+class: WalletAccount
+table: wallet_account
+serverOnly: true
+fields:
+  ### Stellar G-address. One row per wallet.
+  wallet: String
+
+  ### The auth user this wallet signs in as.
+  ###
+  ### Serverpod 4.0.4 requires a model relation to be nullable. WalletIdp
+  ### always sets it; the unique index keeps one user per row.
+  authUser: module:serverpod_auth_core:AuthUser?, relation(onDelete=Cascade)
+
+  ### When the mapping was created.
+  createdAt: DateTime
+indexes:
+  wallet_account_wallet_idx:
+    fields: wallet
+    unique: true
+  wallet_account_auth_user_idx:
+    fields: authUserId
+    unique: true

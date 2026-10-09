@@ -21,6 +21,9 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
     as _iais;
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'auth/wallet_account.dart' as _izqstcym;
+import 'auth/wallet_challenge.dart' as _idvb5xlo;
+import 'auth/wallet_challenge_record.dart' as _i1hfx2wv;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
 import 'greetings/greeting.dart' as _izw8z7ou;
@@ -41,6 +44,9 @@ import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
+export 'auth/wallet_account.dart';
+export 'auth/wallet_challenge.dart';
+export 'auth/wallet_challenge_record.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
 export 'greetings/greeting.dart';
@@ -665,6 +671,167 @@ class Protocol extends _is.DatabaseSerializationManager {
       ],
       managed: true,
     ),
+    _isp.TableDefinition(
+      name: 'wallet_account',
+      dartName: 'WalletAccount',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'wallet',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'authUserId',
+          columnType: _isp.ColumnType.uuid,
+          isNullable: false,
+          dartType: 'UuidValue',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [
+        _isp.ForeignKeyDefinition(
+          constraintName: 'wallet_account_fk_0',
+          columns: ['authUserId'],
+          referenceTable: 'serverpod_auth_core_user',
+          referenceTableSchema: 'public',
+          referenceColumns: ['id'],
+          onUpdate: _isp.ForeignKeyAction.noAction,
+          onDelete: _isp.ForeignKeyAction.cascade,
+          matchType: null,
+        ),
+      ],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'wallet_account_wallet_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'wallet',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'wallet_account_auth_user_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'authUserId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'wallet_challenge',
+      dartName: 'WalletChallengeRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'challengeId',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'wallet',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'challengeXdr',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'transactionHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'expiresAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _isp.ColumnDefinition(
+          name: 'consumedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'wallet_challenge_id_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'challengeId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'wallet_challenge_wallet_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'wallet',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     ..._iais.Protocol.targetTableDefinitions,
     ..._iacs.Protocol.targetTableDefinitions,
     ..._isp.Protocol.targetTableDefinitions,
@@ -702,6 +869,15 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
+    }
+    if (t == _izqstcym.WalletAccount) {
+      return _izqstcym.WalletAccount.fromJson(data) as T;
+    }
+    if (t == _idvb5xlo.WalletChallenge) {
+      return _idvb5xlo.WalletChallenge.fromJson(data) as T;
+    }
+    if (t == _i1hfx2wv.WalletChallengeRecord) {
+      return _i1hfx2wv.WalletChallengeRecord.fromJson(data) as T;
     }
     if (t == _iz6hnyrm.ChainSubmission) {
       return _iz6hnyrm.ChainSubmission.fromJson(data) as T;
@@ -765,6 +941,20 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_izqstcym.WalletAccount?>()) {
+      return (data != null ? _izqstcym.WalletAccount.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_idvb5xlo.WalletChallenge?>()) {
+      return (data != null ? _idvb5xlo.WalletChallenge.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_i1hfx2wv.WalletChallengeRecord?>()) {
+      return (data != null
+              ? _i1hfx2wv.WalletChallengeRecord.fromJson(data)
+              : null)
+          as T;
     }
     if (t == _is.getType<_iz6hnyrm.ChainSubmission?>()) {
       return (data != null ? _iz6hnyrm.ChainSubmission.fromJson(data) : null)
@@ -863,6 +1053,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     return switch (type) {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _izqstcym.WalletAccount => 'WalletAccount',
+      _idvb5xlo.WalletChallenge => 'WalletChallenge',
+      _i1hfx2wv.WalletChallengeRecord => 'WalletChallengeRecord',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
       _izw8z7ou.Greeting => 'Greeting',
@@ -899,6 +1092,12 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'AgentCatalogUnavailable';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _izqstcym.WalletAccount():
+        return 'WalletAccount';
+      case _idvb5xlo.WalletChallenge():
+        return 'WalletChallenge';
+      case _i1hfx2wv.WalletChallengeRecord():
+        return 'WalletChallengeRecord';
       case _iz6hnyrm.ChainSubmission():
         return 'ChainSubmission';
       case _i4si20vg.CreateHireResult():
@@ -966,6 +1165,15 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'WalletAccount') {
+      return deserialize<_izqstcym.WalletAccount>(data['data']);
+    }
+    if (dataClassName == 'WalletChallenge') {
+      return deserialize<_idvb5xlo.WalletChallenge>(data['data']);
+    }
+    if (dataClassName == 'WalletChallengeRecord') {
+      return deserialize<_i1hfx2wv.WalletChallengeRecord>(data['data']);
     }
     if (dataClassName == 'ChainSubmission') {
       return deserialize<_iz6hnyrm.ChainSubmission>(data['data']);
@@ -1062,6 +1270,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       }
     }
     switch (t) {
+      case _izqstcym.WalletAccount:
+        return _izqstcym.WalletAccount.t;
+      case _i1hfx2wv.WalletChallengeRecord:
+        return _i1hfx2wv.WalletChallengeRecord.t;
       case _iz6hnyrm.ChainSubmission:
         return _iz6hnyrm.ChainSubmission.t;
       case _ir9uo1i9.EscrowPreparation:

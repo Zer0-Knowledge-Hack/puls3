@@ -75,6 +75,31 @@
             "columnType": 0,
             "isNullable": true,
             "dartType": "String?"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
+            "name": "attempts",
+            "fieldName": "attempts",
+            "columnType": 6,
+            "isNullable": false,
+            "columnDefault": "0",
+            "dartType": "int"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
+            "name": "notBefore",
+            "fieldName": "notBefore",
+            "columnType": 4,
+            "isNullable": true,
+            "dartType": "DateTime?"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
+            "name": "lastError",
+            "fieldName": "lastError",
+            "columnType": 0,
+            "isNullable": true,
+            "dartType": "String?"
           }
         ],
         "foreignKeys": [],

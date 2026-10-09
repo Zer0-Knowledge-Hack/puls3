@@ -11,7 +11,10 @@ CREATE TABLE "hire_run" (
     "startedAt" timestamp without time zone,
     "finishedAt" timestamp without time zone,
     "result" text,
-    "failureReason" text
+    "failureReason" text,
+    "attempts" bigint NOT NULL DEFAULT 0,
+    "notBefore" timestamp without time zone,
+    "lastError" text
 );
 
 -- Indexes
@@ -23,9 +26,9 @@ CREATE INDEX "hire_run_state_idx" ON "hire_run" USING btree ("state");
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261008212944243', now())
+    VALUES ('puls3', '20261009213200586', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261008212944243', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009213200586', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

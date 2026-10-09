@@ -35,8 +35,8 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 | Endpoint class | Method | Parameters | Returns | Auth | Possible errors |
 |---|---|---|---|---|---|
-| `AuthEndpoint` | `createChallenge` | `wallet: String` | `WalletChallenge` | No | `InvalidStellarAddress`, `ChallengeRateLimited`, `AuthenticationUnavailable` |
-| `AuthEndpoint` | `verifyChallenge` | `challengeId: String`, `wallet: String`, `signature: String` | `AuthSuccess` | No | `InvalidStellarAddress`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
+| `WalletAuthEndpoint` (`walletAuth`) | `createChallenge` | `wallet: String` | `WalletChallenge` | No | `InvalidStellarAddress`, `ChallengeRateLimited`, `AuthenticationUnavailable` |
+| `WalletAuthEndpoint` (`walletAuth`) | `verifyChallenge` | `challengeId: String`, `wallet: String`, `signedChallengeXdr: String` | `AuthSuccess` | No | `InvalidStellarAddress`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
 | `ConfigEndpoint` | `getNetworkConfig` | — | `NetworkConfig` | No | `ConfigurationUnavailable` |
 | `AgentEndpoint` | `list` | — | `List<AgentSummary>` | No | `AgentCatalogUnavailable` (typed exception, see [Agent catalog](#agent-catalog)) |
 | `AgentEndpoint` | `get` | `id: String` (metadata id, for example `agt-001`) | `AgentSummary?` (`null` for an unknown id) | No | `AgentCatalogUnavailable` (typed exception) |
@@ -201,8 +201,8 @@ Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escro
 
 ### Wallet session lifecycle
 
-1. `createChallenge` returns a one-use challenge bound to the wallet, the testnet network, and a five-minute expiry.
-2. The wallet signs the exact challenge bytes. `verifyChallenge` verifies the signature, consumes the challenge atomically, and returns Serverpod `AuthSuccess` access/refresh credentials bound to that wallet. **Unverified:** the spike did not exercise wallet message signing (`signMessage`) for this challenge; #25 must prove it before this step is final.
+1. `client.walletAuth.createChallenge` returns a one-use SEP-10 challenge bound to the wallet and the configured network. `expiresAt` is 900 seconds (15 minutes) after issuance.
+2. The wallet signs that challenge transaction. `verifyChallenge(challengeId, wallet, signedChallengeXdr)` checks the signed envelope, consumes the challenge atomically, and returns Serverpod `AuthSuccess` access and refresh credentials bound to that wallet. The web client learns the expected signer and domains from `config.json` `auth`: `serverSigningKey` (the public `G…` address), `homeDomain`, `webAuthDomain` and `networkPassphrase`. That payload never carries the `S…` secret.
 3. Protected endpoints load the wallet from the session. They never trust a caller-supplied wallet address without comparing it to the session wallet. Relay submissions must be signed by that same wallet.
 4. The standard Serverpod JWT refresh path renews an expired access token. If the refresh token is expired, revoked, or invalid, Flutter discards the session and repeats the wallet challenge before resuming the pending action.
 
@@ -271,7 +271,7 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 
 | Type | Required fields |
 |---|---|
-| `WalletChallenge` | `challengeId`, `wallet`, `payload`, `expiresAt` |
+| `WalletChallenge` | `challengeId`, `wallet`, `payload` (the challenge transaction XDR), `networkPassphrase`, `expiresAt` (900 seconds after issuance) |
 | `NetworkConfig` | `network`, `rpcUrl`, `networkPassphrase`, `usdcContractId`, `escrowContractId`, `platformFeeBps`, `identityRegistryContractId`, `reputationRegistryContractId`, `explorerBaseUrl` |
 | [`AgentSummary`](models/agent_summary.spy.yaml) | `id: String`, `registryId: int`, `name: String`, `description: String`, `skills: List<String>`, `priceUsdcStroops: int`, `wallet: String?`, `model: String?` |
 | `AgentManifestDraft` | ADR-0004 fields without `version` (a draft has none; the deployed `AgentManifest` gets it): `name`, `description`, `skills`, `model: ModelId`, `systemPrompt`, `inputType`, `inputMaxChars`, `outputType`, `outputMaxChars`, `price`. `DraftVersionConflict` is a storage concern (`StudioDraft.revision`), not a manifest field |
@@ -320,8 +320,8 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F1-1 | Client-only: open the wallet picker. |
-| F1-2 | Client detects the selected wallet extension and requests connection (`WalletUnavailable` is client-only). After an installed wallet returns its address, call `AuthEndpoint.createChallenge(wallet)`. |
-| F1-3 | After connection approval, the wallet signs the challenge and `AuthEndpoint.verifyChallenge` establishes the wallet-bound Serverpod session; rejection (`WalletRejected`) cancels connection and no private key reaches Serverpod. Challenge signing is unverified (see the session lifecycle). |
+| F1-2 | Client detects the selected wallet extension and requests connection (`WalletUnavailable` is client-only). After an installed wallet returns its address, call `client.walletAuth.createChallenge(wallet)`. |
+| F1-3 | After connection approval, the wallet signs the challenge transaction and `verifyChallenge(challengeId, wallet, signedChallengeXdr)` establishes the wallet-bound Serverpod session; rejection (`WalletRejected`) cancels connection and no private key reaches Serverpod. |
 | F1-4 | `ConfigEndpoint.getNetworkConfig`; Flutter compares the wallet network. `WrongNetwork` is a client-only outcome: ask for a switch. |
 | F1-5 | Client shows the authenticated wallet address and resumes the pending action. If the session cannot refresh, repeat F1-2/F1-3 before resuming. |
 
@@ -451,5 +451,5 @@ Both decisions were made by the product owner on 2026-09-30. They resolve the tw
 | Escrow interface: function signatures, job id type, events, a job read method, how auto-approval and the D4 invariant are enforced | #55 | Preparation, funding verification, and `approvalDeadline` depend on it |
 | RPC providers other than SDF Testnet returning contract events and state | #30 | Funding verification reads the job and its event |
 | Server-side submission with `stellar_dart` | #18, #19 | Relay implementation path; spike passed (stellar_dart 2.3.0, `puls3_server/test/spike`); the pure-Dart fallback is `package:crypto` + ed25519 with hand-written XDR behind the same adapter. |
-| Wallet challenge signing (`signMessage`) for F1-3 | #25 | Session establishment is not yet proven with Freighter. |
+| A Freighter-signed SEP-10 challenge recorded as a vector | #136 | The server verifies the signed transaction (`signedChallengeXdr`), not `signMessage`. A manual Freighter check is still required. |
 | `give_feedback` arguments in the Stellar 8004 drop-in | #14 | `prepareFeedback` builds that call |

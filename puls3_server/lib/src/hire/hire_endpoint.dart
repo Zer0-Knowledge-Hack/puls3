@@ -25,11 +25,14 @@ class HireEndpoint extends Endpoint {
   static HireServicesBuilder? _servicesBuilder;
   static HireWiring? _wiring;
 
-  static SessionWallet get _wallet =>
-      _sessionWallet ?? const FailClosedSessionWallet();
+  /// A request without an access token is HTTP 401 before the method runs.
+  @override
+  bool get requireLogin => true;
 
-  /// Replaces the session seam, for tests. `null` restores the production
-  /// default, which fails closed until #25 provides real sessions.
+  static SessionWallet get _wallet =>
+      _sessionWallet ?? const WalletSessionWallet();
+
+  /// Replaces the session seam, for tests. `null` restores [WalletSessionWallet].
   @visibleForTesting
   static set sessionWallet(SessionWallet? wallet) => _sessionWallet = wallet;
 

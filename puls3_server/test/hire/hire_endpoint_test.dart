@@ -16,6 +16,7 @@ import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:serverpod/serverpod.dart' show Session;
 import 'package:test/test.dart';
 
+import '../support/fail_closed_session_wallet.dart';
 import '../support/fake_envelope_codec.dart';
 import '../support/in_memory_hire_run_store.dart';
 import '../support/relay_rig.dart';
@@ -190,23 +191,9 @@ void main() {
     });
   });
 
-  group('the production seam fails closed until sessions exist (#25)', () {
-    test('the default wallet raises AuthenticationUnavailable', () async {
-      HireEndpoint.sessionWallet = null;
-      HireEndpoint.servicesBuilder = (_) {
-        events.add('services');
-        throw StateError('no service may be built without a session');
-      };
-
-      await expectLater(
-        endpoint.createHire(session, 7, alice, 'hi', 'req-1'),
-        throwsA(api('AuthenticationUnavailable')),
-      );
-      await expectLater(
-        endpoint.prepareFund(session, 1),
-        throwsA(api('AuthenticationUnavailable')),
-      );
-      expect(events, isEmpty);
+  group('login is required and the fail-closed double stays for tests', () {
+    test('HireEndpoint.requireLogin is true', () {
+      expect(HireEndpoint().requireLogin, isTrue);
     });
 
     test('FailClosedSessionWallet never returns a wallet', () {
