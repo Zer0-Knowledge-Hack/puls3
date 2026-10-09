@@ -12,23 +12,23 @@ T _roundTrip<T>(T value) {
 }
 
 Hire _hire({String? status = 'open'}) => Hire(
-      id: 7,
-      agentId: 3,
-      consumer: 'GCONSUMER',
-      price: 10000000,
-      manifestVersion: 1,
-      status: status,
-    );
+  id: 7,
+  agentId: 3,
+  consumer: 'GCONSUMER',
+  price: 10000000,
+  manifestVersion: 1,
+  status: status,
+);
 
 PreparedTransaction _prepared() => PreparedTransaction(
-      preparationId: 'prep-1',
-      purpose: 'createJob',
-      signer: 'GCONSUMER',
-      networkPassphrase: 'Test SDF Network ; September 2015',
-      unsignedTransactionXdr: 'AAAA',
-      transaction: 'ab' * 32,
-      expiresAt: DateTime.utc(2026, 10, 7, 12),
-    );
+  preparationId: 'prep-1',
+  purpose: 'createJob',
+  signer: 'GCONSUMER',
+  networkPassphrase: 'Test SDF Network ; September 2015',
+  unsignedTransactionXdr: 'AAAA',
+  transaction: 'ab' * 32,
+  expiresAt: DateTime.utc(2026, 10, 7, 12),
+);
 
 void main() {
   group('Puls3ApiException', () {
@@ -69,15 +69,17 @@ void main() {
     });
 
     test('round-trips a setAgentWallet authorization entry', () {
-      final decoded = _roundTrip(PreparedTransaction(
-        preparationId: 'prep-2',
-        purpose: 'setAgentWallet',
-        signer: 'GOWNER',
-        networkPassphrase: 'Test SDF Network ; September 2015',
-        authorizationEntryXdr: 'BBBB',
-        signatureExpirationLedger: 123456,
-        expiresAt: DateTime.utc(2026, 10, 7, 13),
-      ));
+      final decoded = _roundTrip(
+        PreparedTransaction(
+          preparationId: 'prep-2',
+          purpose: 'setAgentWallet',
+          signer: 'GOWNER',
+          networkPassphrase: 'Test SDF Network ; September 2015',
+          authorizationEntryXdr: 'BBBB',
+          signatureExpirationLedger: 123456,
+          expiresAt: DateTime.utc(2026, 10, 7, 13),
+        ),
+      );
       expect(decoded.authorizationEntryXdr, 'BBBB');
       expect(decoded.signatureExpirationLedger, 123456);
       expect(decoded.unsignedTransactionXdr, isNull);
@@ -88,7 +90,10 @@ void main() {
   group('CreateHireResult', () {
     test('round-trips a hire with a prepared create_job', () {
       final decoded = _roundTrip(
-        CreateHireResult(hire: _hire(status: null), preparedCreateJob: _prepared()),
+        CreateHireResult(
+          hire: _hire(status: null),
+          preparedCreateJob: _prepared(),
+        ),
       );
       expect(decoded.hire.id, 7);
       expect(decoded.hire.status, isNull);
@@ -104,13 +109,13 @@ void main() {
 
   group('HireDetail', () {
     AgentSummary agent() => AgentSummary(
-          id: 'agt-001',
-          registryId: 3,
-          name: 'Ledger Scout',
-          description: 'Reads the ledger.',
-          skills: ['ledger'],
-          priceUsdcStroops: 10000000,
-        );
+      id: 'agt-001',
+      registryId: 3,
+      name: 'Ledger Scout',
+      description: 'Reads the ledger.',
+      skills: ['ledger'],
+      priceUsdcStroops: 10000000,
+    );
 
     test('round-trips a minimal detail', () {
       final decoded = _roundTrip(
@@ -127,30 +132,32 @@ void main() {
     });
 
     test('round-trips payment, job and the escrow submission', () {
-      final decoded = _roundTrip(HireDetail(
-        hire: _hire(status: 'funded'),
-        agent: agent(),
-        input: 'hello',
-        result: 'done',
-        payment: Payment(
-          transaction: 'cd' * 32,
-          hireId: 7,
-          payer: 'GCONSUMER',
-          payee: 'GAGENT',
-          amount: 10000000,
+      final decoded = _roundTrip(
+        HireDetail(
+          hire: _hire(status: 'funded'),
+          agent: agent(),
+          input: 'hello',
+          result: 'done',
+          payment: Payment(
+            transaction: 'cd' * 32,
+            hireId: 7,
+            payer: 'GCONSUMER',
+            payee: 'GAGENT',
+            amount: 10000000,
+          ),
+          jobId: 42,
+          expiresAt: DateTime.utc(2026, 10, 8),
+          approvalDeadline: DateTime.utc(2026, 10, 9),
+          rejectReason: 'late',
+          escrowSubmission: ChainSubmission(
+            purpose: 'fund',
+            transaction: 'cd' * 32,
+            state: 'submitted',
+            updatedAt: DateTime.utc(2026, 10, 7),
+          ),
+          paymentExplorerUrl: 'https://stellar.expert/tx/x',
         ),
-        jobId: 42,
-        expiresAt: DateTime.utc(2026, 10, 8),
-        approvalDeadline: DateTime.utc(2026, 10, 9),
-        rejectReason: 'late',
-        escrowSubmission: ChainSubmission(
-          purpose: 'fund',
-          transaction: 'cd' * 32,
-          state: 'submitted',
-          updatedAt: DateTime.utc(2026, 10, 7),
-        ),
-        paymentExplorerUrl: 'https://stellar.expert/tx/x',
-      ));
+      );
       expect(decoded.payment?.payee, 'GAGENT');
       expect(decoded.jobId, 42);
       expect(decoded.expiresAt, DateTime.utc(2026, 10, 8));
