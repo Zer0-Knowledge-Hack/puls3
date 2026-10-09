@@ -182,6 +182,24 @@ PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
+## Agent wallet custody
+
+Part of #18. Each agent will get its own custodied ed25519 account (ADR-0003
+decision 4). The server generates the keypair, encrypts the secret seed with
+AES-256-GCM, and stores only the ciphertext, nonce, MAC and key version in
+`agent_wallet`. The wallet address is the GCM additional authenticated data, so
+a secret copied to another row does not decrypt. The plaintext seed is never
+logged, stored or returned; only the public `G…` address leaves the custody
+adapter. Creation is idempotent per caller key (the deploy session/draft id), so
+a retry cannot orphan a funded account.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_AGENT_WALLET_SECRET_KEY` | none (required) | Base64 of a random 32-byte key (`openssl rand -base64 32`) that encrypts agent secrets at rest. **Back it up:** losing it makes every custodied account unrecoverable. When it is unset, creating an agent wallet fails with `AgentWalletCustodyUnavailable`. |
+
+Funding the account and adding its USDC trustline, and the on-chain
+registration (`register_full` / `set_agent_wallet`), are the next part of #18.
+
 ## Prerequisites
 
 - Dart 3.12.2
