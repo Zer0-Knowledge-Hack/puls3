@@ -30,38 +30,6 @@ language plpgsql
 volatile;
 
 --
--- Class AgentRecord as table agent_record
---
-CREATE TABLE "agent_record" (
-    "id" bigserial PRIMARY KEY,
-    "registryId" bigint NOT NULL,
-    "agentId" text NOT NULL,
-    "name" text NOT NULL,
-    "description" text NOT NULL,
-    "skills" json NOT NULL,
-    "priceUsdcStroops" bigint NOT NULL,
-    "wallet" text,
-    "model" text
-);
-
--- Indexes
-CREATE UNIQUE INDEX "agent_record_registry_idx" ON "agent_record" USING btree ("registryId");
-CREATE INDEX "agent_record_agent_id_idx" ON "agent_record" USING btree ("agentId");
-
---
--- Class CatalogIndexState as table catalog_index_state
---
-CREATE TABLE "catalog_index_state" (
-    "id" bigserial PRIMARY KEY,
-    "network" text NOT NULL,
-    "lastProcessedLedger" bigint NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
-);
-
--- Indexes
-CREATE UNIQUE INDEX "catalog_index_network_idx" ON "catalog_index_state" USING btree ("network");
-
---
 -- Class ChainSubmission as table chain_submission
 --
 CREATE TABLE "chain_submission" (
@@ -149,6 +117,27 @@ CREATE TABLE "hire_payment" (
 CREATE UNIQUE INDEX "hire_id" ON "hire_payment" USING btree ("hireId");
 CREATE UNIQUE INDEX "transaction_hash" ON "hire_payment" USING btree ("transactionHash");
 CREATE UNIQUE INDEX "job_id" ON "hire_payment" USING btree ("jobId");
+
+--
+-- Class HireRunRecord as table hire_run
+--
+CREATE TABLE "hire_run" (
+    "id" bigserial PRIMARY KEY,
+    "hireId" bigint NOT NULL,
+    "state" text NOT NULL,
+    "queuedAt" timestamp without time zone NOT NULL,
+    "startedAt" timestamp without time zone,
+    "finishedAt" timestamp without time zone,
+    "result" text,
+    "failureReason" text,
+    "attempts" bigint NOT NULL DEFAULT 0,
+    "notBefore" timestamp without time zone,
+    "lastError" text
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "hire_run_hire_idx" ON "hire_run" USING btree ("hireId");
+CREATE INDEX "hire_run_state_idx" ON "hire_run" USING btree ("state");
 
 --
 -- Class WalletAccount as table wallet_account
@@ -931,9 +920,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261009213303097', now())
+    VALUES ('puls3', '20261009213200586', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261009213303097', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009213200586', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

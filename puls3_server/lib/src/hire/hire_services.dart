@@ -6,14 +6,17 @@ import 'package:serverpod/serverpod.dart';
 import '../agent/agent_catalog_service.dart';
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
+import '../generated/protocol.dart' show AgentSummary;
 import '../ledger/envelope_codec.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/soroban_submission_ledger.dart';
 import '../ledger/stellar_config.dart';
 import '../ledger/stellar_envelope_codec.dart';
+import '../runtime/serverpod_hire_run_store.dart';
 import 'chain_accounts.dart';
 import 'escrow_relay_service.dart';
+import 'hire_query_service.dart';
 import 'hire_relay_config.dart';
 import 'hire_service.dart';
 import 'serverpod_escrow_preparation_store.dart';
@@ -24,10 +27,13 @@ const _rpcTimeout = Duration(seconds: 8);
 
 /// The services one `HireEndpoint` request works with.
 final class HireServices {
-  const HireServices({required this.hires, required this.relay});
+  const HireServices({required this.hires, required this.relay, this.query});
 
   final HireService hires;
   final EscrowRelayService relay;
+
+  /// Reads a hire for `getHire`. Null only in tests that do not read hires.
+  final HireQueryService? query;
 }
 
 /// Builds the [HireServices] of one request on its database [Session].
@@ -88,17 +94,20 @@ final class HireWiring {
   HireServices servicesOn(Session session) {
     final repository = ServerpodHireRepository(session);
     final preparations = ServerpodEscrowPreparationStore(session);
+    final submissions = ServerpodChainSubmissionStore(session);
+    Future<AgentSummary?> agentOf(int registryId) async =>
+        (await catalog.list())
+            .where((agent) => agent.registryId == registryId)
+            .firstOrNull;
     final relay = EscrowRelayService(
       preparations: preparations,
-      submissions: ServerpodChainSubmissionStore(session),
+      submissions: submissions,
       hires: repository,
       accounts: accounts,
       codec: codec,
       sender: sender,
       agentWallets: ledger,
-      agents: (registryId) async => (await catalog.list())
-          .where((agent) => agent.registryId == registryId)
-          .firstOrNull,
+      agents: agentOf,
       stellar: stellar,
       config: config,
     );
@@ -112,6 +121,12 @@ final class HireWiring {
         config: config,
       ),
       relay: relay,
+      query: HireQueryService(
+        hires: repository,
+        runs: ServerpodHireRunStore(session),
+        submissions: submissions,
+        agents: agentOf,
+      ),
     );
   }
 }

@@ -43,6 +43,7 @@ import 'hire_detail.dart' as _ipbsq2gs;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
+import 'runtime/hire_run.dart' as _iw9spjs5;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
@@ -67,6 +68,7 @@ export 'hire_detail.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
+export 'runtime/hire_run.dart';
 
 class Protocol extends _is.DatabaseSerializationManager {
   Protocol._();
@@ -711,6 +713,112 @@ class Protocol extends _is.DatabaseSerializationManager {
       managed: true,
     ),
     _isp.TableDefinition(
+      name: 'hire_run',
+      dartName: 'HireRunRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'hireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'state',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'queuedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _isp.ColumnDefinition(
+          name: 'startedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'finishedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'result',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'failureReason',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'attempts',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+          columnDefault: '0',
+        ),
+        _isp.ColumnDefinition(
+          name: 'notBefore',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'lastError',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'hire_run_hire_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'hireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'hire_run_state_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'state',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
       name: 'wallet_account',
       dartName: 'WalletAccount',
       schema: 'public',
@@ -975,6 +1083,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _i5rj3edu.Puls3ApiException) {
       return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
     }
+    if (t == _iw9spjs5.HireRunRecord) {
+      return _iw9spjs5.HireRunRecord.fromJson(data) as T;
+    }
     if (t == _is.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
               ? _it6c3ckv.AgentCatalogUnavailable.fromJson(data)
@@ -1073,6 +1184,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_iw9spjs5.HireRunRecord?>()) {
+      return (data != null ? _iw9spjs5.HireRunRecord.fromJson(data) : null)
+          as T;
+    }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
@@ -1120,6 +1235,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
+      _iw9spjs5.HireRunRecord => 'HireRunRecord',
       _ => null,
     };
   }
@@ -1182,6 +1298,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'PreparedTransaction';
       case _i5rj3edu.Puls3ApiException():
         return 'Puls3ApiException';
+      case _iw9spjs5.HireRunRecord():
+        return 'HireRunRecord';
     }
     className = _iais.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -1280,6 +1398,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'Puls3ApiException') {
       return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);
     }
+    if (dataClassName == 'HireRunRecord') {
+      return deserialize<_iw9spjs5.HireRunRecord>(data['data']);
+    }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
       return _iais.Protocol().deserializeByClassName(data);
@@ -1337,6 +1458,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _ikb6z54u.HireRecord.t;
       case _i7gyvijy.HirePaymentRecord:
         return _i7gyvijy.HirePaymentRecord.t;
+      case _iw9spjs5.HireRunRecord:
+        return _iw9spjs5.HireRunRecord.t;
     }
     return null;
   }
