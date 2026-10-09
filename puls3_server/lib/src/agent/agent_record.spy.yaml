@@ -1,0 +1,37 @@
+### One agent of the catalog index, synced from the on-chain identity
+### registry (ADR-0001 §2: the server indexes on-chain data for the catalog).
+### Rows are complete: the indexer only stores an agent whose required
+### metadata is valid, exactly like the on-chain catalog.
+class: AgentRecord
+table: agent_record
+serverOnly: true
+fields:
+  ### The on-chain integer id in the identity registry.
+  registryId: int
+
+  ### The metadata id of the agent, for example agt-001.
+  agentId: String
+
+  ### The display name.
+  name: String
+
+  ### What the agent does.
+  description: String
+
+  ### The skill ids, in kebab-case, in the stored order.
+  skills: List<String>
+
+  ### The price of one hire in USDC stroops.
+  priceUsdcStroops: int
+
+  ### The Stellar address (G...) that receives payments, when registered.
+  wallet: String?
+
+  ### The model that runs the agent, when the metadata names one.
+  model: String?
+indexes:
+  agent_record_registry_idx:
+    fields: registryId
+    unique: true
+  agent_record_agent_id_idx:
+    fields: agentId

@@ -30,6 +30,25 @@ language plpgsql
 volatile;
 
 --
+-- Class AgentRecord as table agent_record
+--
+CREATE TABLE "agent_record" (
+    "id" bigserial PRIMARY KEY,
+    "registryId" bigint NOT NULL,
+    "agentId" text NOT NULL,
+    "name" text NOT NULL,
+    "description" text NOT NULL,
+    "skills" json NOT NULL,
+    "priceUsdcStroops" bigint NOT NULL,
+    "wallet" text,
+    "model" text
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "agent_record_registry_idx" ON "agent_record" USING btree ("registryId");
+CREATE INDEX "agent_record_agent_id_idx" ON "agent_record" USING btree ("agentId");
+
+--
 -- Class AgentWallet as table agent_wallet
 --
 CREATE TABLE "agent_wallet" (
@@ -49,6 +68,19 @@ CREATE TABLE "agent_wallet" (
 CREATE UNIQUE INDEX "agent_wallet_address_idx" ON "agent_wallet" USING btree ("address");
 CREATE UNIQUE INDEX "agent_wallet_idempotency_idx" ON "agent_wallet" USING btree ("idempotencyKey");
 CREATE INDEX "agent_wallet_owner_idx" ON "agent_wallet" USING btree ("owner");
+
+--
+-- Class CatalogIndexState as table catalog_index_state
+--
+CREATE TABLE "catalog_index_state" (
+    "id" bigserial PRIMARY KEY,
+    "network" text NOT NULL,
+    "lastProcessedLedger" bigint NOT NULL,
+    "updatedAt" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "catalog_index_network_idx" ON "catalog_index_state" USING btree ("network");
 
 --
 -- Class ChainSubmission as table chain_submission
@@ -941,9 +973,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261009221649485', now())
+    VALUES ('puls3', '20261009222945940', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261009221649485', "timestamp" = now();
+    DO UPDATE SET "version" = '20261009222945940', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

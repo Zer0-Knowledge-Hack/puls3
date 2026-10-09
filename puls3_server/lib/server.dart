@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:serverpod/serverpod.dart';
 import 'package:serverpod_auth_idp_server/core.dart';
 
+import 'src/agent/catalog_indexer_wiring.dart';
 import 'src/auth/wallet_auth_config.dart';
 import 'src/chain/chain_tracker_wiring.dart';
 import 'src/cors/allowed_origins.dart';
@@ -107,6 +108,12 @@ void run(List<String> args) async {
   final tracker = startChainTracker(pod, Platform.environment);
   if (tracker != null) {
     pod.experimental.shutdownTasks.addTask('chain-tracker', tracker.stop);
+  }
+
+  // Sync the catalog index from the registry, when PULS3_INDEXER_ENABLED=true.
+  final indexer = startCatalogIndexer(pod, Platform.environment);
+  if (indexer != null) {
+    pod.experimental.shutdownTasks.addTask('catalog-indexer', indexer.stop);
   }
 
   // Run the agent of every funded hire, when PULS3_RUNTIME_ENABLED=true and
