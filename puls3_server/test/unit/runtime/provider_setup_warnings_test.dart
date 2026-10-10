@@ -45,6 +45,38 @@ void main() {
     expect(onlyToken.single, contains('PULS3_WORKERS_AI_ACCOUNT_ID is not'));
   });
 
+  test('the account id is trimmed; blank, dot or path values are refused', () {
+    expect(workersAiAccountId('abc0123DEF'), 'abc0123DEF');
+    expect(workersAiAccountId('  abc0123  '), 'abc0123');
+    for (final raw in [
+      null,
+      '',
+      '   ',
+      '.',
+      '..',
+      'a/b',
+      'a..',
+      'a b',
+      'a?x',
+    ]) {
+      expect(workersAiAccountId(raw), isNull, reason: '$raw');
+    }
+  });
+
+  test('a malformed account id is named once, never its value', () {
+    final warnings = providerSetupWarnings(
+      workersAiAccountSet: false,
+      workersAiTokenSet: true,
+      workersAiAccountMalformed: true,
+      configured: {'workers-ai'},
+      manifests: const {},
+    );
+    expect(warnings, [
+      'PULS3_WORKERS_AI_ACCOUNT_ID is not a Cloudflare account id (letters '
+          'and digits only), so the workers-ai provider is off',
+    ]);
+  });
+
   test('neither part of Workers AI set is not a partial setup', () {
     expect(
       providerSetupWarnings(

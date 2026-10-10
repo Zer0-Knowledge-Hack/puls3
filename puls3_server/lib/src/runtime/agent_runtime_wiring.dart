@@ -98,10 +98,10 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
   final (loopConfig, config) = settings;
   final httpClient = http.Client();
   final runtimes = <String, ModelRuntime>{};
-  final accountId = env[workersAiAccountVariable];
+  final rawAccountId = env[workersAiAccountVariable];
+  final accountId = workersAiAccountId(rawAccountId);
   final workersAiToken = pod.getPassword(workersAiTokenPassword);
   if (accountId != null &&
-      accountId.isNotEmpty &&
       workersAiToken != null &&
       workersAiToken.isNotEmpty) {
     runtimes[WorkersAiRuntime.provider] = WorkersAiRuntime(
@@ -118,7 +118,9 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     );
   }
   for (final warning in providerSetupWarnings(
-    workersAiAccountSet: accountId != null && accountId.isNotEmpty,
+    workersAiAccountSet: accountId != null,
+    workersAiAccountMalformed:
+        accountId == null && (rawAccountId?.trim().isNotEmpty ?? false),
     workersAiTokenSet: workersAiToken != null && workersAiToken.isNotEmpty,
     configured: runtimes.keys.toSet(),
     manifests: demoManifests,
@@ -209,9 +211,15 @@ List<String> providerSetupWarnings({
   required bool workersAiTokenSet,
   required Set<String> configured,
   required Map<String, Map<int, RunManifest>> manifests,
+  bool workersAiAccountMalformed = false,
 }) {
   final warnings = <String>[];
-  if (workersAiAccountSet != workersAiTokenSet) {
+  if (workersAiAccountMalformed) {
+    warnings.add(
+      '$workersAiAccountVariable is not a Cloudflare account id (letters and '
+      'digits only), so the workers-ai provider is off',
+    );
+  } else if (workersAiAccountSet != workersAiTokenSet) {
     final (present, missing) = workersAiAccountSet
         ? (workersAiAccountVariable, 'the "$workersAiTokenPassword" password')
         : ('the "$workersAiTokenPassword" password', workersAiAccountVariable);
@@ -237,6 +245,18 @@ List<String> providerSetupWarnings({
   }
   return warnings;
 }
+
+/// `PULS3_WORKERS_AI_ACCOUNT_ID` trimmed, or `null` when it is unset, blank
+/// or not a Cloudflare account id. The id is a path segment of every
+/// Workers AI call, so only letters and digits are accepted: a `.`, `..`,
+/// `/` or blank value would change the URL's path.
+String? workersAiAccountId(String? raw) {
+  final value = raw?.trim();
+  if (value == null || !_accountIdPattern.hasMatch(value)) return null;
+  return value;
+}
+
+final _accountIdPattern = RegExp(r'^[A-Za-z0-9]+$');
 
 /// The loop and runtime settings from [env], or `null` when the runtime is
 /// disabled or a setting is invalid. An invalid `PULS3_RUNTIME_*` value is
