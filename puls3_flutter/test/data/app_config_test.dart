@@ -38,4 +38,29 @@ void main() {
       expect(resolveApiUrl(bundled), 'http://localhost:8080');
     });
   });
+
+  group('readAuthConfig (#136)', () {
+    test('reads the server key and home domain the server publishes', () {
+      final auth = readAuthConfig(
+        '{"apiUrl":"https://x","auth":{"serverSigningKey":"GSERVER",'
+        '"homeDomain":"puls3.example","webAuthDomain":"puls3.example"}}',
+      );
+      expect(auth.serverSigningKey, 'GSERVER');
+      expect(auth.homeDomain, 'puls3.example');
+    });
+
+    test('a static build config without auth gives nulls', () {
+      final auth = readAuthConfig('{"apiUrl":"http://localhost:8080"}');
+      expect(auth.serverSigningKey, isNull);
+      expect(auth.homeDomain, isNull);
+    });
+
+    test('empty values count as missing', () {
+      final auth = readAuthConfig(
+        '{"auth":{"serverSigningKey":"","homeDomain":""}}',
+      );
+      expect(auth.serverSigningKey, isNull);
+      expect(auth.homeDomain, isNull);
+    });
+  });
 }

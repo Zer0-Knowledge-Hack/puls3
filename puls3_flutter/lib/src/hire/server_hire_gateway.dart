@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:puls3_client/puls3_client.dart';
 
 import 'hire_gateway.dart';
+import 'wallet_session.dart';
 
 /// `client.hire.createHire`.
 typedef CreateHireCall =
@@ -36,6 +37,7 @@ class ServerHireGateway implements HireGateway {
     required this._prepareCreateJob,
     required this._prepareFund,
     required this._submitEscrowCall,
+    this._session,
     this.callTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 3),
     this.confirmationTimeout = const Duration(minutes: 2),
@@ -45,6 +47,10 @@ class ServerHireGateway implements HireGateway {
   final PrepareEscrowCall _prepareCreateJob;
   final PrepareEscrowCall _prepareFund;
   final SubmitEscrowCall _submitEscrowCall;
+
+  /// The wallet session (#136). Without it, the server is called with no
+  /// session and answers `NotAuthenticated`.
+  final WalletSession? _session;
 
   /// Upper bound for one server call.
   final Duration callTimeout;
@@ -57,6 +63,16 @@ class ServerHireGateway implements HireGateway {
 
   @override
   bool get isDemo => false;
+
+  @override
+  Future<void> ensureSignedIn(String wallet, ChallengeSigner sign) async {
+    final session = _session;
+    if (session == null) return;
+    await _call(() => session.ensureSignedIn(wallet, sign));
+  }
+
+  @override
+  Future<void> forgetSession() async => _session?.forget();
 
   @override
   Future<HireStart> createHire({
@@ -159,6 +175,15 @@ class ServerHireGateway implements HireGateway {
     return switch (e.code) {
       'AuthenticationUnavailable' ||
       'NotAuthenticated' => const HireNotSignedIn(),
+      // walletAuth (api.md): the challenge or its signature was refused;
+      // a new attempt asks for a fresh challenge.
+      'ChallengeNotFound' ||
+      'ChallengeExpired' ||
+      'ChallengeConsumed' ||
+      'InvalidWalletSignature' => const HireSignInFailed(),
+      'ChallengeRateLimited' => const HireBackendUnavailable(
+        'Too many sign-in attempts. Wait a minute, then try again.',
+      ),
       'AgentNotFound' || 'AgentInactive' => const HireAgentUnavailable(
         'This agent is not accepting hires.',
       ),

@@ -1,3 +1,5 @@
+import 'wallet_session.dart';
+
 /// Backend side of the hire and pay flow (#91), shaped after the server
 /// relay in docs/architecture/api.md (F5-3 to F5-5): the server prepares
 /// each escrow call, the consumer's wallet signs it unchanged, and the
@@ -10,6 +12,14 @@ abstract interface class HireGateway {
   /// True for a stand-in that moves no funds. The UI then labels the flow
   /// and its result as a demo, with no explorer link.
   bool get isDemo;
+
+  /// Makes sure the server has a session for [wallet] (#136, SEP-10),
+  /// signing a challenge with [sign] when it has none. A demo does nothing.
+  Future<void> ensureSignedIn(String wallet, ChallengeSigner sign);
+
+  /// Drops the session after the server refused it, so the next attempt
+  /// signs in again.
+  Future<void> forgetSession();
 
   /// Creates the hire (idempotent per [requestId]) and returns it with the
   /// unsigned `create_job`. [agentId] is the on-chain registry id.
@@ -96,10 +106,19 @@ sealed class HireGatewayException implements Exception {
   String toString() => '$runtimeType: $message';
 }
 
-/// The caller has no wallet session yet (#136). Nothing was created.
+/// The server has no valid session for the wallet (#136), or wallet
+/// sign-in is not set up on the server. Nothing was created.
 final class HireNotSignedIn extends HireGatewayException {
   const HireNotSignedIn()
-    : super('Sign-in with your wallet is not available yet.');
+    : super('Your wallet session ended. Try again to sign in.');
+}
+
+/// The server did not accept the wallet's sign-in (expired, already used or
+/// unknown challenge, or a signature it could not verify). Nothing was
+/// created; trying again asks for a fresh challenge.
+final class HireSignInFailed extends HireGatewayException {
+  const HireSignInFailed()
+    : super('Signing in with your wallet failed. Try again.');
 }
 
 /// The agent cannot be hired (unknown on chain or inactive).

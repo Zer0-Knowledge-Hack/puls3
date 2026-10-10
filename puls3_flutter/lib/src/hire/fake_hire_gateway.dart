@@ -1,5 +1,6 @@
 import '../wallet/demo_envelope.dart';
 import 'hire_gateway.dart';
+import 'wallet_session.dart';
 
 /// Labelled demo of the hire backend, used until the deployed server accepts
 /// wallet sessions (#136). It prepares harmless, never-submitted Testnet
@@ -16,6 +17,13 @@ class FakeHireGateway implements HireGateway {
 
   @override
   bool get isDemo => true;
+
+  /// The demo has no server session.
+  @override
+  Future<void> ensureSignedIn(String wallet, ChallengeSigner sign) async {}
+
+  @override
+  Future<void> forgetSession() async {}
 
   @override
   Future<HireStart> createHire({
