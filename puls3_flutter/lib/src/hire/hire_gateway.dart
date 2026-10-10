@@ -21,6 +21,13 @@ abstract interface class HireGateway {
   /// signs in again.
   Future<void> forgetSession();
 
+  /// Checks, before any signature, that [consumer] can pay
+  /// [priceUsdcStroops] (api.md F5-2): throws [HireInsufficientFunds] when
+  /// the account, its USDC trustline or its balance is missing. When the
+  /// balance cannot be read it returns, and the server's simulation of the
+  /// `fund` stays the check. A demo does nothing.
+  Future<void> checkFunds(String consumer, int priceUsdcStroops);
+
   /// Creates the hire (idempotent per [requestId]) and returns it with the
   /// unsigned `create_job`. [agentId] is the on-chain registry id.
   Future<HireStart> createHire({
@@ -258,6 +265,12 @@ final class HirePaymentNotPrepared extends HireGatewayException {
         'The payment could not be prepared. Check that your wallet has '
         'enough testnet USDC and XLM, then try again.',
       );
+}
+
+/// The wallet cannot pay the hire: no account, no USDC trustline, or less
+/// USDC than the price. Found before any signature, so nothing was signed.
+final class HireInsufficientFunds extends HireGatewayException {
+  const HireInsufficientFunds(super.message);
 }
 
 /// An earlier payment for this hire may have moved funds; never pay again.
