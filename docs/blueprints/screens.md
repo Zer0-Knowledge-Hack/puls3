@@ -26,10 +26,12 @@ flutter test tool/wireframes/wireframes_test.dart --update-goldens
 | [`S04-hire-sheet`](#s04-hire-sheet) | Bottom sheet over S03 | F5, F6 | Yes | [1440](wireframes/S04-hire-sheet-1440.png) · [390](wireframes/S04-hire-sheet-390.png) |
 | [`S05-my-hires`](#s05-my-hires) | `/hires` | F6 | No | [1440](wireframes/S05-my-hires-1440.png) · [390](wireframes/S05-my-hires-390.png) |
 | [`S06-hire-detail`](#s06-hire-detail) | `/hires/:id` | F6, F7 | Partly (read-only) | [1440](wireframes/S06-hire-detail-1440.png) · [390](wireframes/S06-hire-detail-390.png) |
-| [`S07-studio`](#s07-studio) | `/studio` | F4 | Yes | [1440](wireframes/S07-studio-1440.png) · [390](wireframes/S07-studio-390.png) |
-| [`S08-deploy-sheet`](#s08-deploy-sheet) | Bottom sheet over S07 | F4 | Yes | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
+| [`S07-studio`](#s07-studio) | `/studio` | F4, F8, F9, F10 | Yes | [1440](wireframes/S07-studio-1440.png) · [390](wireframes/S07-studio-390.png) |
+| [`S08-deploy-sheet`](#s08-deploy-sheet) | Bottom sheet over S07 | F4, F10, F11 | Yes | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
 | [`S09-wallet-connect`](#s09-wallet-connect) | Sheet over any screen | F1 | Yes | [1440](wireframes/S09-wallet-connect-1440.png) · [390](wireframes/S09-wallet-connect-390.png) |
 | [`S10-rate-sheet`](#s10-rate-sheet) | Bottom sheet over S06 | F7 | No | [1440](wireframes/S10-rate-sheet-1440.png) · [390](wireframes/S10-rate-sheet-390.png) |
+| [`S11-playground`](#s11-playground) | Panel beside the S07 preview (desktop), sheet over S07 (phone) | F9 | No | [1440](wireframes/S11-playground-1440.png) · [390](wireframes/S11-playground-390.png) |
+| [`S12-my-agents`](#s12-my-agents) | `/studio/agents` | F10, F11 | No | [1440](wireframes/S12-my-agents-1440.png) · [390](wireframes/S12-my-agents-390.png) |
 
 Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phones, the bottom navigation (Studio, Marketplace). Sheets open above the whole app.
 
@@ -139,7 +141,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ### S07-studio
 
-**Purpose:** build an agent and deploy it. **Flows:** F4.
+**Purpose:** build an agent, save it as a draft and deploy it. **Flows:** F4, F8, F9, F10.
 
 **Data:** the manifest draft, named as `AgentManifestDraft`: `name`, `description`, `skills` (`Skill.name`, kebab-case `Skill.id`), `model` (`ModelId.provider`, `ModelId.id`), `systemPrompt`, `inputType` and `inputMaxChars`, `outputType` and `outputMaxChars`, `price`. The preview is the Marketplace card.
 
@@ -150,13 +152,13 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 | Error | The domain's problems (`ManifestProblem`) under each edited field; **What is missing?** shows the rest; **Deploy** stays disabled. |
 | Success | "Ready to deploy" and **Deploy to Stellar** enabled. |
 
-**Actions:** **Deploy to Stellar** → S08 (S09 first if no wallet). **Test run** (#36, planned) runs the draft once without payment.
+**Actions:** **Deploy to Stellar** → S08 (S09 first if no wallet). **Save draft** (F8). **Test run** → S11 (F9). **My agents** → S12 (F11). When editing a live agent, a banner says the edit becomes version *n+1* (F10).
 
 **Components:** `AgentForm`, `AgentCard` (preview), `SectionLabel`, `SkillChip`, `PrimaryButton`, `SiteFooter`.
 
 ### S08-deploy-sheet
 
-**Purpose:** register the agent on Stellar step by step. **Flows:** F4 (steps 4 to 8).
+**Purpose:** register the agent on Stellar step by step, or deploy a new version of it. **Flows:** F4 (steps 4 to 8), F10 (steps 4 to 6), F11 (resume).
 
 **Data:** the steps (preparing, waiting for signature, registering on-chain, activating, live), the agent's `Agent.id`, the registration transaction and `Agent.wallet` once live.
 
@@ -170,6 +172,40 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 **Actions:** **Open agent** → S03. **Back to Studio** → S07.
 
 **Components:** `DeployFlowView`, `DeployStepper`, `ProgressStepRow`, `DeployPhaseCard`, `DeployErrorPanel`, `DeploySuccess`, `CopyableValueRow`, `PrimaryButton`.
+
+### S11-playground
+
+**Purpose:** run a saved draft once on a sample input, without payment or chain writes. **Flows:** F9.
+
+**Data:** the draft's `StudioDraft.draftId`, `inputType` and `inputMaxChars`, `outputType`; after a run, `TestRunResult.output` and `TestRunResult.remainingDailyRuns`.
+
+| State | What the user sees |
+|---|---|
+| Loading | **Running…** with the input locked, and a note that the run stops at the runtime timeout. |
+| Empty | The input box with its counter (`0 / inputMaxChars`), **Run** disabled until there is text, and "Test runs are free and limited per day". |
+| Error | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed` / `RuntimeUnavailable`: the safe reason in an `ErrorBanner` with **Try again**. Over `inputMaxChars`: inline error under the input. |
+| Success | The output (text, or Markdown when `outputType` is `markdown`), labelled "Test run: not paid, nothing on chain", with **Copy** and "N runs left today". |
+
+**Actions:** **Run** → `testRun`. **Try again**. **Copy** output. **Close** (phone) → S07. **Deploy** → S08 (F4).
+
+**Components:** `PlaygroundPanel`, `TestRunResultCard`, `ErrorBanner`, `SectionLabel`, `PrimaryButton`.
+
+### S12-my-agents
+
+**Purpose:** the builder's drafts and deployed agents, to continue, resume or edit them. **Flows:** F10, F11.
+
+**Data:** for each row, `StudioDraft.draftId`, `manifest.name`, `manifest.price`, `StudioDraft.deployState`, the live `ManifestVersion` and `Agent.id` once deployed, and the deploy step from `DeploySession.state` / `retryFromStep` when a deploy is in progress or failed.
+
+| State | What the user sees |
+|---|---|
+| Loading | Skeleton rows (`SkeletonBox`) under the **Drafts** and **Live** headers. |
+| Empty | `EmptyState`: "No agents yet" and **Create your first agent** (→ S07). |
+| Error | `ErrorBanner`: "Could not load your agents" and **Retry**. |
+| Success | Rows grouped as **Drafts**, **Deploying or failed** and **Live**. Each `AgentVersionRow` shows the name, a state label, the version (live rows) and the price, with its action. |
+
+**Actions:** **Continue editing** → S07 (F8). **Resume deploy** → S08 at its step. **View** → S03. **Edit** → S07 as version *n+1* (F10). **New agent** → S07.
+
+**Components:** `MyAgentsList`, `AgentVersionRow`, `ScreenHeader`, `PriceTag`, `EmptyState`, `ErrorBanner`, `SkeletonBox`, `PrimaryButton`.
 
 ### S09-wallet-connect
 
@@ -224,7 +260,7 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `PulseBackground` | landing | S01 |
 | `RatingBadge` | `AgentCard`, `AgentDetailView` | S02, S03 |
 | `SectionLabel` | `AgentDetailView`, `AgentForm`, landing, Studio | S01, S03, S06, S07 |
-| `SkeletonBox` | `AgentCardSkeleton`, `AgentDetailSkeleton`, `CopyableValueRow` | S02, S03, S08 |
+| `SkeletonBox` | `AgentCardSkeleton`, `AgentDetailSkeleton`, `CopyableValueRow`, `MyAgentsList` | S02, S03, S08, S12 |
 | `SkillChip` | `AgentCard`, `AgentDetailView`, `AgentForm`, Marketplace | S02, S03, S05, S07 |
 
 ### Molecules
@@ -236,12 +272,14 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `AgentMiniCard` | landing | S01 |
 | `BuiltOnStellar` | landing, `SiteFooter` | S01 and every page footer |
 | `CopyableValueRow` | `WalletPanel`, deploy panels | S08, S09 |
-| `EmptyState` | Marketplace, agent detail | S02, S03, S05 |
-| `ErrorBanner` | Marketplace, agent detail | S02, S03, S05, S06 |
+| `EmptyState` | Marketplace, agent detail, `MyAgentsList` | S02, S03, S05, S12 |
+| `ErrorBanner` | Marketplace, agent detail, `PlaygroundPanel`, `MyAgentsList` | S02, S03, S05, S06, S11, S12 |
 | `FeaturePoint` | landing | S01 |
 | `KeyValueRow` | `AgentDetailView`, `HirePaymentView` | S03, S04, S06 |
 | `ProgressStepRow` | `DeployStepper` | S06, S08 |
-| `ScreenHeader` | planned pages | S05, S06 |
+| `ScreenHeader` | planned pages | S05, S06, S12 |
+| `AgentVersionRow` *(new)* | `MyAgentsList` | S12 |
+| `TestRunResultCard` *(new)* | `PlaygroundPanel` | S11 |
 | `WalletChip` | `TopBar` | all |
 
 ### Organisms
@@ -256,3 +294,5 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `TopBar` | all (app shell) |
 | `WalletPanel` | S09 |
 | `DeployFlowView`, `DeployStepper`, `DeployPhaseCard`, `DeployErrorPanel`, `DeploySuccess` | S08 |
+| `PlaygroundPanel` *(new)* | S11 |
+| `MyAgentsList` *(new)* | S12 |
