@@ -388,6 +388,13 @@ class _Error extends StatelessWidget {
         'Install the $walletName extension, reload this page, then '
             'connect.',
       ),
+      WalletConnectorUnavailable() => (
+        'connector-unavailable',
+        Icons.cloud_off_rounded,
+        'Could not load the wallet connector',
+        'puls3 could not load what it needs to talk to $walletName. Check '
+            'your connection or ad blocker, then reload this page.',
+      ),
       WalletUnavailable() => (
         'unavailable',
         Icons.lock_outline_rounded,

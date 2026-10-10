@@ -64,6 +64,14 @@ final class WalletNotInstalled extends WalletException {
   const WalletNotInstalled();
 }
 
+/// The app could not load its wallet connector (`web/freighter_bridge.js`
+/// and the Freighter API it imports): offline, a blocked CDN, an ad blocker
+/// or a network filter. The wallet itself may well be installed, so the
+/// user must not be told to install it.
+final class WalletConnectorUnavailable extends WalletException {
+  const WalletConnectorUnavailable();
+}
+
 /// A wallet is installed but cannot be used now (locked, not connected).
 final class WalletUnavailable extends WalletException {
   const WalletUnavailable();
