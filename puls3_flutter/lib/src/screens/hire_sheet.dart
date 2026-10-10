@@ -82,10 +82,12 @@ class _HireSheetState extends State<HireSheet> {
 
   void _run() => unawaited(_flow!.run(_input.text.trim()));
 
-  void _backToMarketplace() {
+  void _backToMarketplace() => _leaveTo('/market');
+
+  void _leaveTo(String location) {
     final router = GoRouter.of(context);
     Navigator.of(context).pop();
-    router.go('/market');
+    router.go(location);
   }
 
   @override
@@ -127,6 +129,9 @@ class _HireSheetState extends State<HireSheet> {
                   onConfirm: _run,
                   onRetry: _run,
                   onBackToMarketplace: _backToMarketplace,
+                  onViewHire: flow.hireId == null
+                      ? null
+                      : () => _leaveTo('/hires/${flow.hireId}'),
                   onOpenExplorer: hash == null || hash.isEmpty
                       ? null
                       : () => unawaited(

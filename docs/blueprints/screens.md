@@ -25,7 +25,7 @@ flutter test tool/wireframes/wireframes_test.dart --update-goldens
 | [`S03-agent-detail`](#s03-agent-detail) | `/agent/:id` | F3, F4, F5, F7 | Yes | [1440](wireframes/S03-agent-detail-1440.png) · [390](wireframes/S03-agent-detail-390.png) |
 | [`S04-hire-sheet`](#s04-hire-sheet) | Bottom sheet over S03 | F5, F6 | Yes | [1440](wireframes/S04-hire-sheet-1440.png) · [390](wireframes/S04-hire-sheet-390.png) |
 | [`S05-my-hires`](#s05-my-hires) | `/hires` | F6 | No | [1440](wireframes/S05-my-hires-1440.png) · [390](wireframes/S05-my-hires-390.png) |
-| [`S06-hire-detail`](#s06-hire-detail) | `/hires/:id` | F6, F7 | No | [1440](wireframes/S06-hire-detail-1440.png) · [390](wireframes/S06-hire-detail-390.png) |
+| [`S06-hire-detail`](#s06-hire-detail) | `/hires/:id` | F6, F7 | Partly (read-only) | [1440](wireframes/S06-hire-detail-1440.png) · [390](wireframes/S06-hire-detail-390.png) |
 | [`S07-studio`](#s07-studio) | `/studio` | F4 | Yes | [1440](wireframes/S07-studio-1440.png) · [390](wireframes/S07-studio-390.png) |
 | [`S08-deploy-sheet`](#s08-deploy-sheet) | Bottom sheet over S07 | F4 | Yes | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
 | [`S09-wallet-connect`](#s09-wallet-connect) | Sheet over any screen | F1 | Yes | [1440](wireframes/S09-wallet-connect-1440.png) · [390](wireframes/S09-wallet-connect-390.png) |
@@ -122,7 +122,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ### S06-hire-detail
 
-**Purpose:** follow a hire, read the result and decide. **Flows:** F6, F7. **Not built yet.**
+**Purpose:** follow a hire, read the result and decide. **Flows:** F6, F7. **Partly built** (`hire_detail_screen.dart`, #28): status, run progress, result with **Copy** and the `fund` link, polled until final. **Approve** and **Reject and refund** wait for the server-signed `submit` (#97); **Rate** waits for #14 and #21.
 
 **Data:** `Hire.id`, the agent's `Agent.name`, `Hire.status`, `Hire.runtimeStatus`, `Hire.failureReason`, `Hire.price` (held in escrow), the result, the approval deadline, `Payment.transaction` (the `fund` link), and the refund transaction after a reject or expiry. A rated hire shows `Feedback.score`.
 
