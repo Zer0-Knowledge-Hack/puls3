@@ -14,6 +14,7 @@ import 'adapters/workers_ai_runtime.dart';
 import 'agent_runner.dart';
 import 'demo_manifests.dart';
 import 'hire_runner.dart';
+import 'missed_run_backfill.dart';
 import 'provider_router.dart';
 import 'run_manifest.dart';
 import 'runtime_config.dart';
@@ -163,7 +164,7 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     log: log,
     batchSize: _batchSize,
   );
-  var backfilled = false;
+  final backfill = MissedRunBackfill(log: log);
   final loop = TrackerLoop(
     interval: loopConfig.interval,
     passTimeout: config.timeout * _batchSize + const Duration(minutes: 1),
@@ -171,14 +172,10 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     runPass: () async {
       final session = await pod.createSession();
       try {
-        if (!backfilled) {
-          // Hires paid before hire_run existed get their run once.
-          final queued = await ServerpodHireRunStore(
-            session,
-          ).enqueueMissing(DateTime.now());
-          if (queued > 0) log(ChainLogLevel.info, 'Queued $queued missed runs');
-          backfilled = true;
-        }
+        // Hires paid before hire_run existed get their run once.
+        await backfill.run(
+          () => ServerpodHireRunStore(session).enqueueMissing(DateTime.now()),
+        );
         final summary = await runner.pass(
           runs: ServerpodHireRunStore(session),
           hires: ServerpodHireRepository(session),
