@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:puls3_client/puls3_client.dart';
 
 import 'hire_gateway.dart';
+import 'wallet_session.dart';
 
 /// `client.hire.createHire`.
 typedef CreateHireCall =
@@ -24,18 +25,23 @@ typedef SubmitEscrowCall =
       String signedTransactionXdr,
     );
 
-/// [HireGateway] over `HireEndpoint` (api.md, F5-3 to F5-5).
+/// `client.hire.getHire`.
+typedef GetHireCall = Future<HireDetail> Function(int hireId, String consumer);
+
+/// [HireGateway] over `HireEndpoint` (api.md, F5-3 to F5-5, F6).
 ///
-/// `getHire` is not served yet, so [prepareFund] waits for the `create_job`
-/// confirmation by asking again while the server answers that the job is
-/// still being created (`InvalidHireTransition` with no status, or
-/// `SubmissionInProgress`), up to [confirmationTimeout].
+/// [prepareFund] waits for the `create_job` confirmation by asking again
+/// while the server answers that the job is still being created
+/// (`InvalidHireTransition` with no status, or `SubmissionInProgress`), up
+/// to [confirmationTimeout].
 class ServerHireGateway implements HireGateway {
   ServerHireGateway({
     required this._createHire,
     required this._prepareCreateJob,
     required this._prepareFund,
     required this._submitEscrowCall,
+    required this._getHire,
+    this._session,
     this.callTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 3),
     this.confirmationTimeout = const Duration(minutes: 2),
@@ -45,6 +51,11 @@ class ServerHireGateway implements HireGateway {
   final PrepareEscrowCall _prepareCreateJob;
   final PrepareEscrowCall _prepareFund;
   final SubmitEscrowCall _submitEscrowCall;
+  final GetHireCall _getHire;
+
+  /// The wallet session (#136). Without it, the server is called with no
+  /// session and answers `NotAuthenticated`.
+  final WalletSession? _session;
 
   /// Upper bound for one server call.
   final Duration callTimeout;
@@ -57,6 +68,16 @@ class ServerHireGateway implements HireGateway {
 
   @override
   bool get isDemo => false;
+
+  @override
+  Future<void> ensureSignedIn(String wallet, ChallengeSigner sign) async {
+    final session = _session;
+    if (session == null) return;
+    await _call(() => session.ensureSignedIn(wallet, sign));
+  }
+
+  @override
+  Future<void> forgetSession() async => _session?.forget();
 
   @override
   Future<HireStart> createHire({
@@ -128,6 +149,32 @@ class ServerHireGateway implements HireGateway {
     );
   }
 
+  @override
+  Future<HireProgress> getHire(int hireId, String consumer) async {
+    final detail = await _call(() => _getHire(hireId, consumer));
+    final hire = detail.hire;
+    // The latest submission is the `fund` until the agent submits, so it
+    // also carries the payment link when the hire has no payment yet.
+    final latest = detail.escrowSubmission;
+    final fund = latest != null && latest.purpose == 'fund' ? latest : null;
+    final paymentTransaction = hire.paymentTransaction ?? fund?.transaction;
+    return HireProgress(
+      hireId: hire.id,
+      agentName: detail.agent.name,
+      priceUsdcStroops: hire.price,
+      input: detail.input,
+      status: hire.status,
+      runtimeStatus: hire.runtimeStatus,
+      failureReason: hire.failureReason,
+      rejectedFrom: hire.rejectedFrom,
+      result: detail.result,
+      paymentTransaction: paymentTransaction,
+      paymentExplorerUrl:
+          detail.paymentExplorerUrl ??
+          (fund?.transaction == paymentTransaction ? fund?.explorerUrl : null),
+    );
+  }
+
   EscrowPreparation _preparation(PreparedTransaction prepared) {
     final xdr = prepared.unsignedTransactionXdr;
     if (xdr == null || xdr.isEmpty) {
@@ -159,6 +206,18 @@ class ServerHireGateway implements HireGateway {
     return switch (e.code) {
       'AuthenticationUnavailable' ||
       'NotAuthenticated' => const HireNotSignedIn(),
+      // walletAuth (api.md): the challenge or its signature was refused;
+      // a new attempt asks for a fresh challenge.
+      'ChallengeNotFound' ||
+      'ChallengeExpired' ||
+      'ChallengeConsumed' ||
+      'InvalidWalletSignature' => const HireSignInFailed(),
+      'ChallengeRateLimited' => const HireBackendUnavailable(
+        'Too many sign-in attempts. Wait a minute, then try again.',
+      ),
+      'InvalidHireId' ||
+      'HireNotFound' ||
+      'HireNotOwned' => const HireNotFound(),
       'AgentNotFound' || 'AgentInactive' => const HireAgentUnavailable(
         'This agent is not accepting hires.',
       ),

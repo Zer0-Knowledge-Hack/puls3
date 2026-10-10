@@ -140,6 +140,16 @@ final class RuntimeEmptyOutput extends RuntimeFailure {
   String get code => 'empty_output';
 }
 
+/// The manifest's model id cannot be sent to the provider, for example a
+/// Workers AI id with an empty, `.` or `..` path segment. Retrying fails
+/// the same way.
+final class RuntimeInvalidModel extends RuntimeFailure {
+  const RuntimeInvalidModel();
+
+  @override
+  String get code => 'invalid_model';
+}
+
 /// No adapter serves the manifest's `model.provider`.
 final class RuntimeUnsupportedProvider extends RuntimeFailure {
   const RuntimeUnsupportedProvider(this.provider);
