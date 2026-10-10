@@ -2,6 +2,7 @@
 // ed25519 signers of a ledger account entry.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -94,6 +95,68 @@ void main() {
       expect(authority!.masterWeight, 1);
       expect(authority.mediumThreshold, 2);
       expect(authority.signers, {fixture.signer: 3});
+    },
+  );
+
+  test(
+    'a real testnet account entry, with its ledger extensions, decodes too',
+    () async {
+      // Recorded from testnet: a funded account whose entry carries the
+      // liabilities and sponsorship extensions every real account has.
+      final accounts = RpcChainAccounts(
+        _client(
+          jsonDecode(
+                File(
+                  'test/fixtures/escrow_relay/get_ledger_entries_account.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, Object?>,
+        ),
+      );
+
+      final authority = await accounts.authorityOf(_recorded);
+
+      expect(authority, isNotNull);
+      expect(authority!.masterWeight, 1);
+      expect(authority.mediumThreshold, 0);
+      expect(authority.signers, isEmpty);
+    },
+  );
+
+  test(
+    'a truncated or foreign entry is unreadable, never a master key',
+    () async {
+      final recorded =
+          jsonDecode(
+                File(
+                  'test/fixtures/escrow_relay/get_ledger_entries_account.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, Object?>;
+      final xdr = base64Decode(
+        ((recorded['result'] as Map)['entries'] as List).first['xdr'] as String,
+      );
+
+      for (final broken in [
+        xdr.sublist(0, 60), // cut inside the account id and balance
+        xdr.sublist(0, 78), // cut inside the signer count
+        Uint8List.fromList([0, 0, 0, 9, ...xdr.sublist(4)]), // not an account
+      ]) {
+        final accounts = RpcChainAccounts(
+          _client(_entries(base64Encode(broken))),
+        );
+
+        await expectLater(
+          accounts.authorityOf(_recorded),
+          throwsA(
+            isA<Puls3ApiException>().having(
+              (error) => error.code,
+              'code',
+              'ChainUnavailable',
+            ),
+          ),
+        );
+      }
     },
   );
 
