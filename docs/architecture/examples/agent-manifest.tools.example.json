@@ -1,0 +1,39 @@
+{
+  "schema": "puls3.agent-manifest/v1",
+  "version": 2,
+  "name": "Remit Pilot",
+  "description": "Compares USD/MXN remittance routes for a given amount and returns the cheapest option with its assumptions.",
+  "skills": [
+    {
+      "id": "remittance-route-compare",
+      "name": "Remittance route compare",
+      "description": "Compares Bitso spot, USDC on Stellar, and traditional SPEI for a USD amount.",
+      "tags": ["remittance", "fx"]
+    }
+  ],
+  "model": {
+    "provider": "anthropic",
+    "id": "claude-sonnet-5"
+  },
+  "system_prompt": "You are Remit Pilot. The user gives you a USD amount. Use the tia_get_route tool to fetch the live comparison, then explain the best option and its assumptions in plain language. If the tool fails, say so and do not invent rates.",
+  "input": {
+    "type": "text",
+    "max_chars": 2000
+  },
+  "output": {
+    "type": "markdown",
+    "max_chars": 8000
+  },
+  "tools": [
+    { "integration": "tia", "operation": "getRoute" },
+    { "integration": "tia", "operation": "getQuote" }
+  ],
+  "tools_budget": {
+    "max_spend_per_hire": 5000000,
+    "max_spend_per_day": 50000000
+  },
+  "price": {
+    "asset": "USDC",
+    "amount": 10000000
+  }
+}
