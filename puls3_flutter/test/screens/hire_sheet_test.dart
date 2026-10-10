@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
@@ -240,6 +241,10 @@ class ScriptedHireGateway implements HireGateway {
     );
   }
 
+  @override
+  Future<HireProgress> getHire(int hireId, String consumer) async =>
+      throw const HireNotFound();
+
   EscrowPreparation _prep(String purpose) => EscrowPreparation(
     preparationId: 'prep-$purpose-${_nextPreparation++}',
     purpose: purpose,
@@ -327,6 +332,8 @@ void main() {
       expect(find.text('Demo signature only'), findsOneWidget);
       expect(find.text('Payment sent, confirming on Stellar…'), findsNothing);
       expect(find.text('View on StellarExpert'), findsNothing);
+      // The demo creates no hire: there is nothing to follow.
+      expect(find.text('View hire'), findsNothing);
       // Two prompts: create_job and fund.
       expect(wallet.signed, hasLength(2));
     });
@@ -353,9 +360,56 @@ void main() {
       expect(gateway.submitted, ['signed:AAAA-createJob', 'signed:AAAA-fund']);
       expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
       expect(find.text('#3'), findsOneWidget);
+      expect(find.text('View hire'), findsOneWidget);
 
       await tap(tester, 'View on StellarExpert');
       expect(opened.single.toString(), contains('/tx/fa11ce'));
+    });
+
+    testWidgets('View hire closes the sheet and opens the hire detail (S06)', (
+      tester,
+    ) async {
+      Puls3Fonts.useGoogleFonts = false;
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, _) => Scaffold(
+              body: TextButton(
+                onPressed: () => showHireSheet(context, _onChainAgent),
+                child: const Text('Open sheet'),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/hires/:id',
+            builder: (_, state) =>
+                Scaffold(body: Text('detail ${state.pathParameters['id']}')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        AppScope(
+          catalog: AgentCatalog(InMemoryAgentRepository([_onChainAgent])),
+          wallet: WalletController(TestWallet(initialAddress: 'GUSER123')),
+          deployGateway: FakeDeployGateway(),
+          hireGateway: ScriptedHireGateway(),
+          hireFlowStore: MemoryHireFlowStore(),
+          child: MaterialApp.router(
+            theme: Puls3Theme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open sheet'));
+      await settle(tester);
+      await confirm(tester);
+
+      await tap(tester, 'View hire');
+
+      expect(find.byType(HireSheet), findsNothing);
+      expect(find.text('detail 3'), findsOneWidget);
     });
 
     testWidgets('a rejected payment signature resumes at the payment, with '

@@ -304,7 +304,10 @@ when its origin is not allowed.
 The server runs on Serverpod Cloud, which also provides its PostgreSQL
 database. The Flutter web app is deployed separately to Cloudflare Pages (not
 covered here); build it with `--dart-define=PULS3_API_URL=<api-url>` so it
-calls this server.
+calls this server. In the Pages project, `scripts/cloudflare-pages-build.sh`
+reads `PULS3_API_URL` and `PULS3_HIRE` from the environment; set
+`PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
+stay the labelled demo.
 
 | | URL |
 |---|---|

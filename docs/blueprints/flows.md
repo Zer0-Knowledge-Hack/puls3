@@ -279,7 +279,7 @@ Each screen's data, states, actions and wireframes are in [screens.md](screens.m
 | `S03-agent-detail` | `/agent/:id` | Yes (`agent_detail_screen.dart`) | F3, F4, F5, F7, demos |
 | `S04-hire-sheet` | Bottom sheet over S03 | Yes (`hire_sheet.dart`) | F5, F6, demos |
 | `S05-my-hires` | `/hires` | No, new | F6 |
-| `S06-hire-detail` | `/hires/:id` | No, new | F6, F7, demos |
+| `S06-hire-detail` | `/hires/:id` | Partly (`hire_detail_screen.dart`, read-only) | F6, F7, demos |
 | `S07-studio` | `/studio` | Yes (`studio_screen.dart`) | F4, demo |
 | `S08-deploy-sheet` | Bottom sheet over S07 | Yes (`deploy_sheet.dart`) | F4, demo |
 | `S09-wallet-connect` | Sheet over any screen | Yes (`wallet_sheet.dart`, #25) | F1, F4, F5, F6 |

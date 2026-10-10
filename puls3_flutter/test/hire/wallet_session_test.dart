@@ -193,6 +193,7 @@ void main() {
           prepareCreateJob: (_) => throw UnimplementedError(),
           prepareFund: (_) => throw UnimplementedError(),
           submitEscrowCall: (_, _, _) => throw UnimplementedError(),
+          getHire: (_, _) => throw UnimplementedError(),
           session: walletSession,
         );
 

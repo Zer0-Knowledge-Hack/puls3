@@ -61,6 +61,13 @@ class FakeHireGateway implements HireGateway {
     return const EscrowSubmission(transactionHash: '', state: 'demo');
   }
 
+  /// The demo creates no hire, so there is none to read.
+  @override
+  Future<HireProgress> getHire(int hireId, String consumer) async {
+    await Future<void>.delayed(delay);
+    throw const HireNotFound();
+  }
+
   EscrowPreparation _prepare(int hireId, String purpose) => EscrowPreparation(
     preparationId: 'demo-${_nextPreparation++}',
     purpose: purpose,

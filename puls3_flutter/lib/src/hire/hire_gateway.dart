@@ -44,6 +44,109 @@ abstract interface class HireGateway {
     EscrowPreparation preparation,
     String signedTransaction,
   );
+
+  /// The hire as S06 shows it (`HireEndpoint.getHire`). Only the
+  /// [consumer] who created it can read it: any other hire is
+  /// [HireNotFound].
+  Future<HireProgress> getHire(int hireId, String consumer);
+}
+
+/// Where a hire is, as S06 shows it: the escrow job state (#10, ADR-0005)
+/// and, while the hire is funded, the agent run.
+enum HireStage {
+  /// No confirmed `fund` yet: the job is being created or waits for the
+  /// payment.
+  awaitingPayment,
+
+  /// Funded; the run waits for the runtime.
+  queued,
+
+  /// Funded; the agent is working.
+  running,
+
+  /// Funded and the run finished with a result, which the agent has not
+  /// submitted on chain yet.
+  delivered,
+
+  /// Funded, but the run failed for good. The escrow still holds the funds.
+  runFailed,
+
+  /// The agent submitted the result; the client approves or rejects it.
+  submitted,
+  completed,
+  rejected,
+  expired;
+
+  /// Nothing changes any more without the client, so polling can stop.
+  bool get isFinal => switch (this) {
+    runFailed || completed || rejected || expired => true,
+    _ => false,
+  };
+}
+
+/// One hire read from the server (api.md `HireDetail`).
+class HireProgress {
+  const HireProgress({
+    required this.hireId,
+    required this.agentName,
+    required this.priceUsdcStroops,
+    required this.input,
+    this.status,
+    this.runtimeStatus,
+    this.failureReason,
+    this.rejectedFrom,
+    this.result,
+    this.paymentTransaction,
+    this.paymentExplorerUrl,
+  });
+
+  final int hireId;
+  final String agentName;
+
+  /// The price the escrow holds.
+  final int priceUsdcStroops;
+
+  /// The task the client gave the agent.
+  final String input;
+
+  /// `HireStatus` name: open, funded, submitted, completed, rejected,
+  /// expired; null until the `create_job` is confirmed.
+  final String? status;
+
+  /// `RuntimeStatus` name while funded: queued, running, failed.
+  final String? runtimeStatus;
+
+  /// Safe reason of a failed run.
+  final String? failureReason;
+
+  /// The status a reject came from; a reject from `open` is a cancel.
+  final String? rejectedFrom;
+
+  /// The agent's output, once the run produced one.
+  final String? result;
+
+  /// Lowercase hex hash of the confirmed `fund` transaction.
+  final String? paymentTransaction;
+
+  /// StellarExpert link of [paymentTransaction], when the server built one.
+  final String? paymentExplorerUrl;
+
+  HireStage get stage => switch (status) {
+    'funded' when runtimeStatus == 'failed' => HireStage.runFailed,
+    // A succeeded run stays `running` until its `submit` lands (api.md,
+    // "Hire escrow states"): the result says it finished.
+    'funded' when result != null => HireStage.delivered,
+    'funded' when runtimeStatus == 'running' => HireStage.running,
+    'funded' => HireStage.queued,
+    'submitted' => HireStage.submitted,
+    'completed' => HireStage.completed,
+    'rejected' => HireStage.rejected,
+    'expired' => HireStage.expired,
+    _ => HireStage.awaitingPayment,
+  };
+
+  /// A reject before any payment: the app calls it cancelled.
+  bool get isCancelled => status == 'rejected' && rejectedFrom == 'open';
 }
 
 /// A created hire and its first escrow call.
@@ -166,6 +269,12 @@ final class HirePaymentAlreadySubmitted extends HireGatewayException {
 /// The hire is closed (`rejected` or `expired`): it takes no payment.
 final class HireClosed extends HireGatewayException {
   const HireClosed() : super('This hire is closed. Start a new hire.');
+}
+
+/// No hire with this id belongs to the connected wallet.
+final class HireNotFound extends HireGatewayException {
+  const HireNotFound()
+    : super('This hire does not exist or belongs to another wallet.');
 }
 
 /// The server or the chain could not answer. Retrying the same step is
