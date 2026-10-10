@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/wallet/demo_envelope.dart';
@@ -382,5 +383,259 @@ void main() {
         throwsA(isA<WalletInvalidPayload>()),
       );
     });
+  });
+
+  group('signChallenge: SEP-10 sign-in (#136)', () {
+    late KeyPair server;
+    const homeDomain = 'puls3-hub-on-stellar.api.serverpod.space';
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+
+    /// A challenge shaped like the server's `StellarSep10Codec`: server
+    /// source, sequence 0, `<home domain> auth` from the wallet, then
+    /// `web_auth_domain` from the server, valid for 900 seconds.
+    Transaction challenge({
+      String? source,
+      String? clientAccount,
+      String name = '$homeDomain auth',
+      int sequenceBefore = -1,
+      int? minTime,
+      int? maxTime,
+      bool withTimeBounds = true,
+      bool extraPayment = false,
+      String? secondOperationSource,
+    }) {
+      final builder =
+          TransactionBuilder(
+              Account(
+                source ?? server.accountId,
+                BigInt.from(sequenceBefore),
+              ),
+            )
+            ..addOperation(
+              ManageDataOperationBuilder(
+                name,
+                Uint8List.fromList(List.filled(48, 65)),
+              ).setSourceAccount(clientAccount ?? key.accountId).build(),
+            )
+            ..addOperation(
+              ManageDataOperationBuilder(
+                    'web_auth_domain',
+                    Uint8List.fromList('puls3.dev'.codeUnits),
+                  )
+                  .setSourceAccount(
+                    secondOperationSource ?? source ?? server.accountId,
+                  )
+                  .build(),
+            );
+      if (extraPayment) {
+        builder.addOperation(
+          PaymentOperationBuilder(
+            _destination,
+            AssetTypeNative(),
+            '1',
+          ).setSourceAccount(key.accountId).build(),
+        );
+      }
+      if (withTimeBounds) {
+        builder.addPreconditions(
+          TransactionPreconditions()
+            ..timeBounds = TimeBounds(
+              minTime ?? now - 10,
+              maxTime ?? now + 900,
+            ),
+        );
+      }
+      final tx = builder.build();
+      tx.sign(server, Network.TESTNET);
+      return tx;
+    }
+
+    SignInChallenge signIn(
+      Transaction tx, {
+      String? serverSigningKey,
+      String? home,
+      String passphrase = stellarTestnetPassphrase,
+    }) => SignInChallenge(
+      transactionXdr: tx.toEnvelopeXdrBase64(),
+      networkPassphrase: passphrase,
+      serverSigningKey: serverSigningKey,
+      homeDomain: home,
+    );
+
+    Matcher refused(String reason) => throwsA(
+      isA<WalletInvalidPayload>().having(
+        (e) => e.reason,
+        'reason',
+        contains(reason),
+      ),
+    );
+
+    setUp(() async {
+      server = KeyPair.random();
+      await wallet.connect();
+    });
+
+    test(
+      'signs a valid challenge and returns it signed by the wallet',
+      () async {
+        final tx = challenge();
+
+        final signedXdr = await wallet.signChallenge(
+          signIn(tx, serverSigningKey: server.accountId, home: homeDomain),
+        );
+
+        final signed =
+            AbstractTransaction.fromEnvelopeXdrString(signedXdr) as Transaction;
+        expect(
+          signed.toXdrBase64(),
+          tx.toXdrBase64(),
+          reason: 'body unchanged',
+        );
+        expect(signed.signatures, hasLength(2), reason: 'server + wallet');
+        final hash = signed.hash(Network.TESTNET);
+        expect(
+          signed.signatures.any(
+            (s) => key.verify(hash, s.signature.signature),
+          ),
+          isTrue,
+        );
+        expect(bridge.signCalls, 1);
+      },
+    );
+
+    test(
+      'works without the server key and home domain (static builds)',
+      () async {
+        await wallet.signChallenge(signIn(challenge()));
+        expect(bridge.signCalls, 1);
+      },
+    );
+
+    test('signTransaction would refuse the same challenge: the server is its '
+        'source', () {
+      expect(
+        wallet.signTransaction(challenge().toEnvelopeXdrBase64()),
+        throwsA(isA<WalletInvalidPayload>()),
+      );
+    });
+
+    test('refuses a challenge that could be submitted (sequence not 0)', () {
+      expect(
+        wallet.signChallenge(signIn(challenge(sequenceBefore: 41))),
+        refused('sequence number 0'),
+      );
+      expect(bridge.signCalls, 0);
+    });
+
+    test('refuses a transaction whose source is the wallet itself', () {
+      expect(
+        wallet.signChallenge(
+          signIn(
+            challenge(
+              source: key.accountId,
+              secondOperationSource: key.accountId,
+            ),
+          ),
+        ),
+        refused('must come from the server'),
+      );
+    });
+
+    test('refuses any operation other than manage_data', () {
+      expect(
+        wallet.signChallenge(signIn(challenge(extraPayment: true))),
+        refused('only contain manage_data'),
+      );
+      expect(bridge.signCalls, 0);
+    });
+
+    test('refuses a challenge for another account', () {
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(clientAccount: KeyPair.random().accountId)),
+        ),
+        refused('not for your account'),
+      );
+    });
+
+    test('refuses a later operation sourced from another account', () {
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(secondOperationSource: key.accountId)),
+        ),
+        refused('for another account'),
+      );
+    });
+
+    test('refuses a first operation that is not "<domain> auth"', () {
+      expect(
+        wallet.signChallenge(signIn(challenge(name: 'transfer'))),
+        refused('not for this server'),
+      );
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(), home: 'evil.example'),
+        ),
+        refused('not for this server'),
+      );
+    });
+
+    test('refuses a challenge from another server key when it is known', () {
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(), serverSigningKey: KeyPair.random().accountId),
+        ),
+        refused('not from the puls3 server'),
+      );
+    });
+
+    test('refuses a challenge without time bounds or outside them', () {
+      expect(
+        wallet.signChallenge(signIn(challenge(withTimeBounds: false))),
+        refused('no expiry'),
+      );
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(minTime: now - 2000, maxTime: now - 1000)),
+        ),
+        refused('expired'),
+      );
+    });
+
+    test('refuses another network before any prompt', () {
+      expect(
+        wallet.signChallenge(
+          signIn(
+            challenge(),
+            passphrase: 'Public Global Stellar Network ; September 2015',
+          ),
+        ),
+        throwsA(isA<WalletWrongNetwork>()),
+      );
+      expect(bridge.signCalls, 0);
+    });
+
+    test('refuses a wallet answer that changed the challenge', () async {
+      bridge.signer = (_) {
+        final other = challenge(name: 'other.example auth');
+        other.sign(key, Network.TESTNET);
+        return other.toEnvelopeXdrBase64();
+      };
+      expect(
+        wallet.signChallenge(signIn(challenge())),
+        refused('changed the transaction'),
+      );
+    });
+
+    test(
+      'refuses a wallet answer with no new signature from the account',
+      () async {
+        bridge.signer = (xdr) => xdr;
+        expect(
+          wallet.signChallenge(signIn(challenge())),
+          refused('did not add a signature'),
+        );
+      },
+    );
   });
 }
