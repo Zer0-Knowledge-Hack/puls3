@@ -256,6 +256,7 @@ void main() {
       expect((await runs.find(id))!.state, HireRunState.failed);
       expect(isRetryable(const RuntimeTimedOut(Duration(seconds: 1))), isFalse);
       expect(isRetryable(const RuntimeRefused(null)), isFalse);
+      expect(isRetryable(const RuntimeInvalidModel()), isFalse);
     });
 
     test('a 429 stops the pass: the rest of the batch waits', () async {

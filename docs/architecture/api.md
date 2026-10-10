@@ -186,7 +186,7 @@ Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escro
 | `open` | `createJob` `confirmed`, or `fund` `failed` with `SubmissionRejected`, `PreparationExpired` or `TransactionFailed` | Job created and priced; unfunded | `prepareFund`, `prepareReject` (cancel), `submitEscrowCall` |
 | `open` | `fund` `submitted` | Funding in flight | Poll `getHire`. `prepare…` methods raise `SubmissionInProgress` |
 | `open` | `fund` `failed` with `JobMismatch` or `JobEvidenceUnavailable` | The transaction succeeded but the job does not match this hire; funds stay in the escrow | None. `prepareFund` raises `PaymentAlreadySubmitted`. Refund through `claim_refund` after `expired_at` |
-| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`) | Poll `getHire` |
+| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`). A finished run reads `running` with `result` set until its `submit` lands | Poll `getHire` |
 | `funded` | — | `runtimeStatus` is `failed` | `prepareReject` (one-step reject and refund). Fallback: the tracker calls `claim_refund` after `expired_at` |
 | `submitted` | `submit` `confirmed` | Delivered; awaiting the client's evaluation; `result` and `approvalDeadline` are set | Before `approvalDeadline`: `prepareComplete`, `prepareReject`. After it: `prepareComplete` until the tracker's `release` lands; poll `getHire` |
 | `expired` (derived) | — | Unfunded job past `expired_at`: on chain it stays `Open`, but `fund` reverts and there is nothing to refund | None. No transaction |
@@ -289,6 +289,8 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `HireSummary` | `hire: Hire`, `agentName` |
 | `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
 | `FeedbackEligibility` | `hireId`, `eligible: bool` |
+
+**`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline`, `rejectReason` and `feedbackSubmission` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`.
 
 `PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
 
