@@ -212,7 +212,7 @@ All three identity events keep the Stellar 8004 struct name, topic set (the `#[t
 
 | ID | Gap | Follow-up | Tracked as |
 |---|---|---|---|
-| F1 | [G9](#g9-ownable-interface) | **Task — `fix(contracts): expose the Stellar 8004 Ownable interface on the Identity Registry`.** Add `get_owner() -> Option<Address>`, `transfer_ownership(new_owner, live_until_ledger)`, `accept_ownership()` and `renounce_ownership()` with the Stellar 8004 (OpenZeppelin `9dd85c30`) signatures, backed by the `Admin` address stored in the constructor. Add a test that `get_owner` returns the constructor owner and that only the owner can call the mutators; keep the error codes unchanged. | This review (F1); to be filed on the puls3 tracker as a follow-up issue when the PR for #74 lands. |
+| F1 | [G9](#g9-ownable-interface) | `fix(contracts): expose the Stellar 8004 Ownable interface on the Identity Registry` — add `get_owner() -> Option<Address>`, `transfer_ownership(new_owner, live_until_ledger)`, `accept_ownership()` and `renounce_ownership()` with the Stellar 8004 (OpenZeppelin `9dd85c30`) signatures, backed by the `Admin` address stored in the constructor; keep the error codes unchanged. | [#153](https://github.com/Zer0-Knowledge-Hack/puls3/issues/153) |
 
 Gaps marked **document** or **additive extension** become no follow-up work.
 
