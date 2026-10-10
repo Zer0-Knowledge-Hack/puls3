@@ -1,68 +1,86 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/agent.dart';
+import '../domain/stellar_explorer.dart';
+import '../hire/hire_flow_controller.dart';
 import '../state/app_scope.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/organisms/hire_payment_view.dart';
-import '../wallet/demo_envelope.dart';
-import '../wallet/wallet_port.dart';
+
+export '../hire/hire_flow_controller.dart' show walletErrorMessage;
 
 /// Opens the hire and pay flow for [agent].
 Future<void> showHireSheet(BuildContext context, Agent agent) {
   return showModalBottomSheet<void>(
     context: context,
+    // Above the whole app, so the phone's bottom navigation bar does not
+    // cover the end of the sheet.
+    useRootNavigator: true,
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => HireSheet(agent: agent),
   );
 }
 
-/// Container for the hire flow: owns the phase and talks to the wallet.
+Future<void> _launch(Uri url) async {
+  await launchUrl(url, mode: LaunchMode.externalApplication);
+}
+
+/// Container for the hire flow (F5): owns the [HireFlowController] and the
+/// work request, and maps the flow to [HirePaymentView].
 class HireSheet extends StatefulWidget {
-  const HireSheet({super.key, required this.agent});
+  const HireSheet({super.key, required this.agent, this.openUrl = _launch});
 
   final Agent agent;
+
+  /// Opens the explorer; replaceable in tests.
+  final Future<void> Function(Uri url) openUrl;
 
   @override
   State<HireSheet> createState() => _HireSheetState();
 }
 
 class _HireSheetState extends State<HireSheet> {
-  HirePhase _phase = HirePhase.review;
-  String? _errorMessage;
+  final _input = TextEditingController();
+  HireFlowController? _flow;
 
-  Future<void> _confirm() async {
-    final wallet = AppScope.of(context).wallet;
-    setState(() {
-      _phase = HirePhase.signing;
-      _errorMessage = null;
-    });
-
-    try {
-      if (wallet.address == null) {
-        await wallet.connect();
-      }
-      // Demo signing: nothing is submitted. The real flow calls the server
-      // relay (createHire, prepareFund, submitEscrowCall) once it exists.
-      // Demo signing: a real, harmless Testnet envelope for the payer so a
-      // real wallet shows its prompt; it is never submitted.
-      await wallet.signTransaction(
-        demoEnvelope(wallet.address!, note: 'hire ${widget.agent.id}'),
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scope = AppScope.of(context);
+    if (_flow == null) {
+      final flow = _flow = HireFlowController(
+        agent: widget.agent,
+        gateway: scope.hireGateway,
+        wallet: scope.wallet,
+        store: scope.hireFlowStore,
       );
-      if (!mounted) return;
-      setState(() => _phase = HirePhase.confirmed);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = HirePhase.error;
-        _errorMessage = switch (e) {
-          WalletException() => walletErrorMessage(e),
-          Exception() => e.toString().replaceFirst('Exception: ', ''),
-          _ => 'Payment could not be completed',
-        };
-      });
+      flow.addListener(_showResumedTask);
+      // A connected wallet: offer to resume an unfinished hire right away.
+      final consumer = scope.wallet.address;
+      if (consumer != null) flow.restore(consumer);
+      _showResumedTask();
     }
   }
+
+  @override
+  void dispose() {
+    _flow?.dispose();
+    _input.dispose();
+    super.dispose();
+  }
+
+  /// Shows the task of the unfinished hire this sheet resumes.
+  void _showResumedTask() {
+    final task = _flow?.resumedInput;
+    if (task != null && _input.text != task) _input.text = task;
+  }
+
+  void _run() => unawaited(_flow!.run(_input.text.trim()));
 
   void _backToMarketplace() {
     final router = GoRouter.of(context);
@@ -72,45 +90,78 @@ class _HireSheetState extends State<HireSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final flow = _flow!;
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
           Puls3Spacing.lg,
           0,
           Puls3Spacing.lg,
-          Puls3Spacing.lg,
+          Puls3Spacing.lg + MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: HirePaymentView(
-            phase: _phase,
-            agentName: widget.agent.name,
-            priceUsdcStroops: widget.agent.priceUsdcStroops,
-            destinationAddress: widget.agent.stellarAddress,
-            errorMessage: _errorMessage,
-            onConfirm: _confirm,
-            onRetry: _confirm,
-            onBackToMarketplace: _backToMarketplace,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListenableBuilder(
+              listenable: flow,
+              builder: (context, _) {
+                final hash = flow.payment?.transactionHash;
+                return HirePaymentView(
+                  phase: _phase(flow),
+                  agentName: widget.agent.name,
+                  priceUsdcStroops: widget.agent.priceUsdcStroops,
+                  destinationAddress: widget.agent.stellarAddress,
+                  isDemo: flow.isDemo,
+                  inputController: _input,
+                  inputLocked: !flow.canEditTask,
+                  resumeNote: flow.resumedInput == null
+                      ? null
+                      : 'You have an unfinished hire with this agent. '
+                            'Confirming resumes it, so you are never charged '
+                            'twice.',
+                  progressLabel: _progress(flow.step),
+                  errorMessage: flow.error,
+                  hireId: flow.hireId,
+                  transactionHash: hash,
+                  paymentConfirmed: flow.payment?.isConfirmed ?? false,
+                  onConfirm: _run,
+                  onRetry: _run,
+                  onBackToMarketplace: _backToMarketplace,
+                  onOpenExplorer: hash == null || hash.isEmpty
+                      ? null
+                      : () => unawaited(
+                          widget.openUrl(Uri.parse(_explorerUrl(flow))),
+                        ),
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-/// A human message for a wallet failure. In every case nothing was signed,
-/// so no funds moved.
-String walletErrorMessage(WalletException e) => switch (e) {
-  WalletSignatureRejected() =>
-    'You cancelled the payment in your wallet. No funds moved.',
-  WalletWrongNetwork() =>
-    'Switch your wallet to Stellar Testnet, then try again.',
-  WalletNotInstalled() => 'No wallet found. Install Freighter, then try again.',
-  WalletUnavailable() => 'Open or unlock your wallet, then try again.',
-  WalletTimedOut() =>
-    'Your wallet did not answer. Open it, then try again. No funds moved.',
-  WalletAccountChanged() =>
-    'Your wallet account changed. Reconnect, then try again.',
-  WalletInvalidPayload() =>
-    'This payment could not be signed safely. No funds moved.',
-};
+  static String _explorerUrl(HireFlowController flow) {
+    final payment = flow.payment!;
+    return payment.explorerUrl ?? stellarExpertTxUrl(payment.transactionHash);
+  }
+
+  static HirePhase _phase(HireFlowController flow) {
+    if (flow.error != null && !flow.isRunning) return HirePhase.error;
+    return switch (flow.step) {
+      HireStep.review => HirePhase.review,
+      HireStep.done => HirePhase.confirmed,
+      _ => HirePhase.signing,
+    };
+  }
+
+  static String? _progress(HireStep step) => switch (step) {
+    HireStep.creating => 'Creating the hire…',
+    HireStep.signingCreateJob => 'Sign the escrow job in your wallet (1 of 2).',
+    HireStep.submittingCreateJob => 'Creating the escrow job on Stellar…',
+    HireStep.preparingFund => 'Waiting for the escrow job to confirm…',
+    HireStep.signingFund => 'Sign the payment in your wallet (2 of 2).',
+    HireStep.submittingFund => 'Sending the payment to the escrow…',
+    HireStep.review || HireStep.done => null,
+  };
+}

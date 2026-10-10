@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'data/agent_repository.dart';
 import 'deploy/deploy_gateway.dart';
 import 'deploy/fake_deploy_gateway.dart';
+import 'hire/create_hire_flow_store.dart';
+import 'hire/fake_hire_gateway.dart';
+import 'hire/hire_flow_store.dart';
+import 'hire/hire_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
 import 'screens/landing_screen.dart';
@@ -53,6 +57,8 @@ class Puls3App extends StatefulWidget {
     required this.wallet,
     this.demoRepository,
     this.deployGateway,
+    this.hireGateway,
+    this.hireFlowStore,
     this.healthCheck,
     this.initialLocation = '/',
   });
@@ -68,6 +74,13 @@ class Puls3App extends StatefulWidget {
   /// The deploy backend. Until the register/deploy endpoint (#18) exists
   /// it defaults to [FakeDeployGateway], which the flow labels as a demo.
   final DeployGateway? deployGateway;
+
+  /// The hire backend (#91). It defaults to [FakeHireGateway], which the
+  /// flow labels as a demo, until the server accepts wallet sessions (#136).
+  final HireGateway? hireGateway;
+
+  /// Where unfinished hires are kept: the browser's storage by default.
+  final HireFlowStore? hireFlowStore;
   final Future<String>? healthCheck;
   final String initialLocation;
 
@@ -86,6 +99,9 @@ class _Puls3AppState extends State<Puls3App> {
   );
   late final DeployGateway _deployGateway =
       widget.deployGateway ?? FakeDeployGateway();
+  late final HireGateway _hireGateway = widget.hireGateway ?? FakeHireGateway();
+  late final HireFlowStore _hireFlowStore =
+      widget.hireFlowStore ?? createHireFlowStore();
 
   @override
   void dispose() {
@@ -104,6 +120,8 @@ class _Puls3AppState extends State<Puls3App> {
       catalog: _catalog,
       wallet: _wallet,
       deployGateway: _deployGateway,
+      hireGateway: _hireGateway,
+      hireFlowStore: _hireFlowStore,
       child: MaterialApp.router(
         title: 'puls3: the agent hub on Stellar',
         debugShowCheckedModeBanner: false,

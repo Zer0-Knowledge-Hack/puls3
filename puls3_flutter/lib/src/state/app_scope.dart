@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../deploy/deploy_gateway.dart';
+import '../hire/hire_flow_store.dart';
+import '../hire/hire_gateway.dart';
 import 'agent_catalog.dart';
 import 'wallet_controller.dart';
 
@@ -12,12 +14,18 @@ class AppScope extends InheritedWidget {
     required this.catalog,
     required this.wallet,
     required this.deployGateway,
+    required this.hireGateway,
+    required this.hireFlowStore,
     required super.child,
   });
 
   final AgentCatalog catalog;
   final WalletController wallet;
   final DeployGateway deployGateway;
+  final HireGateway hireGateway;
+
+  /// Unfinished hires, so a closed sheet or a reload resumes them.
+  final HireFlowStore hireFlowStore;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
@@ -29,5 +37,7 @@ class AppScope extends InheritedWidget {
   bool updateShouldNotify(AppScope oldWidget) =>
       catalog != oldWidget.catalog ||
       wallet != oldWidget.wallet ||
-      deployGateway != oldWidget.deployGateway;
+      deployGateway != oldWidget.deployGateway ||
+      hireGateway != oldWidget.hireGateway ||
+      hireFlowStore != oldWidget.hireFlowStore;
 }

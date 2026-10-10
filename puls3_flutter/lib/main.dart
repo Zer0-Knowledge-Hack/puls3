@@ -7,6 +7,8 @@ import 'src/app.dart';
 import 'src/data/agent_repository.dart';
 import 'src/data/app_config.dart';
 import 'src/data/server_agent_repository.dart';
+import 'src/hire/hire_gateway.dart';
+import 'src/hire/server_hire_gateway.dart';
 import 'src/wallet/freighter/create_freighter_bridge.dart';
 import 'src/wallet/freighter/freighter_wallet.dart';
 import 'src/wallet/mock_wallet.dart';
@@ -28,6 +30,23 @@ WalletPort _createWallet() => switch (_walletKind) {
   ),
 };
 
+/// Which hire backend the app uses: `demo` (default, labelled, moves no
+/// funds) or `server` for the escrow relay (#96):
+/// `--dart-define=HIRE=server`. The server needs wallet sessions (#136).
+const _hireKind = String.fromEnvironment('HIRE', defaultValue: 'demo');
+
+HireGateway? _createHireGateway(Client client) => switch (_hireKind) {
+  'demo' => null,
+  'server' => ServerHireGateway(
+    createHire: client.hire.createHire,
+    prepareCreateJob: client.hire.prepareCreateJob,
+    prepareFund: client.hire.prepareFund,
+    submitEscrowCall: client.hire.submitEscrowCall,
+  ),
+  // A typo must not silently ship the demo.
+  _ => throw StateError('Unknown HIRE "$_hireKind": use "demo" or "server".'),
+};
+
 /// Starts the demo shell and verifies the generated Serverpod client connection.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +65,7 @@ Future<void> main() async {
       ),
       demoRepository: AssetAgentRepository(),
       wallet: _createWallet(),
+      hireGateway: _createHireGateway(client),
       healthCheck: client.health.check().then((health) => health.version),
     ),
   );
