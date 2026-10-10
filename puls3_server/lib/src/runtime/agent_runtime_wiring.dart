@@ -117,6 +117,14 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
       apiKey: apiKey,
     );
   }
+  for (final warning in providerSetupWarnings(
+    workersAiAccountSet: accountId != null && accountId.isNotEmpty,
+    workersAiTokenSet: workersAiToken != null && workersAiToken.isNotEmpty,
+    configured: runtimes.keys.toSet(),
+    manifests: demoManifests,
+  )) {
+    log(ChainLogLevel.warning, warning);
+  }
   if (runtimes.isEmpty) {
     httpClient.close();
     log(
@@ -187,6 +195,47 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     'timeout ${config.timeout.inSeconds}s',
   );
   return loop;
+}
+
+/// What is wrong with the provider credentials at startup, as log lines
+/// that name variables and passwords but never their values:
+///
+/// - Workers AI with only one of its account id and token, which would
+///   otherwise be dropped without a word;
+/// - every provider a seeded manifest uses that has no credentials, whose
+///   runs then fail as `unsupported_provider`.
+List<String> providerSetupWarnings({
+  required bool workersAiAccountSet,
+  required bool workersAiTokenSet,
+  required Set<String> configured,
+  required Map<String, Map<int, RunManifest>> manifests,
+}) {
+  final warnings = <String>[];
+  if (workersAiAccountSet != workersAiTokenSet) {
+    final (present, missing) = workersAiAccountSet
+        ? (workersAiAccountVariable, 'the "$workersAiTokenPassword" password')
+        : ('the "$workersAiTokenPassword" password', workersAiAccountVariable);
+    warnings.add(
+      'Workers AI is only partly configured: $present is set but $missing '
+      'is not, so the workers-ai provider is off',
+    );
+  }
+  final agentsByProvider = <String, Set<String>>{};
+  for (final MapEntry(key: agent, value: versions) in manifests.entries) {
+    for (final manifest in versions.values) {
+      agentsByProvider.putIfAbsent(manifest.provider, () => {}).add(agent);
+    }
+  }
+  final missing = agentsByProvider.keys.toSet().difference(configured).toList()
+    ..sort();
+  for (final provider in missing) {
+    final agents = agentsByProvider[provider]!.toList()..sort();
+    warnings.add(
+      'Provider "$provider" has no credentials; runs of ${agents.join(', ')} '
+      'fail as unsupported_provider',
+    );
+  }
+  return warnings;
 }
 
 /// The loop and runtime settings from [env], or `null` when the runtime is
