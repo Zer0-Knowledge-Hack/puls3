@@ -78,6 +78,9 @@ class _ProgressGateway implements HireGateway {
   Future<void> forgetSession() async {}
 
   @override
+  Future<void> checkFunds(String consumer, int priceUsdcStroops) async {}
+
+  @override
   Future<HireStart> createHire({
     required int agentId,
     required String consumer,

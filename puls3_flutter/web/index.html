@@ -78,11 +78,13 @@
   </script>
   <script type="module">
     // The Freighter bridge (#25) installs window.puls3Freighter* before
-    // Flutter starts. If it cannot load (offline CDN), the app still starts
-    // and connecting reports "Freighter not installed".
+    // Flutter starts. If it cannot load (offline, blocked CDN, ad blocker),
+    // the app still starts and connecting reports that the wallet connector
+    // could not load, not that Freighter is missing.
     try {
       await import('./freighter_bridge.js');
     } catch (e) {
+      window.puls3FreighterBridgeFailed = true;
       console.warn('Freighter bridge unavailable', e);
     }
     const bootstrap = document.createElement('script');

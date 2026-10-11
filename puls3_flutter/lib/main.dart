@@ -10,6 +10,7 @@ import 'src/data/app_config.dart';
 import 'src/data/server_agent_repository.dart';
 import 'src/hire/hire_gateway.dart';
 import 'src/hire/server_hire_gateway.dart';
+import 'src/hire/wallet_funds.dart';
 import 'src/hire/wallet_session.dart';
 import 'src/wallet/freighter/create_freighter_bridge.dart';
 import 'src/wallet/freighter/freighter_wallet.dart';
@@ -47,6 +48,7 @@ HireGateway? _createHireGateway(Client client, String configJson) =>
         submitEscrowCall: client.hire.submitEscrowCall,
         getHire: client.hire.getHire,
         session: _walletSession(client, configJson),
+        readFunds: readTestnetFunds,
       ),
       // A typo must not silently ship the demo.
       _ => throw StateError(

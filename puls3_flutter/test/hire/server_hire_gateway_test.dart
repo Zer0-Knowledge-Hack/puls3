@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_client/puls3_client.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/server_hire_gateway.dart';
+import 'package:puls3_flutter/src/hire/wallet_funds.dart';
 
 const _consumer = 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY';
 
@@ -55,8 +56,10 @@ ServerHireGateway _gateway({
   PrepareEscrowCall? prepareFund,
   SubmitEscrowCall? submit,
   GetHireCall? getHire,
+  ReadWalletFunds? readFunds,
   Duration confirmationTimeout = const Duration(seconds: 1),
 }) => ServerHireGateway(
+  readFunds: readFunds,
   createHire:
       createHire ??
       (_, _, _, _) async => CreateHireResult(
@@ -325,6 +328,45 @@ void main() {
         ),
         throwsA(isA<HireBackendUnavailable>()),
       );
+    });
+  });
+
+  group('ServerHireGateway.checkFunds (F5-2)', () {
+    test('enough USDC passes; the account and price are the ones asked', () {
+      final reads = <String>[];
+      final gateway = _gateway(
+        readFunds: (account) async {
+          reads.add(account);
+          return const WalletFunds(accountExists: true, usdcStroops: 45000000);
+        },
+      );
+      expect(gateway.checkFunds(_consumer, 45000000), completes);
+      expect(reads, [_consumer]);
+    });
+
+    test('too little USDC, no trustline and no account are refused', () async {
+      for (final funds in const [
+        WalletFunds(accountExists: true, usdcStroops: 44999999),
+        WalletFunds(accountExists: true),
+        WalletFunds(accountExists: false),
+      ]) {
+        await expectLater(
+          _gateway(
+            readFunds: (_) async => funds,
+          ).checkFunds(_consumer, 45000000),
+          throwsA(isA<HireInsufficientFunds>()),
+        );
+      }
+    });
+
+    test('an unreadable balance or no reader never blocks the payment', () {
+      expect(
+        _gateway(
+          readFunds: (_) async => throw Exception('Horizon is down'),
+        ).checkFunds(_consumer, 45000000),
+        completes,
+      );
+      expect(_gateway().checkFunds(_consumer, 45000000), completes);
     });
   });
 
