@@ -101,30 +101,112 @@ final class RpcChainAccounts implements ChainAccounts {
   }
 }
 
+// XDR discriminants of the account entry (CAP stellar-ledger-entries).
+const _ledgerEntryTypeAccount = 0;
+const _publicKeyTypeEd25519 = 0;
+const _signerKeyEd25519 = 0;
+const _signerKeyPreAuthTx = 1;
+const _signerKeyHashX = 2;
+const _signerKeyEd25519SignedPayload = 3;
+const _maxHomeDomain = 32;
+const _maxSigners = 20;
+
+/// Reads the thresholds and the ed25519 signers of an `AccountEntry` ledger
+/// entry (XDR).
+///
+/// It walks the fixed layout up to the signers on purpose and ignores the
+/// extension tail: a real account carries liabilities and sponsorship
+/// extensions that the general-purpose decoder of `stellar_dart` cannot read.
+/// Anything that does not fit the layout throws, and the caller treats that as
+/// unreadable, never as a master-key account.
 AccountAuthority _authorityOf(Uint8List xdr) {
-  final decoded = stellar.LedgerEntryData.fromStruct(
-    stellar.XDRVariantSerialization.deserialize(
-      bytes: xdr,
-      layout: stellar.LedgerEntryData.layout(),
-    ),
-  );
-  if (decoded is! stellar.AccountEntry) {
+  final data = ByteData.sublistView(xdr);
+  var at = 0;
+
+  void need(int bytes) {
+    if (bytes < 0 || at + bytes > xdr.length) {
+      throw const FormatException('truncated account entry');
+    }
+  }
+
+  int u32() {
+    need(4);
+    final value = data.getUint32(at);
+    at += 4;
+    return value;
+  }
+
+  void skip(int bytes) {
+    need(bytes);
+    at += bytes;
+  }
+
+  Uint8List take(int bytes) {
+    need(bytes);
+    final out = Uint8List.sublistView(xdr, at, at + bytes);
+    at += bytes;
+    return out;
+  }
+
+  // XDR pads variable data to a multiple of four bytes.
+  int padded(int length) => (length + 3) & ~3;
+
+  if (u32() != _ledgerEntryTypeAccount) {
     throw const FormatException('not an account');
   }
+  if (u32() != _publicKeyTypeEd25519) {
+    throw const FormatException('unknown account id type');
+  }
+  skip(32); // account id
+  skip(8); // balance
+  skip(8); // sequence number
+  skip(4); // number of sub entries
+  switch (u32()) {
+    case 0: // no inflation destination
+      break;
+    case 1:
+      if (u32() != _publicKeyTypeEd25519) {
+        throw const FormatException('unknown inflation destination type');
+      }
+      skip(32);
+    default:
+      throw const FormatException('bad inflation destination flag');
+  }
+  skip(4); // flags
+  final homeDomain = u32();
+  if (homeDomain > _maxHomeDomain) {
+    throw const FormatException('home domain too long');
+  }
+  skip(padded(homeDomain));
+  final thresholds = take(4);
+  final count = u32();
+  if (count > _maxSigners) throw const FormatException('too many signers');
+
   final signers = <StellarAddress, int>{};
-  for (final signer in decoded.signers) {
-    final key = signer.key;
-    if (key is! stellar.SignerKeyEd25519) continue;
+  for (var i = 0; i < count; i++) {
+    final type = u32();
+    Uint8List? ed25519;
+    switch (type) {
+      case _signerKeyEd25519:
+        ed25519 = take(32);
+      case _signerKeyPreAuthTx || _signerKeyHashX:
+        skip(32);
+      case _signerKeyEd25519SignedPayload:
+        skip(32);
+        skip(padded(u32()));
+      default:
+        throw const FormatException('unknown signer key type');
+    }
+    final weight = u32();
+    if (ed25519 == null) continue;
     final address = StellarAddress.parse(
-      stellar.StellarPublicKey.fromPublicBytes(
-        key.ed25519,
-      ).toAddress().address,
+      stellar.StellarPublicKey.fromPublicBytes(ed25519).toAddress().address,
     );
-    signers[address] = signer.weight;
+    signers[address] = weight;
   }
   return AccountAuthority(
-    masterWeight: decoded.thresholds[0],
-    mediumThreshold: decoded.thresholds[2],
+    masterWeight: thresholds[0],
+    mediumThreshold: thresholds[2],
     signers: signers,
   );
 }

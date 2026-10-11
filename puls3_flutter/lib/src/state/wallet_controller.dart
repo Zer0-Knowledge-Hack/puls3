@@ -153,6 +153,10 @@ class WalletController extends ChangeNotifier {
   Future<String> signAuthEntry(String entryXdr) =>
       _sign(() => _wallet.signAuthEntry(entryXdr));
 
+  /// Signs a SEP-10 sign-in challenge (#136); returns the signed XDR.
+  Future<String> signChallenge(SignInChallenge challenge) =>
+      _sign(() => _wallet.signChallenge(challenge));
+
   Future<String> _sign(Future<String> Function() sign) async {
     _lastError = null;
     _signed = false;

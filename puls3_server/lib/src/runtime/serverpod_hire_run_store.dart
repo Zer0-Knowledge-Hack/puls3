@@ -52,8 +52,12 @@ final class ServerpodHireRunStore implements HireRunStore {
       try {
         await enqueue(session, hireId, at.toUtc());
         queued++;
-      } on DatabaseQueryException {
+      } on DatabaseQueryException catch (e) {
         // Another instance queued it first: the unique index kept one run.
+        // Any other database error is not a duplicate and is rethrown.
+        if (!isDuplicateRun(code: e.code, constraintName: e.constraintName)) {
+          rethrow;
+        }
       }
     }
     return queued;
@@ -203,3 +207,14 @@ final class ServerpodHireRunStore implements HireRunStore {
     failureReason: record.failureReason,
   );
 }
+
+/// Whether a failed insert into `hire_run` is the unique violation
+/// (SQLSTATE 23505) of `hire_run_hire_idx`: the hire already has its run.
+bool isDuplicateRun({required String? code, required String? constraintName}) =>
+    code == _uniqueViolation && constraintName == _hireIndex;
+
+/// SQLSTATE of a unique violation.
+const _uniqueViolation = '23505';
+
+/// The unique index on `hire_run.hireId` (`hire_run.spy.yaml`).
+const _hireIndex = 'hire_run_hire_idx';
