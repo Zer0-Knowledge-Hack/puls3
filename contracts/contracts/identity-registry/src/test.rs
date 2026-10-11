@@ -599,3 +599,127 @@ fn writes_extend_ttl_of_touched_keys() {
         TTL_BUMP
     );
 }
+
+// --- G9: Ownable interface (#153) ---
+
+fn setup_with_admin(mock_all: bool) -> (Env, Address, Address) {
+    let env = Env::default();
+    if mock_all {
+        env.mock_all_auths();
+    }
+    let admin = Address::generate(&env);
+    let contract_id = env.register(
+        IdentityRegistryContract,
+        (
+            &admin,
+            &String::from_str(&env, "Puls3 Agent"),
+            &String::from_str(&env, "P3A"),
+        ),
+    );
+    (env, contract_id, admin)
+}
+
+#[test]
+fn g9_get_owner_returns_the_constructor_admin() {
+    let (env, contract_id, admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    assert_eq!(client.get_owner(), Some(admin));
+}
+
+#[test]
+fn g9_transfer_is_two_step_and_only_changes_on_accept() {
+    let (env, contract_id, admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    let new_owner = Address::generate(&env);
+
+    env.ledger().set_sequence_number(100);
+    client.transfer_ownership(&new_owner, &2000);
+    assert_eq!(
+        client.get_owner(),
+        Some(admin),
+        "owner is unchanged until accept"
+    );
+    client.accept_ownership();
+    assert_eq!(client.get_owner(), Some(new_owner));
+}
+
+#[test]
+fn g9_transfer_with_zero_cancels_a_pending_transfer() {
+    let (env, contract_id, admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    let new_owner = Address::generate(&env);
+
+    env.ledger().set_sequence_number(100);
+    client.transfer_ownership(&new_owner, &2000);
+    client.transfer_ownership(&new_owner, &0);
+    assert_eq!(
+        client.get_owner(),
+        Some(admin),
+        "cancelled transfer keeps the owner"
+    );
+}
+
+#[test]
+fn g9_renounce_clears_the_owner() {
+    let (env, contract_id, _admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    client.renounce_ownership();
+    assert_eq!(client.get_owner(), None);
+}
+
+#[test]
+#[should_panic(expected = "ownership transfer expired")]
+fn g9_accept_after_live_until_is_rejected() {
+    let (env, contract_id, _admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    let new_owner = Address::generate(&env);
+
+    env.ledger().set_sequence_number(100);
+    client.transfer_ownership(&new_owner, &150);
+    env.ledger().set_sequence_number(200);
+    client.accept_ownership();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2101)")]
+fn g9_renounce_with_a_pending_transfer_is_rejected() {
+    let (env, contract_id, _admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+    let new_owner = Address::generate(&env);
+
+    env.ledger().set_sequence_number(1);
+    client.transfer_ownership(&new_owner, &1000);
+    client.renounce_ownership();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2102)")]
+fn g9_transfer_to_the_current_owner_is_rejected() {
+    let (env, contract_id, admin) = setup_with_admin(true);
+    let client = client(&env, &contract_id);
+
+    env.ledger().set_sequence_number(1);
+    client.transfer_ownership(&admin, &1000);
+}
+
+#[test]
+#[should_panic]
+fn g9_transfer_requires_the_current_owner() {
+    let (env, contract_id, _admin) = setup_with_admin(false);
+    let client = client(&env, &contract_id);
+    let stranger = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let live_until = env.ledger().sequence() + 1000;
+
+    // Only the stranger authorizes, but the contract requires the owner's auth.
+    env.mock_auths(&[MockAuth {
+        address: &stranger,
+        invoke: &MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "transfer_ownership",
+            args: (&new_owner, &live_until).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.transfer_ownership(&new_owner, &live_until);
+}
