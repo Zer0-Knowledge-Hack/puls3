@@ -1,3 +1,5 @@
+import '../wallet_port.dart';
+
 /// What Freighter reports for the active account.
 class FreighterSession {
   const FreighterSession({
@@ -49,3 +51,11 @@ abstract interface class FreighterBridge {
     String address,
   );
 }
+
+/// The error when the bridge functions are missing: the bridge script failed
+/// to load ([bridgeFailedToLoad], so the wallet may be installed), or no
+/// wallet is installed.
+WalletException bridgeMissingError({required bool bridgeFailedToLoad}) =>
+    bridgeFailedToLoad
+    ? const WalletConnectorUnavailable()
+    : const WalletNotInstalled();

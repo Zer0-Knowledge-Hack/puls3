@@ -310,7 +310,9 @@ class DeployFlowController extends ChangeNotifier {
       step: step,
       detail: reason,
     ),
-    WalletNotInstalled() || WalletUnavailable() => DeployError(
+    WalletNotInstalled() ||
+    WalletUnavailable() ||
+    WalletConnectorUnavailable() => DeployError(
       kind: DeployErrorKind.walletUnavailable,
       step: step,
     ),
