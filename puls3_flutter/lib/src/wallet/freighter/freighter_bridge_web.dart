@@ -9,6 +9,10 @@ import 'freighter_bridge.dart';
 @JS('puls3FreighterConnect')
 external JSPromise<JSString>? _connect();
 
+/// Set by `web/index.html` when `freighter_bridge.js` failed to load.
+@JS('puls3FreighterBridgeFailed')
+external JSBoolean? get _bridgeFailed;
+
 @JS('puls3FreighterCurrentSession')
 external JSPromise<JSString> _currentSession();
 
@@ -38,9 +42,9 @@ final class _FreighterWebBridge implements FreighterBridge {
       promise = _connect();
     } on Object {
       // The bridge script did not load: no extension API to talk to.
-      throw const WalletNotInstalled();
+      throw _bridgeMissing();
     }
-    if (promise == null) throw const WalletNotInstalled();
+    if (promise == null) throw _bridgeMissing();
     return _session(await _call(promise));
   }
 
@@ -111,6 +115,12 @@ final class _FreighterWebBridge implements FreighterBridge {
       throw _translate(error.toString());
     }
   }
+
+  /// Why there is no bridge to call: it failed to load (the wallet may be
+  /// installed), or it loaded nothing, which only happens without a wallet.
+  static WalletException _bridgeMissing() => bridgeMissingError(
+    bridgeFailedToLoad: _bridgeFailed?.toDart ?? false,
+  );
 
   static WalletException _translate(String message) {
     if (message.contains('not_installed:')) return const WalletNotInstalled();

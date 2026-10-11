@@ -10,6 +10,7 @@ import 'hire/hire_flow_store.dart';
 import 'hire/hire_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
+import 'screens/hire_detail_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/market_screen.dart';
 import 'screens/studio_screen.dart';
@@ -42,6 +43,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
             path: '/agent/:id',
             builder: (context, state) =>
                 AgentDetailScreen(agentId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: '/hires/:id',
+            builder: (context, state) =>
+                HireDetailScreen(hireId: state.pathParameters['id']!),
           ),
         ],
       ),

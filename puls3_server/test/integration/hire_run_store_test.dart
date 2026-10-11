@@ -5,7 +5,7 @@ import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/hire/serverpod_hire_repository.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
 import 'package:puls3_server/src/runtime/serverpod_hire_run_store.dart';
-import 'package:serverpod/serverpod.dart' show Session;
+import 'package:serverpod/serverpod.dart' show DatabaseQueryException, Session;
 import 'package:test/test.dart';
 
 import '../support/hire_run_store_contract.dart';
@@ -132,6 +132,33 @@ void main() {
         expect((await runs.find(row.id))!.state, HireRunState.queued);
         expect((await runs.find(withRun))!.state, HireRunState.queued);
         expect(await runs.enqueueMissing(now), 0);
+      },
+    );
+
+    test(
+      'a second run for a hire is the 23505 of hire_run_hire_idx, the only '
+      'error enqueueMissing skips',
+      () async {
+        final session = sessionBuilder.build();
+        final hireId = await _fundedHire(session, seq: ++seq);
+
+        await expectLater(
+          ServerpodHireRunStore.enqueue(
+            session,
+            hireId,
+            DateTime.utc(2026, 10, 10),
+          ),
+          throwsA(
+            isA<DatabaseQueryException>().having(
+              (e) => isDuplicateRun(
+                code: e.code,
+                constraintName: e.constraintName,
+              ),
+              'isDuplicateRun',
+              isTrue,
+            ),
+          ),
+        );
       },
     );
 

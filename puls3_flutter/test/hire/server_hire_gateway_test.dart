@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_client/puls3_client.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/server_hire_gateway.dart';
+import 'package:puls3_flutter/src/hire/wallet_funds.dart';
 
 const _consumer = 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY';
 
@@ -54,8 +55,11 @@ ServerHireGateway _gateway({
   PrepareEscrowCall? prepareCreateJob,
   PrepareEscrowCall? prepareFund,
   SubmitEscrowCall? submit,
+  GetHireCall? getHire,
+  ReadWalletFunds? readFunds,
   Duration confirmationTimeout = const Duration(seconds: 1),
 }) => ServerHireGateway(
+  readFunds: readFunds,
   createHire:
       createHire ??
       (_, _, _, _) async => CreateHireResult(
@@ -65,6 +69,7 @@ ServerHireGateway _gateway({
   prepareCreateJob: prepareCreateJob ?? (_) async => _prepared('createJob'),
   prepareFund: prepareFund ?? (_) async => _prepared('fund'),
   submitEscrowCall: submit ?? (_, _, _) async => _detail('submitted'),
+  getHire: getHire ?? (_, _) async => _detail('confirmed'),
   pollInterval: const Duration(milliseconds: 5),
   confirmationTimeout: confirmationTimeout,
 );
@@ -311,6 +316,7 @@ void main() {
         prepareCreateJob: (_) async => _prepared('createJob'),
         prepareFund: (_) async => _prepared('fund'),
         submitEscrowCall: (_, _, _) async => _detail('submitted'),
+        getHire: (_, _) async => _detail('confirmed'),
         callTimeout: const Duration(milliseconds: 20),
       );
       await expectLater(
@@ -321,6 +327,242 @@ void main() {
           requestId: 'r',
         ),
         throwsA(isA<HireBackendUnavailable>()),
+      );
+    });
+  });
+
+  group('ServerHireGateway.checkFunds (F5-2)', () {
+    test('enough USDC passes; the account and price are the ones asked', () {
+      final reads = <String>[];
+      final gateway = _gateway(
+        readFunds: (account) async {
+          reads.add(account);
+          return const WalletFunds(accountExists: true, usdcStroops: 45000000);
+        },
+      );
+      expect(gateway.checkFunds(_consumer, 45000000), completes);
+      expect(reads, [_consumer]);
+    });
+
+    test('too little USDC, no trustline and no account are refused', () async {
+      for (final funds in const [
+        WalletFunds(accountExists: true, usdcStroops: 44999999),
+        WalletFunds(accountExists: true),
+        WalletFunds(accountExists: false),
+      ]) {
+        await expectLater(
+          _gateway(
+            readFunds: (_) async => funds,
+          ).checkFunds(_consumer, 45000000),
+          throwsA(isA<HireInsufficientFunds>()),
+        );
+      }
+    });
+
+    test('an unreadable balance or no reader never blocks the payment', () {
+      expect(
+        _gateway(
+          readFunds: (_) async => throw Exception('Horizon is down'),
+        ).checkFunds(_consumer, 45000000),
+        completes,
+      );
+      expect(_gateway().checkFunds(_consumer, 45000000), completes);
+    });
+  });
+
+  group('ServerHireGateway.getHire (S06)', () {
+    HireDetail funded({
+      String? status = 'funded',
+      String? runtimeStatus = 'running',
+      String? result,
+      String? paymentTransaction = 'fa11ce',
+      ChainSubmission? submission,
+    }) => HireDetail(
+      hire: _hire(3).copyWith(
+        status: status,
+        runtimeStatus: runtimeStatus,
+        paymentTransaction: paymentTransaction,
+      ),
+      agent: AgentSummary(
+        id: 'agt-007',
+        registryId: 13,
+        name: 'Support Relay',
+        description: 'Answers support tickets',
+        skills: ['support'],
+        priceUsdcStroops: 45000000,
+      ),
+      input: 'Answer this ticket',
+      result: result,
+      escrowSubmission: submission,
+    );
+
+    ChainSubmission submission(String purpose, String hash) => ChainSubmission(
+      purpose: purpose,
+      transaction: hash,
+      state: 'confirmed',
+      explorerUrl: 'https://stellar.expert/explorer/testnet/tx/$hash',
+      updatedAt: DateTime(2030),
+    );
+
+    test('reads the hire of the consumer and maps the detail', () async {
+      final calls = <(int, String)>[];
+      final gateway = _gateway(
+        getHire: (id, consumer) async {
+          calls.add((id, consumer));
+          return funded(
+            result: 'Ticket answered',
+            submission: submission('fund', 'fa11ce'),
+          );
+        },
+      );
+
+      final hire = await gateway.getHire(3, _consumer);
+
+      expect(calls, [(3, _consumer)]);
+      expect(hire.hireId, 3);
+      expect(hire.agentName, 'Support Relay');
+      expect(hire.priceUsdcStroops, 45000000);
+      expect(hire.input, 'Answer this ticket');
+      expect(hire.result, 'Ticket answered');
+      expect(hire.stage, HireStage.delivered);
+      expect(hire.paymentTransaction, 'fa11ce');
+      expect(
+        hire.paymentExplorerUrl,
+        'https://stellar.expert/explorer/testnet/tx/fa11ce',
+      );
+    });
+
+    test('takes the payment from the fund submission until the hire has '
+        'one', () async {
+      final hire = await _gateway(
+        getHire: (_, _) async => funded(
+          status: null,
+          paymentTransaction: null,
+          submission: submission('fund', 'beef'),
+        ),
+      ).getHire(3, _consumer);
+      expect(hire.paymentTransaction, 'beef');
+      expect(hire.paymentExplorerUrl, contains('/tx/beef'));
+      expect(hire.stage, HireStage.awaitingPayment);
+    });
+
+    test('never links another submission as the payment', () async {
+      final hire = await _gateway(
+        getHire: (_, _) async => funded(
+          paymentTransaction: null,
+          submission: submission('createJob', 'c0ffee'),
+        ),
+      ).getHire(3, _consumer);
+      expect(hire.paymentTransaction, isNull);
+      expect(hire.paymentExplorerUrl, isNull);
+
+      final paid = await _gateway(
+        getHire: (_, _) async =>
+            funded(submission: submission('submit', '5eed')),
+      ).getHire(3, _consumer);
+      expect(paid.paymentTransaction, 'fa11ce');
+      expect(paid.paymentExplorerUrl, isNull);
+    });
+
+    test('an unknown or foreign hire is HireNotFound', () async {
+      for (final code in ['HireNotFound', 'HireNotOwned', 'InvalidHireId']) {
+        await expectLater(
+          _gateway(
+            getHire: (_, _) async => throw Puls3ApiException(code: code),
+          ).getHire(3, _consumer),
+          throwsA(isA<HireNotFound>()),
+          reason: code,
+        );
+      }
+    });
+
+    test('no session is HireNotSignedIn; an unreachable chain is '
+        'retryable', () async {
+      await expectLater(
+        _gateway(
+          getHire: (_, _) async =>
+              throw Puls3ApiException(code: 'NotAuthenticated'),
+        ).getHire(3, _consumer),
+        throwsA(isA<HireNotSignedIn>()),
+      );
+      await expectLater(
+        _gateway(
+          getHire: (_, _) async =>
+              throw Puls3ApiException(code: 'ChainDataUnavailable'),
+        ).getHire(3, _consumer),
+        throwsA(isA<HireBackendUnavailable>()),
+      );
+    });
+  });
+
+  group('HireProgress.stage', () {
+    HireProgress progress({
+      String? status,
+      String? runtimeStatus,
+      String? result,
+      String? rejectedFrom,
+    }) => HireProgress(
+      hireId: 3,
+      agentName: 'Support Relay',
+      priceUsdcStroops: 1,
+      input: 'x',
+      status: status,
+      runtimeStatus: runtimeStatus,
+      result: result,
+      rejectedFrom: rejectedFrom,
+    );
+
+    test('follows the escrow status and, while funded, the run', () {
+      expect(progress().stage, HireStage.awaitingPayment);
+      expect(progress(status: 'open').stage, HireStage.awaitingPayment);
+      expect(progress(status: 'funded').stage, HireStage.queued);
+      expect(
+        progress(status: 'funded', runtimeStatus: 'queued').stage,
+        HireStage.queued,
+      );
+      expect(
+        progress(status: 'funded', runtimeStatus: 'running').stage,
+        HireStage.running,
+      );
+      // A succeeded run reads `running` until its submit lands.
+      expect(
+        progress(
+          status: 'funded',
+          runtimeStatus: 'running',
+          result: 'ok',
+        ).stage,
+        HireStage.delivered,
+      );
+      expect(
+        progress(status: 'funded', runtimeStatus: 'failed').stage,
+        HireStage.runFailed,
+      );
+      expect(progress(status: 'submitted').stage, HireStage.submitted);
+      expect(progress(status: 'completed').stage, HireStage.completed);
+      expect(progress(status: 'rejected').stage, HireStage.rejected);
+      expect(progress(status: 'expired').stage, HireStage.expired);
+    });
+
+    test('polling stops only where nothing moves without the client', () {
+      expect(
+        HireStage.values.where((s) => s.isFinal),
+        [
+          HireStage.runFailed,
+          HireStage.completed,
+          HireStage.rejected,
+          HireStage.expired,
+        ],
+      );
+    });
+
+    test('a reject from open is a cancel', () {
+      expect(
+        progress(status: 'rejected', rejectedFrom: 'open').isCancelled,
+        isTrue,
+      );
+      expect(
+        progress(status: 'rejected', rejectedFrom: 'funded').isCancelled,
+        isFalse,
       );
     });
   });

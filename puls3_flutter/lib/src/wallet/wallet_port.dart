@@ -1,6 +1,32 @@
 /// The Stellar Testnet passphrase: the only network the MVP accepts.
 const stellarTestnetPassphrase = 'Test SDF Network ; September 2015';
 
+/// A SEP-10 sign-in challenge from the puls3 server (#136, api.md "Wallet
+/// session lifecycle"): a transaction that proves the wallet owns its
+/// account and can never be submitted (its sequence number is 0).
+class SignInChallenge {
+  const SignInChallenge({
+    required this.transactionXdr,
+    required this.networkPassphrase,
+    this.serverSigningKey,
+    this.homeDomain,
+  });
+
+  /// Base64 challenge transaction envelope, as the server issued it.
+  final String transactionXdr;
+
+  /// The network the signature must cover.
+  final String networkPassphrase;
+
+  /// The server's public signing key (`G…`), when the app knows it from
+  /// `config.json` `auth`. Checked against the challenge source when set.
+  final String? serverSigningKey;
+
+  /// The server's home domain, when known: the first operation must be
+  /// `<homeDomain> auth`.
+  final String? homeDomain;
+}
+
 /// Port for anything that can hold a Stellar account and sign transactions
 /// (#25, ADR-0003).
 ///
@@ -43,6 +69,15 @@ abstract interface class WalletPort {
   /// account (ADR-0003: the builder's step of `set_agent_wallet`, #18) and
   /// returns the signed entry as base64 XDR.
   Future<String> signAuthEntry(String entryXdr);
+
+  /// Signs a SEP-10 sign-in [challenge] for the connected account and returns
+  /// the signed envelope as base64 XDR. Unlike [signTransaction], the
+  /// transaction source is the server: the wallet only proves it controls
+  /// its account, and the challenge can never be submitted.
+  ///
+  /// Throws [WalletInvalidPayload] when the payload is not a SEP-10 challenge
+  /// for the connected account.
+  Future<String> signChallenge(SignInChallenge challenge);
 }
 
 /// Why the wallet could not connect or sign. Nothing was signed, so the
@@ -62,6 +97,14 @@ final class WalletSignatureRejected extends WalletException {
 /// No supported wallet is installed in this browser.
 final class WalletNotInstalled extends WalletException {
   const WalletNotInstalled();
+}
+
+/// The app could not load its wallet connector (`web/freighter_bridge.js`
+/// and the Freighter API it imports): offline, a blocked CDN, an ad blocker
+/// or a network filter. The wallet itself may well be installed, so the
+/// user must not be told to install it.
+final class WalletConnectorUnavailable extends WalletException {
+  const WalletConnectorUnavailable();
 }
 
 /// A wallet is installed but cannot be used now (locked, not connected).

@@ -77,6 +77,12 @@ class MockWallet implements WalletPort {
   @override
   Future<String> signAuthEntry(String entryXdr) => _sign(entryXdr);
 
+  /// Marks the challenge as signed, like [signTransaction]: the demo wallet
+  /// has no real key, so a real server rejects the result.
+  @override
+  Future<String> signChallenge(SignInChallenge challenge) =>
+      _sign(challenge.transactionXdr);
+
   Future<String> _sign(String payload) async {
     if (_address == null) await connect();
     await Future<void>.delayed(signDelay);
