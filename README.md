@@ -16,6 +16,13 @@
 
 ---
 
+## Serverpod hackathon submission
+
+puls3 is submitted to the Serverpod **"Build Something Real"** hackathon (deadline 2026-10-14 23:59 CEST). The submission package — the confirmed rules, the requirement checklist, the judging-criteria evidence map, and the video script — lives in **[docs/submission/serverpod.md](docs/submission/serverpod.md)**.
+
+- **Demo video:** _pending_ — to be recorded and uploaded (YouTube/Vimeo, under 2 minutes).
+- **Live app:** <https://puls3-4lw.pages.dev/> · **Live server:** <https://puls3-hub-on-stellar.api.serverpod.space/>
+
 ## What is puls3
 
 puls3 is a hub where AI agents are **created**, **discovered**, and **paid** on the Stellar network. It has two parts:
@@ -54,6 +61,35 @@ flowchart LR
   X -->|result + feedback| U
 ```
 
+## Features
+
+- **Agent Studio:** define an agent (name, description, skills, model, system prompt, input/output limits, price), test it, and deploy it. Each deployed version is immutable and gets its own on-chain identity and Stellar wallet.
+- **Marketplace:** browse and filter the catalog by name and skill, and open an agent's detail page with its on-chain identity, wallet, and price.
+- **Wallet sign-in:** connect Freighter and authenticate with a SEP-10 challenge; no email or password.
+- **Hire and pay:** the consumer signs `create_job` and `fund` on a Soroban ERC-8183 escrow. The server prepares each transaction, verifies the signed bytes against what it prepared, relays it, and confirms the funded job on-chain before the agent runs.
+- **Agent runtime:** the server runs the agent on the builder's chosen model provider (Cloudflare Workers AI or a BYOK provider), enforces the manifest's input/output limits and a timeout, and submits the result on-chain.
+- **On-chain identity and escrow:** an ERC-8004-aligned Identity Registry and an ERC-8183 escrow on Soroban; contract IDs and evidence in [On-chain evidence](#on-chain-evidence-testnet).
+
+Some flows are still landing: the **Studio deploy** in the app is a demo until #18/#35, and **rating/reputation** is #14. The [submission package](docs/submission/serverpod.md) lists exactly what runs end to end today.
+
+## Architecture
+
+puls3 is a **hexagonal** system: a pure-Dart domain package holds the business rules and ports, and the Flutter app and the Serverpod server are adapters around it. The app and the server both depend on the domain; the domain depends on nothing.
+
+```mermaid
+flowchart LR
+  app["puls3_flutter<br/>Flutter app"] --> domain["puls3_domain<br/>pure Dart: entities, rules, ports"]
+  server["puls3_server<br/>Serverpod 4"] --> domain
+  server --> db[("PostgreSQL<br/>Serverpod ORM")]
+  server --> chain["Stellar / Soroban<br/>RPC + contracts"]
+  app --> wallet["Stellar wallet<br/>Freighter"]
+```
+
+- The decision and layer responsibilities: **[ADR-0001 System architecture](docs/adr/0001-system-architecture.md)** (issue **#5**).
+- Container and context diagrams: [docs/architecture/c4.md](docs/architecture/c4.md).
+- Flutter–Serverpod API contract: [docs/architecture/api.md](docs/architecture/api.md).
+- Decisions: [docs/adr/](docs/adr/) · research: [docs/spikes/](docs/spikes/).
+
 ## Status
 
 puls3 is in **early development**. What exists today:
@@ -65,8 +101,9 @@ puls3 is in **early development**. What exists today:
 - ✅ A direct testnet USDC payment to an agent's muxed address, verified on-chain ([evidence](#on-chain-evidence-testnet))
 - ✅ A hire funded through the puls3 server's escrow relay: the server prepares the envelopes, the consumer signs, and the server verifies, relays and confirms them ([evidence](#server-escrow-relay-hire-1-job-6))
 - ✅ The pure Dart domain model ([`puls3_domain/`](puls3_domain/))
-- 🚧 Reputation Registry contract
-- 🚧 Backend, the app wired to the chain, and agent execution
+- ✅ The Serverpod backend: the agent catalog served from the on-chain registry, SEP-10 wallet sign-in, the escrow relay for `create_job`/`fund`, and the agent runtime ([`puls3_server/`](puls3_server/))
+- ✅ The Flutter app wired to the server for the catalog, wallet sign-in, and hire-and-pay (the Studio deploy flow is still a demo)
+- 🚧 Studio deploy endpoints (#18/#35) and the Reputation Registry / rating (#14)
 
 ### On-chain evidence (testnet)
 
@@ -194,6 +231,45 @@ docs/brand/      Brand guide, design tokens
 assets/brand/    Logos, marks, favicons, fonts
 design/          Design sources (logo lab)
 ```
+
+## Build and run
+
+Prerequisites (exact versions; CI uses the same): **Flutter 3.44.4** (Dart 3.12.2), **Serverpod CLI 4.0.4**, and **Docker**. Rust and the Stellar CLI are only needed for the contracts. Full machine setup: [CONTRIBUTING.md §1](CONTRIBUTING.md#1-set-up-your-machine).
+
+```bash
+# 1. Clone and install the workspace (domain, server, client, app)
+git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
+cd puls3
+flutter pub get
+
+# 2. Create local secrets (Postgres/Redis passwords) and the root config
+./scripts/setup-local-secrets.sh
+cp .env.example .env
+
+# 3. Start the backend (from puls3_server/)
+cd puls3_server
+docker compose up --build --detach
+set -a; . ../.env; set +a
+dart bin/main.dart --apply-migrations     # API on http://localhost:8080
+
+# 4. Run the app (from puls3_flutter/, in a second terminal)
+cd ../puls3_flutter
+flutter run -d chrome --dart-define-from-file=../.env
+```
+
+The API listens on `http://localhost:8080`, Serverpod Insights on `8081`, and the web server on `8082`. Stop the backend with `Ctrl+C`, then `docker compose stop`.
+
+To run the app **without** the backend, skip step 3: the app falls back to the bundled demo catalog.
+
+Production web build:
+
+```bash
+cd puls3_flutter
+flutter build web --release --dart-define=PULS3_API_URL=<server-url>
+npx http-server build/web -p 5000     # open http://localhost:5000 (not 8080)
+```
+
+After changing Serverpod models or endpoints, run `serverpod generate` from `puls3_server/` and commit the generated code. The canonical path from a fresh clone, including a testnet identity for the scripts, is [docs/infra/secrets.md](docs/infra/secrets.md#run-against-testnet-from-a-fresh-clone).
 
 ## Hackathon Note (Stellar Odyssey Perú)
 
