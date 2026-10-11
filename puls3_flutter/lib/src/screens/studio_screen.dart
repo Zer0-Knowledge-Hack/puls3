@@ -76,6 +76,10 @@ class _StudioScreenState extends State<StudioScreen> {
   bool _loadingDraft = false;
   bool _saving = false;
   String? _saveError;
+
+  /// The server's `InvalidManifest` problems, under their fields until the
+  /// field is edited again (F8-3).
+  final Map<StudioField, String> _serverErrors = {};
   bool _conflict = false;
 
   /// The draft the desktop playground runs, once opened.
@@ -115,7 +119,10 @@ class _StudioScreenState extends State<StudioScreen> {
 
   StudioGateway get _gateway => AppScope.of(context).studioGateway;
 
-  void _touch(StudioField field) => setState(() => _touched.add(field));
+  void _touch(StudioField field) => setState(() {
+    _touched.add(field);
+    _serverErrors.remove(field);
+  });
 
   StudioFormValues get _values => StudioFormValues(
     name: _name.text,
@@ -223,8 +230,10 @@ class _StudioScreenState extends State<StudioScreen> {
       _saving = true;
       _saveError = null;
       _conflict = false;
+      _serverErrors.clear();
     });
     String? error;
+    final problems = <StudioField, String>{};
     var conflict = false;
     try {
       final draft = await _gateway.saveDraft(
@@ -247,6 +256,10 @@ class _StudioScreenState extends State<StudioScreen> {
       error = e.message;
     } on StudioInvalidDraft catch (e) {
       error = e.message;
+      for (final problem in e.problems) {
+        final (field, message) = describeManifestProblem(problem);
+        problems.putIfAbsent(field, () => message);
+      }
     } on StudioGatewayException catch (e) {
       error = 'Not saved: ${e.message}';
     } catch (_) {
@@ -257,6 +270,7 @@ class _StudioScreenState extends State<StudioScreen> {
       _saving = false;
       _conflict = conflict;
       _saveError = error;
+      _serverErrors.addAll(problems);
       _touched.addAll(StudioField.values);
     });
     return null;
@@ -340,6 +354,9 @@ class _StudioScreenState extends State<StudioScreen> {
       for (final MapEntry(key: field, value: message) in check.errors.entries)
         if (_touched.contains(field)) field: message,
     };
+    for (final MapEntry(key: field, value: message) in _serverErrors.entries) {
+      shown.putIfAbsent(field, () => message);
+    }
     final wide =
         MediaQuery.sizeOf(context).width >= Puls3Breakpoints.studioTwoColumn;
 

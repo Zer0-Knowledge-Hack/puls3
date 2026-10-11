@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_domain/puls3_domain.dart' show ManifestProblem;
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/ui/atoms/primary_button.dart';
@@ -225,6 +226,31 @@ void main() {
       await advance(tester, const Duration(milliseconds: 400));
       expect(find.text('Not saved: no answer'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Brief Bot'), findsOneWidget);
+    });
+
+    testWidgets('server problems show under their field until it is edited', (
+      tester,
+    ) async {
+      final studio = _studio()
+        ..nextSaveError = const StudioInvalidDraft([
+          ManifestProblem.modelProviderNotEnabled,
+        ]);
+      await pumpApp(
+        tester,
+        location: '/studio',
+        wallet: _connected(),
+        studioGateway: studio,
+      );
+      await _fillValid(tester);
+
+      await _tapText(tester, 'Save draft');
+      await advance(tester, const Duration(milliseconds: 400));
+      expect(
+        find.text('The server refused the agent: check the fields.'),
+        findsOneWidget,
+      );
+      expect(find.text('This provider is not enabled yet.'), findsOneWidget);
+      expect(find.text('Saved · revision 1 (demo)'), findsNothing);
     });
 
     testWidgets('a newer revision saved elsewhere offers Reload or Keep mine', (
