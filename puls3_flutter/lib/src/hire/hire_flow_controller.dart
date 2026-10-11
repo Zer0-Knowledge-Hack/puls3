@@ -123,6 +123,13 @@ class HireFlowController extends ChangeNotifier {
           'This agent is not registered on chain, so it cannot be hired.',
         );
       }
+      // A new payment is checked before any signature, the sign-in
+      // included (F5-2). A resumed hire may have paid already, so its
+      // balance says nothing: the server decides.
+      restore(consumer);
+      if (_fund == null && _resumedInput == null) {
+        await _gateway.checkFunds(consumer, agent.priceUsdcStroops);
+      }
       // The server only accepts calls from a signed-in wallet (#136).
       _set(HireStep.signingIn);
       await _gateway.ensureSignedIn(consumer, _wallet.signChallenge);

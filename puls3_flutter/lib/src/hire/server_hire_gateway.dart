@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:puls3_client/puls3_client.dart';
 
 import 'hire_gateway.dart';
+import 'wallet_funds.dart';
 import 'wallet_session.dart';
 
 /// `client.hire.createHire`.
@@ -42,6 +44,7 @@ class ServerHireGateway implements HireGateway {
     required this._submitEscrowCall,
     required this._getHire,
     this._session,
+    this._readFunds,
     this.callTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 3),
     this.confirmationTimeout = const Duration(minutes: 2),
@@ -56,6 +59,10 @@ class ServerHireGateway implements HireGateway {
   /// The wallet session (#136). Without it, the server is called with no
   /// session and answers `NotAuthenticated`.
   final WalletSession? _session;
+
+  /// Reads the consumer's USDC before any signature (api.md F5-2). Without
+  /// it, the server's simulation of the `fund` is the only check.
+  final ReadWalletFunds? _readFunds;
 
   /// Upper bound for one server call.
   final Duration callTimeout;
@@ -78,6 +85,22 @@ class ServerHireGateway implements HireGateway {
 
   @override
   Future<void> forgetSession() async => _session?.forget();
+
+  @override
+  Future<void> checkFunds(String consumer, int priceUsdcStroops) async {
+    final readFunds = _readFunds;
+    if (readFunds == null) return;
+    final WalletFunds funds;
+    try {
+      funds = await readFunds(consumer).timeout(callTimeout);
+    } on Object catch (e) {
+      // An unreadable balance never blocks a payment: the server simulates
+      // the `fund` before anything is signed.
+      debugPrint('Wallet funds not checked: ${e.runtimeType}');
+      return;
+    }
+    requireFunds(funds, priceUsdcStroops);
+  }
 
   @override
   Future<HireStart> createHire({

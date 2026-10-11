@@ -155,6 +155,23 @@ class ScriptedHireGateway implements HireGateway {
   @override
   Future<void> forgetSession() async => forgottenSessions++;
 
+  /// When set, the next funds check fails with it once.
+  HireGatewayException? failFunds;
+
+  /// The prices the funds check was asked about, in order.
+  final fundsChecks = <int>[];
+
+  @override
+  Future<void> checkFunds(String consumer, int priceUsdcStroops) async {
+    calls.add('checkFunds');
+    fundsChecks.add(priceUsdcStroops);
+    final failure = failFunds;
+    if (failure != null) {
+      failFunds = null;
+      throw failure;
+    }
+  }
+
   @override
   Future<HireStart> createHire({
     required int agentId,
@@ -514,19 +531,64 @@ void main() {
       expect(gateway.forgottenSessions, 1);
     });
 
-    testWidgets('the wallet signs in before the hire is created (#136)', (
-      tester,
-    ) async {
+    testWidgets('the funds are checked, then the wallet signs in, before the '
+        'hire is created (#136, F5-2)', (tester) async {
       final wallet = TestWallet(initialAddress: 'GUSER123');
       final gateway = ScriptedHireGateway();
       await pumpSheet(tester, wallet: wallet, gateway: gateway);
 
       await confirm(tester);
 
-      expect(gateway.calls.take(2), ['signIn', 'createHire']);
+      expect(gateway.calls.take(3), ['checkFunds', 'signIn', 'createHire']);
+      expect(gateway.fundsChecks, [45000000]);
       expect(gateway.signIns, ['GUSER123']);
       expect(wallet.challenges, ['challenge']);
       expect(gateway.hireCount, 1);
+    });
+
+    testWidgets('too little USDC stops the hire before any signature; Try '
+        'again checks again (#28)', (tester) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..failFunds = const HireInsufficientFunds(
+          'This hire costs 4.50 USDC and your wallet holds 1.00 USDC.',
+        );
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      expect(find.text('Payment failed'), findsOneWidget);
+      expect(
+        find.text('This hire costs 4.50 USDC and your wallet holds 1.00 USDC.'),
+        findsOneWidget,
+      );
+      expect(gateway.calls, ['checkFunds']);
+      expect(wallet.challenges, isEmpty);
+      expect(wallet.signed, isEmpty);
+      expect(gateway.forgottenSessions, 0);
+
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(gateway.fundsChecks, [45000000, 45000000]);
+      expect(gateway.hireCount, 1);
+    });
+
+    testWidgets('a payment that may have been sent is not checked again', (
+      tester,
+    ) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()
+        ..failFundSubmit = const HireBackendUnavailable('No answer.');
+      await pumpSheet(tester, wallet: wallet, gateway: gateway);
+
+      await confirm(tester);
+      expect(find.text('No answer.'), findsOneWidget);
+
+      // The balance may already be lower: only the server can tell.
+      gateway.failFunds = const HireInsufficientFunds('Too little USDC.');
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(gateway.fundsChecks, hasLength(1));
+      expect(find.text('Too little USDC.'), findsNothing);
     });
 
     testWidgets('a declined sign-in creates no hire and can be retried', (
