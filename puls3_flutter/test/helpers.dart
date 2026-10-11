@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/app.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
+import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
@@ -40,6 +41,7 @@ Future<void> pumpApp(
   AgentRepository repository = const InMemoryAgentRepository(testAgents),
   AgentRepository? demoRepository,
   MockWallet? wallet,
+  StudioGateway? studioGateway,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = size;
@@ -51,6 +53,7 @@ Future<void> pumpApp(
       repository: repository,
       demoRepository: demoRepository,
       wallet: wallet ?? MockWallet(),
+      studioGateway: studioGateway,
       initialLocation: location,
       healthCheck: healthCheck,
     ),

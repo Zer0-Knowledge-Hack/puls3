@@ -11,8 +11,13 @@ import '../theme/puls3_theme.dart';
 
 /// Opens the deploy flow for [draft] in a bottom sheet. It is not
 /// dismissible by tapping outside or dragging: [DeployFlow] decides when
-/// leaving is safe.
-Future<void> showDeploySheet(BuildContext context, AgentDraft draft) {
+/// leaving is safe. [onLive] also runs when the agent goes live, for the
+/// Studio to record the deploy on its draft.
+Future<void> showDeploySheet(
+  BuildContext context,
+  AgentDraft draft, {
+  ValueChanged<DeployResult>? onLive,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -25,18 +30,20 @@ Future<void> showDeploySheet(BuildContext context, AgentDraft draft) {
         top: Radius.circular(Puls3Radius.lg),
       ),
     ),
-    builder: (_) => DeploySheet(draft: draft),
+    builder: (_) => DeploySheet(draft: draft, onLive: onLive),
   );
 }
 
 /// Hosts [DeployFlow] for the Studio and publishes the agent to the catalog
 /// when it goes live.
 class DeploySheet extends StatelessWidget {
-  const DeploySheet({super.key, required this.draft});
+  const DeploySheet({super.key, required this.draft, this.onLive});
 
   final AgentDraft draft;
+  final ValueChanged<DeployResult>? onLive;
 
   void _publish(BuildContext context, DeployResult result) {
+    onLive?.call(result);
     // A demo deploy created nothing: never list it as a real agent.
     if (result.isDemo) return;
     AppScope.of(context).catalog.publish(

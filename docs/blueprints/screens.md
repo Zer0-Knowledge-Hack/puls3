@@ -245,7 +245,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ## Component inventory
 
-Atomic design, as in `puls3_flutter/lib/src/ui/`. Components marked *(new)* are specified for screens not built yet (S11, S12). Presentational widgets get their data through constructors; only screens (containers) read app state or call the server.
+Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get their data through constructors; only screens (containers) read app state or call the server.
 
 ### Atoms
 
@@ -279,8 +279,8 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Components marked *(new)* are 
 | `KeyValueRow` | `AgentDetailView`, `HirePaymentView` | S03, S04, S06 |
 | `ProgressStepRow` | `DeployStepper` | S06, S08 |
 | `ScreenHeader` | planned pages | S05, S06, S12 |
-| `AgentVersionRow` *(new)* | `MyAgentsList` | S12 |
-| `TestRunResultCard` *(new)* | `PlaygroundPanel` | S11 |
+| `AgentVersionRow` | `MyAgentsList` | S12 |
+| `TestRunResultCard` | `PlaygroundPanel` | S11 |
 | `WalletChip` | `TopBar` | all |
 
 ### Organisms
@@ -296,5 +296,5 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Components marked *(new)* are 
 | `TopBar` | all (app shell) |
 | `WalletPanel` | S09 |
 | `DeployFlowView`, `DeployStepper`, `DeployPhaseCard`, `DeployErrorPanel`, `DeploySuccess` | S08 |
-| `PlaygroundPanel` *(new)* | S11 |
-| `MyAgentsList` *(new)* | S12 |
+| `PlaygroundPanel` | S11 |
+| `MyAgentsList` | S12 |
