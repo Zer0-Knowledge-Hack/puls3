@@ -25,6 +25,10 @@ class FakeHireGateway implements HireGateway {
   @override
   Future<void> forgetSession() async {}
 
+  /// The demo moves no funds, so any wallet can run it.
+  @override
+  Future<void> checkFunds(String consumer, int priceUsdcStroops) async {}
+
   @override
   Future<HireStart> createHire({
     required int agentId,
