@@ -211,6 +211,14 @@ final class InvalidFeedback extends DomainError {
   };
 }
 
+/// The feedback was left by the agent's owner, rating its own agent (#11).
+final class FeedbackFromAgentOwner extends DomainError {
+  const FeedbackFromAgentOwner();
+
+  @override
+  String get message => 'an agent owner cannot rate its own agent';
+}
+
 /// A rule of the agent manifest that an input breaks. Declaration order is the
 /// order of the manifest fields, which is the order problems are reported in.
 enum ManifestProblem {

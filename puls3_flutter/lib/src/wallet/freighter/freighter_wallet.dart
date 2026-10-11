@@ -64,6 +64,44 @@ final class FreighterWallet implements WalletPort {
     }
     _assertSourceBinding(unsigned, session);
 
+    return _signAndVerify(unsigned, unsignedXdr, session);
+  }
+
+  /// SEP-10 sign-in (#136). The challenge source is the server, so the
+  /// payment rule of [signTransaction] (every source is the connected
+  /// account) does not apply. Instead it must be a challenge that can only
+  /// prove ownership; [assertSep10Challenge] lists the checks.
+  @override
+  Future<String> signChallenge(SignInChallenge challenge) async {
+    final session = _requireSession();
+    await _assertActiveSession(session);
+    if (challenge.networkPassphrase != stellarTestnetPassphrase) {
+      throw const WalletWrongNetwork();
+    }
+    final unsigned = _parse(challenge.transactionXdr, canonical: true);
+    if (unsigned is! Transaction) {
+      throw const WalletInvalidPayload(
+        'A sign-in challenge must be a transaction.',
+      );
+    }
+    assertSep10Challenge(
+      unsigned,
+      account: session.address,
+      serverSigningKey: challenge.serverSigningKey,
+      homeDomain: challenge.homeDomain,
+      now: DateTime.now(),
+    );
+    return _signAndVerify(unsigned, challenge.transactionXdr, session);
+  }
+
+  /// Asks Freighter to sign [unsigned], then verifies that the body is
+  /// unchanged and that a new signature from the connected account covers it
+  /// on Testnet.
+  Future<String> _signAndVerify(
+    Transaction unsigned,
+    String unsignedXdr,
+    FreighterSession session,
+  ) async {
     final signedXdr = await _bridge.signTransaction(
       unsignedXdr,
       stellarTestnetPassphrase,
@@ -257,5 +295,65 @@ final class FreighterWallet implements WalletPort {
     } on Object {
       throw const WalletInvalidPayload('The transaction XDR is malformed.');
     }
+  }
+}
+
+/// Throws [WalletInvalidPayload] unless [tx] is a SEP-10 challenge that only
+/// lets [account] prove it owns its key (#136, SEP-10 "Challenge"):
+///
+/// - sequence number 0, so it can never be submitted;
+/// - every operation is `manage_data`;
+/// - the first one is `<home domain> auth` with [account] as its source;
+/// - the transaction source is not [account], and every other operation's
+///   source is the transaction source (the server);
+/// - time bounds are set and include [now];
+/// - when known, the source is [serverSigningKey] and the first operation is
+///   `<homeDomain> auth`.
+void assertSep10Challenge(
+  Transaction tx, {
+  required String account,
+  required DateTime now,
+  String? serverSigningKey,
+  String? homeDomain,
+}) {
+  Never refuse(String reason) => throw WalletInvalidPayload(reason);
+
+  final server = tx.sourceAccount.ed25519AccountId;
+  if (tx.sequenceNumber != BigInt.zero) {
+    refuse('A sign-in challenge must have sequence number 0.');
+  }
+  if (server == account) {
+    refuse('A sign-in challenge must come from the server, not your account.');
+  }
+  if (serverSigningKey != null && server != serverSigningKey) {
+    refuse('The sign-in challenge is not from the puls3 server.');
+  }
+  final operations = tx.operations;
+  if (operations.isEmpty) refuse('The sign-in challenge has no operation.');
+  for (final (index, operation) in operations.indexed) {
+    if (operation is! ManageDataOperation) {
+      refuse('A sign-in challenge may only contain manage_data operations.');
+    }
+    final source = operation.sourceAccount?.ed25519AccountId;
+    if (index == 0) {
+      if (source != account) {
+        refuse('The sign-in challenge is not for your account.');
+      }
+      final name = operation.name;
+      final expected = homeDomain == null ? null : '$homeDomain auth';
+      if (expected != null ? name != expected : !name.endsWith(' auth')) {
+        refuse('The sign-in challenge is not for this server.');
+      }
+    } else if (source != server) {
+      refuse('A sign-in challenge operation is for another account.');
+    }
+  }
+  final bounds = tx.preconditions?.timeBounds;
+  if (bounds == null || bounds.maxTime == 0) {
+    refuse('The sign-in challenge has no expiry.');
+  }
+  final seconds = now.toUtc().millisecondsSinceEpoch ~/ 1000;
+  if (seconds < bounds.minTime || seconds > bounds.maxTime) {
+    refuse('The sign-in challenge has expired. Try again.');
   }
 }
