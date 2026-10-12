@@ -20,6 +20,9 @@ Future<void> showDeploySheet(
 }) {
   return showModalBottomSheet<void>(
     context: context,
+    // Above the whole app, so the phone's bottom navigation bar does not
+    // cover the end of the sheet.
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     isDismissible: false,

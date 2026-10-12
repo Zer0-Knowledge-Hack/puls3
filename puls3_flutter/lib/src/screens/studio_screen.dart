@@ -221,10 +221,13 @@ class _StudioScreenState extends State<StudioScreen> {
     AgentManifestDraft manifest, {
     bool overwrite = false,
   }) async {
-    final owner = _owner;
+    var owner = _owner;
     if (owner == null) {
+      // F8: connect, then the save continues with the same form.
       await showWalletSheet(context);
-      return null;
+      if (!mounted) return null;
+      owner = _owner;
+      if (owner == null) return null;
     }
     setState(() {
       _saving = true;

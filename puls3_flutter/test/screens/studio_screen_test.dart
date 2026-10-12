@@ -184,6 +184,14 @@ void main() {
         find.byKey(const ValueKey('wallet-state-disconnected')),
         findsOneWidget,
       );
+
+      // Connecting, then closing the sheet, continues the same save.
+      await tester.tap(find.text('Connect Demo wallet'));
+      await advance(tester, const Duration(milliseconds: 700));
+      await tester.tapAt(const Offset(20, 20));
+      await advance(tester, const Duration(milliseconds: 800));
+      expect(find.text('Saved · revision 1 (demo)'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Brief Bot'), findsOneWidget);
     });
 
     testWidgets('Save draft shows the revision, then unsaved changes', (
@@ -344,6 +352,14 @@ void main() {
       expect(find.byKey(const Key('playground-panel')), findsOneWidget);
       expect(find.byKey(const Key('playground-close')), findsOneWidget);
       expect(tester.takeException(), isNull);
+
+      // Above the bottom navigation bar: Run is reachable.
+      await tester.enterText(_field('playground-input'), 'A short task.');
+      await tester.pump();
+      await tester.ensureVisible(_field('playground-run'));
+      await tester.tap(_field('playground-run'));
+      await advance(tester, const Duration(milliseconds: 400));
+      expect(find.text('Test run: not paid, nothing on chain'), findsOneWidget);
 
       await tester.tap(_field('playground-close'));
       await advance(tester, const Duration(milliseconds: 600));

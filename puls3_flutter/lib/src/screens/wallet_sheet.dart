@@ -13,6 +13,9 @@ import '../ui/organisms/wallet_panel.dart';
 Future<void> showWalletSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
+    // Above the whole app, so the phone's bottom navigation bar does not
+    // cover the end of the sheet.
+    useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => const WalletSheet(),
