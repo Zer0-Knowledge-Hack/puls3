@@ -24,6 +24,16 @@ Brand assets live in `assets/brand/`, `docs/brand/` and `design/logo-lab/`, but 
 - [x] T3 — Footer link + test. Route: delegated with T2. Commit `6e03af1`.
 - [ ] T4 — Run locally (`flutter run -d web-server`) for the user to test.
 
+### Redesign round (user feedback after local test, BNB comparison)
+Rationale: our page explains with text; BNB shows each rule visually, curates fewer choices and reveals actions on hover.
+- [x] T5 — Hero: centered mark with dashed construction guides, title below; hide "Backend unavailable" banner on `/brand`. Route: delegated. Commit `544af84`.
+- [x] T6 — Logos: curate to 8 cards (dark, light, mono-white, mono-ink × lockup, mark); hover/tap overlay with PNG, SVG, Copy SVG; "Download all" in the Logos section header; small sizes stay ZIP-only. Route: delegated. Commits `544af84`, `5a7ae2d`. Deviation: 6 cards, the kit has no mono-white/mono-ink mark files (needs `design/logo-lab/scripts/build-brand-kit.mjs`).
+- [x] T7 — Colors: 4 primary swatches large with copy-to-clipboard per value (HEX, RGB, approximate CMYK labelled as such; no Pantone); secondary palette collapsible. Route: delegated. Commit `9952b0a`.
+- [x] T8 — Guidelines: numbered Dimensions rows (min-size ✓ vs below-min ✗ with ruler) + Safe space diagram (4c). Route: delegated. Commit `9952b0a`.
+- [x] T9 — Usage Do's / Don'ts as rendered visual cards (green/red bottom border): recolor, outline, shadow, gradient, stretch, busy background, low contrast, halftone 3 at small size. Route: delegated. Commit `23b76c3` (halftone-at-small-size lives in Dimensions row 04).
+- [x] T10 — New "Using puls3 in your project" section (can do / should avoid / expectations), DRAFT copy adapted from BNB — requires user/brand-owner approval before publish. Route: delegated. Commit `23b76c3`; copy in `puls3_flutter/lib/src/brand/brand_policy.dart` (DRAFT header, `contactEmail` TODO = null, no email link rendered). Approval still pending.
+- Out of scope: vertical lockup (needs design in logo-lab), official Pantone.
+
 ## Acceptance criteria
 - `/brand` renders all sections; every variant has working PNG and SVG links; Download all serves the ZIP.
 - Footer shows a Brand link on every screen that uses `SiteFooter`.
@@ -35,5 +45,19 @@ Brand assets live in `assets/brand/`, `docs/brand/` and `design/logo-lab/`, but 
 - T2+T3 `6e03af1` feat(app): add the /brand guidelines page. Dart mirror `lib/src/brand/brand_kit.dart` tested against `web/brand/manifest.json` and `tokens.json`; previews load PNGs via `Image.network` (relative `brand/...` URLs, resolved against `<base href>`). Test-first: RED observed (missing files / no Brand link), then GREEN. ~1070 authored lines (over the 400 advisory heuristic: screen + 2 molecules + kit mirror + 3 test files).
 - Checks: `flutter analyze` no issues; `flutter test` 212 passed, 0 failed.
 
+- T4: served locally with `flutter run -d web-server --web-port 8787`; `/` and `/brand/puls3-brand-kit.zip` return 200 (zip 5,195,962 bytes). Parent spot check: 13 brand/footer tests pass.
+- Review: RDD on; assess (untracked excluded) = medium, `slice_budget_reached` (74 paths, 2113 lines incl. generated). Native review deferred until the user finishes local testing, so feedback fixes land in the same candidate.
+
+- Redesign round (T5–T10), test-first per commit (RED observed: missing symbols, banner visible on `/brand`; then GREEN):
+  - `544af84` feat(brand): hero with construction guides and curated logo cards. Banner hidden via `routeInformationProvider` (listening to `routerDelegate` threw setState-during-build).
+  - `5a7ae2d` fix(brand): preview logo cards from the largest PNG. The full-size kit SVGs nest the mark in an inner `<svg>`, which flutter_svg does not draw; Copy SVG still copies the original markup (bundled as Flutter assets from `web/brand/svg/{logo,mark}/`).
+  - `9952b0a` feat(brand): primary colors and visual dimension rules. CMYK is a naive RGB conversion labelled "CMYK (approx.)".
+  - `23b76c3` feat(brand): visual usage rules and third-party usage policy.
+  - Numbers verified: README 07 (c = 0.072 × mark height, 4c clear space, minimums lockup mark 24 / mark 16 / wordmark 14 px) and README 06 (halftone 3 at lockup mark ≥ 72 px, C01 full ≥ 48 px) agree with `Puls3LogoTokens` and logo.tsx (`THREE_HALFTONE_MIN_PX = 40`, `MARK_FULL_MIN_PX = 48`, 72 derived); C01 center dot r = 4.60 of 128 in the SVG = 0.0719. No discrepancies. Digital minimums 16/14 exist only in the README (not in logo.tsx).
+  - Wordmark sample is cropped from the small lockup SVG (box from logo.tsx `WM`: ascender to descender ± 30 units), never retyped.
+  - "Don't" red `#F2555A` is a page-local constant (tokens.json has no error color) — flag for brand review.
+  - Checks: `flutter analyze` no issues; `flutter test` 234 passed, 0 failed (incl. 360 px phone and 800 px tablet no-overflow tests).
+  - ~2300 authored lines added across 4 commits (over the 400 advisory heuristic: 6 new organisms/molecules with painters and tests).
+
 ## Next step
-T4: run locally (`flutter run -d web-server` or `flutter run -d chrome`) and open `/brand` (hash routing: `/#/brand`).
+Hot restart the local web server, user re-tests `http://localhost:8787/#/brand`; brand owner approves T10 copy and sets the contact email; add mono marks to the kit build if wanted; then run the native review preflight.
