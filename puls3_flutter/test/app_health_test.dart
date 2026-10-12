@@ -11,4 +11,21 @@ void main() {
 
     expect(find.text('Backend v1.0.0'), findsOneWidget);
   });
+
+  Future<String> failing() => Future<String>.error('down')..ignore();
+
+  testWidgets('shows "Backend unavailable" on app screens', (tester) async {
+    await pumpApp(tester, healthCheck: failing());
+    await tester.pump();
+
+    expect(find.text('Backend unavailable'), findsOneWidget);
+  });
+
+  testWidgets('hides the backend banner on /brand', (tester) async {
+    await pumpApp(tester, location: '/brand', healthCheck: failing());
+    await tester.pump();
+
+    expect(find.text('Backend unavailable'), findsNothing);
+    expect(find.text('Brand guidelines'), findsOneWidget);
+  });
 }

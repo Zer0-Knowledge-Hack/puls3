@@ -1,114 +1,172 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../brand/brand_kit.dart';
 import '../../theme/puls3_theme.dart';
 
-/// A logo or mark variant: a preview on the background it is drawn for,
-/// its label, and one download action per file (SVG plus each PNG size).
-class BrandAssetCard extends StatelessWidget {
+/// A logo or mark variant, drawn on the background it is made for. The
+/// download actions (PNG, SVG, Copy SVG) appear over the dimmed card on
+/// hover, or on tap on touch screens.
+class BrandAssetCard extends StatefulWidget {
   const BrandAssetCard({
     super.key,
     required this.variant,
     required this.onOpenFile,
+    required this.onCopySvg,
+    this.height = 260,
   });
 
   final BrandVariant variant;
+
+  /// Opens a kit file by its path under `web/brand/`.
   final ValueChanged<String> onOpenFile;
 
-  static const _paper = Color(0xFFF6F7F8);
+  /// Copies the markup of the SVG at this path.
+  final ValueChanged<String> onCopySvg;
+  final double height;
+
+  static const paper = Color(0xFFF6F7F8);
+
+  @override
+  State<BrandAssetCard> createState() => _BrandAssetCardState();
+}
+
+class _BrandAssetCardState extends State<BrandAssetCard> {
+  bool _hovered = false;
+  bool _pinned = false;
+
+  bool get _revealed => _hovered || _pinned;
 
   @override
   Widget build(BuildContext context) {
-    final onLight = variant.background == BrandBackground.light;
-    final isSmallMark =
-        variant.group == BrandGroup.mark && variant.png.first.width < 48;
-    return Container(
-      decoration: BoxDecoration(
-        color: Puls3Colors.surface,
-        borderRadius: Puls3Radius.mdAll,
-        border: Border.all(color: Puls3Colors.hairline),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 140,
-            color: onLight ? _paper : Puls3Colors.background,
-            padding: const EdgeInsets.all(Puls3Spacing.lg),
-            alignment: Alignment.center,
-            child: Image.network(
-              brandFileUrl(variant.preview.path).toString(),
-              // Small marks are shown at their own pixel size.
-              width: isSmallMark ? variant.png.first.width.toDouble() : null,
-              fit: BoxFit.contain,
-              semanticLabel: variant.label,
-              errorBuilder: (context, error, stack) => Icon(
-                Icons.image_outlined,
-                color: onLight ? Puls3Colors.background : Puls3Colors.muted,
-              ),
+    final v = widget.variant;
+    final onLight = v.background == BrandBackground.light;
+    return Semantics(
+      button: true,
+      label: v.label,
+      hint: 'Show download options',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          key: ValueKey('brand-card:${v.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _pinned = !_pinned),
+          child: Container(
+            height: widget.height,
+            decoration: BoxDecoration(
+              color: onLight ? BrandAssetCard.paper : Puls3Colors.background,
+              borderRadius: Puls3Radius.lgAll,
+              border: Border.all(color: Puls3Colors.hairline),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(Puls3Spacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(variant.label, style: Puls3Text.title),
-                const SizedBox(height: Puls3Spacing.sm),
-                Wrap(
-                  spacing: Puls3Spacing.xs,
-                  runSpacing: Puls3Spacing.xs,
-                  children: [
-                    _DownloadChip(
-                      label: 'SVG',
-                      path: variant.svg,
-                      onOpenFile: onOpenFile,
-                    ),
-                    for (final png in variant.png)
-                      _DownloadChip(
-                        label: 'PNG ${png.width}',
-                        path: png.path,
-                        onOpenFile: onOpenFile,
-                      ),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.all(Puls3Spacing.lg),
+                  child: Center(child: _Preview(variant: v)),
                 ),
+                AnimatedOpacity(
+                  opacity: _revealed ? 1 : 0,
+                  duration: Puls3Durations.fast,
+                  child: ColoredBox(
+                    color: Puls3Colors.background.withValues(alpha: 0.72),
+                  ),
+                ),
+                if (_revealed)
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ActionPill(
+                          key: ValueKey('download:${v.preview.path}'),
+                          icon: Icons.download_rounded,
+                          label: 'PNG',
+                          tooltip: 'Download PNG (${v.preview.width} px)',
+                          onPressed: () => widget.onOpenFile(v.preview.path),
+                        ),
+                        const SizedBox(height: Puls3Spacing.xs),
+                        _ActionPill(
+                          key: ValueKey('download:${v.svg}'),
+                          icon: Icons.download_rounded,
+                          label: 'SVG',
+                          tooltip: 'Download SVG',
+                          onPressed: () => widget.onOpenFile(v.svg),
+                        ),
+                        const SizedBox(height: Puls3Spacing.xs),
+                        _ActionPill(
+                          key: ValueKey('copy:${v.svg}'),
+                          icon: Icons.copy_rounded,
+                          label: 'Copy SVG',
+                          tooltip: 'Copy SVG markup',
+                          onPressed: () => widget.onCopySvg(v.svg),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _DownloadChip extends StatelessWidget {
-  const _DownloadChip({
-    required this.label,
-    required this.path,
-    required this.onOpenFile,
-  });
+class _Preview extends StatelessWidget {
+  const _Preview({required this.variant});
 
-  final String label;
-  final String path;
-  final ValueChanged<String> onOpenFile;
+  final BrandVariant variant;
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      key: ValueKey('download:$path'),
-      onPressed: () => onOpenFile(path),
-      icon: const Icon(Icons.download_rounded, size: 16),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Puls3Colors.text,
-        side: const BorderSide(color: Puls3Colors.hairline),
-        shape: const RoundedRectangleBorder(
-          borderRadius: Puls3Radius.pillAll,
+    final svg = SvgPicture.asset(
+      brandAssetKey(variant.svg),
+      fit: BoxFit.contain,
+      semanticsLabel: variant.label,
+      excludeFromSemantics: true,
+    );
+    // The mark is shown at a fixed size; the lockup fills the card width,
+    // which keeps its mark near or above the 72 px halftone-3 minimum.
+    return variant.group == BrandGroup.mark
+        ? SizedBox.square(dimension: 120, child: svg)
+        : svg;
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          backgroundColor: Puls3Colors.text,
+          foregroundColor: Puls3Colors.background,
+          shape: const RoundedRectangleBorder(
+            borderRadius: Puls3Radius.pillAll,
+          ),
+          textStyle: Puls3Text.caption.copyWith(fontWeight: FontWeight.w700),
+          padding: const EdgeInsets.symmetric(horizontal: Puls3Spacing.md),
+          minimumSize: const Size(128, 40),
         ),
-        textStyle: Puls3Text.caption.copyWith(fontWeight: FontWeight.w700),
-        padding: const EdgeInsets.symmetric(horizontal: Puls3Spacing.sm),
-        minimumSize: const Size(0, 36),
       ),
     );
   }

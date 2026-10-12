@@ -134,6 +134,21 @@ abstract final class BrandKit {
     ('mono-ink', 'mono ink', BrandBackground.light),
   ];
 
+  /// The files shown on the page: the full-size lockup in every colorway
+  /// and the full mark. Small sizes stay in the ZIP and the manifest.
+  // TODO(brand): add mono-white and mono-ink marks once the kit builds them.
+  static List<BrandVariant> get curated => [
+    for (final id in const [
+      'puls3-logo-dark',
+      'puls3-logo-light',
+      'puls3-logo-mono-white',
+      'puls3-logo-mono-ink',
+      'puls3-mark-c01-dark',
+      'puls3-mark-c01-light',
+    ])
+      variants.firstWhere((v) => v.id == id),
+  ];
+
   static List<BrandVariant> get logos => [
     for (final v in variants)
       if (v.group == BrandGroup.logo) v,
@@ -199,6 +214,13 @@ abstract final class BrandKit {
 Uri brandFileUrl(String path) {
   final clean = path.startsWith('/') ? path.substring(1) : path;
   return Uri.parse('brand/$clean');
+}
+
+/// The Flutter asset key of a kit file bundled from `web/brand/` (the SVG
+/// folders are listed under `assets` in pubspec.yaml).
+String brandAssetKey(String path) {
+  final clean = path.startsWith('/') ? path.substring(1) : path;
+  return 'web/brand/$clean';
 }
 
 /// Opens a kit file in a new tab (the browser downloads or previews it).

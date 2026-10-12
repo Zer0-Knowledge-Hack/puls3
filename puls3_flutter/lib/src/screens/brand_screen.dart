@@ -1,29 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../brand/brand_kit.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/content_width.dart';
-import '../ui/atoms/primary_button.dart';
+import '../ui/atoms/copy_to_clipboard.dart';
 import '../ui/atoms/puls3_logo.dart';
 import '../ui/atoms/pulse_background.dart';
 import '../ui/atoms/section_label.dart';
-import '../ui/molecules/brand_asset_card.dart';
+import '../ui/molecules/brand_section.dart';
 import '../ui/molecules/built_on_stellar.dart';
 import '../ui/molecules/color_swatch_card.dart';
+import '../ui/organisms/brand_hero.dart';
+import '../ui/organisms/brand_logos_section.dart';
 import '../ui/organisms/site_footer.dart';
 
-/// `/brand`: the public brand guidelines, with every logo and mark file as
+/// `/brand`: the public brand guidelines, with the curated logo files as
 /// SVG and PNG, the palette, typography, size and usage rules, and a ZIP of
 /// the whole kit. Content follows docs/brand/README.md.
 class BrandScreen extends StatelessWidget {
-  const BrandScreen({super.key, this.onOpenFile = _open});
+  const BrandScreen({
+    super.key,
+    this.onOpenFile = _open,
+    this.loadSvg = _loadSvg,
+  });
 
   /// Opens a kit file by its path under `web/brand/`. Injectable for tests.
   final ValueChanged<String> onOpenFile;
 
+  /// Reads the markup of a kit SVG by its path under `web/brand/`.
+  final Future<String> Function(String path) loadSvg;
+
   static void _open(String path) => openBrandFile(path);
+
+  static Future<String> _loadSvg(String path) =>
+      rootBundle.loadString(brandAssetKey(path));
+
+  Future<void> _copySvg(BuildContext context, String path) async {
+    final markup = await loadSvg(path);
+    if (!context.mounted) return;
+    await copyToClipboard(context, markup, message: 'SVG copied');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +55,16 @@ class BrandScreen extends StatelessWidget {
         child: Column(
           children: [
             PulseBackground(
-              focalPoint: Alignment.topRight,
+              focalPoint: Alignment.topCenter,
               radiusFactor: narrow ? 0.7 : 0.45,
               child: SafeArea(
                 bottom: false,
                 child: ContentWidth(
-                  child: _Hero(narrow: narrow, onOpenFile: onOpenFile),
+                  child: BrandHero(
+                    narrow: narrow,
+                    onHome: () => context.go('/'),
+                    onOpenGuide: () => onOpenFile(BrandKit.guide),
+                  ),
                 ),
               ),
             ),
@@ -50,32 +73,12 @@ class BrandScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: sectionGap),
-                  _Section(
-                    title: 'Logo',
-                    intro:
-                        'The C01 Halftone Pulse mark with the "puls3" '
-                        'wordmark. Use the full lockup when the mark is at '
-                        'least 72 px tall; below that, use the small lockup '
-                        'with the solid 3. Never retype the wordmark.',
-                    child: _AssetGrid(
-                      variants: BrandKit.logos,
-                      onOpenFile: onOpenFile,
-                    ),
+                  BrandLogosSection(
+                    onOpenFile: onOpenFile,
+                    onCopySvg: (path) => _copySvg(context, path),
                   ),
                   SizedBox(height: sectionGap),
-                  _Section(
-                    title: 'Mark',
-                    intro:
-                        'C01 full for marks of 48 px and above. Below that, '
-                        'use C01-small at its 32, 24 or 16 px level. The '
-                        '16 px level is the favicon.',
-                    child: _AssetGrid(
-                      variants: BrandKit.marks,
-                      onOpenFile: onOpenFile,
-                    ),
-                  ),
-                  SizedBox(height: sectionGap),
-                  const _Section(
+                  const BrandSection(
                     title: 'Color',
                     intro:
                         'Dark is the default. The dark-theme amber and '
@@ -84,7 +87,7 @@ class BrandScreen extends StatelessWidget {
                     child: _Palettes(),
                   ),
                   SizedBox(height: sectionGap),
-                  const _Section(
+                  const BrandSection(
                     title: 'Typography',
                     intro:
                         'Unbounded for headlines and the wordmark, Manrope '
@@ -94,7 +97,7 @@ class BrandScreen extends StatelessWidget {
                     child: _Typography(),
                   ),
                   SizedBox(height: sectionGap),
-                  const _Section(
+                  const BrandSection(
                     title: 'Size and clear space',
                     intro:
                         'c is the diameter of the C01 center dot '
@@ -113,9 +116,9 @@ class BrandScreen extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: sectionGap),
-                  const _Section(title: 'Usage', child: _Usage()),
+                  const BrandSection(title: 'Usage', child: _Usage()),
                   SizedBox(height: sectionGap),
-                  const _Section(
+                  const BrandSection(
                     title: 'Co-branding',
                     intro:
                         'puls3 comes first. Separate the two logos with a '
@@ -136,147 +139,6 @@ class BrandScreen extends StatelessWidget {
   }
 }
 
-class _Hero extends StatelessWidget {
-  const _Hero({required this.narrow, required this.onOpenFile});
-
-  final bool narrow;
-  final ValueChanged<String> onOpenFile;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: Puls3Spacing.lg),
-        SizedBox(
-          width: double.infinity,
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: Puls3Spacing.md,
-            runSpacing: Puls3Spacing.md,
-            children: [
-              Puls3Logo(markHeight: 48, onTap: () => context.go('/')),
-              const BuiltOnStellar(compact: true),
-            ],
-          ),
-        ),
-        SizedBox(height: narrow ? Puls3Spacing.xxl : Puls3Spacing.huge),
-        const SectionLabel('Brand guidelines', color: Puls3Colors.accent),
-        const SizedBox(height: Puls3Spacing.md),
-        Text(
-          'puls3 brand kit',
-          style: narrow ? Puls3Text.h1Compact : Puls3Text.display,
-        ),
-        const SizedBox(height: Puls3Spacing.lg),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: Text(
-            'Official logos, colors and type for partners, press and '
-            'builders. Use the files as they are.',
-            style: Puls3Text.lead,
-          ),
-        ),
-        const SizedBox(height: Puls3Spacing.xl),
-        Wrap(
-          spacing: Puls3Spacing.sm,
-          runSpacing: Puls3Spacing.sm,
-          children: [
-            PrimaryButton(
-              label: 'Download all',
-              icon: Icons.download_rounded,
-              onPressed: () => onOpenFile(BrandKit.zip),
-            ),
-            PrimaryButton(
-              label: 'Brand guide (PDF)',
-              variant: PrimaryButtonVariant.outline,
-              onPressed: () => onOpenFile(BrandKit.guide),
-            ),
-          ],
-        ),
-        SizedBox(height: narrow ? Puls3Spacing.xxl : Puls3Spacing.huge),
-      ],
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, this.intro, required this.child});
-
-  final String title;
-  final String? intro;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Puls3Text.h2Compact),
-        if (intro != null) ...[
-          const SizedBox(height: Puls3Spacing.sm),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Text(intro!, style: Puls3Text.bodyMuted),
-          ),
-        ],
-        const SizedBox(height: Puls3Spacing.lg),
-        child,
-      ],
-    );
-  }
-}
-
-/// Lays children out in 1 to [maxColumns] equal columns by width.
-class _Grid extends StatelessWidget {
-  const _Grid({
-    required this.children,
-    this.minTileWidth = 300,
-    this.maxColumns = 3,
-  });
-
-  final List<Widget> children;
-  final double minTileWidth;
-  final int maxColumns;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const gap = Puls3Spacing.md;
-        final columns = ((constraints.maxWidth + gap) / (minTileWidth + gap))
-            .floor()
-            .clamp(1, maxColumns);
-        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final child in children) SizedBox(width: width, child: child),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _AssetGrid extends StatelessWidget {
-  const _AssetGrid({required this.variants, required this.onOpenFile});
-
-  final List<BrandVariant> variants;
-  final ValueChanged<String> onOpenFile;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Grid(
-      children: [
-        for (final v in variants)
-          BrandAssetCard(variant: v, onOpenFile: onOpenFile),
-      ],
-    );
-  }
-}
-
 class _Palettes extends StatelessWidget {
   const _Palettes();
 
@@ -287,7 +149,7 @@ class _Palettes extends StatelessWidget {
       children: [
         SectionLabel(label),
         const SizedBox(height: Puls3Spacing.sm),
-        _Grid(
+        BrandGrid(
           minTileWidth: 160,
           maxColumns: 4,
           children: [for (final s in swatches) ColorSwatchCard(swatch: s)],
@@ -316,7 +178,7 @@ class _Typography extends StatelessWidget {
       ('UI', 'Manrope 400–800', 'Create agents.', Puls3Text.lead),
       ('Data', 'JetBrains Mono 400, 500', 'GCDSVE…QFXZ', Puls3Text.data),
     ];
-    return _Grid(
+    return BrandGrid(
       minTileWidth: 240,
       maxColumns: 4,
       children: [
@@ -376,7 +238,7 @@ class _Usage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _Grid(
+    return const BrandGrid(
       minTileWidth: 340,
       maxColumns: 2,
       children: [

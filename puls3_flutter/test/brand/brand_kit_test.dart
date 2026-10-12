@@ -76,6 +76,32 @@ void main() {
     expect(BrandKit.lightPalette.length, (colors['light'] as Map).length);
   });
 
+  test('the page curates the full-size lockups and marks', () {
+    expect(
+      [for (final v in BrandKit.curated) v.id],
+      [
+        'puls3-logo-dark',
+        'puls3-logo-light',
+        'puls3-logo-mono-white',
+        'puls3-logo-mono-ink',
+        'puls3-mark-c01-dark',
+        'puls3-mark-c01-light',
+      ],
+    );
+    // Small sizes stay in the ZIP and manifest only.
+    expect(BrandKit.curated.where((v) => v.id.contains('small')), isEmpty);
+  });
+
+  test('curated SVGs are bundled as Flutter assets for Copy SVG', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(pubspec, contains('- web/brand/svg/logo/'));
+    expect(pubspec, contains('- web/brand/svg/mark/'));
+    expect(
+      brandAssetKey('svg/logo/puls3-logo-dark.svg'),
+      'web/brand/svg/logo/puls3-logo-dark.svg',
+    );
+  });
+
   test('swatch RGB is derived from the HEX value', () {
     const swatch = BrandSwatch(token: 'accent', hex: '#FFB547', role: '');
     expect(swatch.rgb, 'RGB 255 181 71');

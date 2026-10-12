@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/brand/brand_kit.dart';
 import 'package:puls3_flutter/src/screens/brand_screen.dart';
@@ -6,7 +8,13 @@ import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 
 import '../helpers.dart';
 
-Future<List<String>> pumpBrand(
+/// What a pumped brand page did: files opened and text copied.
+class BrandHarness {
+  final opened = <String>[];
+  final copied = <String>[];
+}
+
+Future<BrandHarness> pumpBrand(
   WidgetTester tester, {
   Size size = const Size(1440, 1000),
 }) async {
@@ -14,72 +22,142 @@ Future<List<String>> pumpBrand(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final opened = <String>[];
+  final harness = BrandHarness();
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    SystemChannels.platform,
+    (call) async {
+      if (call.method == 'Clipboard.setData') {
+        harness.copied.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    },
+  );
+  addTearDown(
+    () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      null,
+    ),
+  );
   await tester.pumpWidget(
     MaterialApp(
       theme: Puls3Theme.dark(),
-      home: BrandScreen(onOpenFile: opened.add),
+      home: BrandScreen(
+        onOpenFile: harness.opened.add,
+        loadSvg: (path) async => '<svg data-path="$path"/>',
+      ),
     ),
   );
   await tester.pump();
-  return opened;
+  return harness;
+}
+
+Finder card(BrandVariant v) => find.byKey(ValueKey('brand-card:${v.id}'));
+
+Future<void> reveal(WidgetTester tester, BrandVariant v) async {
+  await tester.ensureVisible(card(v));
+  await tester.tap(card(v));
+  await tester.pump();
 }
 
 void main() {
   testWidgets('/brand route renders the brand page', (tester) async {
     await pumpApp(tester, location: '/brand');
-    expect(find.text('puls3 brand kit'), findsOneWidget);
+    expect(find.text('Brand guidelines'), findsOneWidget);
   });
 
-  testWidgets('renders every section', (tester) async {
-    await pumpBrand(tester);
-    for (final title in [
-      'Logo',
-      'Mark',
-      'Color',
-      'Typography',
-      'Size and clear space',
-      'Usage',
-      'Co-branding',
-    ]) {
-      expect(find.text(title), findsOneWidget, reason: title);
-    }
-    expect(find.text('Download all'), findsOneWidget);
+  group('hero', () {
+    testWidgets('centers the mark inside dashed construction guides', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.byKey(const ValueKey('brand-hero-guides')), findsOneWidget);
+      expect(find.text('Brand guidelines'), findsOneWidget);
+    });
   });
 
-  testWidgets('every variant offers an SVG and its PNG sizes', (tester) async {
-    await pumpBrand(tester);
-    for (final v in BrandKit.variants) {
-      expect(find.text(v.label), findsOneWidget, reason: v.id);
-      expect(find.byKey(ValueKey('download:${v.svg}')), findsOneWidget);
-      for (final png in v.png) {
-        expect(find.byKey(ValueKey('download:${png.path}')), findsOneWidget);
+  group('logos', () {
+    testWidgets('shows exactly the curated cards, without labels', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      for (final v in BrandKit.variants) {
+        expect(
+          card(v),
+          BrandKit.curated.contains(v) ? findsOneWidget : findsNothing,
+          reason: v.id,
+        );
       }
-    }
+      expect(find.text(BrandKit.curated.first.label), findsNothing);
+      expect(
+        find.text('Small sizes (16–32 px) are included in the full kit.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Download all sits in the Logos header', (tester) async {
+      final h = await pumpBrand(tester);
+      expect(find.text('Logos'), findsOneWidget);
+      await tester.ensureVisible(find.text('Download all'));
+      await tester.tap(find.text('Download all'));
+      expect(h.opened, [BrandKit.zip]);
+    });
+
+    testWidgets('actions stay hidden until the card is hovered or tapped', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      final v = BrandKit.curated.first;
+      expect(find.byKey(ValueKey('download:${v.svg}')), findsNothing);
+
+      await reveal(tester, v);
+      expect(find.byKey(ValueKey('download:${v.svg}')), findsOneWidget);
+      expect(
+        find.byKey(ValueKey('download:${v.png.last.path}')),
+        findsOneWidget,
+      );
+      expect(find.byKey(ValueKey('copy:${v.svg}')), findsOneWidget);
+    });
+
+    testWidgets('hovering a card reveals its actions', (tester) async {
+      await pumpBrand(tester);
+      final v = BrandKit.curated[1];
+      await tester.ensureVisible(card(v));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(card(v)));
+      await tester.pump();
+      expect(find.byKey(ValueKey('copy:${v.svg}')), findsOneWidget);
+    });
+
+    testWidgets('PNG and SVG open the largest PNG and the SVG', (tester) async {
+      final h = await pumpBrand(tester);
+      final v = BrandKit.curated.last;
+      await reveal(tester, v);
+      await tester.tap(find.byKey(ValueKey('download:${v.png.last.path}')));
+      await tester.tap(find.byKey(ValueKey('download:${v.svg}')));
+      expect(h.opened, [v.png.last.path, v.svg]);
+    });
+
+    testWidgets('Copy SVG puts the markup on the clipboard', (tester) async {
+      final h = await pumpBrand(tester);
+      final v = BrandKit.curated.first;
+      await reveal(tester, v);
+      await tester.tap(find.byKey(ValueKey('copy:${v.svg}')));
+      await tester.pump();
+      expect(h.copied, ['<svg data-path="${v.svg}"/>']);
+      expect(find.text('SVG copied'), findsOneWidget);
+    });
   });
 
-  testWidgets('download actions open the kit files', (tester) async {
-    final opened = await pumpBrand(tester);
-
-    await tester.tap(find.text('Download all'));
-    final svg = find.byKey(ValueKey('download:${BrandKit.variants.first.svg}'));
-    await tester.ensureVisible(svg);
-    await tester.tap(svg);
-    final png = BrandKit.variants.first.png.last.path;
-    await tester.tap(find.byKey(ValueKey('download:$png')));
-
-    expect(opened, [BrandKit.zip, BrandKit.variants.first.svg, png]);
+  testWidgets('lays out on a 360 px phone without overflow', (tester) async {
+    await pumpBrand(tester, size: const Size(360, 800));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Brand guidelines'), findsOneWidget);
   });
 
-  testWidgets('shows HEX and RGB for each color', (tester) async {
-    await pumpBrand(tester);
-    expect(find.text('#FFB547'), findsWidgets);
-    expect(find.text('RGB 255 181 71'), findsOneWidget);
-    expect(find.text('#A05F00'), findsWidgets);
-  });
-
-  testWidgets('lays out on a phone without overflow', (tester) async {
-    await pumpBrand(tester, size: const Size(390, 844));
-    expect(find.text('puls3 brand kit'), findsOneWidget);
+  testWidgets('lays out on a tablet without overflow', (tester) async {
+    await pumpBrand(tester, size: const Size(800, 1000));
+    expect(tester.takeException(), isNull);
   });
 }
