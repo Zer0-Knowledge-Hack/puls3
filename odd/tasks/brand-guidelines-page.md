@@ -32,6 +32,7 @@ Rationale: our page explains with text; BNB shows each rule visually, curates fe
 - [x] T8 — Guidelines: numbered Dimensions rows (min-size ✓ vs below-min ✗ with ruler) + Safe space diagram (4c). Route: delegated. Commit `9952b0a`.
 - [x] T9 — Usage Do's / Don'ts as rendered visual cards (green/red bottom border): recolor, outline, shadow, gradient, stretch, busy background, low contrast, halftone 3 at small size. Route: delegated. Commit `23b76c3` (halftone-at-small-size lives in Dimensions row 04).
 - [x] T10 — New "Using puls3 in your project" section (can do / should avoid / expectations), DRAFT copy adapted from BNB — requires user/brand-owner approval before publish. Route: delegated. Commit `23b76c3`; copy in `puls3_flutter/lib/src/brand/brand_policy.dart` (DRAFT header, `contactEmail` TODO = null, no email link rendered). Approval still pending.
+- [x] T11 — Mono-white and mono-ink C01 marks (user-authorized): export from `design/logo-lab/scripts/export-brand.tsx`, add to the kit in `build-brand-kit.mjs`, show 8 curated cards. Route: delegated. Commit `b160bb9`.
 - Out of scope: vertical lockup (needs design in logo-lab), official Pantone.
 
 ## Acceptance criteria
@@ -59,6 +60,7 @@ Rationale: our page explains with text; BNB shows each rule visually, curates fe
   - Checks: `flutter analyze` no issues; `flutter test` 234 passed, 0 failed (incl. 360 px phone and 800 px tablet no-overflow tests).
   - ~2300 authored lines added across 4 commits (over the 400 advisory heuristic: 6 new organisms/molecules with painters and tests).
   - `6519cc6` fix(app): handle a failed health check when the banner is hidden. A release build logged `Uncaught` on `/#/brand` only: with the banner hidden, nothing listened to the failing health-check future. A regression test (Completer failing after startup, on `/brand`) failed before the fix and passes after it. Re-verified with the release build on :8788 using headless Chrome over CDP: no exceptions on `/#/brand` or `/#/`. `flutter analyze` clean; `flutter test` 234 passed.
+  - `b160bb9` feat(brand): add mono-white and mono-ink marks (T11). `npm run brand:export` writes the two new marks (nested `<svg>` like the existing full marks, one fill each: #F6F7F8 / #0B0B0D). It also rewrites the other 18 SVGs and tokens.json with LF line endings, but with `core.autocrlf=true` git sees no content diff, so those were restored, not committed. `npm run brand:kit`: 61 to 67 files (+2 SVG, +4 PNG), zip 5,195,962 to 5,453,124 bytes; a second run gave the same zip SHA-256 (02769f1b…). Test-first: the 8-card and curated-ids tests failed, then passed. `flutter analyze` clean; `flutter test` 234 passed. Release build on :8788: headless screenshot shows the 8 cards, and no Uncaught in the console.
 
 ## Next step
-Hot restart the local web server, user re-tests `http://localhost:8787/#/brand`; brand owner approves T10 copy and sets the contact email; add mono marks to the kit build if wanted; then run the native review preflight.
+Hot restart the local web server, user re-tests `http://localhost:8787/#/brand`; brand owner approves T10 copy and sets the contact email; then run the native review preflight.
