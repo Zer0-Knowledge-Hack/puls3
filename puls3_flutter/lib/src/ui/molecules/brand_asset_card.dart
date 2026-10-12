@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../brand/brand_kit.dart';
 import '../../theme/puls3_theme.dart';
@@ -121,17 +120,24 @@ class _Preview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final svg = SvgPicture.asset(
-      brandAssetKey(variant.svg),
+    // The largest PNG, not the SVG: the kit SVGs nest the mark in an inner
+    // <svg>, which flutter_svg does not draw. The mark is shown at a fixed
+    // size; the lockup fills the card width, which keeps its mark near or
+    // above the 72 px halftone-3 minimum.
+    final isMark = variant.group == BrandGroup.mark;
+    return Image.network(
+      brandFileUrl(variant.preview.path).toString(),
+      width: isMark ? 120 : null,
+      height: isMark ? 120 : null,
       fit: BoxFit.contain,
-      semanticsLabel: variant.label,
       excludeFromSemantics: true,
+      errorBuilder: (context, error, stack) => Icon(
+        Icons.image_outlined,
+        color: variant.background == BrandBackground.light
+            ? Puls3Colors.background
+            : Puls3Colors.muted,
+      ),
     );
-    // The mark is shown at a fixed size; the lockup fills the card width,
-    // which keeps its mark near or above the 72 px halftone-3 minimum.
-    return variant.group == BrandGroup.mark
-        ? SizedBox.square(dimension: 120, child: svg)
-        : svg;
   }
 }
 
