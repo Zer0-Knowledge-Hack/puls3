@@ -90,6 +90,15 @@ class _Puls3AppState extends State<Puls3App> {
       widget.deployGateway ?? FakeDeployGateway();
 
   @override
+  void initState() {
+    super.initState();
+    // The banner reports a failed health check, but routes that hide it
+    // (/brand) leave the future unwatched; mark the error as handled so it
+    // is not reported as uncaught. The banner still receives it.
+    widget.healthCheck?.ignore();
+  }
+
+  @override
   void dispose() {
     _router.dispose();
     _catalog.dispose();

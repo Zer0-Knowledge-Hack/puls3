@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers.dart';
@@ -12,19 +14,31 @@ void main() {
     expect(find.text('Backend v1.0.0'), findsOneWidget);
   });
 
-  Future<String> failing() => Future<String>.error('down')..ignore();
+  // The health call fails after the app is up, like a real request. The
+  // error is not pre-handled: on /brand nothing renders the banner, so the
+  // app itself must handle it (unhandled, it is "Uncaught" on web).
+  Future<void> pumpWithFailingHealth(
+    WidgetTester tester, {
+    String location = '/',
+  }) async {
+    final health = Completer<String>();
+    await pumpApp(tester, location: location, healthCheck: health.future);
+    health.completeError(Exception('down'));
+    await tester.pump();
+  }
 
   testWidgets('shows "Backend unavailable" on app screens', (tester) async {
-    await pumpApp(tester, healthCheck: failing());
-    await tester.pump();
+    await pumpWithFailingHealth(tester);
 
     expect(find.text('Backend unavailable'), findsOneWidget);
   });
 
-  testWidgets('hides the backend banner on /brand', (tester) async {
-    await pumpApp(tester, location: '/brand', healthCheck: failing());
-    await tester.pump();
+  testWidgets('hides the backend banner on /brand without an uncaught error', (
+    tester,
+  ) async {
+    await pumpWithFailingHealth(tester, location: '/brand');
 
+    expect(tester.takeException(), isNull);
     expect(find.text('Backend unavailable'), findsNothing);
     expect(find.text('Brand guidelines'), findsOneWidget);
   });
