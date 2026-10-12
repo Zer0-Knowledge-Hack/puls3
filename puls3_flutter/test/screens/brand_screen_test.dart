@@ -6,6 +6,7 @@ import 'package:puls3_flutter/src/brand/brand_kit.dart';
 import 'package:puls3_flutter/src/brand/brand_policy.dart';
 import 'package:puls3_flutter/src/screens/brand_screen.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
+import 'package:puls3_flutter/src/ui/molecules/brand_asset_card.dart';
 import 'package:puls3_flutter/src/ui/organisms/brand_policy_section.dart';
 
 import '../helpers.dart';
@@ -78,10 +79,11 @@ void main() {
   });
 
   group('logos', () {
-    testWidgets('shows exactly the curated cards, without labels', (
+    testWidgets('shows exactly the 8 curated cards, without labels', (
       tester,
     ) async {
       await pumpBrand(tester);
+      expect(BrandKit.curated, hasLength(8));
       for (final v in BrandKit.variants) {
         expect(
           card(v),
@@ -90,6 +92,19 @@ void main() {
         );
       }
       expect(find.text(BrandKit.curated.first.label), findsNothing);
+      // Each card sits on the background its file is drawn for.
+      for (final v in BrandKit.curated) {
+        final box = tester.widget<Container>(
+          find.descendant(of: card(v), matching: find.byType(Container)).first,
+        );
+        expect(
+          (box.decoration! as BoxDecoration).color,
+          v.background == BrandBackground.light
+              ? BrandAssetCard.paper
+              : Puls3Colors.background,
+          reason: v.id,
+        );
+      }
       expect(
         find.text('Small sizes (16–32 px) are included in the full kit.'),
         findsOneWidget,

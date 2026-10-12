@@ -39,6 +39,8 @@ const groups = {
   mark: [
     ["puls3-mark-c01-dark", "Mark, on dark", "dark", [512, 1024]],
     ["puls3-mark-c01-light", "Mark, on light", "light", [512, 1024]],
+    ["puls3-mark-c01-mono-white", "Mark, mono white", "dark", [512, 1024]],
+    ["puls3-mark-c01-mono-ink", "Mark, mono ink", "light", [512, 1024]],
     ...[32, 24, 16].flatMap((level) => [
       [`puls3-mark-c01-small-${level}-dark`, `Small mark ${level} px, on dark`, "dark", [level, level * 2]],
       [`puls3-mark-c01-small-${level}-light`, `Small mark ${level} px, on light`, "light", [level, level * 2]],

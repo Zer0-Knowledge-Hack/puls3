@@ -135,6 +135,14 @@ abstract final class BrandKit {
       BrandBackground.light,
       [512, 1024],
     ),
+    for (final (color, label, bg) in _colorways.skip(2))
+      BrandVariant.of(
+        BrandGroup.mark,
+        'puls3-mark-c01-$color',
+        'Mark, $label',
+        bg,
+        [512, 1024],
+      ),
     for (final level in [32, 24, 16])
       for (final bg in BrandBackground.values)
         BrandVariant.of(
@@ -153,9 +161,8 @@ abstract final class BrandKit {
     ('mono-ink', 'mono ink', BrandBackground.light),
   ];
 
-  /// The files shown on the page: the full-size lockup in every colorway
-  /// and the full mark. Small sizes stay in the ZIP and the manifest.
-  // TODO(brand): add mono-white and mono-ink marks once the kit builds them.
+  /// The files shown on the page: the full-size lockup and the full mark in
+  /// every colorway. Small sizes stay in the ZIP and the manifest.
   static List<BrandVariant> get curated => [
     for (final id in const [
       'puls3-logo-dark',
@@ -164,6 +171,8 @@ abstract final class BrandKit {
       'puls3-logo-mono-ink',
       'puls3-mark-c01-dark',
       'puls3-mark-c01-light',
+      'puls3-mark-c01-mono-white',
+      'puls3-mark-c01-mono-ink',
     ])
       variants.firstWhere((v) => v.id == id),
   ];

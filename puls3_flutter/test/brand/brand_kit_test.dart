@@ -76,7 +76,7 @@ void main() {
     expect(BrandKit.lightPalette.length, (colors['light'] as Map).length);
   });
 
-  test('the page curates the full-size lockups and marks', () {
+  test('the page curates every colorway of the lockup and the mark', () {
     expect(
       [for (final v in BrandKit.curated) v.id],
       [
@@ -86,6 +86,8 @@ void main() {
         'puls3-logo-mono-ink',
         'puls3-mark-c01-dark',
         'puls3-mark-c01-light',
+        'puls3-mark-c01-mono-white',
+        'puls3-mark-c01-mono-ink',
       ],
     );
     // Small sizes stay in the ZIP and manifest only.
