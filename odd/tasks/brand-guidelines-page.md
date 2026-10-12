@@ -58,6 +58,7 @@ Rationale: our page explains with text; BNB shows each rule visually, curates fe
   - "Don't" red `#F2555A` is a page-local constant (tokens.json has no error color) — flag for brand review.
   - Checks: `flutter analyze` no issues; `flutter test` 234 passed, 0 failed (incl. 360 px phone and 800 px tablet no-overflow tests).
   - ~2300 authored lines added across 4 commits (over the 400 advisory heuristic: 6 new organisms/molecules with painters and tests).
+  - `6519cc6` fix(app): handle a failed health check when the banner is hidden. A release build logged `Uncaught` on `/#/brand` only: with the banner hidden, nothing listened to the failing health-check future. A regression test (Completer failing after startup, on `/brand`) failed before the fix and passes after it. Re-verified with the release build on :8788 using headless Chrome over CDP: no exceptions on `/#/brand` or `/#/`. `flutter analyze` clean; `flutter test` 234 passed.
 
 ## Next step
 Hot restart the local web server, user re-tests `http://localhost:8787/#/brand`; brand owner approves T10 copy and sets the contact email; add mono marks to the kit build if wanted; then run the native review preflight.
