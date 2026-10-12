@@ -6,6 +6,7 @@ import 'deploy/deploy_gateway.dart';
 import 'deploy/fake_deploy_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
+import 'screens/brand_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/market_screen.dart';
 import 'screens/studio_screen.dart';
@@ -22,6 +23,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
     initialLocation: initialLocation,
     routes: [
       GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
+      GoRoute(path: '/brand', builder: (context, state) => const BrandScreen()),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.uri.path, child: child),

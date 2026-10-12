@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/puls3_theme.dart';
 import '../atoms/content_width.dart';
 import '../atoms/puls3_logo.dart';
 import '../molecules/built_on_stellar.dart';
 
-/// Footer with the logo, a demo disclaimer and the Stellar lockup.
+/// Footer with the logo, a demo disclaimer, the Brand link and the Stellar
+/// lockup.
 class SiteFooter extends StatelessWidget {
   const SiteFooter({super.key});
 
@@ -34,7 +36,23 @@ class SiteFooter extends StatelessWidget {
                 ),
               ],
             ),
-            const BuiltOnStellar(compact: true),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: Puls3Spacing.sm,
+              children: [
+                TextButton(
+                  onPressed: () => context.go('/brand'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Puls3Colors.muted,
+                    textStyle: Puls3Text.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: const Text('Brand'),
+                ),
+                const BuiltOnStellar(compact: true),
+              ],
+            ),
           ],
         ),
       ),
