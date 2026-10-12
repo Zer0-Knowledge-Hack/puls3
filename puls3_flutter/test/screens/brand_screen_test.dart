@@ -3,8 +3,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/brand/brand_kit.dart';
+import 'package:puls3_flutter/src/brand/brand_policy.dart';
 import 'package:puls3_flutter/src/screens/brand_screen.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
+import 'package:puls3_flutter/src/ui/organisms/brand_policy_section.dart';
 
 import '../helpers.dart';
 
@@ -196,8 +198,13 @@ void main() {
       await pumpBrand(tester);
       expect(find.text('Guidelines'), findsOneWidget);
       expect(find.text('Dimensions'), findsOneWidget);
-      for (final n in ['01', '02', '03', '04']) {
-        expect(find.text(n), findsOneWidget, reason: n);
+      for (final n in [1, 2, 3, 4]) {
+        final row = find.byKey(ValueKey('dimension:$n'));
+        expect(row, findsOneWidget, reason: '$n');
+        expect(
+          find.descendant(of: row, matching: find.text('0$n')),
+          findsOneWidget,
+        );
       }
       expect(find.text('Minimum size'), findsNWidgets(3));
       for (final label in ['< 24 px', '< 16 px', '< 14 px']) {
@@ -216,6 +223,83 @@ void main() {
       expect(find.text('Safe space'), findsWidgets);
       expect(find.byKey(const ValueKey('safe-space-diagram')), findsOneWidget);
       expect(find.text('4c'), findsWidgets);
+    });
+  });
+
+  group('usage', () {
+    testWidgets("renders the do's and don'ts as visual examples", (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.text("Usage Do's"), findsOneWidget);
+      expect(find.text("Usage Don'ts"), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('usage-do:'),
+        ),
+        findsNWidgets(4),
+      );
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('usage-dont:'),
+        ),
+        findsNWidgets(9),
+      );
+      expect(
+        find.text('Never recolor the logo with Stellar yellow (#FDDA24).'),
+        findsOneWidget,
+      );
+      expect(find.text('Use the official files, unaltered.'), findsOneWidget);
+    });
+  });
+
+  group('using puls3 in your project', () {
+    testWidgets('lists what projects can do, avoid and are expected to do', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.text(BrandPolicy.title), findsOneWidget);
+      expect(find.text('What you can do'), findsOneWidget);
+      expect(find.text('What to avoid'), findsOneWidget);
+      expect(find.text('Expectations'), findsOneWidget);
+      for (final rule in [...BrandPolicy.canDo, ...BrandPolicy.avoid]) {
+        expect(find.text(rule), findsOneWidget, reason: rule);
+      }
+      for (final e in BrandPolicy.expectations) {
+        expect(find.text(e.title), findsOneWidget, reason: e.title);
+      }
+    });
+
+    testWidgets('renders no email link while the contact is unset', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(BrandPolicy.contactEmail, isNull);
+      expect(find.byKey(const ValueKey('policy-contact-email')), findsNothing);
+    });
+
+    testWidgets('renders the email link once a contact is set', (
+      tester,
+    ) async {
+      Puls3Fonts.useGoogleFonts = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: Puls3Theme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: BrandPolicySection(contactEmail: 'brand@example.com'),
+            ),
+          ),
+        ),
+      );
+      expect(
+        find.byKey(const ValueKey('policy-contact-email')),
+        findsOneWidget,
+      );
     });
   });
 

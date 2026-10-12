@@ -4,6 +4,7 @@ import '../../brand/brand_geometry.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/brand_logo_samples.dart';
 import '../atoms/dashed_line.dart';
+import '../atoms/outlined_numeral.dart';
 import '../atoms/ruler.dart';
 import '../molecules/brand_section.dart';
 import '../molecules/rule_example_card.dart';
@@ -146,7 +147,7 @@ class _DimensionRow extends StatelessWidget {
     final text = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _OutlinedNumeral(number),
+        OutlinedNumeral(number),
         const SizedBox(height: Puls3Spacing.sm),
         Text(title, style: Puls3Text.h3),
         const SizedBox(height: Puls3Spacing.xs),
@@ -159,6 +160,7 @@ class _DimensionRow extends StatelessWidget {
       children: [good, bad],
     );
     return Padding(
+      key: ValueKey('dimension:$number'),
       padding: EdgeInsets.only(bottom: last ? 0 : Puls3Spacing.xxl),
       child: LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth >= 860
@@ -178,32 +180,6 @@ class _DimensionRow extends StatelessWidget {
                   examples,
                 ],
               ),
-      ),
-    );
-  }
-}
-
-/// A big two-digit numeral drawn as an outline.
-class _OutlinedNumeral extends StatelessWidget {
-  const _OutlinedNumeral(this.number);
-
-  final int number;
-
-  @override
-  Widget build(BuildContext context) {
-    final base = Puls3Text.h1;
-    return Text(
-      number.toString().padLeft(2, '0'),
-      style: TextStyle(
-        fontFamily: base.fontFamily,
-        fontFamilyFallback: base.fontFamilyFallback,
-        fontWeight: base.fontWeight,
-        fontSize: 56,
-        height: 1,
-        foreground: Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = Puls3Colors.muted,
       ),
     );
   }

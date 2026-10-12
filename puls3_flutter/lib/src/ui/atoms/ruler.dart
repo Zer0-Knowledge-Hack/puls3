@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../theme/puls3_theme.dart';
 
-/// A vertical measuring ruler: a line with end ticks, [length] tall.
+/// A vertical measuring ruler: a line with a tick at each end, as tall as
+/// the painted size.
 class RulerPainter extends CustomPainter {
   const RulerPainter({required this.color});
 

@@ -16,6 +16,8 @@ import '../ui/organisms/brand_colors_section.dart';
 import '../ui/organisms/brand_guidelines_section.dart';
 import '../ui/organisms/brand_hero.dart';
 import '../ui/organisms/brand_logos_section.dart';
+import '../ui/organisms/brand_policy_section.dart';
+import '../ui/organisms/brand_usage_section.dart';
 import '../ui/organisms/site_footer.dart';
 
 /// `/brand`: the public brand guidelines, with the curated logo files as
@@ -99,7 +101,7 @@ class BrandScreen extends StatelessWidget {
                   SizedBox(height: sectionGap),
                   const BrandGuidelinesSection(),
                   SizedBox(height: sectionGap),
-                  const BrandSection(title: 'Usage', child: _Usage()),
+                  const BrandUsageSection(),
                   SizedBox(height: sectionGap),
                   const BrandSection(
                     title: 'Co-branding',
@@ -110,6 +112,8 @@ class BrandScreen extends StatelessWidget {
                         'small "Built on" label.',
                     child: _CoBranding(),
                   ),
+                  SizedBox(height: sectionGap),
+                  const BrandPolicySection(),
                   SizedBox(height: sectionGap),
                 ],
               ),
@@ -150,93 +154,6 @@ class _Typography extends StatelessWidget {
               ],
             ),
           ),
-      ],
-    );
-  }
-}
-
-class _Rules extends StatelessWidget {
-  const _Rules({required this.items, this.icon, this.iconColor});
-
-  final List<String> items;
-  final IconData? icon;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: Puls3Spacing.xs),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  icon ?? Icons.circle,
-                  size: icon == null ? 6 : 18,
-                  color: iconColor ?? Puls3Colors.accent,
-                ),
-                const SizedBox(width: Puls3Spacing.sm),
-                Expanded(child: Text(item, style: Puls3Text.body)),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _Usage extends StatelessWidget {
-  const _Usage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const BrandGrid(
-      minTileWidth: 340,
-      maxColumns: 2,
-      children: [
-        _Panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionLabel('Do', color: Puls3Colors.success),
-              SizedBox(height: Puls3Spacing.sm),
-              _Rules(
-                icon: Icons.check_rounded,
-                iconColor: Puls3Colors.success,
-                items: [
-                  'Use the official files, unaltered.',
-                  'Use the on-light files on light backgrounds.',
-                  'Switch to the small lockup and C01-small at small sizes.',
-                  'Place the logo on calm, solid backgrounds.',
-                ],
-              ),
-            ],
-          ),
-        ),
-        _Panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionLabel("Don't", color: Puls3Colors.accent),
-              SizedBox(height: Puls3Spacing.sm),
-              _Rules(
-                icon: Icons.close_rounded,
-                items: [
-                  'Stretch, rotate, or add shadows, glows or bevels.',
-                  'Recolor the logo with Stellar yellow (#FDDA24).',
-                  'Use the dark-theme amber on white or paper.',
-                  'Force the halftone 3 at small sizes.',
-                  'Place the logo on busy photos or patterns.',
-                  'Set the logo in Doto.',
-                  'Merge the mark with the Stellar monogram.',
-                ],
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }

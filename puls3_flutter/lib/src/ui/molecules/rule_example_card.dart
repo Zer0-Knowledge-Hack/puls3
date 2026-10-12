@@ -10,8 +10,8 @@ abstract final class RuleColors {
 }
 
 /// A rendered example of a brand rule: a ✓ or ✗ badge with an optional
-/// [title], the example centered on [background], a green or red bottom
-/// border, and an optional [caption] below the card.
+/// [title], the example centered on [background] (and [backdrop]), a green
+/// or red bottom border, and an optional [caption] below the card.
 class RuleExampleCard extends StatelessWidget {
   const RuleExampleCard({
     super.key,
@@ -20,6 +20,7 @@ class RuleExampleCard extends StatelessWidget {
     this.title,
     this.caption,
     this.background = Puls3Colors.surface,
+    this.backdrop,
     this.height = 200,
   });
 
@@ -28,6 +29,9 @@ class RuleExampleCard extends StatelessWidget {
   final String? title;
   final String? caption;
   final Color background;
+
+  /// Painted full-bleed behind the example, e.g. a busy pattern.
+  final Widget? backdrop;
   final double height;
 
   @override
@@ -46,6 +50,7 @@ class RuleExampleCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
+              if (backdrop != null) Positioned.fill(child: backdrop!),
               Positioned.fill(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
