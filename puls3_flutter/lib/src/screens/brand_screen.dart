@@ -12,7 +12,8 @@ import '../ui/atoms/pulse_background.dart';
 import '../ui/atoms/section_label.dart';
 import '../ui/molecules/brand_section.dart';
 import '../ui/molecules/built_on_stellar.dart';
-import '../ui/molecules/color_swatch_card.dart';
+import '../ui/organisms/brand_colors_section.dart';
+import '../ui/organisms/brand_guidelines_section.dart';
 import '../ui/organisms/brand_hero.dart';
 import '../ui/organisms/brand_logos_section.dart';
 import '../ui/organisms/site_footer.dart';
@@ -78,13 +79,12 @@ class BrandScreen extends StatelessWidget {
                     onCopySvg: (path) => _copySvg(context, path),
                   ),
                   SizedBox(height: sectionGap),
-                  const BrandSection(
-                    title: 'Color',
-                    intro:
-                        'Dark is the default. The dark-theme amber and '
-                        'lavender fail on paper, so on light backgrounds '
-                        'always use the on-light variants.',
-                    child: _Palettes(),
+                  BrandColorsSection(
+                    onCopy: (label, value) => copyToClipboard(
+                      context,
+                      value,
+                      message: '$label copied',
+                    ),
                   ),
                   SizedBox(height: sectionGap),
                   const BrandSection(
@@ -97,24 +97,7 @@ class BrandScreen extends StatelessWidget {
                     child: _Typography(),
                   ),
                   SizedBox(height: sectionGap),
-                  const BrandSection(
-                    title: 'Size and clear space',
-                    intro:
-                        'c is the diameter of the C01 center dot '
-                        '(0.072 × mark height).',
-                    child: _Rules(
-                      items: [
-                        'Keep a clear space of 4c (about 0.29 × mark height) '
-                            'on every side.',
-                        'Digital minimums: lockup mark 24 px, mark 16 px, '
-                            'wordmark 14 px tall.',
-                        'Print minimums: lockup 25 mm wide, mark 6 mm, '
-                            'wordmark 18 mm.',
-                        'Use the halftone 3 only when the rendered 3 is at '
-                            'least 40 px tall (lockup mark ≥ 72 px).',
-                      ],
-                    ),
-                  ),
+                  const BrandGuidelinesSection(),
                   SizedBox(height: sectionGap),
                   const BrandSection(title: 'Usage', child: _Usage()),
                   SizedBox(height: sectionGap),
@@ -135,34 +118,6 @@ class BrandScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Palettes extends StatelessWidget {
-  const _Palettes();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget palette(String label, List<BrandSwatch> swatches) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionLabel(label),
-        const SizedBox(height: Puls3Spacing.sm),
-        BrandGrid(
-          minTileWidth: 160,
-          maxColumns: 4,
-          children: [for (final s in swatches) ColorSwatchCard(swatch: s)],
-        ),
-      ],
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        palette('Dark palette (default)', BrandKit.darkPalette),
-        const SizedBox(height: Puls3Spacing.xl),
-        palette('Light palette', BrandKit.lightPalette),
-      ],
     );
   }
 }

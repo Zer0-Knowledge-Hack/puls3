@@ -78,8 +78,27 @@ class BrandSwatch {
 
   Color get color => Color(0xFF000000 | _value);
 
-  String get rgb =>
-      'RGB ${(_value >> 16) & 0xFF} ${(_value >> 8) & 0xFF} ${_value & 0xFF}';
+  List<int> get _channels => [
+    (_value >> 16) & 0xFF,
+    (_value >> 8) & 0xFF,
+    _value & 0xFF,
+  ];
+
+  String get rgb => 'RGB ${_channels.join(' ')}';
+
+  /// `R, G, B`, ready to copy.
+  String get rgbValues => _channels.join(', ');
+
+  /// `C, M, Y, K` in percent, converted naively from RGB. Approximate: not
+  /// a print profile, so it is labelled as such on the page.
+  String get cmykValues {
+    final [r, g, b] = [for (final c in _channels) c / 255];
+    final k = 1 - [r, g, b].reduce((a, b) => a > b ? a : b);
+    if (k >= 1) return '0, 0, 0, 100';
+    int pct(double v) => (v * 100).round();
+    double ink(double c) => (1 - c - k) / (1 - k);
+    return [ink(r), ink(g), ink(b), k].map(pct).join(', ');
+  }
 }
 
 /// The brand kit served from `web/brand/` (built by `npm run brand:kit` in
@@ -180,6 +199,12 @@ abstract final class BrandKit {
       hex: '#2A2A31',
       role: 'Dividers and borders (decorative)',
     ),
+  ];
+
+  /// The four colors shown large on the page.
+  static List<BrandSwatch> get primaryPalette => [
+    for (final token in const ['background', 'text', 'accent', 'lavender'])
+      darkPalette.firstWhere((s) => s.token == token),
   ];
 
   static const lightPalette = [

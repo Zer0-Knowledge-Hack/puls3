@@ -150,6 +150,75 @@ void main() {
     });
   });
 
+  group('colors', () {
+    testWidgets('shows the four primary swatches with HEX, RGB and CMYK', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.text('Colors'), findsOneWidget);
+      for (final s in BrandKit.primaryPalette) {
+        expect(find.byKey(ValueKey('swatch:${s.token}')), findsOneWidget);
+      }
+      expect(find.text('CMYK (approx.)'), findsNWidgets(4));
+      expect(find.text('#FFB547'), findsOneWidget);
+      expect(find.text('255, 181, 71'), findsOneWidget);
+      expect(find.text('0, 29, 72, 0'), findsOneWidget);
+      expect(find.textContaining('Pantone'), findsNothing);
+    });
+
+    testWidgets('copies a value and confirms it', (tester) async {
+      final h = await pumpBrand(tester);
+      final copy = find.byKey(const ValueKey('copy:accent:HEX'));
+      await tester.ensureVisible(copy);
+      await tester.tap(copy);
+      await tester.pump();
+      expect(h.copied, ['#FFB547']);
+      expect(find.text('HEX copied'), findsOneWidget);
+    });
+
+    testWidgets('the rest of the palette is collapsed under Full palette', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.text('#A05F00'), findsNothing);
+      await tester.ensureVisible(find.text('Full palette'));
+      await tester.tap(find.text('Full palette'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('#A05F00'), findsOneWidget);
+      expect(find.text('RGB 22 22 26'), findsOneWidget);
+    });
+  });
+
+  group('guidelines', () {
+    testWidgets('numbers the dimension rules with ok and too-small examples', (
+      tester,
+    ) async {
+      await pumpBrand(tester);
+      expect(find.text('Guidelines'), findsOneWidget);
+      expect(find.text('Dimensions'), findsOneWidget);
+      for (final n in ['01', '02', '03', '04']) {
+        expect(find.text(n), findsOneWidget, reason: n);
+      }
+      expect(find.text('Minimum size'), findsNWidgets(3));
+      for (final label in ['< 24 px', '< 16 px', '< 14 px']) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      expect(find.text('Halftone at 72 px'), findsOneWidget);
+      expect(find.text('Halftone below 72 px'), findsOneWidget);
+      for (final px in [24, 16, 14, 72]) {
+        expect(find.byKey(ValueKey('ruler:$px')), findsOneWidget);
+        expect(find.text('$px px'), findsOneWidget, reason: '$px');
+      }
+    });
+
+    testWidgets('draws the 4c safe-space diagram', (tester) async {
+      await pumpBrand(tester);
+      expect(find.text('Safe space'), findsWidgets);
+      expect(find.byKey(const ValueKey('safe-space-diagram')), findsOneWidget);
+      expect(find.text('4c'), findsWidgets);
+    });
+  });
+
   testWidgets('lays out on a 360 px phone without overflow', (tester) async {
     await pumpBrand(tester, size: const Size(360, 800));
     expect(tester.takeException(), isNull);

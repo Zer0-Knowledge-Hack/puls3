@@ -108,6 +108,35 @@ void main() {
     expect(swatch.color.toARGB32(), 0xFFFFB547);
   });
 
+  test('swatch values are formatted for copying', () {
+    const accent = BrandSwatch(token: 'accent', hex: '#FFB547', role: '');
+    expect(accent.rgbValues, '255, 181, 71');
+    expect(accent.cmykValues, '0, 29, 72, 0');
+    expect(
+      const BrandSwatch(token: 'w', hex: '#FFFFFF', role: '').cmykValues,
+      '0, 0, 0, 0',
+    );
+    expect(
+      const BrandSwatch(token: 'k', hex: '#000000', role: '').cmykValues,
+      '0, 0, 0, 100',
+    );
+  });
+
+  test('the primary palette is background, text, accent and lavender', () {
+    expect(
+      [for (final s in BrandKit.primaryPalette) s.token],
+      [
+        'background',
+        'text',
+        'accent',
+        'lavender',
+      ],
+    );
+    for (final s in BrandKit.primaryPalette) {
+      expect(BrandKit.darkPalette, contains(s));
+    }
+  });
+
   test('brand files resolve to relative web URLs', () {
     expect(brandFileUrl(BrandKit.zip).toString(), 'brand/puls3-brand-kit.zip');
     expect(
