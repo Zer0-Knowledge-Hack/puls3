@@ -460,4 +460,18 @@ void main() {
       expect(() => h.ledger.escrowJob(3), _throwsUnavailable);
     });
   });
+
+  group('isExpired', () {
+    test('reads the escrow is_expired view and does not submit', () async {
+      final h = _ledgerAnswering(_fixture('simulate_agent_exists_true.json'));
+
+      expect(await h.ledger.isExpired(3), isTrue);
+      expect(h.requests, hasLength(1));
+      final params = h.requests.single['params']! as Map<String, Object?>;
+      expect(
+        params['transaction'],
+        _expectedEnvelope(_config.escrow, 'is_expired', const ScArg.u64(3)),
+      );
+    });
+  });
 }

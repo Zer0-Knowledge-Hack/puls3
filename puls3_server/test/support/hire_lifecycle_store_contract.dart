@@ -122,4 +122,22 @@ void hireLifecycleStoreContract(HireLifecycleStore Function() build) {
       throwsStateError,
     );
   });
+
+  test('listWithJob returns hires that have a job, oldest first', () async {
+    final bare = await store.insertHire(_newHire());
+    final second = await store.insertHire(_newHire(requestId: 'request-2'));
+    final first = await store.insertHire(_newHire(requestId: 'request-3'));
+    await store.bindJob(second.id, 9, expiredAt: 1800000500);
+    await store.bindJob(first.id, 4, expiredAt: 1800000500);
+
+    final listed = await store.listWithJob();
+
+    expect(listed.map((hire) => hire.id), [second.id, first.id]);
+    expect(listed.map((hire) => hire.jobId), [9, 4]);
+    expect((await store.findHire(bare.id))!.jobId, isNull);
+  });
+
+  test('listWithJob rejects a limit below 1', () {
+    expect(() => store.listWithJob(limit: 0), throwsArgumentError);
+  });
 }

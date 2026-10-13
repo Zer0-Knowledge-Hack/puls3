@@ -562,7 +562,7 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
 | `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
 | `mySharedPassword` | Unused template entry. Do not set |
-| `walletAuthSigningKey`, `workersAiApiToken`, `anthropicApiKey` (optional), and the planned server key for server-signed submissions | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| `walletAuthSigningKey`, `escrowRelaySigningKey` (optional `S…` that signs permissionless `release` and `claim_refund`; without it the tracker still runs and those calls stay off), `workersAiApiToken`, `anthropicApiKey` (optional) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
 Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret

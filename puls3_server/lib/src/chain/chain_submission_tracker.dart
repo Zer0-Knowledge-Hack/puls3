@@ -12,15 +12,13 @@ const defaultResendAfter = Duration(seconds: 30);
 /// How many `submitted` records one pass handles at most.
 const defaultTrackerBatchLimit = 100;
 
-/// Purposes whose final outcomes use codes this tracker does not set yet:
-/// `setAgentWallet` expires as `AuthorizationExpired`, and server-signed
-/// calls fail as `EscrowCallFailed` after bounded retries (api.md). They are
-/// left `submitted` until their rules are implemented.
+/// Purposes whose final outcomes use codes this tracker does not set yet.
+/// `setAgentWallet` expires as `AuthorizationExpired`, and `submit` fails as
+/// `EscrowCallFailed` after bounded retries (api.md). They stay `submitted`.
+/// `release` and `claimRefund` are confirmed when the transaction succeeds.
 const _untrackedPurposes = {
   SubmissionPurpose.setAgentWallet,
   SubmissionPurpose.submit,
-  SubmissionPurpose.release,
-  SubmissionPurpose.claimRefund,
 };
 
 /// What one [ChainSubmissionTracker.pass] did, for logging.
@@ -259,6 +257,9 @@ final class ChainSubmissionTracker {
         result = event == null
             ? null
             : await _effects.onFunded(submission, event);
+      case SubmissionPurpose.release || SubmissionPurpose.claimRefund:
+        if (await store.markConfirmed(submission.id)) summary.confirmed++;
+        return true;
       default:
         _untracked(submission, summary);
         return false;

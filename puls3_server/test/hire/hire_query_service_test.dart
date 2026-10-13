@@ -178,4 +178,16 @@ void main() {
 
     expect((await runs.find(hire.id))!.state, HireRunState.queued);
   });
+
+  test(
+    'reading a hire past its deadline records no server submission',
+    () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      final before = await rig.submissions.listByHire(hire.id);
+
+      await query().getHire(rig.wallet, hire.id);
+
+      expect(await rig.submissions.listByHire(hire.id), before);
+    },
+  );
 }

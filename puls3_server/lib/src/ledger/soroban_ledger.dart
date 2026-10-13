@@ -49,7 +49,7 @@ const _simulationSequence = 0;
 /// means the chain says "not there"; an infrastructure problem or a response
 /// the adapter cannot read is a [LedgerException] instead.
 final class SorobanLedger
-    implements LedgerPort, RegistryReader, EscrowJobReader {
+    implements LedgerPort, RegistryReader, EscrowJobReader, EscrowExpiryReader {
   SorobanLedger(this._rpc, this._config);
 
   final SorobanRpcClient _rpc;
@@ -110,6 +110,13 @@ final class SorobanLedger
     );
     return value == null ? null : readOptional(value, decodeEscrowJob);
   }
+
+  /// Escrow `is_expired`. This adapter only simulates the view; it does not
+  /// submit `release` or `claim_refund`.
+  @override
+  Future<bool> isExpired(int jobId) async => readBool(
+    await _read(_config.escrow, 'is_expired', [ScArg.u64(jobId)]),
+  );
 
   @override
   Future<Payment?> findPayment(TransactionHash transaction) async {
