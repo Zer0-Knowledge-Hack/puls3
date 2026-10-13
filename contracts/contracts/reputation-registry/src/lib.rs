@@ -479,9 +479,8 @@ impl ReputationRegistryContract {
             return Err(ReputationError::TimelockNotExpired);
         }
         remove_pending_upgrade(e);
-        e.deployer().update_current_contract(
-            ContractExecutable::Wasm(proposal.wasm_hash),
-        );
+        e.deployer()
+            .update_current_contract(ContractExecutable::Wasm(proposal.wasm_hash));
         Ok(())
     }
 

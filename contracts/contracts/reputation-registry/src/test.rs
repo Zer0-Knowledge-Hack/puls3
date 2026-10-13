@@ -206,8 +206,7 @@ fn only_the_submitter_can_revoke_their_feedback() {
     let stranger = Address::generate(&ctx.env);
     ctx.give(&reviewer, ctx.agent_id, 5, 0);
     assert!(matches!(
-        ctx.rep()
-            .try_revoke_feedback(&stranger, &ctx.agent_id, &1),
+        ctx.rep().try_revoke_feedback(&stranger, &ctx.agent_id, &1),
         Err(Ok(ReputationError::FeedbackNotFound)),
     ));
 }
