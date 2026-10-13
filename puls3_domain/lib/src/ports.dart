@@ -74,6 +74,13 @@ abstract interface class LedgerPort {
   Future<StellarAddress?> agentWallet(AgentId agent);
 }
 
+/// Reads who registered an agent on-chain (`owner_of` of the Identity
+/// Registry). Implemented by the Stellar RPC adapter.
+abstract interface class AgentOwnerReader {
+  /// The owner of [agent], or `null` if the registry has no such agent.
+  Future<StellarAddress?> ownerOf(AgentId agent);
+}
+
 /// Runs agents. Implemented by the agent runtime (#20).
 abstract interface class AgentRuntimePort {
   /// Runs [agent] on [input] and returns its output.
