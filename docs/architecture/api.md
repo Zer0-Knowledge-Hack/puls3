@@ -53,13 +53,15 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 | `HireEndpoint` | `prepareComplete` | `hireId: int` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `SubmissionInProgress`, `ChainUnavailable` |
 | `HireEndpoint` | `prepareReject` | `hireId: int`, `reason: String` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `InvalidRejectReason`, `SubmissionInProgress`, `ChainUnavailable` |
 | `HireEndpoint` | `submitEscrowCall` | `hireId: int`, `preparationId: String`, `signedTransactionXdr: String` | `HireDetail` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `ChainDataUnavailable` |
-| `HireEndpoint` | `getHire` | `hireId: int`, `consumer: String` | `HireDetail` | Yes | `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned` |
+| `HireEndpoint` | `getHire` | `hireId: int`, `consumer: String` | `HireDetail` | Yes | `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned`, `ChainDataUnavailable` |
 | `HireEndpoint` | `listHires` | `consumer: String` | `List<HireSummary>` | Yes | `InvalidStellarAddress`, `WalletMismatch`, `PersistenceUnavailable` |
 | `FeedbackEndpoint` | `getFeedbackEligibility` | `hireId: int`, `client: String` | `FeedbackEligibility` | Yes | `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned`, `HireNotCompleted`, `HireAlreadyRated` |
 | `FeedbackEndpoint` | `prepareFeedback` | `hireId: int`, `score: int`, `comment: String` | `PreparedTransaction` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback`, `SubmissionInProgress`, `ChainUnavailable` |
 | `FeedbackEndpoint` | `submitFeedback` | `hireId: int`, `preparationId: String`, `signedTransactionXdr: String` | `HireDetail` | Yes | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `HireNotCompleted`, `HireAlreadyRated`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature` |
 
 `submitEscrowCall` accepts any client-signed escrow preparation (`createJob`, `fund`, `complete`, `reject`); the preparation's `purpose` selects the domain effect. `prepareReject` hashes `reason` (short display-safe text) into the ERC-8183 `reason` (`bytes32`) and stores the text with the hire.
+
+**Catalog reads (#17).** `listAgents` and `getAgent` are served from the Postgres `agent_record` index, which the server syncs from the identity registry (bootstrap from registry state, then registry events after a stored per-network cursor). While the index is empty the server falls back to reading the registry directly, so `AgentCatalogUnavailable` no longer fires for a chain outage once the index has rows. `listAgents` returns the whole index; Flutter filters by name and skill client-side (F2-3, F2-4). Pagination and server-side search are deferred to a follow-up issue.
 
 **Lifecycle error rule.** Hire methods report a wrong hire state with one code per family, so clients can branch on it:
 
@@ -72,7 +74,7 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 - **Two identifiers.** [`AgentSummary`](models/agent_summary.spy.yaml) carries `id: String`, the metadata id (for example `agt-001`), and `registryId: int`, the on-chain Identity Registry agent id (`u32`, the domain `AgentId`). `get` takes the metadata `id`. `HireEndpoint.createHire(agentId, …)`, `Hire.agentId`, and the escrow use the on-chain id, so the app passes `AgentSummary.registryId` as `agentId`. When orphaned registrations repeat a metadata id, the catalog serves only the newest one (highest `registryId`).
 - **Ordering and skipping.** `list` returns every agent with valid metadata, ordered by `registryId`. An agent whose required metadata (`id`, `name`, `description`, `skills`, `priceUsdcStroops`) is missing or invalid is skipped, not reported as an error.
-- **Outage.** When the chain cannot be read, the last catalog built is served as is, with no freshness flag. Only when nothing is cached do `list` and `get` raise [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) (`message: String`). An outage is never reported as an empty list or `null`.
+- **Outage.** Reads are served from the `agent_record` index, so a chain outage does not affect them while the index has rows. Only when the index is empty and the chain cannot be read do `list` and `get` raise [`AgentCatalogUnavailable`](models/agent_catalog_unavailable.spy.yaml) (`message: String`). An outage is never reported as an empty list or `null`.
 - **Typed exception, not `Puls3ApiException`.** The catalog is the one exception to contract rule 7: it raises the typed Serverpod exception `AgentCatalogUnavailable`, not a `Puls3ApiException` code. An unknown metadata id is `null`, not `AgentNotFound`. The catalog codes `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, and `ChainDataUnavailable` are not raised by the catalog; `InvalidAgentId` and `AgentNotFound` remain in use by `createHire`.
 - **Field names.** `AgentSummary` uses `priceUsdcStroops` (USDC stroops, at most 2^53 − 1) for the domain `price`, and `skills` holds kebab-case skill ids only (1 to 5, in stored order).
 
@@ -184,7 +186,7 @@ Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escro
 | `open` | `createJob` `confirmed`, or `fund` `failed` with `SubmissionRejected`, `PreparationExpired` or `TransactionFailed` | Job created and priced; unfunded | `prepareFund`, `prepareReject` (cancel), `submitEscrowCall` |
 | `open` | `fund` `submitted` | Funding in flight | Poll `getHire`. `prepare…` methods raise `SubmissionInProgress` |
 | `open` | `fund` `failed` with `JobMismatch` or `JobEvidenceUnavailable` | The transaction succeeded but the job does not match this hire; funds stay in the escrow | None. `prepareFund` raises `PaymentAlreadySubmitted`. Refund through `claim_refund` after `expired_at` |
-| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`) | Poll `getHire` |
+| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`). A finished run reads `running` with `result` set until its `submit` lands | Poll `getHire` |
 | `funded` | — | `runtimeStatus` is `failed` | `prepareReject` (one-step reject and refund). Fallback: the tracker calls `claim_refund` after `expired_at` |
 | `submitted` | `submit` `confirmed` | Delivered; awaiting the client's evaluation; `result` and `approvalDeadline` are set | Before `approvalDeadline`: `prepareComplete`, `prepareReject`. After it: `prepareComplete` until the tracker's `release` lands; poll `getHire` |
 | `expired` (derived) | — | Unfunded job past `expired_at`: on chain it stays `Open`, but `fund` reverts and there is nothing to refund | None. No transaction |
@@ -288,6 +290,8 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
 | `FeedbackEligibility` | `hireId`, `eligible: bool` |
 
+**`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline`, `rejectReason` and `feedbackSubmission` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`.
+
 `PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
 
 **`createHire` idempotency.** `requestId` is a client-generated UUID, created once per **Confirm and pay** action and reused on every retry of it. The server keeps it unique per session wallet for the life of the hire:
@@ -340,7 +344,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F3-1 | `AgentEndpoint.get(id)`; `null` shows the not-found state. |
-| F3-2 | `AgentEndpoint.get`; during an outage the server serves its last cached catalog with no freshness flag, and raises `AgentCatalogUnavailable` only when nothing is cached. The cached-data warning needs `chainDataFresh`, planned in #17. |
+| F3-2 | `AgentEndpoint.get`; reads come from the index (no chain while it has rows), and `AgentCatalogUnavailable` is raised only when the index is empty and the chain cannot be read. The cached-data warning needs `chainDataFresh`, deferred (not served yet). |
 | F3-3 | Client-only: open the agent's explorer link. Planned: `explorerUrl` is not served yet (#17). |
 | F3-4 | Client-only: open F5 with `registryId` as the hire's `agentId`. Planned: `active` is not served yet (#18), so Hire is not hidden by the catalog. |
 
@@ -364,7 +368,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F5-1 | Client-only input validation. Planned: the input limit is not served by `AgentSummary` yet (#35); `createHire` validates authoritatively (`InputTooLong`). |
-| F5-2 | Client-only wallet balance and trustline check using network configuration; run F1 if disconnected. |
+| F5-2 | Client-only wallet balance and trustline check, before any signature: the app reads the consumer's Circle testnet USDC (`USDC:GBBD…LFLA5`, the asset of `PULS3_STELLAR_USDC_SAC`) from Horizon; run F1 if disconnected. No account, no trustline or less than `Hire.price` stops the flow with the balance shown. A failed read does not block: `prepareFund`'s simulation (`ChainUnavailable`, `simulationFailed`) stays the authoritative check. |
 | F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)`, with `agentId` = `AgentSummary.registryId`, creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, a server-set `expired_at`, the USDC SAC as token, and `Hire.price` as budget. **Retry** reuses the same `requestId`. |
 | F5-4 | Two signatures. The wallet signs `preparedCreateJob`; `submitEscrowCall` relays it. Once `create_job` is confirmed, `prepareFund(hireId)` returns the `fund` envelope, with `expected_budget` = `Hire.price` and `max_fee_bps` = `NetworkConfig.platformFeeBps`; the wallet signs it and `submitEscrowCall` relays it. `WalletRejected` is client-only: the hire stays `open`. After `PreparationExpired` or `SubmissionRejected`, call the same `prepare…` method and sign again. |
 | F5-5 | Poll `HireEndpoint.getHire`; `escrowSubmission` (`fund`, `submitted`) shows **Verifying payment…**. `JobMismatch` or `JobEvidenceUnavailable` shows "Payment does not match this hire" with the transaction link; the funds stay in the escrow and return after `expired_at`. |

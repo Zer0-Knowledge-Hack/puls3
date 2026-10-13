@@ -168,6 +168,26 @@ void main() {
       expect(installs, 1);
     });
 
+    testWidgets('a connector that failed to load never asks to install', (
+      tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        WalletPanel(
+          status: WalletStatus.error,
+          walletName: 'Freighter',
+          error: const WalletConnectorUnavailable(),
+          onConnect: () {},
+          onDisconnect: () {},
+          onInstall: () {},
+        ),
+      );
+      expect(find.text('Could not load the wallet connector'), findsOneWidget);
+      expect(find.textContaining('ad blocker'), findsOneWidget);
+      expect(find.text('Install Freighter'), findsNothing);
+      expect(find.text('Try again'), findsOneWidget);
+    });
+
     testWidgets('a locked wallet asks to unlock', (tester) async {
       await pumpPanel(
         tester,

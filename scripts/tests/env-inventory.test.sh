@@ -63,8 +63,9 @@ done
 echo "# every secret is in docs/infra/secrets.md"
 if [ -f "$SECRETS_DOC" ]; then
   ok "secrets.md exists"
-  # Serverpod passwords: every key of passwords.example.yaml.
-  KEYS="$(grep -oE '^ *#? *[A-Za-z]+: *<generate>' "$REPO_ROOT/puls3_server/config/passwords.example.yaml" |
+  # Serverpod passwords: every key of passwords.example.yaml, generated
+  # (<generate>) or provided (<Stellar secret key>, <your ... token>).
+  KEYS="$(grep -oE '^ *#? *[A-Za-z]+: *<' "$REPO_ROOT/puls3_server/config/passwords.example.yaml" |
     sed -E 's/^ *#? *//; s/:.*//' | sort -u)"
   # Docker passwords, CLI identities that hold keys, and the env alternatives.
   OTHERS="$(grep -oE '^[A-Z_]+=' "$REPO_ROOT/puls3_server/.env.example" | tr -d '=')

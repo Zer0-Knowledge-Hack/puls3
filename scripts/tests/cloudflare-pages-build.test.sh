@@ -82,7 +82,16 @@ else
   bad "passes PULS3_API_URL as a dart-define" "$(cat "$log")"
 fi
 
-# 4. A failed clone stops the build before Flutter runs.
+# 4. PULS3_HIRE from the Pages environment selects the hire backend.
+log="$WORK/hire"
+run_build "$log" PULS3_API_URL=https://example.api.serverpod.space/ PULS3_HIRE=server
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_API_URL=https://example.api.serverpod.space/ --dart-define=HIRE=server" "$log"; then
+  ok "passes PULS3_HIRE as the HIRE dart-define"
+else
+  bad "passes PULS3_HIRE as the HIRE dart-define" "$(cat "$log")"
+fi
+
+# 5. A failed clone stops the build before Flutter runs.
 log="$WORK/clone-fails"
 if run_build "$log" GIT_STUB_FAIL=1; then
   bad "failed clone exits non-zero" "exit 0"

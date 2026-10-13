@@ -279,4 +279,140 @@ void main() {
       });
     }
   });
+
+  group('getLatestLedger', () {
+    test('posts no params and returns the sequence', () async {
+      late Map<String, Object?> body;
+      final client = _client(
+        MockClient((request) async {
+          body = jsonDecode(request.body) as Map<String, Object?>;
+          return _json(_fixture('get_latest_ledger.json'));
+        }),
+      );
+
+      final sequence = await client.getLatestLedger();
+
+      expect(body['method'], 'getLatestLedger');
+      expect(body['params'], isEmpty);
+      expect(sequence, 5079957);
+    });
+
+    test('a result without a numeric sequence is LedgerUnavailable', () {
+      final client = _client(
+        MockClient(
+          (_) async => _json({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'result': {'sequence': '5079957'},
+          }),
+        ),
+      );
+
+      expect(client.getLatestLedger, _throwsUnavailable);
+    });
+  });
+
+  group('getEvents', () {
+    test('posts the ledger range, filter and xdrFormat json', () async {
+      late Map<String, Object?> body;
+      final client = _client(
+        MockClient((request) async {
+          body = jsonDecode(request.body) as Map<String, Object?>;
+          return _json(_fixture('get_events_registry_register_7.json'));
+        }),
+      );
+
+      final page = await client.getEvents(
+        startLedger: 5023602,
+        endLedger: 5023606,
+        limit: 10,
+        filters: const [
+          RpcEventFilter(contractIds: ['CD5QZO']),
+        ],
+      );
+
+      expect(body['method'], 'getEvents');
+      expect(body['params'], {
+        'startLedger': 5023602,
+        'endLedger': 5023606,
+        'filters': [
+          {
+            'type': 'contract',
+            'contractIds': ['CD5QZO'],
+          },
+        ],
+        'pagination': {'limit': 10},
+        'xdrFormat': 'json',
+      });
+      expect(page.events, hasLength(8));
+      expect(page.latestLedger, 5079954);
+      expect(page.cursor, '0021576223477989375-4294967295');
+      expect(page.events.first.ledger, 5023604);
+      expect(
+        page.events.first.contractId,
+        'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
+      );
+      expect(page.events.first.inSuccessfulContractCall, isTrue);
+      expect(page.events.first.topicJson, hasLength(3));
+    });
+
+    test('a cursor is sent without a startLedger', () async {
+      late Map<String, Object?> body;
+      final client = _client(
+        MockClient((request) async {
+          body = jsonDecode(request.body) as Map<String, Object?>;
+          return _json(_fixture('get_events_registry_register_7.json'));
+        }),
+      );
+
+      await client.getEvents(cursor: 'abc', limit: 2);
+
+      expect(body['params'], {
+        'pagination': {'limit': 2, 'cursor': 'abc'},
+        'xdrFormat': 'json',
+      });
+    });
+
+    test('needs a startLedger or a cursor', () {
+      final client = _client(MockClient((_) async => _json({})));
+
+      expect(() => client.getEvents(), throwsArgumentError);
+    });
+
+    test('a malformed event is LedgerUnavailable', () {
+      final client = _client(
+        MockClient(
+          (_) async => _json({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'result': {
+              'events': [
+                {'ledger': 'nope'},
+              ],
+              'latestLedger': 1,
+            },
+          }),
+        ),
+      );
+
+      expect(
+        () => client.getEvents(startLedger: 1),
+        _throwsUnavailable,
+      );
+    });
+
+    test('a result without events and latestLedger is unavailable', () {
+      final client = _client(
+        MockClient(
+          (_) async => _json({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'result': {'cursor': 'abc'},
+          }),
+        ),
+      );
+
+      expect(() => client.getEvents(startLedger: 1), _throwsUnavailable);
+    });
+  });
 }

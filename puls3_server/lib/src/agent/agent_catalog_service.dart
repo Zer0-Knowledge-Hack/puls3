@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:puls3_domain/puls3_domain.dart';
 
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
-import 'agent_metadata.dart';
+import 'agent_summary_reader.dart';
+import 'catalog_reader.dart';
 import 'registry_reader.dart';
 
 /// How long a built catalog is served without reading the chain again.
@@ -22,7 +20,7 @@ const _readConcurrency = 4;
 /// read is different: the refresh is abandoned, the last list built is served
 /// when there is one, and [AgentCatalogUnavailable] is thrown otherwise. An
 /// outage is never reported as an empty catalog.
-final class AgentCatalogService {
+final class AgentCatalogService implements CatalogReader {
   AgentCatalogService(
     this._registry, {
     DateTime Function()? now,
@@ -42,6 +40,7 @@ final class AgentCatalogService {
   Future<List<AgentSummary>>? _refresh;
 
   /// Every valid agent, ordered by registry id.
+  @override
   Future<List<AgentSummary>> list() {
     final cached = _cached;
     final builtAt = _builtAt;
@@ -54,6 +53,7 @@ final class AgentCatalogService {
   }
 
   /// The agent whose metadata id is [id], or `null` when there is none.
+  @override
   Future<AgentSummary?> get(String id) async {
     for (final agent in await list()) {
       if (agent.id == id) return agent;
@@ -101,37 +101,8 @@ final class AgentCatalogService {
   }
 
   /// One agent, or `null` when its metadata is missing or invalid.
-  Future<AgentSummary?> _read(int registryId) async {
-    final agent = AgentId(registryId);
-
-    Future<Uint8List?> metadata(String key) =>
-        _registry.agentMetadata(agent, key);
-
-    final id = parseAgentId(await metadata('id'));
-    if (id == null) return null;
-    final name = parseName(await metadata('name'));
-    final description = parseDescription(await metadata('description'));
-    final skills = parseSkills(await metadata('skills'));
-    final price = parsePriceUsdcStroops(await metadata('priceUsdcStroops'));
-    if (name == null ||
-        description == null ||
-        skills == null ||
-        price == null) {
-      return null;
-    }
-    final model = parseModel(await metadata('model'));
-    final wallet = await _registry.agentWallet(agent);
-    return AgentSummary(
-      id: id,
-      registryId: registryId,
-      name: name,
-      description: description,
-      skills: skills,
-      priceUsdcStroops: price,
-      wallet: wallet?.value,
-      model: model,
-    );
-  }
+  Future<AgentSummary?> _read(int registryId) =>
+      readAgentSummary(_registry, registryId);
 
   /// Orphans may repeat a metadata id: keep the newest registration.
   List<AgentSummary> _newestPerId(List<AgentSummary> agents) {

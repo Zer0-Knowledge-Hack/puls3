@@ -1,51 +1,49 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:puls3_domain/puls3_domain.dart';
-import 'package:puls3_server/src/agent/agent_catalog_service.dart';
+import 'package:puls3_server/src/agent/agent_catalog_wiring.dart';
 import 'package:puls3_server/src/agent/agent_endpoint.dart';
-import 'package:puls3_server/src/agent/registry_reader.dart';
+import 'package:puls3_server/src/agent/catalog_reader.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
-import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
-/// The endpoint never touches the session, so a bare stand-in is enough.
+/// The injected reader never touches the session, so a bare stand-in is
+/// enough for those tests.
 final class _UnusedSession implements Session {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('The agent endpoint must not use the session');
 }
 
-final class _FakeRegistry implements RegistryReader {
-  _FakeRegistry({this.unavailable = false});
+AgentSummary _agent({String id = 'agt-001'}) => AgentSummary(
+  id: id,
+  registryId: 7,
+  name: 'Ledger Scout',
+  description: 'Reads the ledger and reports what changed.',
+  skills: const ['ledger-analysis'],
+  priceUsdcStroops: 5000000,
+  wallet: 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+  model: 'claude-sonnet',
+);
 
-  final bool unavailable;
+final class _FakeCatalog implements CatalogReader {
+  _FakeCatalog(this.agents, {this.failure});
 
-  static const _agent = {
-    'id': 'agt-001',
-    'name': 'Ledger Scout',
-    'description': 'Reads the ledger and reports what changed.',
-    'skills': '["ledger-analysis"]',
-    'priceUsdcStroops': '5000000',
-  };
+  final List<AgentSummary> agents;
+  final Object? failure;
 
   @override
-  Future<int> totalAgents() async {
-    if (unavailable) throw const LedgerUnavailable('down');
-    return 1;
+  Future<List<AgentSummary>> list() async {
+    if (failure != null) throw failure!;
+    return agents;
   }
 
   @override
-  Future<Uint8List?> agentMetadata(AgentId id, String key) async {
-    final value = _agent[key];
-    return value == null ? null : Uint8List.fromList(utf8.encode(value));
+  Future<AgentSummary?> get(String id) async {
+    if (failure != null) throw failure!;
+    for (final agent in agents) {
+      if (agent.id == id) return agent;
+    }
+    return null;
   }
-
-  @override
-  Future<StellarAddress?> agentWallet(AgentId id) async => null;
 }
 
 void main() {
@@ -54,85 +52,56 @@ void main() {
 
   tearDown(() {
     AgentEndpoint.service = null;
-    AgentEndpoint.defaultServiceBuilder = null;
+    AgentEndpoint.defaultServiceBuilder = buildAgentCatalogReader;
   });
 
-  test('list serves the injected service', () async {
-    AgentEndpoint.service = AgentCatalogService(_FakeRegistry());
+  test('list serves the injected reader', () async {
+    AgentEndpoint.service = _FakeCatalog([_agent()]);
 
     final agents = await endpoint.list(session);
 
-    expect(agents.map((a) => a.id), ['agt-001']);
+    expect(agents.single.id, 'agt-001');
     expect(agents.single.name, 'Ledger Scout');
   });
 
   test('get returns a known agent and null for an unknown id', () async {
-    AgentEndpoint.service = AgentCatalogService(_FakeRegistry());
+    AgentEndpoint.service = _FakeCatalog([_agent()]);
 
     expect((await endpoint.get(session, 'agt-001'))?.priceUsdcStroops, 5000000);
     expect(await endpoint.get(session, 'agt-999'), isNull);
   });
 
-  test('list and get throw AgentCatalogUnavailable during an outage', () {
-    AgentEndpoint.service = AgentCatalogService(
-      _FakeRegistry(unavailable: true),
+  test('list and get propagate an unavailability error', () {
+    AgentEndpoint.service = _FakeCatalog(
+      const [],
+      failure: AgentCatalogUnavailable(
+        message: 'The agent catalog cannot be read from the chain right now.',
+      ),
     );
 
-    expect(
-      endpoint.list(session),
-      throwsA(isA<AgentCatalogUnavailable>()),
-    );
+    expect(endpoint.list(session), throwsA(isA<AgentCatalogUnavailable>()));
     expect(
       endpoint.get(session, 'agt-001'),
       throwsA(isA<AgentCatalogUnavailable>()),
     );
   });
 
-  test(
-    'default service is built once on first use from the environment',
-    () async {
-      final urls = <Uri>[];
-      var built = 0;
-      AgentEndpoint.service = null;
-      AgentEndpoint.defaultServiceBuilder = () {
-        built++;
-        return AgentEndpoint.buildDefaultService(
-          environment: {'PULS3_STELLAR_RPC_URL': 'https://rpc.example.test'},
-          httpClient: MockClient((http.Request request) async {
-            urls.add(request.url);
-            return http.Response('down', 503);
-          }),
-        );
-      };
+  test('the default builder receives the session', () async {
+    late Session seen;
+    AgentEndpoint.service = null;
+    AgentEndpoint.defaultServiceBuilder = (s) {
+      seen = s;
+      return _FakeCatalog([_agent()]);
+    };
 
-      expect(built, 0, reason: 'nothing is built before the first call');
+    final agents = await endpoint.list(session);
 
-      await expectLater(
-        endpoint.list(session),
-        throwsA(isA<AgentCatalogUnavailable>()),
-      );
-      await expectLater(
-        endpoint.list(session),
-        throwsA(isA<AgentCatalogUnavailable>()),
-      );
-
-      expect(built, 1, reason: 'the default service is reused');
-      expect(urls, isNotEmpty);
-      expect(urls.first.host, 'rpc.example.test');
-    },
-  );
+    expect(seen, same(session));
+    expect(agents.single.id, 'agt-001');
+  });
 
   test('AgentSummary exposes exactly the catalog fields and no rating', () {
-    final json = AgentSummary(
-      id: 'agt-001',
-      registryId: 1,
-      name: 'n',
-      description: 'd',
-      skills: ['s'],
-      priceUsdcStroops: 1,
-      wallet: 'w',
-      model: 'm',
-    ).toJson();
+    final json = _agent().toJson();
 
     expect(
       json.keys.toSet()..remove('__className__'),

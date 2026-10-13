@@ -107,6 +107,27 @@ base64 string, a `Uint8Array`/`ArrayBuffer`, or a JSON-serialized Node
 verified, so it arrived in one of these shapes; which one was not logged.
 Dart verifies the signature, so an unexpected shape fails closed.
 
+### Production adapter (#69)
+
+The spike adapter above stays as reviewed. The production adapter that
+replaced it in #113 (`puls3_flutter/lib/src/wallet/freighter/freighter_wallet.dart`)
+closes the #69 findings. Each case below is refused with
+`WalletInvalidPayload` before Freighter is called, and its test in
+`puls3_flutter/test/wallet/freighter_wallet_test.dart` asserts that the
+bridge was never called (`signCalls == 0` / `authCalls == 0`):
+
+| Guarantee | Test |
+|---|---|
+| A fee-bump envelope is refused (only standard `Transaction` envelopes are signed) | `#69: refuses a fee-bump envelope before the prompt` |
+| An auth entry with `signatureExpirationLedger == 0` is refused | `#69: refuses an entry without an expiration ledger` |
+| An auth entry followed by trailing bytes is refused | `#69: refuses trailing bytes before the prompt` |
+| An auth entry with contract-address credentials is refused | `#69: refuses contract-address credentials` |
+
+Legacy `ADDRESS` signing still passes there (`signs the preimage like the
+SDK signer`); `ADDRESS_V2` signing is covered by the spike tests. The spike
+adapter's own tests do not cover the four cases above, so these guarantees
+hold for the production adapter only.
+
 ## Automated verification
 
 Use Flutter 3.35+ / Dart 3.8+ and `stellar_flutter_sdk` 3.8.0:
@@ -304,9 +325,9 @@ the spike's tests; anything else is marked **unverified**.
      prompt;
    - the signed envelope must be unchanged and carry a new valid signature.
 
-   Still open in #69: binding fee-bump envelopes before the prompt, and
-   rejecting zero expiration. Production must bundle the Freighter API and
-   enforce CSP. Mobile needs a separate wallet adapter.
+   The production adapter adds the #69 guarantees (see "Production adapter
+   (#69)" above). Production must still bundle the Freighter API and enforce
+   CSP. Mobile needs a separate wallet adapter.
 
 ### #8 API contract draft ([`docs/architecture/api.md`](../architecture/api.md), provisional)
 

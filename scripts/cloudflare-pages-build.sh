@@ -22,6 +22,11 @@ build_args=(--release)
 if [ -n "${PULS3_API_URL:-}" ]; then
   build_args+=("--dart-define=PULS3_API_URL=$PULS3_API_URL")
 fi
+# Set PULS3_HIRE=server once the server accepts wallet sessions, so hires
+# move real testnet USDC through the escrow. Unset keeps the labelled demo.
+if [ -n "${PULS3_HIRE:-}" ]; then
+  build_args+=("--dart-define=HIRE=$PULS3_HIRE")
+fi
 
 cd "$REPO_ROOT/puls3_flutter"
 flutter build web "${build_args[@]}"

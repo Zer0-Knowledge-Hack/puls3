@@ -345,6 +345,30 @@ class Endpoints extends _is.EndpointDispatch {
                     params['reason'],
                   ),
         ),
+        'getHire': _is.MethodConnector(
+          name: 'getHire',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'consumer': _is.ParameterDescription(
+              name: 'consumer',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _icdhibuq.HireEndpoint).getHire(
+                session,
+                params['hireId'],
+                params['consumer'],
+              ),
+        ),
         'submitEscrowCall': _is.MethodConnector(
           name: 'submitEscrowCall',
           params: {

@@ -13,11 +13,15 @@ the agent catalog from the on-chain identity registry.
 for example `agt-001`, or `null` when there is none. There is no rating: the
 registry does not store one.
 
-The registry has no list function, so the server reads `total_agents` and then
-the metadata of ids `0` to `total - 1` through Soroban RPC simulations (four
-agents at a time). An agent whose metadata is missing or invalid, such as a
-superseded registration, is skipped. The endpoint never signs or submits a
-transaction.
+The endpoint reads from the Postgres index (`agent_record`), which the
+**agent catalog indexer** below syncs from the identity registry. While the
+index is empty the endpoint falls back to reading the registry directly: the
+registry has no list function, so it reads `total_agents` and then the metadata
+of ids `0` to `total - 1` through Soroban RPC simulations (four agents at a
+time). An agent whose metadata is missing or invalid, such as a superseded
+registration, is skipped. Reads never touch the chain while the index has rows,
+so a chain outage does not take the catalog down. The endpoint never signs or
+submits a transaction.
 
 The chain is read from the testnet values unless these variables override
 them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
@@ -25,11 +29,30 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
-The built list is cached in memory for 60 seconds, and concurrent callers share
-one refresh. If a refresh fails because the chain cannot be read, the last list
-is served. With no cached list, `list` and `get` throw the serializable
-`AgentCatalogUnavailable` exception; an outage is never an empty list, and an
-unknown id is never reported as an outage.
+With no indexed rows and a chain that cannot be read, the on-chain fallback
+throws the serializable `AgentCatalogUnavailable` exception; an outage is never
+an empty list, and an unknown id is never reported as an outage.
+
+## Agent catalog indexer
+
+A background loop keeps the `agent_record` index in sync with the identity
+registry. The first pass bootstraps from registry state, because the RPC keeps
+only about 7 days of events. Later passes read the registry events after the
+stored cursor (`catalog_index_state`) to find the agents that changed, then
+hydrate them from state; any agent missing from the index is always hydrated,
+so a registration is never lost. Writes are idempotent (upsert by registry id),
+so re-running a pass never creates duplicates. The chain stays the source of
+truth; the index keeps serving reads while the chain is down.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_INDEXER_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_INDEXER_INTERVAL_SECONDS` | `30` | Seconds between passes; a positive whole number |
+
+It is off by default so tests, CI and existing deployments do not read the
+chain unless asked to. It uses the same `PULS3_STELLAR_*` variables as the
+agent catalog, and writes `[catalog-indexer]` lines to stdout (info) and stderr
+(warnings).
 
 ## Chain submission tracker
 
@@ -55,6 +78,52 @@ It is off by default so tests, CI and existing deployments do not poll the
 chain. It uses the same `PULS3_STELLAR_*` variables as the agent catalog, and
 writes `[chain-tracker]` lines to stdout (info) and stderr (warnings).
 
+## Agent runtime
+
+A second background loop runs the agent of every funded hire once (#20).
+When the tracker records a hire's payment, it queues a run (`hire_run`) in
+the same transaction. Each pass:
+1. fails runs still `running` past the timeout plus a minute (`interrupted`);
+2. takes up to 10 queued runs, one at a time, with a conditional update, so
+   two runners never run the same hire;
+3. loads the manifest the hire pinned and calls the model through
+   `AgentRunner` (input and output limits, timeout that aborts the call);
+4. stores the result, or a safe failure code such as `timeout`,
+   `provider_error:<type>` or `manifest_unavailable`.
+
+Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
+`HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
+`running`, `failed`), with the `result` and `failureReason`.
+
+A successful run leaves the hire `funded` with its result: the server-signed
+escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
+deployed manifests, the demo agents' manifests are seeded in
+`lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
+(`agt-006` Copy Forge, `agt-007` Support Relay). Both run on Cloudflare
+Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`), the free provider of
+the #34 model policy. `ProviderRouter` sends each run to its manifest's
+provider; a provider without credentials fails the run as
+`unsupported_provider`.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PULS3_RUNTIME_ENABLED` | `false` | Only `true` starts the loop |
+| `PULS3_RUNTIME_INTERVAL_SECONDS` | `5` | Seconds between passes; a positive whole number |
+| `PULS3_RUNTIME_TIMEOUT_SECONDS` | `120` | Longest one run may take; it must end before the job's `expired_at` |
+| `PULS3_WORKERS_AI_ACCOUNT_ID` | none | Cloudflare account id for Workers AI (public) |
+| Serverpod password `workersAiApiToken` | none | Cloudflare API token for Workers AI. Locally, `shared: workersAiApiToken:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set workersAiApiToken --from-file <file>` |
+| Serverpod password `anthropicApiKey` | none | Optional Anthropic API key, for manifests with provider `anthropic` (BYOK) |
+
+With neither provider configured the loop does not start, even when enabled.
+
+The server-wide `workersAiApiToken` is for the seeded demo agents only. Builder
+agents run on the builder's own provider account (ADR-0004 amendment, #142),
+resolved from the deploy record once #18/#35 land.
+
+It is off by default so tests, CI and existing deployments never call a paid
+model. It writes `[agent-runtime]` lines to stdout (info) and stderr
+(warnings).
+
 ### Hire configuration
 
 | Variable | Default | Meaning |
@@ -72,14 +141,15 @@ value makes that call fail with `HireConfigurationMissing` naming the key
 
 ### Hire endpoint sessions
 
-`HireEndpoint` (`createHire`, `prepareCreateJob`, `prepareFund`,
-`prepareComplete`, `prepareReject`, `submitEscrowCall`) resolves the caller
-through the `SessionWallet` seam before doing any work. Until wallet sessions
-exist (#25) the production binding, `FailClosedSessionWallet`, fails closed:
-every call is rejected with `AuthenticationUnavailable`, so the hire methods
-are not usable against a running server yet. Tests inject a fake with
-`HireEndpoint.sessionWallet`. `InputTooLong` has no documented limit, so the
-hire `input` length is not checked.
+Every `HireEndpoint` method (`createHire`, `prepareCreateJob`, `prepareFund`,
+`prepareComplete`, `prepareReject`, `submitEscrowCall`, `getHire`) requires a
+signed-in caller: a request without a session is HTTP 401 before the method
+runs. The method then resolves the caller's wallet through the
+`SessionWallet` seam before doing any work. The production binding,
+`WalletSessionWallet`, reads the wallet that [wallet sign-in](#wallet-sign-in)
+bound to the session and never trusts an address the caller sends. Tests
+inject a fake with `HireEndpoint.sessionWallet`. `InputTooLong` has no
+documented limit, so the hire `input` length is not checked.
 
 ### End-to-end proof on testnet
 
@@ -112,6 +182,53 @@ PULS3_PLATFORM_FEE_BPS=0 \
 PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
 ```
+
+## Wallet sign-in
+
+Hires need a wallet session (#136). The app asks
+`walletAuth.createChallenge` for a SEP-10 challenge, the wallet signs it, and
+`walletAuth.verifyChallenge` checks both signatures and returns a Serverpod
+session (a JWT, renewed through `jwtRefresh`).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Serverpod password `walletAuthSigningKey` | none | Stellar secret key (`S…`) that signs every challenge. It only signs and never submits, so a new key with no funds is enough. Locally, `walletAuthSigningKey:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set walletAuthSigningKey --from-file <file>` |
+| `PULS3_AUTH_HOME_DOMAIN` | none | Home domain written into the challenge (`<home domain> auth`). The deployed server uses its API host |
+| `PULS3_AUTH_WEB_AUTH_DOMAIN` | none | Host that serves wallet authentication. The deployed server uses its API host |
+
+In the `production` run mode **the server refuses to start** while any of the
+three is missing or blank (`WalletAuthConfig.ensureProduction` in
+`server.dart`), so set them before deploying a commit that includes #136.
+Other run modes start, and `createChallenge` answers
+`AuthenticationUnavailable`. When all three are set, the server publishes its
+public signing key and home domain in the web app's `config.json` (`auth`).
+
+A key for testnet:
+
+```bash
+stellar keys generate puls3-auth --network testnet
+stellar keys secret puls3-auth > walletAuthSigningKey.txt
+scloud password set walletAuthSigningKey --from-file walletAuthSigningKey.txt
+rm walletAuthSigningKey.txt
+```
+
+## Agent wallet custody
+
+Part of #18. Each agent will get its own custodied ed25519 account (ADR-0003
+decision 4). The server generates the keypair, encrypts the secret seed with
+AES-256-GCM, and stores only the ciphertext, nonce, MAC and key version in
+`agent_wallet`. The wallet address is the GCM additional authenticated data, so
+a secret copied to another row does not decrypt. The plaintext seed is never
+logged, stored or returned; only the public `G…` address leaves the custody
+adapter. Creation is idempotent per caller key (the deploy session/draft id), so
+a retry cannot orphan a funded account.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_AGENT_WALLET_SECRET_KEY` | none (required) | Base64 of a random 32-byte key (`openssl rand -base64 32`) that encrypts agent secrets at rest. **Back it up:** losing it makes every custodied account unrecoverable. When it is unset, creating an agent wallet fails with `AgentWalletCustodyUnavailable`. |
+
+Funding the account and adding its USDC trustline, and the on-chain
+registration (`register_full` / `set_agent_wallet`), are the next part of #18.
 
 ## Prerequisites
 
@@ -217,7 +334,10 @@ when its origin is not allowed.
 The server runs on Serverpod Cloud, which also provides its PostgreSQL
 database. The Flutter web app is deployed separately to Cloudflare Pages (not
 covered here); build it with `--dart-define=PULS3_API_URL=<api-url>` so it
-calls this server.
+calls this server. In the Pages project, `scripts/cloudflare-pages-build.sh`
+reads `PULS3_API_URL` and `PULS3_HIRE` from the environment; set
+`PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
+stay the labelled demo.
 
 | | URL |
 |---|---|
@@ -319,12 +439,43 @@ per project.
    - `PULS3_GIT_SHA` is set by the pre-deploy script in step 6. Do not set it
      by hand.
    - `PULS3_STELLAR_*` default to testnet. Set them only for another network.
-   - Leave `PULS3_TRACKER_ENABLED` unset: the chain submission tracker stays
-     off in this deployment.
 
-   Serverpod Cloud generates and manages the passwords the server needs today
-   (see [Secrets in Serverpod Cloud](#secrets-in-serverpod-cloud)). Check them
-   with `scloud password list`.
+   For hires on testnet (wallet sign-in, payment confirmation and the agent
+   run), also set these. Replace `<api-host>` with
+   `<project-id>.api.serverpod.space`:
+
+   ```bash
+   scloud variable set PULS3_AUTH_HOME_DOMAIN <api-host>
+   scloud variable set PULS3_AUTH_WEB_AUTH_DOMAIN <api-host>
+   scloud variable set PULS3_TRACKER_ENABLED true
+   scloud variable set PULS3_INDEXER_ENABLED true
+   scloud variable set PULS3_RUNTIME_ENABLED true
+   scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 86400
+   scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
+   scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
+   scloud variable set PULS3_PLATFORM_FEE_BPS 0
+   ```
+
+   - `PULS3_AUTH_*`, with the `walletAuthSigningKey` password below, enable
+     [wallet sign-in](#wallet-sign-in). Production does not start without
+     them.
+   - `PULS3_TRACKER_ENABLED=true` is required for hires: a hire is paid only
+     when the tracker confirms its `fund`
+     ([Chain submission tracker](#chain-submission-tracker)). Without it, a
+     payment stays at "Awaiting payment".
+   - `PULS3_INDEXER_ENABLED` keeps the catalog in sync with the registry.
+     `PULS3_RUNTIME_ENABLED` and the Workers AI account run the agent of every
+     paid hire ([Agent runtime](#agent-runtime)).
+   - The four hire values are the ones of the testnet end-to-end proof
+     ([Hire configuration](#hire-configuration)). `PULS3_PLATFORM_FEE_BPS`
+     must equal `NetworkConfig.platformFeeBps` (0 on testnet).
+
+   Serverpod Cloud generates and manages the platform passwords (see
+   [Secrets in Serverpod Cloud](#secrets-in-serverpod-cloud)). Set the two
+   that hires need from files: `walletAuthSigningKey`
+   ([Wallet sign-in](#wallet-sign-in)) and `workersAiApiToken`
+   ([Agent runtime](#agent-runtime)). Check them with `scloud password list`.
 
 6. **Deploy.**
 
@@ -366,9 +517,13 @@ per project.
 Anyone with access to the project, on a machine where steps 1 and 2 are done:
 
 1. Update `main`: `git switch main && git pull`.
-2. Deploy: `scloud deploy`. The pre-deploy script sets `PULS3_GIT_SHA`.
-3. Verify with the three calls of step 7. `version` must name the commit you
-   just pulled.
+2. Compare `scloud variable list` and `scloud password list` with step 5 and
+   set anything new first. A production server without the
+   [wallet sign-in](#wallet-sign-in) settings does not start.
+3. Deploy: `scloud deploy`. The pre-deploy script sets `PULS3_GIT_SHA`.
+4. Verify with the three calls of step 7. `version` must name the commit you
+   just pulled. With the hire settings in place, `walletAuth/createChallenge`
+   answers instead of `Endpoint not found`.
 
 To change only variables (no new code), run `scloud variable set ...` and then
 `scloud deploy --redeploy`, which redeploys the running build with the latest
@@ -407,7 +562,7 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
 | `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
 | `mySharedPassword` | Unused template entry. Do not set |
-| Server signing key, per-agent wallet encryption key, LLM provider key (planned) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| `walletAuthSigningKey`, `workersAiApiToken`, `anthropicApiKey` (optional), and the planned server key for server-signed submissions | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
 Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret

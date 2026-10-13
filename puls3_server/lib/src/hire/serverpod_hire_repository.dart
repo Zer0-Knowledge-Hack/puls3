@@ -3,6 +3,8 @@ import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart' hide Hire, Payment;
+import '../runtime/hire_run_store.dart';
+import '../runtime/serverpod_hire_run_store.dart';
 import 'hire_lifecycle_store.dart';
 
 /// PostgreSQL-backed implementation of [HireRepository] using Serverpod ORM.
@@ -13,10 +15,15 @@ import 'hire_lifecycle_store.dart';
 ///
 /// It is also the [HireLifecycleStore]: the relay's view of a hire adds the
 /// idempotency key, the input and the escrow job id (design D10).
+///
+/// Recording a payment also queues the hire's agent run (#20) in the same
+/// transaction, so every funded hire has exactly one run.
 class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
-  ServerpodHireRepository(this.session);
+  ServerpodHireRepository(this.session, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
 
   final Session session;
+  final DateTime Function() _now;
 
   @override
   Future<Hire> create({
@@ -171,8 +178,24 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       amount: UsdcAmount.stroops(paymentRecord.amount),
     );
 
-    return open.fund(payment, agentWallet: payment.payee);
+    final funded = open.fund(payment, agentWallet: payment.payee);
+    final run = await HireRunRecord.db.findFirstRow(
+      session,
+      where: (t) => t.hireId.equals(id.value),
+    );
+    return run == null ? funded : _replayRun(funded, run);
   }
+
+  /// [funded] with its stored run applied through the domain transitions.
+  static Hire _replayRun(Hire funded, HireRunRecord run) =>
+      switch (HireRunState.parse(run.state)) {
+        HireRunState.queued => funded,
+        HireRunState.running || HireRunState.succeeded => funded.startRun(),
+        HireRunState.failed =>
+          (run.startedAt == null ? funded : funded.startRun()).failRun(
+            reason: run.failureReason ?? runFailedWithoutReason,
+          ),
+      };
 
   @override
   Future<int?> preparedExpiry(HireId id) async =>
@@ -185,17 +208,26 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
         : funded.fund(payment, agentWallet: payment.payee);
 
     try {
-      await HirePaymentRecord.db.insertRow(
-        session,
-        HirePaymentRecord(
-          hireId: funded.id.value,
-          transactionHash: payment.transaction.value,
-          jobId: jobId,
-          payer: payment.payer.value,
-          payee: payment.payee.value,
-          amount: payment.amount.stroops,
-        ),
-      );
+      await session.db.transaction((transaction) async {
+        await HirePaymentRecord.db.insertRow(
+          session,
+          HirePaymentRecord(
+            hireId: funded.id.value,
+            transactionHash: payment.transaction.value,
+            jobId: jobId,
+            payer: payment.payer.value,
+            payee: payment.payee.value,
+            amount: payment.amount.stroops,
+          ),
+          transaction: transaction,
+        );
+        await ServerpodHireRunStore.enqueue(
+          session,
+          funded.id.value,
+          _now().toUtc(),
+          transaction: transaction,
+        );
+      });
       return fundedHire;
     } on DatabaseQueryException catch (e) {
       final index = hirePaymentIndexOf(

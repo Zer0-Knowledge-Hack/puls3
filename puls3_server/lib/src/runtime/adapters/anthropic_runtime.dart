@@ -35,10 +35,11 @@ final class AnthropicRuntime implements ModelRuntime {
   static const thinkingHeadroom = 4000;
 
   /// `max_tokens` for [task]: its `output.max_chars` plus [thinkingHeadroom],
-  /// capped at [maxTokensCeiling]. A token is at least about one character, so
-  /// any output within the manifest limit fits, and a small limit no longer
-  /// pays for 16000 tokens. `AgentRunner` still enforces the limit on the
-  /// text.
+  /// capped at [maxTokensCeiling], so a small limit no longer pays for 16000
+  /// tokens. For most text a token covers one or more characters, so an
+  /// output within the limit fits. Some scripts and emoji take more than one
+  /// token per character, so such an output near the limit can still end as
+  /// `output_truncated`. `AgentRunner` enforces the limit on the text.
   static int maxTokensFor(RuntimeTask task) =>
       min(maxTokensCeiling, task.maxOutputChars + thinkingHeadroom);
 

@@ -10,6 +10,24 @@ const String apiUrlOverride = String.fromEnvironment('PULS3_API_URL');
 
 /// Returns the Serverpod API URL: [override] when it is not blank, otherwise
 /// the `apiUrl` field of [configJson] (the bundled `assets/config.json`).
+/// The wallet sign-in values the server publishes in `config.json` `auth`
+/// (#136): its public signing key and home domain. The bundled config of a
+/// static build (Cloudflare Pages) has no `auth`, so both may be null.
+({String? serverSigningKey, String? homeDomain}) readAuthConfig(
+  String configJson,
+) {
+  final config = jsonDecode(configJson);
+  final auth = config is Map<String, dynamic> ? config['auth'] : null;
+  String? text(Object? value) =>
+      value is String && value.isNotEmpty ? value : null;
+  return auth is Map<String, dynamic>
+      ? (
+          serverSigningKey: text(auth['serverSigningKey']),
+          homeDomain: text(auth['homeDomain']),
+        )
+      : (serverSigningKey: null, homeDomain: null);
+}
+
 String resolveApiUrl(String configJson, {String override = apiUrlOverride}) {
   final trimmed = override.trim();
   if (trimmed.isNotEmpty) return trimmed;

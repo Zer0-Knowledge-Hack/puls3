@@ -1,9 +1,9 @@
 # MVP user flows
 
-- **Issues:** #22, #76 · **Date:** 2026-09-26 · **Updated:** 2026-10-08 (ADR-0005 escrow and hire states)
+- **Issues:** #22, #76, #36 · **Date:** 2026-09-26 · **Updated:** 2026-10-10 (Agent Studio flows F8 to F11, #36)
 - **Sources:** [vision](../vision.md) (MVP scope), [ADR-0002](../adr/0002-agent-registry-on-soroban.md) (registry), [ADR-0003](../adr/0003-payment-rail-and-custody.md) (custody), [ADR-0004](../adr/0004-agent-manifest-and-deployment.md) (manifest and deploy), [ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) (escrow, hire states, feedback), [API contract](../architecture/api.md), [domain model](../domain/model.md)
 
-What the user does, step by step, including what happens when something fails. The wireframes (#23), the API contract (#8), and the app screens (#25–#28) derive from these flows. Agent Studio details (drafts, test run, edit, my agents) are added to this file by #36.
+What the user does, step by step, including what happens when something fails. The wireframes (#23), the API contract (#8), and the app screens (#25–#28) derive from these flows. Agent Studio details (drafts, test run, edit, my agents) are F8 to F11 (#36).
 
 Screen IDs reuse the app's existing screens where they exist (`puls3_flutter/lib/src/screens/`). The full list is at the end.
 
@@ -13,7 +13,7 @@ Screen IDs reuse the app's existing screens where they exist (`puls3_flutter/lib
 
 | MVP "In" item ([vision](../vision.md#in)) | Flows |
 |---|---|
-| Create an agent | F4 |
+| Create an agent | F4 (deploy), F8 (draft), F9 (test run), F10 (new version), F11 (my agents) |
 | Discover agents | F2, F3 |
 | Hire and pay an agent | F1, F5 |
 | Get the result and rate it | F6, F7 |
@@ -90,7 +90,7 @@ flowchart TD
 
 ## F4. Create (register) an agent
 
-The Studio form fields map 1:1 to the manifest (ADR-0004): name, description, skills, model, system prompt, input (type and maximum characters), output (type and maximum characters), and price. Deploy steps follow ADR-0004 and ADR-0003. Test runs and drafts are detailed in #36.
+The Studio form fields map 1:1 to the manifest (ADR-0004): name, description, skills, model, system prompt, input (type and maximum characters), output (type and maximum characters), and price. Deploy steps follow ADR-0004 and ADR-0003. Drafts, test runs, new versions and the builder's list of agents are F8 to F11.
 
 **Registration URI.** The server gives every Studio draft its own registration URI (the URL of the agent's public registration file, ADR-0004), built from a server-generated draft id. Before the builder signs `register_full`, the server calls `agent_id_by_uri` on the Identity Registry:
 
@@ -125,7 +125,7 @@ flowchart TD
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
 | 1 | `S07-studio` | Fills in name, description, skills, model, system prompt, input (type, max characters), output (type, max characters) and price | Validates as they type: skills (I6, I9, I10), name (I7), description (I8), price as whole USDC stroops (I2) and greater than zero (I11), input ≤ 8,000 and output ≤ 16,000 characters (ADR-0004) | Invalid field: inline error; **Deploy** disabled |
-| 2 | `S07-studio` | Taps **Test run** (optional) | Runs the draft once, no payment, no on-chain write (#36) | Daily test quota used: "Quota resets at …" |
+| 2 | `S07-studio` | Taps **Test run** (optional) | Runs the draft once, no payment, no on-chain write ([F9](#f9-test-run-in-the-playground)) | Daily test quota used: "Quota resets at …" |
 | 3 | `S07-studio` | Taps **Deploy** | Opens `S08-deploy-sheet` with the steps listed | No wallet: F1 first, then resumes here |
 | 4 | `S08-deploy-sheet` | — | Server stores the manifest version, its salted hash, and creates the agent's wallet (testnet custody, ADR-0003) | Server error: step marked failed, **Retry** |
 | 5 | `S08-deploy-sheet` | — | Server checks the draft's registration URI with `agent_id_by_uri` (see **Registration URI** above) | Already registered by this builder: resume at step 7 with that `agent_id`. Registered by another address: new draft URI, then step 6 |
@@ -167,7 +167,7 @@ flowchart TD
 | # | Screen | User action | System response | Error / edge path |
 |---|---|---|---|---|
 | 1 | `S04-hire-sheet` | Types the task input | Shows the price in USDC, the character limit, and that the payment is held in escrow until the client approves the result | Input over the agent's limit: inline error, **Confirm** disabled. The server checks it again (`InputTooLong`) |
-| 2 | `S04-hire-sheet` | — | Checks the wallet is connected and holds enough USDC | No wallet: F1. Not enough USDC or no trustline: shows the balance and how to get testnet USDC, **Confirm** disabled |
+| 2 | `S04-hire-sheet` | — | When **Confirm** is tapped, before any wallet prompt (the sign-in included), checks the wallet is connected and reads its USDC from Horizon | No wallet: F1. No account, no USDC trustline or not enough USDC: shows the price, the balance and how to get testnet USDC; nothing is signed and **Try again** checks again. A balance Horizon cannot read does not block: the server's simulation of `fund` still refuses a short balance. A resumed hire is not checked, because its payment may already have moved the funds |
 | 3 | `S04-hire-sheet` | Taps **Confirm and pay** | Server creates the hire record (agent, price and manifest version fixed) and returns the unsigned `create_job` envelope. In it, the consumer is the client and the evaluator, the agent wallet is the provider, the hire price is the budget, and the server sets `expired_at` | Server error: "Could not create the hire", **Retry** (same request id, so no duplicate hire) |
 | 4 | `S04-hire-sheet` (wallet popup) | Signs `create_job` | Server verifies the signed envelope against what it prepared, relays it, and shows **Creating the job…** until the tracker confirms it. The hire is then `open` | Rejects: nothing reaches the chain, back to review. Preparation expired or rejected: the app asks for a new one and the user signs again |
 | 5 | `S04-hire-sheet` (wallet popup) | Signs `fund` | Server prepares `fund` (budget = hire price, the client's maximum fee), verifies and relays the signed envelope, and shows **Verifying payment…** while it polls | Rejects: hire stays `open`; the user can sign again or **Cancel** (step 7). Tx fails (balance changed, fees): reason shown, sign again |
@@ -236,6 +236,111 @@ flowchart TD
 | 5 | `S10-rate-sheet` | — | Polls until the feedback is confirmed | `HireAlreadyRated`: "You already rated this hire", back to S06 |
 | 6 | `S06-hire-detail` | — | The hire stays **Completed** and shows the rating. The new score counts in the agent's rating on S03 (served once #21 lands) | — |
 
+## F8. Create and save a draft
+
+A draft is an `AgentManifestDraft` (#34): the manifest fields without `version`. The server stores it as a `StudioDraft` (`draftId`, `manifest`, `revision`, `deployState`), so the builder can leave and come back. The system prompt is private: it is stored with the draft and returned only to its owner (ADR-0004).
+
+```mermaid
+flowchart TD
+  A["S07 studio: New agent, or a draft from S12"] --> B["Builder fills in the form; the preview card updates"]
+  B --> C{"Wallet connected and signed in?"}
+  C -- No --> C1["F1 connect wallet and sign in, then resume"]
+  C -- Yes --> D["Save draft"]
+  D --> E{"Server accepts?"}
+  E -- "InvalidManifest" --> E1["Problems under each field; the last saved revision is kept"]
+  E -- "DraftVersionConflict" --> E2["A newer revision exists: Reload it, or Keep mine"]
+  E -- "Server unreachable" --> E3["Not saved, Retry; the form keeps the text"]
+  E -- Yes --> F["Saved: revision shown; the draft appears in S12"]
+```
+
+| # | Screen | User action | System response | Error / edge path |
+|---|---|---|---|---|
+| 1 | `S07-studio` | Opens the Studio and taps **New agent**, or **Continue editing** on a draft in `S12-my-agents` | A blank form, or the draft's fields. The preview is the Marketplace `AgentCard` | — |
+| 2 | `S07-studio` | Types the fields | Validates as they type with the domain (`AgentManifestDraft`, `ManifestProblem`), the same rules as F4 step 1 | Invalid field: inline error under it; the rest of the form stays editable |
+| 3 | `S07-studio` | Taps **Save draft** | Needs a wallet session (F1 and the #136 sign-in). `StudioEndpoint.saveDraft(draft)` validates authoritatively and returns the `StudioDraft` with its new `revision` | `InvalidManifest`: each `ManifestProblem` under its field, nothing overwritten. `DraftVersionConflict`: the draft was saved elsewhere (another tab or device); **Reload** loads the newer revision, **Keep mine** saves over it. `DraftNotOwned`: "This draft belongs to another wallet", **New agent**. No answer: "Not saved", **Retry**, the typed text stays |
+| 4 | `S07-studio` | — | Shows "Saved · revision n". The draft is listed in `S12-my-agents` | — |
+
+## F9. Test run in the playground
+
+A test run uses the same runtime path as a paid hire (#20), with no payment, no on-chain write and nothing stored beyond a usage counter (spike #33 §6). The draft must be valid and saved first, because `testRun` takes a `draftId`.
+
+```mermaid
+flowchart TD
+  A["S07: Test run"] --> B{"Draft valid and saved?"}
+  B -- No --> B1["Test run disabled: fix the fields, then F8"]
+  B -- Yes --> C["S11 playground: type a sample input"]
+  C --> D{"Input within inputMaxChars?"}
+  D -- No --> D1["Inline error, Run disabled"]
+  D -- Yes --> E["Run"]
+  E --> F{"Result"}
+  F -- "Output" --> G["Output shown, with the runs left today"]
+  F -- "TestQuotaExceeded" --> H["Today's runs are used: when they reset"]
+  F -- "AgentExecutionFailed or RuntimeUnavailable" --> I["Reason shown, Try again"]
+  G --> J["Edit the draft and run again, or Deploy (F4)"]
+```
+
+| # | Screen | User action | System response | Error / edge path |
+|---|---|---|---|---|
+| 1 | `S07-studio` | Taps **Test run** | Opens `S11-playground` beside the preview (desktop) or as a sheet (phone). **Test run** is enabled only for a valid, saved draft | Unsaved changes: F8 step 3 runs first |
+| 2 | `S11-playground` | Types a sample input | Counts characters against the draft's `inputMaxChars` | Over the limit: inline error, **Run** disabled. The server checks it again (`InputTooLong`) |
+| 3 | `S11-playground` | Taps **Run** | `StudioEndpoint.testRun(draftId, input)` runs the draft once under the runtime timeout. Shows **Running…** | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed`: the safe reason (for example `timeout`), **Try again**. `RuntimeUnavailable`: "The test runner is unavailable", **Try again** |
+| 4 | `S11-playground` | — | Shows `TestRunResult.output` (as text or Markdown, from the draft's `outputType`) and `remainingDailyRuns`. Labelled "Test run: not paid, nothing on chain" | — |
+| 5 | `S07-studio` | Edits the draft and runs again, or taps **Deploy** | Back to step 1, or F4 | — |
+
+## F10. Edit a deployed agent (new version)
+
+A deployed version is immutable (ADR-0004 decision 4). Editing opens a new draft from version *n*; nothing changes for hirers until version *n+1* is deployed. Deploying it keeps the same `agent_id` and agent wallet: no new `register_full` and no new `set_agent_wallet`. The builder signs the new `puls3.manifestHash` and `puls3.manifestVersion` metadata, and new hires switch to *n+1*. Hires in flight keep the version, price and prompt they were paid for (spike #33 §4).
+
+```mermaid
+flowchart TD
+  A["S12 my agents: a live agent, Edit"] --> B["S07 opens version n as a new draft"]
+  B --> C["Builder edits; F8 saves, F9 tests"]
+  C --> D["Deploy version n+1: S08"]
+  D --> E{"Wallet is the agent's owner?"}
+  E -- No --> E1["Connect the owner wallet (F1), then resume"]
+  E -- Yes --> F["Server stores version n+1 and its salted hash"]
+  F --> G["Builder signs the metadata update"]
+  G --> H{"Signed and confirmed?"}
+  H -- "Rejected" --> H1["Version n stays live; Retry"]
+  H -- "Tx failed" --> H2["Reason shown; version n stays live; Retry"]
+  H -- Yes --> I["New hires use n+1; hires in flight finish on n"]
+```
+
+| # | Screen | User action | System response | Error / edge path |
+|---|---|---|---|---|
+| 1 | `S12-my-agents` | Taps **Edit** on a live agent | Opens `S07-studio` with version *n*'s fields as a new draft, and a banner: "Editing creates version n+1. Hirers keep version n until you deploy" | — |
+| 2 | `S07-studio` | Edits; saves (F8) and tests (F9) | As in F8 and F9. Changing the model or the price also needs a new version | As in F8 and F9 |
+| 3 | `S07-studio` | Taps **Deploy version n+1** | Opens `S08-deploy-sheet` with the steps of a new version: store, sign the metadata update, publish | Connected wallet is not the agent's owner: "Connect the wallet that owns this agent" (F1) |
+| 4 | `S08-deploy-sheet` | — | Server stores version *n+1*, its salt and `manifestHash` | Server error: step failed, **Retry** |
+| 5 | `S08-deploy-sheet` (wallet popup) | Signs the update of `puls3.manifestHash` and `puls3.manifestVersion` | Waits for confirmation | Rejects: step paused, version *n* stays live, **Retry**. Tx failed: reason shown, **Retry** |
+| 6 | `S08-deploy-sheet` | — | Republishes the registration file and switches new hires to *n+1*. Shows "Version n+1 is live" and **View agent** (S03) | Publication failed: "Version n+1 is on chain but not live yet", **Retry** (as F4 step 8) |
+
+## F11. My agents
+
+The builder's own drafts and deployed agents, one list, for the connected wallet.
+
+```mermaid
+flowchart TD
+  A["S07 or the app shell: My agents"] --> B{"Wallet connected and signed in?"}
+  B -- No --> B1["F1, then resume"]
+  B -- Yes --> C["Load this wallet's drafts and agents"]
+  C -- "Server error" --> C1["Error banner, Retry"]
+  C --> D{"Any?"}
+  D -- No --> D1["Empty: Create your first agent, to S07"]
+  D -- Yes --> E["Rows grouped: Drafts, Deploying or failed, Live"]
+  E --> F["Draft: Continue editing, to S07 (F8)"]
+  E --> G["Deploying or failed: Resume deploy, to S08 at its step"]
+  E --> H["Live: View, to S03; Edit, to F10"]
+```
+
+| # | Screen | User action | System response | Error / edge path |
+|---|---|---|---|---|
+| 1 | `S07-studio` or the app shell | Taps **My agents** | Opens `S12-my-agents`. Needs a wallet session | No wallet: F1, then resumes here |
+| 2 | `S12-my-agents` | — | Lists the wallet's drafts and deployed agents: name, state (`StudioDraft.deployState`), live `manifestVersion`, price | Server error: `ErrorBanner` with **Retry**. None: "No agents yet" with **Create your first agent** (→ S07) |
+| 3 | `S12-my-agents` | Taps a **draft** | Opens it in `S07-studio` (F8) | `DraftNotFound` (deleted elsewhere): the list reloads |
+| 4 | `S12-my-agents` | Taps **Resume deploy** on a deploying or failed agent | Opens `S08-deploy-sheet` at the step `getDeploySession` reports (`state`, `retryFromStep`) | As in F4 steps 4 to 8 |
+| 5 | `S12-my-agents` | Taps a **live** agent: **View** or **Edit** | **View** opens `S03-agent-detail`; **Edit** starts F10 | — |
+
 ---
 
 ## Demo paths
@@ -279,8 +384,10 @@ Each screen's data, states, actions and wireframes are in [screens.md](screens.m
 | `S03-agent-detail` | `/agent/:id` | Yes (`agent_detail_screen.dart`) | F3, F4, F5, F7, demos |
 | `S04-hire-sheet` | Bottom sheet over S03 | Yes (`hire_sheet.dart`) | F5, F6, demos |
 | `S05-my-hires` | `/hires` | No, new | F6 |
-| `S06-hire-detail` | `/hires/:id` | No, new | F6, F7, demos |
-| `S07-studio` | `/studio` | Yes (`studio_screen.dart`) | F4, demo |
-| `S08-deploy-sheet` | Bottom sheet over S07 | Yes (`deploy_sheet.dart`) | F4, demo |
+| `S06-hire-detail` | `/hires/:id` | Partly (`hire_detail_screen.dart`, read-only) | F6, F7, demos |
+| `S07-studio` | `/studio` | Yes (`studio_screen.dart`) | F4, F8, F9, F10, demo |
+| `S08-deploy-sheet` | Bottom sheet over S07 | Yes (`deploy_sheet.dart`) | F4, F10, F11, demo |
 | `S09-wallet-connect` | Sheet over any screen | Yes (`wallet_sheet.dart`, #25) | F1, F4, F5, F6 |
 | `S10-rate-sheet` | Bottom sheet over S06 | No, new | F7, demo |
+| `S11-playground` | Panel beside the S07 preview (desktop), sheet over S07 (phone) | No, new | F9 |
+| `S12-my-agents` | `/studio/agents` | No, new | F10, F11 |
