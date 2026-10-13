@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/breakpoints.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/agent_avatar.dart';
 import '../atoms/price_tag.dart';
@@ -62,7 +63,10 @@ class _AgentCardState extends State<AgentCard> {
           child: InkWell(
             onTap: widget.onTap,
             child: Padding(
-              padding: const EdgeInsets.all(Puls3Spacing.lg),
+              // Phones: tighter padding, so more agents fit on screen.
+              padding: EdgeInsets.all(
+                isCompactLayout(context) ? Puls3Spacing.md : Puls3Spacing.lg,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -105,7 +109,11 @@ class _AgentCardState extends State<AgentCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  const SizedBox(height: Puls3Spacing.md),
+                  SizedBox(
+                    height: isCompactLayout(context)
+                        ? Puls3Spacing.sm
+                        : Puls3Spacing.md,
+                  ),
                   Row(
                     children: [
                       Expanded(

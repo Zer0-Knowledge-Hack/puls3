@@ -39,7 +39,8 @@
     "export:svg:round3": "tsx scripts/export-svg-round3.tsx",
     "brand:render": "node scripts/render-brand.mjs",
     "brand:export": "tsx scripts/export-brand.tsx",
-    "brand:pdf": "node scripts/build-brand-pdf.mjs"
+    "brand:pdf": "node scripts/build-brand-pdf.mjs",
+    "brand:kit": "node scripts/build-brand-kit.mjs"
   },
   "sideEffects": [
     "*.css",

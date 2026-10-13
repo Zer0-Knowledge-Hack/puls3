@@ -1,0 +1,313 @@
+{
+  "name": "puls3 brand kit",
+  "zip": "puls3-brand-kit.zip",
+  "guide": "puls3-brand-guide.pdf",
+  "variants": [
+    {
+      "id": "puls3-logo-dark",
+      "group": "logo",
+      "label": "Lockup, on dark",
+      "background": "dark",
+      "svg": "svg/logo/puls3-logo-dark.svg",
+      "png": [
+        {
+          "width": 1024,
+          "path": "png/logo/puls3-logo-dark-1024.png"
+        },
+        {
+          "width": 2048,
+          "path": "png/logo/puls3-logo-dark-2048.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-light",
+      "group": "logo",
+      "label": "Lockup, on light",
+      "background": "light",
+      "svg": "svg/logo/puls3-logo-light.svg",
+      "png": [
+        {
+          "width": 1024,
+          "path": "png/logo/puls3-logo-light-1024.png"
+        },
+        {
+          "width": 2048,
+          "path": "png/logo/puls3-logo-light-2048.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-mono-white",
+      "group": "logo",
+      "label": "Lockup, mono white",
+      "background": "dark",
+      "svg": "svg/logo/puls3-logo-mono-white.svg",
+      "png": [
+        {
+          "width": 1024,
+          "path": "png/logo/puls3-logo-mono-white-1024.png"
+        },
+        {
+          "width": 2048,
+          "path": "png/logo/puls3-logo-mono-white-2048.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-mono-ink",
+      "group": "logo",
+      "label": "Lockup, mono ink",
+      "background": "light",
+      "svg": "svg/logo/puls3-logo-mono-ink.svg",
+      "png": [
+        {
+          "width": 1024,
+          "path": "png/logo/puls3-logo-mono-ink-1024.png"
+        },
+        {
+          "width": 2048,
+          "path": "png/logo/puls3-logo-mono-ink-2048.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-dark-small",
+      "group": "logo",
+      "label": "Small lockup, on dark",
+      "background": "dark",
+      "svg": "svg/logo/puls3-logo-dark-small.svg",
+      "png": [
+        {
+          "width": 256,
+          "path": "png/logo/puls3-logo-dark-small-256.png"
+        },
+        {
+          "width": 512,
+          "path": "png/logo/puls3-logo-dark-small-512.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-light-small",
+      "group": "logo",
+      "label": "Small lockup, on light",
+      "background": "light",
+      "svg": "svg/logo/puls3-logo-light-small.svg",
+      "png": [
+        {
+          "width": 256,
+          "path": "png/logo/puls3-logo-light-small-256.png"
+        },
+        {
+          "width": 512,
+          "path": "png/logo/puls3-logo-light-small-512.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-mono-white-small",
+      "group": "logo",
+      "label": "Small lockup, mono white",
+      "background": "dark",
+      "svg": "svg/logo/puls3-logo-mono-white-small.svg",
+      "png": [
+        {
+          "width": 256,
+          "path": "png/logo/puls3-logo-mono-white-small-256.png"
+        },
+        {
+          "width": 512,
+          "path": "png/logo/puls3-logo-mono-white-small-512.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-logo-mono-ink-small",
+      "group": "logo",
+      "label": "Small lockup, mono ink",
+      "background": "light",
+      "svg": "svg/logo/puls3-logo-mono-ink-small.svg",
+      "png": [
+        {
+          "width": 256,
+          "path": "png/logo/puls3-logo-mono-ink-small-256.png"
+        },
+        {
+          "width": 512,
+          "path": "png/logo/puls3-logo-mono-ink-small-512.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-dark",
+      "group": "mark",
+      "label": "Mark, on dark",
+      "background": "dark",
+      "svg": "svg/mark/puls3-mark-c01-dark.svg",
+      "png": [
+        {
+          "width": 512,
+          "path": "png/mark/puls3-mark-c01-dark-512.png"
+        },
+        {
+          "width": 1024,
+          "path": "png/mark/puls3-mark-c01-dark-1024.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-light",
+      "group": "mark",
+      "label": "Mark, on light",
+      "background": "light",
+      "svg": "svg/mark/puls3-mark-c01-light.svg",
+      "png": [
+        {
+          "width": 512,
+          "path": "png/mark/puls3-mark-c01-light-512.png"
+        },
+        {
+          "width": 1024,
+          "path": "png/mark/puls3-mark-c01-light-1024.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-mono-white",
+      "group": "mark",
+      "label": "Mark, mono white",
+      "background": "dark",
+      "svg": "svg/mark/puls3-mark-c01-mono-white.svg",
+      "png": [
+        {
+          "width": 512,
+          "path": "png/mark/puls3-mark-c01-mono-white-512.png"
+        },
+        {
+          "width": 1024,
+          "path": "png/mark/puls3-mark-c01-mono-white-1024.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-mono-ink",
+      "group": "mark",
+      "label": "Mark, mono ink",
+      "background": "light",
+      "svg": "svg/mark/puls3-mark-c01-mono-ink.svg",
+      "png": [
+        {
+          "width": 512,
+          "path": "png/mark/puls3-mark-c01-mono-ink-512.png"
+        },
+        {
+          "width": 1024,
+          "path": "png/mark/puls3-mark-c01-mono-ink-1024.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-32-dark",
+      "group": "mark",
+      "label": "Small mark 32 px, on dark",
+      "background": "dark",
+      "svg": "svg/mark/puls3-mark-c01-small-32-dark.svg",
+      "png": [
+        {
+          "width": 32,
+          "path": "png/mark/puls3-mark-c01-small-32-dark-32.png"
+        },
+        {
+          "width": 64,
+          "path": "png/mark/puls3-mark-c01-small-32-dark-64.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-32-light",
+      "group": "mark",
+      "label": "Small mark 32 px, on light",
+      "background": "light",
+      "svg": "svg/mark/puls3-mark-c01-small-32-light.svg",
+      "png": [
+        {
+          "width": 32,
+          "path": "png/mark/puls3-mark-c01-small-32-light-32.png"
+        },
+        {
+          "width": 64,
+          "path": "png/mark/puls3-mark-c01-small-32-light-64.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-24-dark",
+      "group": "mark",
+      "label": "Small mark 24 px, on dark",
+      "background": "dark",
+      "svg": "svg/mark/puls3-mark-c01-small-24-dark.svg",
+      "png": [
+        {
+          "width": 24,
+          "path": "png/mark/puls3-mark-c01-small-24-dark-24.png"
+        },
+        {
+          "width": 48,
+          "path": "png/mark/puls3-mark-c01-small-24-dark-48.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-24-light",
+      "group": "mark",
+      "label": "Small mark 24 px, on light",
+      "background": "light",
+      "svg": "svg/mark/puls3-mark-c01-small-24-light.svg",
+      "png": [
+        {
+          "width": 24,
+          "path": "png/mark/puls3-mark-c01-small-24-light-24.png"
+        },
+        {
+          "width": 48,
+          "path": "png/mark/puls3-mark-c01-small-24-light-48.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-16-dark",
+      "group": "mark",
+      "label": "Small mark 16 px, on dark",
+      "background": "dark",
+      "svg": "svg/mark/puls3-mark-c01-small-16-dark.svg",
+      "png": [
+        {
+          "width": 16,
+          "path": "png/mark/puls3-mark-c01-small-16-dark-16.png"
+        },
+        {
+          "width": 32,
+          "path": "png/mark/puls3-mark-c01-small-16-dark-32.png"
+        }
+      ]
+    },
+    {
+      "id": "puls3-mark-c01-small-16-light",
+      "group": "mark",
+      "label": "Small mark 16 px, on light",
+      "background": "light",
+      "svg": "svg/mark/puls3-mark-c01-small-16-light.svg",
+      "png": [
+        {
+          "width": 16,
+          "path": "png/mark/puls3-mark-c01-small-16-light-16.png"
+        },
+        {
+          "width": 32,
+          "path": "png/mark/puls3-mark-c01-small-16-light-32.png"
+        }
+      ]
+    }
+  ]
+}
