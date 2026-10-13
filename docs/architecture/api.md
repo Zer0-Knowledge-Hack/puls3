@@ -82,7 +82,6 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 | Field | Earlier shape | Target issue |
 |---|---|---|
-| `rating`, `paidHireCount` | `AgentSummary`, `AgentDetail` | #21 (reputation in catalog) |
 | `active` | `AgentSummary`, `AgentDetail` | #18 (register flow activates the agent) |
 | `owner` | [`Agent`](models/agent.spy.yaml) | #17 (catalog with on-chain indexing) |
 | Structured skills (`name`, `description`, `tags`) | [`Skill`](models/skill.spy.yaml) | #35 (manifest from Agent Studio) |
@@ -242,7 +241,7 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
 | Relay and chain | `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `TransactionFailed`, `ChainUnavailable` |
 | Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed` |
-| Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback` |
+| Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback`, `FeedbackFromAgentOwner` |
 
 `AgentEndpoint` does not use these error codes yet: it raises the typed `AgentCatalogUnavailable` and returns `null` for an unknown id, so `CatalogUnavailable` and `ChainDataUnavailable` are currently unused (see [Agent catalog](#agent-catalog)).
 
@@ -288,7 +287,7 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `CreateHireResult` | `hire: Hire`, `preparedCreateJob: PreparedTransaction?` |
 | `HireSummary` | `hire: Hire`, `agentName` |
 | `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
-| `FeedbackEligibility` | `hireId`, `eligible: bool` |
+| `FeedbackEligibility` | `hireId`, `eligible: bool`, `reason: String?` (the code of the broken rule: `HireNotCompleted`, `HireAlreadyRated` or `FeedbackFromAgentOwner`) |
 
 **`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline`, `rejectReason` and `feedbackSubmission` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`.
 
@@ -393,7 +392,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | F7-3 | Client validation mirrors the domain; `FeedbackEndpoint.prepareFeedback(hireId, score, comment)` validates authoritatively (`InvalidFeedback`) and returns the unsigned `give_feedback` envelope with the client as source. |
 | F7-4 | The wallet signs the prepared envelope; `FeedbackEndpoint.submitFeedback(hireId, preparationId, signedTransactionXdr)` verifies, persists, and submits it. `WalletRejected` is client-only: stay on S10. |
 | F7-5 | Poll `HireEndpoint.getHire` until `feedbackSubmission` is final. `HireAlreadyRated` shows "You already rated this hire" and returns to S06. |
-| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `AgentEndpoint.get(id)`. Planned: the rating is not served yet (#21). |
+| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `AgentEndpoint.get(id)`, whose `rating` and `paidHireCount` come from the #11 reputation function (`rating` is 4.0 and `paidHireCount` 0 for an agent without feedback). Until the Reputation Registry (#14) is wired, every agent shows those empty-input values. |
 
 ## Ownership and non-goals
 

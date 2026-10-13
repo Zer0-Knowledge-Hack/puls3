@@ -22,7 +22,8 @@
 #   InvalidHire, InvalidHireTransition, IdempotencyKeyReused,
 #   PersistenceUnavailable, PaymentAlreadySubmitted, InvalidRejectReason,
 #   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed
-# Feedback: HireNotCompleted, HireAlreadyRated, InvalidFeedback
+# Feedback: HireNotCompleted, HireAlreadyRated, InvalidFeedback,
+#   FeedbackFromAgentOwner
 exception: Puls3ApiException
 fields:
   ### Machine-readable code from the catalog above.
