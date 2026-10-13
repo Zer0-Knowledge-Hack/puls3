@@ -74,6 +74,9 @@ flutter:
     - assets/mock/demo_agents.json
     - assets/brand/logo/
     - assets/brand/mark/
+    # The public kit's SVGs, for Copy SVG and previews on /brand.
+    - web/brand/svg/logo/
+    - web/brand/svg/mark/
   fonts:
     - family: Doto
       fonts:
