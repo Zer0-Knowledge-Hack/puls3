@@ -96,10 +96,10 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 | State | What the user sees |
 |---|---|
-| Loading | **Confirm & sign** shows "Signing…" and the current step: creating the hire, "Sign the escrow job (1 of 2)", "Sign the payment (2 of 2)", sending to the escrow. |
-| Empty | No task typed: **Confirm & sign** is disabled. |
-| Error | "Payment failed" with the reason (wallet rejected, not signed in, preparation expired, missing USDC, server unavailable) and **Try again**, which resumes from the failed step without creating a second hire. |
-| Success | "Payment sent to the escrow" with `Hire.id`, the transaction and **View on StellarExpert**. A demo backend says "Demo signature only" and links nothing. |
+| Loading | **Confirm & sign** shows "Signing…" and the current step: the wallet sign-in ("Sign in with your wallet: it only proves the account is yours", SEP-10, #149), creating the hire, "Sign the escrow job in your wallet (1 of 2)", "Sign the payment in your wallet (2 of 2)", sending the payment to the escrow. |
+| Empty | No task typed: **Confirm & sign** is disabled. An unfinished hire with this agent is resumed instead: its task is shown and locked, with "You have an unfinished hire with this agent. Confirming resumes it, so you are never charged twice." |
+| Error | "Payment failed" with the reason and **Try again**, which resumes from the failed step without creating a second hire. Before any signature, the wallet's testnet funds are checked (#159): no account on testnet, no USDC trustline, or less USDC than `Agent.price`, each with "Nothing was signed". Other reasons: wallet rejected, sign-in unavailable, preparation expired, payment could not be prepared, server unavailable. |
+| Success | While the payment confirms: "Payment sent, confirming on Stellar…" with `Hire.id`, the transaction and **View on StellarExpert**. Once confirmed: "Payment held by the escrow". A demo backend says "Demo signature only" and links nothing. |
 
 **Actions:** **Confirm & sign** → wallet prompts (S09 first if no wallet). **View hire** → S06. **Back to Marketplace** → S02.
 
@@ -137,7 +137,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Actions:** **Approve** → wallet signs `complete` → **Completed**. **Reject and refund** (optional reason) → wallet signs `reject` → **Rejected**; hidden after the deadline. **Rate** → S10.
 
-**Components:** `ScreenHeader`, `ProgressStepRow`, `SectionLabel`, `KeyValueRow`, `AddressBadge`, `PrimaryButton`, `ErrorBanner`.
+**Components:** `HireDetailView` (the read-only screen today), `ScreenHeader`, `ProgressStepRow`, `SectionLabel`, `KeyValueRow`, `AddressBadge`, `PrimaryButton`, `ErrorBanner`.
 
 ### S07-studio
 
@@ -245,7 +245,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ## Component inventory
 
-Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get their data through constructors; only screens (containers) read app state or call the server.
+Atomic design, as in `puls3_flutter/lib/src/ui/`. Components marked *(new)* are specified for screens not built yet (S11, S12). Presentational widgets get their data through constructors; only screens (containers) read app state or call the server.
 
 ### Atoms
 
@@ -257,6 +257,7 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `PriceTag` | `AgentCard`, `AgentDetailView`, `AgentMiniCard`, `HirePaymentView` | S01, S02, S03, S04, S05, S07 |
 | `PrimaryButton` | screens, `AgentDetailView`, `EmptyState`, `HirePaymentView`, `WalletPanel`, deploy panels | S01, S03, S04, S06, S07, S08, S09, S10 |
 | `Puls3Logo` | `TopBar`, `SiteFooter`, landing | all |
+| `Puls3Mark` | the logo's mark alone (no screen uses it yet) | — |
 | `PulseBackground` | landing | S01 |
 | `RatingBadge` | `AgentCard`, `AgentDetailView` | S02, S03 |
 | `SectionLabel` | `AgentDetailView`, `AgentForm`, landing, Studio | S01, S03, S06, S07 |
@@ -290,6 +291,7 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `AgentForm` | S07 |
 | `AgentGrid`, `AgentGridSkeleton` | S02 |
 | `HirePaymentView` | S04 |
+| `HireDetailView` | S06 |
 | `SiteFooter` | S01, S02, S03, S07 |
 | `TopBar` | all (app shell) |
 | `WalletPanel` | S09 |

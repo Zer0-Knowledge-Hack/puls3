@@ -26,6 +26,14 @@ pub struct MetadataEntry {
     pub value: Bytes,
 }
 
+/// A pending two-step ownership transfer (#153, OpenZeppelin `Ownable`).
+#[contracttype]
+#[derive(Clone)]
+pub struct PendingOwnership {
+    pub new_owner: Address,
+    pub live_until_ledger: u32,
+}
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -41,6 +49,17 @@ pub enum IdentityError {
     // 9, 10, 11: reserved for the upgrade errors of Stellar 8004. Do not use.
     /// Puls3 addition: this agent URI already belongs to another agent.
     UriAlreadyRegistered = 100,
+}
+
+/// Ownership errors, matching the OpenZeppelin Stellar `OwnableError` codes.
+/// `IdentityError` codes are unchanged (#153).
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum OwnableError {
+    OwnerNotSet = 2100,
+    TransferInProgress = 2101,
+    OwnerAlreadySet = 2102,
 }
 
 #[contractevent]
@@ -73,6 +92,26 @@ pub struct MetadataSet {
     pub value: Bytes,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipTransfer {
+    pub old_owner: Address,
+    pub new_owner: Address,
+    pub live_until_ledger: u32,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipTransferCompleted {
+    pub new_owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipRenounced {
+    pub old_owner: Address,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
@@ -87,6 +126,7 @@ pub enum DataKey {
     AgentWallet(u32),
     Metadata(u32, String),
     MetadataKeys(u32),
+    PendingOwner,
 }
 
 #[contract]
@@ -427,6 +467,89 @@ impl IdentityRegistryContract {
                 extend_persistent(e, &DataKey::Metadata(agent_id, key));
             }
         }
+    }
+
+    // --- Ownable (#153): drop-in with Stellar 8004 / OpenZeppelin, backed by
+    // the `Admin` address stored in `__constructor`. ---
+
+    /// `Some(owner)`, or `None` when ownership was renounced.
+    pub fn get_owner(e: &Env) -> Option<Address> {
+        e.storage().instance().get(&DataKey::Admin)
+    }
+
+    /// Starts a two-step ownership transfer. `live_until_ledger == 0` cancels a
+    /// pending transfer. Requires the current owner's authorization.
+    pub fn transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32) {
+        let owner: Address = e
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(e, OwnableError::OwnerNotSet));
+        owner.require_auth();
+
+        if live_until_ledger == 0 {
+            e.storage().instance().remove(&DataKey::PendingOwner);
+            return;
+        }
+        if new_owner == owner {
+            soroban_sdk::panic_with_error!(e, OwnableError::OwnerAlreadySet);
+        }
+        if live_until_ledger <= e.ledger().sequence() {
+            panic!("live_until_ledger is in the past");
+        }
+        e.storage().instance().set(
+            &DataKey::PendingOwner,
+            &PendingOwnership {
+                new_owner: new_owner.clone(),
+                live_until_ledger,
+            },
+        );
+        OwnershipTransfer {
+            old_owner: owner,
+            new_owner,
+            live_until_ledger,
+        }
+        .publish(e);
+        extend_instance(e);
+    }
+
+    /// Completes a pending transfer. Requires the pending owner's authorization.
+    pub fn accept_ownership(e: &Env) {
+        let pending: PendingOwnership = e
+            .storage()
+            .instance()
+            .get(&DataKey::PendingOwner)
+            .unwrap_or_else(|| panic!("no pending ownership transfer"));
+        if e.ledger().sequence() > pending.live_until_ledger {
+            panic!("ownership transfer expired");
+        }
+        pending.new_owner.require_auth();
+        e.storage()
+            .instance()
+            .set(&DataKey::Admin, &pending.new_owner);
+        e.storage().instance().remove(&DataKey::PendingOwner);
+        OwnershipTransferCompleted {
+            new_owner: pending.new_owner,
+        }
+        .publish(e);
+        extend_instance(e);
+    }
+
+    /// Renounces ownership permanently. Requires the current owner's
+    /// authorization, and fails while a transfer is pending.
+    pub fn renounce_ownership(e: &Env) {
+        let owner: Address = e
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| soroban_sdk::panic_with_error!(e, OwnableError::OwnerNotSet));
+        owner.require_auth();
+        if e.storage().instance().has(&DataKey::PendingOwner) {
+            soroban_sdk::panic_with_error!(e, OwnableError::TransferInProgress);
+        }
+        e.storage().instance().remove(&DataKey::Admin);
+        OwnershipRenounced { old_owner: owner }.publish(e);
+        extend_instance(e);
     }
 }
 

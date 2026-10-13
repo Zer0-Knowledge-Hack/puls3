@@ -10,6 +10,7 @@ import 'hire/hire_flow_store.dart';
 import 'hire/hire_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
+import 'screens/brand_screen.dart';
 import 'screens/hire_detail_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/market_screen.dart';
@@ -27,6 +28,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
     initialLocation: initialLocation,
     routes: [
       GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
+      GoRoute(path: '/brand', builder: (context, state) => const BrandScreen()),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.uri.path, child: child),
@@ -110,6 +112,15 @@ class _Puls3AppState extends State<Puls3App> {
       widget.hireFlowStore ?? createHireFlowStore();
 
   @override
+  void initState() {
+    super.initState();
+    // The banner reports a failed health check, but routes that hide it
+    // (/brand) leave the future unwatched; mark the error as handled so it
+    // is not reported as uncaught. The banner still receives it.
+    widget.healthCheck?.ignore();
+  }
+
+  @override
   void dispose() {
     _router.dispose();
     _catalog.dispose();
@@ -136,7 +147,16 @@ class _Puls3AppState extends State<Puls3App> {
         builder: (context, child) => Column(
           children: [
             if (widget.healthCheck != null)
-              _BackendStatus(healthCheck: widget.healthCheck!),
+              // The public brand page does not depend on the backend.
+              ListenableBuilder(
+                listenable: _router.routeInformationProvider,
+                builder: (context, _) =>
+                    _hidesBackendStatus(
+                      _router.routeInformationProvider.value.uri.path,
+                    )
+                    ? const SizedBox.shrink()
+                    : _BackendStatus(healthCheck: widget.healthCheck!),
+              ),
             Expanded(child: child ?? const SizedBox.shrink()),
           ],
         ),
@@ -144,6 +164,9 @@ class _Puls3AppState extends State<Puls3App> {
     );
   }
 }
+
+/// Routes that hide the backend status banner.
+bool _hidesBackendStatus(String path) => path == '/brand';
 
 class _BackendStatus extends StatelessWidget {
   const _BackendStatus({required this.healthCheck});
