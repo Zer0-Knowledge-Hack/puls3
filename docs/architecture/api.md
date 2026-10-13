@@ -186,7 +186,7 @@ Progress is read from `hire.status`, `hire.runtimeStatus`, and `HireDetail.escro
 | `open` | `createJob` `confirmed`, or `fund` `failed` with `SubmissionRejected`, `PreparationExpired` or `TransactionFailed` | Job created and priced; unfunded | `prepareFund`, `prepareReject` (cancel), `submitEscrowCall` |
 | `open` | `fund` `submitted` | Funding in flight | Poll `getHire`. `prepare…` methods raise `SubmissionInProgress` |
 | `open` | `fund` `failed` with `JobMismatch` or `JobEvidenceUnavailable` | The transaction succeeded but the job does not match this hire; funds stay in the escrow | None. `prepareFund` raises `PaymentAlreadySubmitted`. Refund through `claim_refund` after `expired_at` |
-| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`) | Poll `getHire` |
+| `funded` | `fund` `confirmed` | Funds held by the escrow; the agent works (`runtimeStatus` `queued` or `running`). A finished run reads `running` with `result` set until its `submit` lands | Poll `getHire` |
 | `funded` | — | `runtimeStatus` is `failed` | `prepareReject` (one-step reject and refund). Fallback: the tracker calls `claim_refund` after `expired_at` |
 | `submitted` | `submit` `confirmed` | Delivered; awaiting the client's evaluation; `result` and `approvalDeadline` are set | Before `approvalDeadline`: `prepareComplete`, `prepareReject`. After it: `prepareComplete` until the tracker's `release` lands; poll `getHire` |
 | `expired` (derived) | — | Unfunded job past `expired_at`: on chain it stays `Open`, but `fund` reverts and there is nothing to refund | None. No transaction |
@@ -290,6 +290,8 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
 | `FeedbackEligibility` | `hireId`, `eligible: bool` |
 
+**`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline`, `rejectReason` and `feedbackSubmission` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`.
+
 `PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
 
 **`createHire` idempotency.** `requestId` is a client-generated UUID, created once per **Confirm and pay** action and reused on every retry of it. The server keeps it unique per session wallet for the life of the hire:
@@ -366,7 +368,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F5-1 | Client-only input validation. Planned: the input limit is not served by `AgentSummary` yet (#35); `createHire` validates authoritatively (`InputTooLong`). |
-| F5-2 | Client-only wallet balance and trustline check using network configuration; run F1 if disconnected. |
+| F5-2 | Client-only wallet balance and trustline check, before any signature: the app reads the consumer's Circle testnet USDC (`USDC:GBBD…LFLA5`, the asset of `PULS3_STELLAR_USDC_SAC`) from Horizon; run F1 if disconnected. No account, no trustline or less than `Hire.price` stops the flow with the balance shown. A failed read does not block: `prepareFund`'s simulation (`ChainUnavailable`, `simulationFailed`) stays the authoritative check. |
 | F5-3 | `HireEndpoint.createHire(agentId, consumer, input, requestId)`, with `agentId` = `AgentSummary.registryId`, creates the hire record (`status: null` until `create_job` is confirmed, then `open`) and returns `preparedCreateJob`: the unsigned `create_job` envelope with the consumer as source, the agent wallet as provider, the consumer as evaluator, a server-set `expired_at`, the USDC SAC as token, and `Hire.price` as budget. **Retry** reuses the same `requestId`. |
 | F5-4 | Two signatures. The wallet signs `preparedCreateJob`; `submitEscrowCall` relays it. Once `create_job` is confirmed, `prepareFund(hireId)` returns the `fund` envelope, with `expected_budget` = `Hire.price` and `max_fee_bps` = `NetworkConfig.platformFeeBps`; the wallet signs it and `submitEscrowCall` relays it. `WalletRejected` is client-only: the hire stays `open`. After `PreparationExpired` or `SubmissionRejected`, call the same `prepare…` method and sign again. |
 | F5-5 | Poll `HireEndpoint.getHire`; `escrowSubmission` (`fund`, `submitted`) shows **Verifying payment…**. `JobMismatch` or `JobEvidenceUnavailable` shows "Payment does not match this hire" with the transaction link; the funds stay in the escrow and return after `expired_at`. |

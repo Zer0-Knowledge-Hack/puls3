@@ -34,6 +34,7 @@ class HirePaymentView extends StatelessWidget {
     this.transactionHash,
     this.paymentConfirmed = false,
     this.onOpenExplorer,
+    this.onViewHire,
   });
 
   final HirePhase phase;
@@ -76,6 +77,9 @@ class HirePaymentView extends StatelessWidget {
 
   /// Opens [transactionHash] on StellarExpert.
   final VoidCallback? onOpenExplorer;
+
+  /// Opens the hire detail (S06), where the agent's progress shows.
+  final VoidCallback? onViewHire;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +226,8 @@ class HirePaymentView extends StatelessWidget {
     );
   }
 
-  /// Demo result: never claims a payment, never links to the explorer.
+  /// Demo result: never claims a payment, never links to the explorer or
+  /// to a hire.
   Widget _buildDemoDone() {
     return Column(
       key: const ValueKey('confirmed-demo'),
@@ -304,6 +309,15 @@ class HirePaymentView extends StatelessWidget {
             mono: true,
           ),
         const SizedBox(height: Puls3Spacing.md),
+        if (onViewHire != null) ...[
+          PrimaryButton(
+            label: 'View hire',
+            icon: Icons.track_changes_rounded,
+            expand: true,
+            onPressed: onViewHire,
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+        ],
         if (hash != null && hash.isNotEmpty && onOpenExplorer != null) ...[
           PrimaryButton(
             label: 'View on StellarExpert',
@@ -317,6 +331,9 @@ class HirePaymentView extends StatelessWidget {
         PrimaryButton(
           label: 'Back to Marketplace',
           icon: Icons.storefront_outlined,
+          variant: onViewHire == null
+              ? PrimaryButtonVariant.filled
+              : PrimaryButtonVariant.outline,
           expand: true,
           onPressed: onBackToMarketplace,
         ),

@@ -9,13 +9,13 @@ void main() {
 
     expect(config.anthropicApiKey, 'secret-key');
     expect(config.timeout, const Duration(seconds: 90));
-    expect(config.isEnabled, isTrue);
+    expect(config.hasAnthropicKey, isTrue);
   });
 
-  test('without a key the runtime is disabled', () {
+  test('without a key the anthropic provider is off', () {
     for (final key in [null, '']) {
       final config = RuntimeConfig.fromEnvironment({}, anthropicApiKey: key);
-      expect(config.isEnabled, isFalse, reason: '$key');
+      expect(config.hasAnthropicKey, isFalse, reason: '$key');
       expect(config.anthropicApiKey, isNull, reason: '$key');
     }
   });
@@ -25,7 +25,7 @@ void main() {
       'PULS3_ANTHROPIC_API_KEY': 'from-env',
       'ANTHROPIC_API_KEY': 'from-env',
     }, anthropicApiKey: null);
-    expect(config.isEnabled, isFalse);
+    expect(config.hasAnthropicKey, isFalse);
   });
 
   test('an unset or empty timeout uses the default', () {
@@ -59,6 +59,10 @@ void main() {
     );
 
     expect(config.toString(), isNot(contains('secret-key')));
-    expect(config.toString(), contains('enabled'));
+    expect(config.toString(), contains('anthropic key set'));
+    expect(
+      RuntimeConfig.fromEnvironment({}, anthropicApiKey: null).toString(),
+      contains('anthropic key unset'),
+    );
   });
 }

@@ -12,6 +12,9 @@ import 'hire_gateway.dart';
 enum HireStep {
   /// Not started: the review screen.
   review,
+
+  /// Signing the SEP-10 challenge that opens the wallet session (#136).
+  signingIn,
   creating,
   signingCreateJob,
   submittingCreateJob,
@@ -120,6 +123,16 @@ class HireFlowController extends ChangeNotifier {
           'This agent is not registered on chain, so it cannot be hired.',
         );
       }
+      // A new payment is checked before any signature, the sign-in
+      // included (F5-2). A resumed hire may have paid already, so its
+      // balance says nothing: the server decides.
+      restore(consumer);
+      if (_fund == null && _resumedInput == null) {
+        await _gateway.checkFunds(consumer, agent.priceUsdcStroops);
+      }
+      // The server only accepts calls from a signed-in wallet (#136).
+      _set(HireStep.signingIn);
+      await _gateway.ensureSignedIn(consumer, _wallet.signChallenge);
       // Same request id and task as an unfinished hire, or a new one kept
       // until this hire is paid.
       restore(consumer);
@@ -182,6 +195,10 @@ class HireFlowController extends ChangeNotifier {
       if (_disposed) return;
       // Paid already, or closed: this hire is over, a new one may start.
       if (e is HirePaymentAlreadySubmitted || e is HireClosed) _finish();
+      // A refused session is dropped, so the retry signs in again.
+      if (e is HireNotSignedIn || e is HireSignInFailed) {
+        await _gateway.forgetSession();
+      }
       _error = _message(e);
       debugPrint('Hire flow stopped at $_step: ${e.runtimeType}');
     } finally {
@@ -290,6 +307,9 @@ String walletErrorMessage(WalletException e) => switch (e) {
   WalletWrongNetwork() =>
     'Switch your wallet to Stellar Testnet, then try again.',
   WalletNotInstalled() => 'No wallet found. Install Freighter, then try again.',
+  WalletConnectorUnavailable() =>
+    'The wallet connector could not load. Check your connection or ad '
+        'blocker, reload the page, then try again. No funds moved.',
   WalletUnavailable() => 'Open or unlock your wallet, then try again.',
   WalletTimedOut() =>
     'Your wallet did not answer. Open it, then try again. No funds moved.',

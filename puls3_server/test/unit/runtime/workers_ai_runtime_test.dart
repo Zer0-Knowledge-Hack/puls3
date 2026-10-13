@@ -112,6 +112,49 @@ void main() {
       );
     });
 
+    test('each model id segment is encoded, so the id cannot leave the run '
+        'path', () async {
+      await send(_task(modelId: '@cf/acme/model?x=1#frag'));
+      expect(
+        seen.url.toString(),
+        'https://api.cloudflare.com/client/v4/accounts/$_account/ai/run/'
+        '@cf/acme/model%3Fx=1%23frag',
+      );
+      expect(seen.url.query, isEmpty);
+      expect(seen.url.fragment, isEmpty);
+
+      await send(_task(modelId: '@cf/acme/50%off'));
+      expect(seen.url.path, endsWith('/ai/run/@cf/acme/50%25off'));
+    });
+
+    test('a model id with an empty, . or .. segment is refused before any '
+        'request', () async {
+      var requests = 0;
+      final runtime = WorkersAiRuntime(
+        httpClient: MockClient((_) async {
+          requests++;
+          return _json(_ok('ok'));
+        }),
+        accountId: _account,
+        apiToken: _token,
+      );
+      for (final model in [
+        '@cf/../../tokens',
+        '@cf/./model',
+        '@cf//model',
+        '/@cf/model',
+        '@cf/model/',
+        '..',
+      ]) {
+        await expectLater(
+          runtime.complete(_task(modelId: model)),
+          throwsA(isA<RuntimeInvalidModel>()),
+          reason: model,
+        );
+      }
+      expect(requests, 0);
+    });
+
     test('max_tokens is always set from the output limit, capped', () async {
       await send(_task(maxOutputChars: 1000));
       expect(body['max_tokens'], 1000);

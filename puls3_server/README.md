@@ -141,14 +141,15 @@ value makes that call fail with `HireConfigurationMissing` naming the key
 
 ### Hire endpoint sessions
 
-`HireEndpoint` (`createHire`, `prepareCreateJob`, `prepareFund`,
-`prepareComplete`, `prepareReject`, `submitEscrowCall`) resolves the caller
-through the `SessionWallet` seam before doing any work. Until wallet sessions
-exist (#25) the production binding, `FailClosedSessionWallet`, fails closed:
-every call is rejected with `AuthenticationUnavailable`, so the hire methods
-are not usable against a running server yet. Tests inject a fake with
-`HireEndpoint.sessionWallet`. `InputTooLong` has no documented limit, so the
-hire `input` length is not checked.
+Every `HireEndpoint` method (`createHire`, `prepareCreateJob`, `prepareFund`,
+`prepareComplete`, `prepareReject`, `submitEscrowCall`, `getHire`) requires a
+signed-in caller: a request without a session is HTTP 401 before the method
+runs. The method then resolves the caller's wallet through the
+`SessionWallet` seam before doing any work. The production binding,
+`WalletSessionWallet`, reads the wallet that [wallet sign-in](#wallet-sign-in)
+bound to the session and never trusts an address the caller sends. Tests
+inject a fake with `HireEndpoint.sessionWallet`. `InputTooLong` has no
+documented limit, so the hire `input` length is not checked.
 
 ### End-to-end proof on testnet
 
@@ -180,6 +181,35 @@ PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
 PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
+```
+
+## Wallet sign-in
+
+Hires need a wallet session (#136). The app asks
+`walletAuth.createChallenge` for a SEP-10 challenge, the wallet signs it, and
+`walletAuth.verifyChallenge` checks both signatures and returns a Serverpod
+session (a JWT, renewed through `jwtRefresh`).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Serverpod password `walletAuthSigningKey` | none | Stellar secret key (`S…`) that signs every challenge. It only signs and never submits, so a new key with no funds is enough. Locally, `walletAuthSigningKey:` in `config/passwords.yaml`; on Serverpod Cloud, `scloud password set walletAuthSigningKey --from-file <file>` |
+| `PULS3_AUTH_HOME_DOMAIN` | none | Home domain written into the challenge (`<home domain> auth`). The deployed server uses its API host |
+| `PULS3_AUTH_WEB_AUTH_DOMAIN` | none | Host that serves wallet authentication. The deployed server uses its API host |
+
+In the `production` run mode **the server refuses to start** while any of the
+three is missing or blank (`WalletAuthConfig.ensureProduction` in
+`server.dart`), so set them before deploying a commit that includes #136.
+Other run modes start, and `createChallenge` answers
+`AuthenticationUnavailable`. When all three are set, the server publishes its
+public signing key and home domain in the web app's `config.json` (`auth`).
+
+A key for testnet:
+
+```bash
+stellar keys generate puls3-auth --network testnet
+stellar keys secret puls3-auth > walletAuthSigningKey.txt
+scloud password set walletAuthSigningKey --from-file walletAuthSigningKey.txt
+rm walletAuthSigningKey.txt
 ```
 
 ## Agent wallet custody
@@ -304,7 +334,10 @@ when its origin is not allowed.
 The server runs on Serverpod Cloud, which also provides its PostgreSQL
 database. The Flutter web app is deployed separately to Cloudflare Pages (not
 covered here); build it with `--dart-define=PULS3_API_URL=<api-url>` so it
-calls this server.
+calls this server. In the Pages project, `scripts/cloudflare-pages-build.sh`
+reads `PULS3_API_URL` and `PULS3_HIRE` from the environment; set
+`PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
+stay the labelled demo.
 
 | | URL |
 |---|---|
@@ -406,12 +439,43 @@ per project.
    - `PULS3_GIT_SHA` is set by the pre-deploy script in step 6. Do not set it
      by hand.
    - `PULS3_STELLAR_*` default to testnet. Set them only for another network.
-   - Leave `PULS3_TRACKER_ENABLED` unset: the chain submission tracker stays
-     off in this deployment.
 
-   Serverpod Cloud generates and manages the passwords the server needs today
-   (see [Secrets in Serverpod Cloud](#secrets-in-serverpod-cloud)). Check them
-   with `scloud password list`.
+   For hires on testnet (wallet sign-in, payment confirmation and the agent
+   run), also set these. Replace `<api-host>` with
+   `<project-id>.api.serverpod.space`:
+
+   ```bash
+   scloud variable set PULS3_AUTH_HOME_DOMAIN <api-host>
+   scloud variable set PULS3_AUTH_WEB_AUTH_DOMAIN <api-host>
+   scloud variable set PULS3_TRACKER_ENABLED true
+   scloud variable set PULS3_INDEXER_ENABLED true
+   scloud variable set PULS3_RUNTIME_ENABLED true
+   scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 86400
+   scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
+   scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
+   scloud variable set PULS3_PLATFORM_FEE_BPS 0
+   ```
+
+   - `PULS3_AUTH_*`, with the `walletAuthSigningKey` password below, enable
+     [wallet sign-in](#wallet-sign-in). Production does not start without
+     them.
+   - `PULS3_TRACKER_ENABLED=true` is required for hires: a hire is paid only
+     when the tracker confirms its `fund`
+     ([Chain submission tracker](#chain-submission-tracker)). Without it, a
+     payment stays at "Awaiting payment".
+   - `PULS3_INDEXER_ENABLED` keeps the catalog in sync with the registry.
+     `PULS3_RUNTIME_ENABLED` and the Workers AI account run the agent of every
+     paid hire ([Agent runtime](#agent-runtime)).
+   - The four hire values are the ones of the testnet end-to-end proof
+     ([Hire configuration](#hire-configuration)). `PULS3_PLATFORM_FEE_BPS`
+     must equal `NetworkConfig.platformFeeBps` (0 on testnet).
+
+   Serverpod Cloud generates and manages the platform passwords (see
+   [Secrets in Serverpod Cloud](#secrets-in-serverpod-cloud)). Set the two
+   that hires need from files: `walletAuthSigningKey`
+   ([Wallet sign-in](#wallet-sign-in)) and `workersAiApiToken`
+   ([Agent runtime](#agent-runtime)). Check them with `scloud password list`.
 
 6. **Deploy.**
 
@@ -453,9 +517,13 @@ per project.
 Anyone with access to the project, on a machine where steps 1 and 2 are done:
 
 1. Update `main`: `git switch main && git pull`.
-2. Deploy: `scloud deploy`. The pre-deploy script sets `PULS3_GIT_SHA`.
-3. Verify with the three calls of step 7. `version` must name the commit you
-   just pulled.
+2. Compare `scloud variable list` and `scloud password list` with step 5 and
+   set anything new first. A production server without the
+   [wallet sign-in](#wallet-sign-in) settings does not start.
+3. Deploy: `scloud deploy`. The pre-deploy script sets `PULS3_GIT_SHA`.
+4. Verify with the three calls of step 7. `version` must name the commit you
+   just pulled. With the hire settings in place, `walletAuth/createChallenge`
+   answers instead of `Endpoint not found`.
 
 To change only variables (no new code), run `scloud variable set ...` and then
 `scloud deploy --redeploy`, which redeploys the running build with the latest
@@ -494,7 +562,7 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
 | `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
 | `mySharedPassword` | Unused template entry. Do not set |
-| Server signing key, per-agent wallet encryption key, LLM provider key (planned) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| `walletAuthSigningKey`, `workersAiApiToken`, `anthropicApiKey` (optional), and the planned server key for server-signed submissions | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
 Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret

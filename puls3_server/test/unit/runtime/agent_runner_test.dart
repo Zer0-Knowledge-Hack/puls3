@@ -147,6 +147,28 @@ void main() {
     expect(await runner.run(_task(input: 'x' * 100)), 'ok');
   });
 
+  test(
+    'limits count runes like the manifest: an emoji is one character',
+    () async {
+      // 100 emoji are 200 UTF-16 units but 100 characters.
+      final runtime = _FakeRuntime((_) async => '\u{1F680}' * 50);
+      final runner = AgentRunner(runtime: runtime, timeout: _timeout);
+
+      expect(await runner.run(_task(input: '\u{1F680}' * 100)), hasLength(100));
+      expect(runtime.calls, hasLength(1));
+
+      await expectLater(
+        runner.run(_task(input: '\u{1F680}' * 101)),
+        _failsWith('input_too_long'),
+      );
+      final over = AgentRunner(
+        runtime: _FakeRuntime((_) async => '\u{1F680}' * 51),
+        timeout: _timeout,
+      );
+      await expectLater(over.run(_task()), _failsWith('output_too_long'));
+    },
+  );
+
   test('output over the manifest limit fails', () async {
     final runner = AgentRunner(
       runtime: _FakeRuntime((_) async => 'y' * 51),

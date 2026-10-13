@@ -82,10 +82,12 @@ class _HireSheetState extends State<HireSheet> {
 
   void _run() => unawaited(_flow!.run(_input.text.trim()));
 
-  void _backToMarketplace() {
+  void _backToMarketplace() => _leaveTo('/market');
+
+  void _leaveTo(String location) {
     final router = GoRouter.of(context);
     Navigator.of(context).pop();
-    router.go('/market');
+    router.go(location);
   }
 
   @override
@@ -127,6 +129,9 @@ class _HireSheetState extends State<HireSheet> {
                   onConfirm: _run,
                   onRetry: _run,
                   onBackToMarketplace: _backToMarketplace,
+                  onViewHire: flow.hireId == null
+                      ? null
+                      : () => _leaveTo('/hires/${flow.hireId}'),
                   onOpenExplorer: hash == null || hash.isEmpty
                       ? null
                       : () => unawaited(
@@ -156,6 +161,8 @@ class _HireSheetState extends State<HireSheet> {
   }
 
   static String? _progress(HireStep step) => switch (step) {
+    HireStep.signingIn =>
+      'Sign in with your wallet: it only proves the account is yours.',
     HireStep.creating => 'Creating the hire…',
     HireStep.signingCreateJob => 'Sign the escrow job in your wallet (1 of 2).',
     HireStep.submittingCreateJob => 'Creating the escrow job on Stellar…',

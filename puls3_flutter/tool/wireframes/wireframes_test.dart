@@ -15,12 +15,14 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
+import 'package:puls3_flutter/src/domain/stellar_format.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/ui/atoms/address_badge.dart';
 import 'package:puls3_flutter/src/ui/atoms/content_width.dart';
@@ -32,6 +34,7 @@ import 'package:puls3_flutter/src/ui/molecules/empty_state.dart';
 import 'package:puls3_flutter/src/ui/molecules/key_value_row.dart';
 import 'package:puls3_flutter/src/ui/molecules/progress_step_row.dart';
 import 'package:puls3_flutter/src/ui/molecules/screen_header.dart';
+import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
 import '../../test/helpers.dart';
 
@@ -98,6 +101,35 @@ Future<void> _tap(WidgetTester tester, String text) async {
   await tester.pump();
   await tester.tap(find.text(text).first);
   await advance(tester, const Duration(milliseconds: 600));
+}
+
+/// Fills the Studio form with a manifest the domain accepts.
+Future<void> _fillValidManifest(WidgetTester tester) async {
+  Future<void> type(String key, String text) async {
+    final field = find.byKey(Key(key));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, text);
+    await tester.pump();
+  }
+
+  await type('agent-name-field', 'Brief Bot');
+  await type(
+    'agent-description-field',
+    'Summarizes long text into a short brief.',
+  );
+  await tester.ensureVisible(find.byKey(const Key('agent-model-field')));
+  await tester.tap(find.byKey(const Key('agent-model-field')));
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.tap(find.text('Llama 3.3 70B · free').last);
+  await tester.pump(const Duration(milliseconds: 300));
+  await type(
+    'agent-prompt-field',
+    'You are Brief Bot. Reply with at most five bullet points.',
+  );
+  await _tap(tester, '+ Summaries');
+  await type('agent-input-max-field', '6000');
+  await type('agent-output-max-field', '2000');
+  await type('agent-price-field', '0.10');
 }
 
 /// A screen that is not built yet, drawn from the app's components.
@@ -422,7 +454,16 @@ void main() {
       });
 
       testWidgets('S08-deploy-sheet', (tester) async {
-        await pumpApp(tester, location: '/studio', size: size);
+        // A seeded demo wallet: its address shows in the top bar, so the PNG
+        // is the same on every run.
+        await pumpApp(
+          tester,
+          location: '/studio',
+          size: size,
+          wallet: MockWallet(ids: FakeLedgerIds(Random(23))),
+        );
+        // Deploy opens only for a valid manifest (S07, #37).
+        await _fillValidManifest(tester);
         await _tap(tester, 'Deploy to Stellar');
         await advance(tester, const Duration(milliseconds: 1500));
         await _shoot(tester, 'S08-deploy-sheet-$width');

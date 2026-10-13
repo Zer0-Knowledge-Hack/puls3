@@ -24,9 +24,13 @@ final class AgentRunner {
   /// The output for [task], or a [RuntimeFailure]. Input over the limit fails
   /// before the model is called. On timeout the provider call is aborted, not
   /// just abandoned, so it stops being billed.
+  ///
+  /// Lengths are counted in runes, like every manifest limit in the domain:
+  /// an emoji is one character, not two UTF-16 units.
   Future<String> run(RuntimeTask task) async {
-    if (task.input.length > task.maxInputChars) {
-      throw RuntimeInputTooLong(task.input.length, task.maxInputChars);
+    final inputLength = task.input.runes.length;
+    if (inputLength > task.maxInputChars) {
+      throw RuntimeInputTooLong(inputLength, task.maxInputChars);
     }
     final abort = Completer<void>();
     final call = _runtime.complete(task, abortTrigger: abort.future);
@@ -40,8 +44,9 @@ final class AgentRunner {
       throw RuntimeTimedOut(_timeout);
     }
     if (output.trim().isEmpty) throw const RuntimeEmptyOutput();
-    if (output.length > task.maxOutputChars) {
-      throw RuntimeOutputTooLong(output.length, task.maxOutputChars);
+    final outputLength = output.runes.length;
+    if (outputLength > task.maxOutputChars) {
+      throw RuntimeOutputTooLong(outputLength, task.maxOutputChars);
     }
     return output;
   }

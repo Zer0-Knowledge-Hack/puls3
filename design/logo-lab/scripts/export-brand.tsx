@@ -87,6 +87,17 @@ for (const [name, p] of [
   }
 }
 
+// Mono marks: C01 full only. Below 48 px use the dark or light C01-small levels.
+for (const [name, p] of [
+  ["mono-white", monoWhite],
+  ["mono-ink", monoInk],
+] as const) {
+  write(
+    `mark/puls3-mark-c01-${name}.svg`,
+    renderToStaticMarkup(<BrandMark size={512} palette={p} mode="full" />),
+  );
+}
+
 write(
   "favicon/favicon.svg",
   renderToStaticMarkup(<FaviconTile size={32} mode="dark" />),

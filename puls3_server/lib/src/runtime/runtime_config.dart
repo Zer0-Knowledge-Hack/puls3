@@ -5,6 +5,12 @@
 /// | Serverpod password `anthropicApiKey` (secret; never logged) | [anthropicApiKey] |
 /// | `PULS3_RUNTIME_TIMEOUT_SECONDS` environment variable | [timeout] |
 ///
+/// The Anthropic key is optional: it only serves manifests whose provider is
+/// `anthropic` (BYOK). Workers AI, the free provider, is configured by
+/// `startAgentRuntime` from `PULS3_WORKERS_AI_ACCOUNT_ID` and the
+/// `workersAiApiToken` password. Whether the runtime runs at all is
+/// `PULS3_RUNTIME_ENABLED` (`RuntimeLoopConfig`).
+///
 /// The key is a secret, so it never comes from `.env`, which the app compiles
 /// into its build (docs/infra/secrets.md). The composition root reads it from
 /// Serverpod's passwords: `passwords.yaml` locally,
@@ -15,7 +21,8 @@ final class RuntimeConfig {
   /// Builds the configuration from [env] (normally `Platform.environment`)
   /// and the Serverpod password [anthropicApiKey].
   ///
-  /// A null or empty key disables the runtime. An unset or empty timeout
+  /// A null or empty key leaves the `anthropic` provider off. An unset or
+  /// empty timeout
   /// uses [defaultTimeout]; a timeout that is not a positive whole number of
   /// seconds throws [FormatException].
   factory RuntimeConfig.fromEnvironment(
@@ -56,11 +63,12 @@ final class RuntimeConfig {
   final String? anthropicApiKey;
   final Duration timeout;
 
-  /// Whether a provider key is configured.
-  bool get isEnabled => anthropicApiKey != null;
+  /// Whether the `anthropic` provider has a key. It says nothing about the
+  /// other providers or whether the runtime runs.
+  bool get hasAnthropicKey => anthropicApiKey != null;
 
   @override
   String toString() =>
-      'RuntimeConfig(${isEnabled ? 'enabled' : 'disabled'}, '
+      'RuntimeConfig(anthropic key ${hasAnthropicKey ? 'set' : 'unset'}, '
       'timeout: ${timeout.inSeconds}s)';
 }

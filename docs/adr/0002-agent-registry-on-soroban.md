@@ -46,6 +46,8 @@ pub const TTL_BUMP: u32 = 1_036_800;
 
 ### Identity Registry (`contracts/identity-registry`, #13)
 
+> **Drop-in review (#74):** the Identity Registry was compared function-by-function and event-by-event against Stellar 8004 at commit [`d92c2f4`](https://github.com/trionlabs/stellar-8004/tree/d92c2f4ee01858b6da9bf4404ac49322c324958b). See [Identity Registry: Stellar 8004 drop-in gap review](0002-identity-registry-stellar-8004-drop-in-review.md).
+
 ```rust
 #[contracttype]
 #[derive(Clone)]

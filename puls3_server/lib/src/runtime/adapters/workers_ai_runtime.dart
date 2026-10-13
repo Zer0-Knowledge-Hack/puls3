@@ -40,10 +40,29 @@ final class WorkersAiRuntime implements ModelRuntime {
   static int maxTokensFor(RuntimeTask task) =>
       min(maxTokensCeiling, task.maxOutputChars);
 
-  Uri _runUrl(String model) => Uri.parse(
-    'https://api.cloudflare.com/client/v4/accounts/'
-    '${Uri.encodeComponent(_accountId)}/ai/run/$model',
-  );
+  /// `POST /accounts/{account}/ai/run/{model}`, or `null` when [model]
+  /// cannot be a path. A model id is `/`-separated (`@cf/meta/…`), so each
+  /// segment is percent-encoded on its own: `?`, `#`, `%` or a space stay
+  /// inside the model path, and `@` stays as Cloudflare writes it. Empty,
+  /// `.` and `..` segments are refused, since URL normalization would turn
+  /// them into another path.
+  static Uri? runUrl(String accountId, String model) {
+    final segments = model.split('/');
+    if (segments.any((s) => s.isEmpty || s == '.' || s == '..')) return null;
+    return Uri(
+      scheme: 'https',
+      host: 'api.cloudflare.com',
+      pathSegments: [
+        'client',
+        'v4',
+        'accounts',
+        accountId,
+        'ai',
+        'run',
+        ...segments,
+      ],
+    );
+  }
 
   @override
   Future<String> complete(
@@ -53,12 +72,10 @@ final class WorkersAiRuntime implements ModelRuntime {
     if (task.provider != provider) {
       throw RuntimeUnsupportedProvider(task.provider);
     }
+    final url =
+        runUrl(_accountId, task.modelId) ?? (throw const RuntimeInvalidModel());
     final request =
-        http.AbortableRequest(
-            'POST',
-            _runUrl(task.modelId),
-            abortTrigger: abortTrigger,
-          )
+        http.AbortableRequest('POST', url, abortTrigger: abortTrigger)
           ..headers.addAll({
             'content-type': 'application/json',
             'authorization': 'Bearer $_apiToken',
