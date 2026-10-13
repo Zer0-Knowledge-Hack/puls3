@@ -395,6 +395,7 @@ class LandingScreen extends StatelessWidget {
                   label: 'My agents',
                   onTap: () => go('/studio/agents'),
                 ),
+                LandingLink(label: 'Brand', onTap: () => go('/brand')),
               ],
               project: [
                 LandingLink(

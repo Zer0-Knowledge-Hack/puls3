@@ -134,6 +134,16 @@ void main() {
     expect(find.text('SHOWING 2 OF 2'), findsOneWidget);
   });
 
+  testWidgets('the footer links to the brand page', (tester) async {
+    await pumpApp(tester);
+    await tester.ensureVisible(find.text('Brand'));
+    await tester.pump();
+    await tester.tap(find.text('Brand'));
+    await advance(tester, const Duration(milliseconds: 800));
+
+    expect(find.text(_headline), findsNothing);
+  });
+
   testWidgets('the phone menu lists the destinations', (tester) async {
     await pumpApp(tester, size: const Size(390, 844));
 
