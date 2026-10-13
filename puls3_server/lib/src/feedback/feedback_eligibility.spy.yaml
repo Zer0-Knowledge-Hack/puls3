@@ -1,0 +1,10 @@
+### Whether the caller may rate a hire, and why not (docs/architecture/api.md,
+### `FeedbackEndpoint.getFeedbackEligibility`).
+class: FeedbackEligibility
+fields:
+  hireId: int
+  eligible: bool
+  ### The `Puls3ApiException` code naming the broken rule when eligible is
+  ### false: HireNotCompleted, HireAlreadyRated or FeedbackFromAgentOwner.
+  ### Null when eligible is true.
+  reason: String?

@@ -34,6 +34,9 @@ import 'xdr_invoke_encoder.dart';
 /// Registry `UriNotSet`: the agent exists but has no metadata uri.
 const _registryUriNotSet = 2;
 
+/// Registry `AgentNotFound`: there is no agent with that id.
+const _registryAgentNotFound = 3;
+
 /// Escrow `JobNotFound`: there is no job with that id.
 const _escrowJobNotFound = 1;
 
@@ -49,7 +52,7 @@ const _simulationSequence = 0;
 /// means the chain says "not there"; an infrastructure problem or a response
 /// the adapter cannot read is a [LedgerException] instead.
 final class SorobanLedger
-    implements LedgerPort, RegistryReader, EscrowJobReader {
+    implements LedgerPort, RegistryReader, EscrowJobReader, AgentOwnerReader {
   SorobanLedger(this._rpc, this._config);
 
   final SorobanRpcClient _rpc;
@@ -61,6 +64,19 @@ final class SorobanLedger
       ScArg.u32(id.value),
     ]),
   );
+
+  /// Registry `owner_of`: who registered [agent], or `null` when there is no
+  /// such agent.
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    final value = await _read(
+      _config.identityRegistry,
+      'owner_of',
+      [ScArg.u32(agent.value)],
+      absentErrors: const {_registryAgentNotFound},
+    );
+    return value == null ? null : readAddress(value);
+  }
 
   /// Registry `agent_uri`, or `null` when the agent has no uri.
   Future<String?> agentUri(AgentId id) async {

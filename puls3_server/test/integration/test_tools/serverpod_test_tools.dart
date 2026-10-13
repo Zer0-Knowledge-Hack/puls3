@@ -19,6 +19,8 @@ import 'package:puls3_server/src/generated/auth/wallet_challenge.dart'
     as _ievkkkll;
 import 'package:puls3_server/src/generated/create_hire_result.dart'
     as _iba6uw0u;
+import 'package:puls3_server/src/generated/feedback/feedback_eligibility.dart'
+    as _i3lyiuyx;
 import 'package:puls3_server/src/generated/greetings/greeting.dart'
     as _idslfse3;
 import 'package:puls3_server/src/generated/health/backend_health.dart'
@@ -169,6 +171,8 @@ class TestEndpoints {
 
   late final _WalletAuthEndpoint walletAuth;
 
+  late final _FeedbackEndpoint feedback;
+
   late final _GreetingEndpoint greeting;
 
   late final _HealthEndpoint health;
@@ -192,6 +196,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     walletAuth = _WalletAuthEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    feedback = _FeedbackEndpoint(
       endpoints,
       serializationManager,
     );
@@ -395,6 +403,126 @@ class _WalletAuthEndpoint {
                   _localCallContext.arguments,
                 )
                 as _ida.Future<_iacs.AuthSuccess>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _FeedbackEndpoint {
+  _FeedbackEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<_i3lyiuyx.FeedbackEligibility> getFeedbackEligibility(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+    String client,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'feedback',
+            method: 'getFeedbackEligibility',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'feedback',
+          methodName: 'getFeedbackEligibility',
+          parameters: _ist.testObjectToJson({
+            'hireId': hireId,
+            'client': client,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i3lyiuyx.FeedbackEligibility>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareFeedback(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+    int score,
+    String comment,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'feedback',
+            method: 'prepareFeedback',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'feedback',
+          methodName: 'prepareFeedback',
+          parameters: _ist.testObjectToJson({
+            'hireId': hireId,
+            'score': score,
+            'comment': comment,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i0z7bvay.HireDetail> submitFeedback(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'feedback',
+            method: 'submitFeedback',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'feedback',
+          methodName: 'submitFeedback',
+          parameters: _ist.testObjectToJson({
+            'hireId': hireId,
+            'preparationId': preparationId,
+            'signedTransactionXdr': signedTransactionXdr,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i0z7bvay.HireDetail>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

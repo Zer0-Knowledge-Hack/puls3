@@ -6,6 +6,10 @@ jwtRefresh:
 walletAuth:
   - createChallenge:
   - verifyChallenge:
+feedback:
+  - getFeedbackEligibility:
+  - prepareFeedback:
+  - submitFeedback:
 greeting:
   - hello:
 health:

@@ -179,6 +179,58 @@ void main() {
     });
   });
 
+  group('ownerOf', () {
+    test('returns the owner and sends owner_of', () async {
+      // `owner_of` returns an Address, the same ScVal shape as the wallet.
+      final h = _ledgerAnswering(
+        _fixture('simulate_agent_wallet_registered.json'),
+      );
+
+      final owner = await h.ledger.ownerOf(AgentId(7));
+
+      expect(
+        owner,
+        StellarAddress.parse(
+          'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+        ),
+      );
+      final params = h.requests.single['params']! as Map<String, Object?>;
+      expect(
+        params['transaction'],
+        _expectedEnvelope(
+          _config.identityRegistry,
+          'owner_of',
+          const ScArg.u32(7),
+        ),
+      );
+    });
+
+    test('AgentNotFound (#3) is null', () async {
+      final response = _withResultKey(
+        'simulate_agent_uri_missing.json',
+        'error',
+        'HostError: Error(Contract, #3)\n\nEvent log (newest first):',
+      );
+      final h = _ledgerAnswering(response);
+
+      expect(await h.ledger.ownerOf(AgentId(99999)), isNull);
+    });
+
+    test('any other contract error surfaces its code', () {
+      final response = _withResultKey(
+        'simulate_agent_uri_missing.json',
+        'error',
+        'HostError: Error(Contract, #2)',
+      );
+      final h = _ledgerAnswering(response);
+
+      expect(
+        () => h.ledger.ownerOf(AgentId(1)),
+        throwsA(isA<LedgerContractError>().having((e) => e.code, 'code', 2)),
+      );
+    });
+  });
+
   group('totalAgents', () {
     test('returns the recorded count and sends the right call', () async {
       final h = _ledgerAnswering(_fixture('simulate_total_agents.json'));
