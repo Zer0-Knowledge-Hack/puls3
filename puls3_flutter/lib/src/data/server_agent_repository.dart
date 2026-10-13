@@ -68,8 +68,9 @@ class ServerAgentRepository implements AgentRepository {
       description: s.description,
       skills: List<String>.unmodifiable(s.skills.map(skillDisplayName)),
       priceUsdcStroops: s.priceUsdcStroops,
-      // The catalog carries no reviews yet; 0.0 makes the badge hide itself.
-      rating: 0.0,
+      // Computed by the server with the #11 reputation function; 4.0 for an
+      // agent without feedback.
+      rating: s.rating,
       stellarAddress: wallet,
       model: model == null || model.isEmpty ? 'Unspecified' : model,
       registryId: s.registryId,
