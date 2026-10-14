@@ -403,6 +403,10 @@ void main() {
       bool withTimeBounds = true,
       bool extraPayment = false,
       String? secondOperationSource,
+      String secondOperationName = 'web_auth_domain',
+      String webAuthDomain = 'puls3.dev',
+      KeyPair? signer,
+      bool signed = true,
     }) {
       final builder =
           TransactionBuilder(
@@ -419,8 +423,8 @@ void main() {
             )
             ..addOperation(
               ManageDataOperationBuilder(
-                    'web_auth_domain',
-                    Uint8List.fromList('puls3.dev'.codeUnits),
+                    secondOperationName,
+                    Uint8List.fromList(webAuthDomain.codeUnits),
                   )
                   .setSourceAccount(
                     secondOperationSource ?? source ?? server.accountId,
@@ -446,7 +450,7 @@ void main() {
         );
       }
       final tx = builder.build();
-      tx.sign(server, Network.TESTNET);
+      if (signed) tx.sign(signer ?? server, Network.TESTNET);
       return tx;
     }
 
@@ -454,12 +458,14 @@ void main() {
       Transaction tx, {
       String? serverSigningKey,
       String? home,
+      String? webAuth,
       String passphrase = stellarTestnetPassphrase,
     }) => SignInChallenge(
       transactionXdr: tx.toEnvelopeXdrBase64(),
       networkPassphrase: passphrase,
       serverSigningKey: serverSigningKey,
       homeDomain: home,
+      webAuthDomain: webAuth,
     );
 
     Matcher refused(String reason) => throwsA(
@@ -587,6 +593,55 @@ void main() {
         ),
         refused('not from the puls3 server'),
       );
+    });
+
+    test('signs a challenge whose web_auth_domain is the pinned one', () async {
+      await wallet.signChallenge(
+        signIn(
+          challenge(webAuthDomain: homeDomain),
+          serverSigningKey: server.accountId,
+          home: homeDomain,
+          webAuth: homeDomain,
+        ),
+      );
+      expect(bridge.signCalls, 1);
+    });
+
+    test('refuses a challenge without a web_auth_domain operation', () {
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(secondOperationName: 'nonce')),
+        ),
+        refused('does not name its auth server'),
+      );
+      expect(bridge.signCalls, 0);
+    });
+
+    test('refuses a web_auth_domain other than the pinned one', () {
+      expect(
+        wallet.signChallenge(
+          signIn(challenge(webAuthDomain: 'evil.example'), webAuth: homeDomain),
+        ),
+        refused('not for this server'),
+      );
+      expect(bridge.signCalls, 0);
+    });
+
+    test('refuses a challenge the server did not sign', () {
+      expect(
+        wallet.signChallenge(signIn(challenge(signed: false))),
+        refused('not signed by the puls3 server'),
+      );
+      expect(
+        wallet.signChallenge(
+          signIn(
+            challenge(signer: KeyPair.random()),
+            serverSigningKey: server.accountId,
+          ),
+        ),
+        refused('not signed by the puls3 server'),
+      );
+      expect(bridge.signCalls, 0);
     });
 
     test('refuses a challenge without time bounds or outside them', () {

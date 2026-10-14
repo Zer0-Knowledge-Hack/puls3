@@ -29,6 +29,15 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
+`PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
+(#14). Its testnet default is the deployed registry
+`CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`, recorded in `contracts/deployments/testnet.json`. While it is
+unset on another network, `FeedbackEndpoint.prepareFeedback` fails with `HireConfigurationMissing`
+and every agent shows the #11 empty-input rating (`4.0`, `0` paid hires). Once
+set, the catalog reads each agent's feedback from the registry (cached for 60
+seconds) and `prepareFeedback` builds the real `give_feedback` call. The value
+is public, like the other contract ids.
+
 With no indexed rows and a chain that cannot be read, the on-chain fallback
 throws the serializable `AgentCatalogUnavailable` exception; an outage is never
 an empty list, and an unknown id is never reported as an outage.
@@ -181,6 +190,25 @@ PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
 PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
+```
+
+### Feedback proof on testnet (#179)
+
+`tool/e2e_feedback_testnet.dart` continues the funded hire of the relay proof:
+the agent fixture signs `submit` directly, the server releases the job after
+`approval_deadline` through the chain tracker's deadline pass (it needs the
+`escrowRelaySigningKey` password), the hire reads `completed`, and the
+consumer rates it with `prepareFeedback` and `submitFeedback`. It exits
+non-zero unless the hire has a `feedbackReference` and `AgentEndpoint.get`
+counts the new rating. It is an ops proof and has no unit test.
+
+Both secrets come from the environment and are never printed. The run waits
+for the approval window, so it can take as long as the window (30 minutes at
+most).
+
+```bash
+cd puls3_server
+PULS3_E2E_HIRE_ID=<hire id printed by the relay proof> PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" PULS3_E2E_AGENT_SECRET="$(stellar keys secret agent)" dart run tool/e2e_feedback_testnet.dart
 ```
 
 ## Wallet sign-in
@@ -338,6 +366,19 @@ calls this server. In the Pages project, `scripts/cloudflare-pages-build.sh`
 reads `PULS3_API_URL` and `PULS3_HIRE` from the environment; set
 `PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
 stay the labelled demo.
+
+With `PULS3_HIRE=server` the Pages build also needs the SEP-10 values the app
+checks every sign-in challenge against before the wallet is prompted (#136),
+and fails without them. All three are public:
+
+| Pages variable | Value for this deployment |
+|---|---|
+| `PULS3_AUTH_SERVER_SIGNING_KEY` | the `G…` account of the `walletAuthSigningKey` password (today `GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG`) |
+| `PULS3_AUTH_HOME_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |
+| `PULS3_AUTH_WEB_AUTH_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |
+
+If `walletAuthSigningKey` is rotated, update `PULS3_AUTH_SERVER_SIGNING_KEY`
+and rebuild Pages, or every sign-in is refused before the wallet prompt.
 
 | | URL |
 |---|---|
@@ -562,7 +603,7 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
 | `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
 | `mySharedPassword` | Unused template entry. Do not set |
-| `walletAuthSigningKey`, `workersAiApiToken`, `anthropicApiKey` (optional), and the planned server key for server-signed submissions | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| `walletAuthSigningKey`, `escrowRelaySigningKey` (optional `S…` that signs permissionless `release` and `claim_refund`; without it the tracker still runs and those calls stay off), `workersAiApiToken`, `anthropicApiKey` (optional) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
 Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret

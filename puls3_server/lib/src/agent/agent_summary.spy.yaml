@@ -24,3 +24,12 @@ fields:
 
   ### The model that runs the agent, when the metadata names one.
   model: String?
+
+  ### The agent's rating from 1 to 5, computed by the #11 reputation function
+  ### over its feedback. An agent without feedback has the #11 empty-input
+  ### value (4.0). The default keeps summaries built without it valid.
+  rating: double, default=4.0
+
+  ### How many paid hires rated the agent: the feedback entries the #11
+  ### function counted.
+  paidHireCount: int, default=0

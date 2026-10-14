@@ -25,7 +25,10 @@ abstract class AgentSummary
     required this.priceUsdcStroops,
     this.wallet,
     this.model,
-  });
+    double? rating,
+    int? paidHireCount,
+  }) : rating = rating ?? 4.0,
+       paidHireCount = paidHireCount ?? 0;
 
   factory AgentSummary({
     required String id,
@@ -36,6 +39,8 @@ abstract class AgentSummary
     required int priceUsdcStroops,
     String? wallet,
     String? model,
+    double? rating,
+    int? paidHireCount,
   }) = _AgentSummaryImpl;
 
   factory AgentSummary.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -50,6 +55,8 @@ abstract class AgentSummary
       priceUsdcStroops: jsonSerialization['priceUsdcStroops'] as int,
       wallet: jsonSerialization['wallet'] as String?,
       model: jsonSerialization['model'] as String?,
+      rating: (jsonSerialization['rating'] as num?)?.toDouble(),
+      paidHireCount: jsonSerialization['paidHireCount'] as int?,
     );
   }
 
@@ -77,6 +84,15 @@ abstract class AgentSummary
   /// The model that runs the agent, when the metadata names one.
   String? model;
 
+  /// The agent's rating from 1 to 5, computed by the #11 reputation function
+  /// over its feedback. An agent without feedback has the #11 empty-input
+  /// value (4.0). The default keeps summaries built without it valid.
+  double rating;
+
+  /// How many paid hires rated the agent: the feedback entries the #11
+  /// function counted.
+  int paidHireCount;
+
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
   @_isc.useResult
@@ -89,6 +105,8 @@ abstract class AgentSummary
     int? priceUsdcStroops,
     String? wallet,
     String? model,
+    double? rating,
+    int? paidHireCount,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -102,6 +120,8 @@ abstract class AgentSummary
       'priceUsdcStroops': priceUsdcStroops,
       if (wallet != null) 'wallet': wallet,
       if (model != null) 'model': model,
+      'rating': rating,
+      'paidHireCount': paidHireCount,
     };
   }
 
@@ -117,6 +137,8 @@ abstract class AgentSummary
       'priceUsdcStroops': priceUsdcStroops,
       if (wallet != null) 'wallet': wallet,
       if (model != null) 'model': model,
+      'rating': rating,
+      'paidHireCount': paidHireCount,
     };
   }
 
@@ -138,6 +160,8 @@ class _AgentSummaryImpl extends AgentSummary {
     required int priceUsdcStroops,
     String? wallet,
     String? model,
+    double? rating,
+    int? paidHireCount,
   }) : super._(
          id: id,
          registryId: registryId,
@@ -147,6 +171,8 @@ class _AgentSummaryImpl extends AgentSummary {
          priceUsdcStroops: priceUsdcStroops,
          wallet: wallet,
          model: model,
+         rating: rating,
+         paidHireCount: paidHireCount,
        );
 
   /// Returns a shallow copy of this [AgentSummary]
@@ -162,6 +188,8 @@ class _AgentSummaryImpl extends AgentSummary {
     int? priceUsdcStroops,
     Object? wallet = _Undefined,
     Object? model = _Undefined,
+    double? rating,
+    int? paidHireCount,
   }) {
     return AgentSummary(
       id: id ?? this.id,
@@ -172,6 +200,8 @@ class _AgentSummaryImpl extends AgentSummary {
       priceUsdcStroops: priceUsdcStroops ?? this.priceUsdcStroops,
       wallet: wallet is String? ? wallet : this.wallet,
       model: model is String? ? model : this.model,
+      rating: rating ?? this.rating,
+      paidHireCount: paidHireCount ?? this.paidHireCount,
     );
   }
 }

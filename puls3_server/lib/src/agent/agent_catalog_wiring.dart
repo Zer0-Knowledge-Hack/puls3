@@ -4,12 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../feedback/reputation_wiring.dart';
+import '../ledger/contract_reader.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'agent_catalog_service.dart';
 import 'catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
+import 'reputation_catalog_reader.dart';
 import 'serverpod_agent_index_repository.dart';
 
 /// How long one Soroban RPC call may take before the chain counts as down.
@@ -24,15 +27,45 @@ http.Client? _sharedHttpClient;
 /// rebuilding it on every request would lose all three.
 CatalogReader? _chainCatalog;
 
+/// The reputation read and its 60 s cache, built once per process: a cache
+/// built per request would never be hit. Its registry is the one of the first
+/// request's configuration: `PULS3_STELLAR_REPUTATION_REGISTRY`, or unwired
+/// (every agent without feedback) while that is unset.
+ReputationCache? _reputationCache;
+
 /// How many times the on-chain fallback was built. Tests assert it stays 1.
 @visibleForTesting
 int chainCatalogBuilds = 0;
 
-/// Clears the cached fallback and the build counter, for tests.
+/// How many times the reputation cache was built. Tests assert it stays 1.
+@visibleForTesting
+int reputationCacheBuilds = 0;
+
+/// Clears the cached fallback, the reputation cache and the build counters,
+/// for tests.
 @visibleForTesting
 void resetChainCatalog() {
   _chainCatalog = null;
   chainCatalogBuilds = 0;
+  _reputationCache = null;
+  reputationCacheBuilds = 0;
+}
+
+ReputationCache _reputation(StellarConfig config) {
+  final cached = _reputationCache;
+  if (cached != null) return cached;
+  reputationCacheBuilds++;
+  final rpc = SorobanRpcClient(
+    httpClient: _sharedHttpClient ??= http.Client(),
+    url: config.rpcUrl,
+    timeout: _rpcTimeout,
+  );
+  return _reputationCache = ReputationCache(
+    registry: reputationRegistryFor(
+      config,
+      ContractReader(rpc, source: config.simulationSource),
+    ),
+  );
 }
 
 /// The process-wide on-chain catalog fallback, created on first use.
@@ -59,7 +92,8 @@ AgentCatalogService _buildChainCatalog(StellarConfig config, http.Client client)
     );
 
 /// Builds the catalog reader for one request: the Postgres index, falling back
-/// to the on-chain catalog while the index is empty.
+/// to the on-chain catalog while the index is empty, with each agent's
+/// reputation added by the #11 function.
 ///
 /// Every Soroban import lives here, not in the endpoint, so the endpoint
 /// depends only on [CatalogReader]. The fallback is a process-wide singleton;
@@ -78,11 +112,14 @@ CatalogReader buildAgentCatalogReader(
           config,
           httpClient ?? (_sharedHttpClient ??= http.Client()),
         );
-  return IndexedAgentCatalogService(
-    index: ServerpodAgentIndexRepository(
-      session,
-      network: config.networkPassphrase,
+  return ReputationCatalogReader(
+    inner: IndexedAgentCatalogService(
+      index: ServerpodAgentIndexRepository(
+        session,
+        network: config.networkPassphrase,
+      ),
+      fallback: fallback,
     ),
-    fallback: fallback,
+    cache: _reputation(config),
   );
 }

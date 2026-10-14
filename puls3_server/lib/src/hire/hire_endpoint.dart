@@ -49,6 +49,14 @@ class HireEndpoint extends Endpoint {
     return (_wiring ??= HireWiring.fromEnvironment()).servicesOn(session);
   }
 
+  /// The caller's wallet through the session seam, for the other endpoints
+  /// of the hire flow that share it.
+  static Future<StellarAddress> sessionWalletOf(Session session) =>
+      _wallet.requireLogin(session);
+
+  /// The services of a request, for the other endpoints of the hire flow.
+  static HireServices servicesOf(Session session) => _servicesOn(session);
+
   /// Creates the hire of [requestId] for [consumer] and prepares its
   /// `create_job`; repeating the request returns the same hire.
   Future<CreateHireResult> createHire(

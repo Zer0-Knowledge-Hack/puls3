@@ -86,7 +86,7 @@ Everything below can be opened on [stellar.expert](https://stellar.expert/explor
 
 The registry owner and original deployer is `GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R`. The test job's `deliverable` and `reason` are SHA-256 hashes of the fixed strings `puls3 testnet evidence deliverable` (`179090692d43733fb69b57dca35e077a5af50ad0a37138b76c3e050027bc0665`) and `puls3 testnet evidence approval` (`2e15dea8c223c8d0abb27717972b7e88b8d7968d846652e275e39ab5bf0f88bc`), so anyone can recompute them.
 
-Escrow configuration: `fee_bps` 0, `approval_window` 86400 s, `max_expiry` 2592000 s, no treasury. The escrow admin is `GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY`. The **Reputation Registry is not deployed**: `reputation_registry` is `null` in `testnet.json` and no address is claimed for it.
+Escrow configuration: `fee_bps` 0, `approval_window` 86400 s, `max_expiry` 2592000 s, no treasury. The escrow admin is `GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY`. The Reputation Registry (#14) is deployed at `CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`, recorded in `testnet.json`.
 
 #### Escrow rail (job 3, the evidence of record)
 
@@ -193,6 +193,55 @@ docs/verification/ How to verify the on-chain evidence (onchain.md)
 docs/brand/      Brand guide, design tokens
 assets/brand/    Logos, marks, favicons, fonts
 design/          Design sources (logo lab)
+```
+
+## Build and run
+
+Prerequisites (the versions CI uses): **Flutter 3.44.4** (bundles Dart 3.12.2), **Serverpod CLI 4.0.4**, and **Docker**. Rust and the Stellar CLI are only needed for the contracts. Machine setup: [CONTRIBUTING.md §1](CONTRIBUTING.md#1-set-up-your-machine).
+
+```bash
+# 1. Clone and install the Dart workspace (domain, server, client, app)
+git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
+cd puls3
+flutter pub get
+
+# 2. Local secrets (random, machine-only) and the public root config
+./scripts/setup-local-secrets.sh   # creates puls3_server/.env + config/passwords.yaml
+cp .env.example .env               # public configuration; no real secret needed
+
+# 3. Start the local database (development DB on 8090)
+cd puls3_server
+docker compose up -d postgres      # add `redis` too if you enable it in config/development.yaml
+
+# 4. Run the server (API on http://localhost:8080)
+set -a; . ../.env; set +a
+dart bin/main.dart --apply-migrations
+
+# 5. Run the Flutter web app against it (second terminal)
+cd ../puls3_flutter
+flutter run -d chrome
+```
+
+The app reads the server URL from [`puls3_flutter/assets/config.json`](puls3_flutter/assets/config.json) (`http://localhost:8080`); override it with `--dart-define=PULS3_API_URL=<url>`. Stop the server with `Ctrl+C`, then `docker compose stop`.
+
+`scripts/setup-local-secrets.sh` writes `puls3_server/.env` (Postgres/Redis passwords) and `puls3_server/config/passwords.yaml` with random values; `.env.example` copied to the root `.env` is public configuration. **No real secret is required** to run locally.
+
+### Quality gates
+
+```bash
+# Domain (pure Dart)
+cd puls3_domain
+dart analyze --fatal-infos && dart test
+
+# Server (uses the test database on 9090 and the test Redis on 9091)
+cd ../puls3_server
+docker compose up -d postgres_test redis_test
+dart analyze --fatal-infos && dart test test/unit test/hire test/ledger
+
+# App
+cd ../puls3_flutter
+flutter analyze --fatal-infos && flutter test
+flutter build web --release
 ```
 
 ## Hackathon Note (Stellar Odyssey Perú)

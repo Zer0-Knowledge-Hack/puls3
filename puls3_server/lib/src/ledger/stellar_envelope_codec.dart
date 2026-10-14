@@ -91,6 +91,22 @@ final class StellarEnvelopeCodec implements EnvelopeCodec {
     );
   }
 
+  /// Attaches [key]'s signature of [prepared.hash] and returns the signed
+  /// envelope as base64 XDR. The transaction hash does not change.
+  String sign(PreparedEnvelope prepared, stellar.StellarPrivateKey key) {
+    final decoded = stellar.Envelope.fromXdr(
+      base64Decode(prepared.envelopeXdr),
+    );
+    if (decoded is! stellar.TransactionV1Envelope) {
+      throw ArgumentError('prepared envelope is not a v1 transaction');
+    }
+    final signed = stellar.TransactionV1Envelope(
+      tx: decoded.tx,
+      signatures: [key.sign(prepared.hash)],
+    );
+    return base64Encode(signed.toVariantXDR());
+  }
+
   @override
   SignedEnvelope parse(String base64) {
     if (base64.isEmpty) {

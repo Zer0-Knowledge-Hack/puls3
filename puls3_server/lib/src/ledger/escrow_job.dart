@@ -14,6 +14,13 @@ abstract interface class EscrowJobReader {
   Future<EscrowJob?> escrowJob(int jobId);
 }
 
+/// Reads the escrow's own expiry view. Implemented by `SorobanLedger`.
+abstract interface class EscrowExpiryReader {
+  /// Escrow `is_expired`. True for `Expired`, and for `Open` or `Funded`
+  /// jobs at or after `expired_at`. A `Submitted` job is never expired.
+  Future<bool> isExpired(int jobId);
+}
+
 /// An escrow `Job` as the contract stores it. It lives in the server package:
 /// the domain does not model escrow jobs.
 final class EscrowJob {

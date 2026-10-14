@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../chain/submission_values.dart';
 import '../generated/protocol.dart' hide Hire, Payment;
 import '../runtime/hire_run_store.dart';
 import '../runtime/serverpod_hire_run_store.dart';
@@ -121,8 +122,28 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
     return current?.jobId == jobId ? JobBinding.alreadyBound : JobBinding.taken;
   }
 
+  @override
+  Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100}) async {
+    if (limit < 1) {
+      throw ArgumentError.value(limit, 'limit', 'must be at least 1');
+    }
+    final records = await HireRecord.db.find(
+      session,
+      where: (t) => t.jobId.notEquals(null) & (t.id > afterId),
+      orderBy: (t) => t.id,
+      limit: limit,
+    );
+    final rows = <HireRow>[];
+    for (final record in records) {
+      rows.add(await _row(record));
+    }
+    return rows;
+  }
+
   /// The wire view of [record]: no status until the job exists, `open`
-  /// after, `funded` once a payment is recorded.
+  /// after, `funded` once a payment is recorded, then `completed` or
+  /// `expired` once a server-signed `release` or `claim_refund` is
+  /// confirmed (see [_settlement]).
   Future<HireRow> _row(HireRecord record, {Transaction? transaction}) async {
     final payment = await HirePaymentRecord.db.findFirstRow(
       session,
@@ -141,11 +162,44 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       jobId: record.jobId,
       paymentTransaction: payment?.transactionHash,
       status: payment != null
-          ? HireStatus.funded
+          ? await _settlement(record.id!, transaction: transaction) ??
+                HireStatus.funded
           : record.jobId != null
           ? HireStatus.open
           : null,
     );
+  }
+
+  /// How a funded hire settled: `completed` after a confirmed `release`,
+  /// `expired` after a confirmed `claim_refund`, otherwise null.
+  ///
+  /// The status is derived on read, so it needs no column and no write by
+  /// the tracker. A confirmed record never changes, so concurrent trackers
+  /// and repeated reads agree. `release` wins when both exist, which the
+  /// contract makes impossible. It uses `chain_submission_hire_idx`.
+  Future<HireStatus?> _settlement(
+    int hireId, {
+    Transaction? transaction,
+  }) async {
+    final settled = await ChainSubmission.db.find(
+      session,
+      where: (t) =>
+          t.hireId.equals(hireId) &
+          t.state.equals(SubmissionState.confirmed.wireName) &
+          t.purpose.inSet({
+            SubmissionPurpose.release.wireName,
+            SubmissionPurpose.claimRefund.wireName,
+          }),
+      transaction: transaction,
+    );
+    final purposes = {for (final row in settled) row.purpose};
+    if (purposes.contains(SubmissionPurpose.release.wireName)) {
+      return HireStatus.completed;
+    }
+    if (purposes.contains(SubmissionPurpose.claimRefund.wireName)) {
+      return HireStatus.expired;
+    }
+    return null;
   }
 
   @override
@@ -183,7 +237,12 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       session,
       where: (t) => t.hireId.equals(id.value),
     );
-    return run == null ? funded : _replayRun(funded, run);
+    final replayed = run == null ? funded : _replayRun(funded, run);
+    return switch (await _settlement(id.value)) {
+      HireStatus.completed => replayed.submit().complete(),
+      HireStatus.expired => replayed.expire(),
+      _ => replayed,
+    };
   }
 
   /// [funded] with its stored run applied through the domain transitions.

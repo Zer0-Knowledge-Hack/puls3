@@ -9,6 +9,7 @@ import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
 import '../chain/submission_values.dart';
+import '../feedback/reputation_calls.dart' show ContractCall;
 import '../generated/protocol.dart';
 import '../ledger/envelope_codec.dart';
 import '../ledger/ledger_errors.dart';
@@ -121,11 +122,20 @@ final class EscrowRelayService {
     String reason,
   ) => _prepare(wallet, hireId, SubmissionPurpose.reject, reason: reason);
 
+  /// The unsigned `give_feedback` of a completed hire. [call] is built by
+  /// the feedback service: the registry contract is not the escrow.
+  Future<PreparedTransaction> prepareFeedback(
+    StellarAddress wallet,
+    int hireId,
+    ContractCall call,
+  ) => _prepare(wallet, hireId, SubmissionPurpose.giveFeedback, call: call);
+
   Future<PreparedTransaction> _prepare(
     StellarAddress wallet,
     int hireId,
     SubmissionPurpose purpose, {
     String? reason,
+    ContractCall? call,
   }) async {
     final hire = await _ownedHire(wallet, hireId);
     if (reason != null && reason.trim().isEmpty) {
@@ -149,6 +159,15 @@ final class EscrowRelayService {
           agentId: hire.agentId,
           price: hire.price,
           expiredAt: _nowSeconds + _config.jobDurationSeconds,
+        );
+      case SubmissionPurpose.giveFeedback:
+        final feedbackCall = call!;
+        draft = await _draft(
+          wallet: wallet,
+          purpose: purpose,
+          function: feedbackCall.function,
+          args: feedbackCall.args,
+          contract: feedbackCall.contract,
         );
       default:
         draft = await _draft(
@@ -411,6 +430,7 @@ final class EscrowRelayService {
     required SubmissionPurpose purpose,
     required String function,
     required List<ScArg> args,
+    StellarAddress? contract,
     int? jobExpiredAt,
     String? rejectReason,
   }) async {
@@ -423,7 +443,7 @@ final class EscrowRelayService {
     final spec = EnvelopeSpec(
       source: wallet,
       accountSequence: accountSequence,
-      contract: _stellar.escrow,
+      contract: contract ?? _stellar.escrow,
       function: function,
       args: args,
       inclusionFee: inclusionFee,
@@ -496,6 +516,7 @@ final class EscrowRelayService {
         SubmissionPurpose.createJob => status == null,
         SubmissionPurpose.fund => status == HireStatus.open,
         SubmissionPurpose.complete => status == HireStatus.submitted,
+        SubmissionPurpose.giveFeedback => status == HireStatus.completed,
         SubmissionPurpose.reject =>
           status == HireStatus.open ||
               status == HireStatus.funded ||

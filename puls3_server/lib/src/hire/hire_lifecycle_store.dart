@@ -69,6 +69,11 @@ final class HireRow {
 
   /// The wire status (api.md, "Hire escrow states"): null until the job
   /// exists, then `open`, and `funded` once a payment is recorded.
+  ///
+  /// A funded hire reads `completed` or `expired` once a server-signed
+  /// `release` or `claim_refund` is confirmed. That is the one status
+  /// derived on read from `chain_submission` instead of stored (ADR-0005
+  /// D4); the store has no write for it.
   final HireStatus? status;
 
   /// The client-visible hire: no runtime or feedback fields, which this
@@ -127,4 +132,14 @@ abstract interface class HireLifecycleStore {
   ///
   /// Throws [StateError] when the hire does not exist.
   Future<JobBinding> bindJob(int hireId, int jobId, {required int expiredAt});
+
+  /// Hires that already have an escrow job and an id above [afterId],
+  /// oldest first (by id), at most [limit]. A hire without a job is not a
+  /// candidate for a server-signed `release` or `claim_refund`.
+  ///
+  /// The deadline pass pages through every hire with [afterId], so hires
+  /// past the first [limit] are swept too.
+  ///
+  /// Throws [ArgumentError] when [limit] is below 1.
+  Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100});
 }

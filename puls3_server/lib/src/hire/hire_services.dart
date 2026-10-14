@@ -6,6 +6,8 @@ import 'package:serverpod/serverpod.dart';
 import '../agent/agent_catalog_service.dart';
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
+import '../feedback/feedback_service.dart';
+import '../feedback/reputation_wiring.dart';
 import '../generated/protocol.dart' show AgentSummary;
 import '../ledger/envelope_codec.dart';
 import '../ledger/soroban_ledger.dart';
@@ -27,13 +29,21 @@ const _rpcTimeout = Duration(seconds: 8);
 
 /// The services one `HireEndpoint` request works with.
 final class HireServices {
-  const HireServices({required this.hires, required this.relay, this.query});
+  const HireServices({
+    required this.hires,
+    required this.relay,
+    this.query,
+    this.feedback,
+  });
 
   final HireService hires;
   final EscrowRelayService relay;
 
   /// Reads a hire for `getHire`. Null only in tests that do not read hires.
   final HireQueryService? query;
+
+  /// Rates a hire for `FeedbackEndpoint`. Null only in tests that do not.
+  final FeedbackService? feedback;
 }
 
 /// Builds the [HireServices] of one request on its database [Session].
@@ -121,6 +131,14 @@ final class HireWiring {
         config: config,
       ),
       relay: relay,
+      feedback: FeedbackService(
+        hires: repository,
+        submissions: submissions,
+        preparations: preparations,
+        owners: ledger,
+        calls: reputationCallsFor(stellar),
+        relay: relay,
+      ),
       query: HireQueryService(
         hires: repository,
         runs: ServerpodHireRunStore(session),

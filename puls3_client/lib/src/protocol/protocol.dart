@@ -23,6 +23,7 @@ import 'agent/agent_summary.dart' as _ipe500bk;
 import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
+import 'feedback/feedback_eligibility.dart' as _i640bgq8;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
 import 'hire.dart' as _ibbrviw7;
@@ -40,6 +41,7 @@ export 'agent/agent_summary.dart';
 export 'auth/wallet_challenge.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
+export 'feedback/feedback_eligibility.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
 export 'hire.dart';
@@ -103,6 +105,9 @@ class Protocol extends _isc.SerializationManager {
     if (t == _i4si20vg.CreateHireResult) {
       return _i4si20vg.CreateHireResult.fromJson(data) as T;
     }
+    if (t == _i640bgq8.FeedbackEligibility) {
+      return _i640bgq8.FeedbackEligibility.fromJson(data) as T;
+    }
     if (t == _izw8z7ou.Greeting) {
       return _izw8z7ou.Greeting.fromJson(data) as T;
     }
@@ -158,6 +163,12 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _isc.getType<_i4si20vg.CreateHireResult?>()) {
       return (data != null ? _i4si20vg.CreateHireResult.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_i640bgq8.FeedbackEligibility?>()) {
+      return (data != null
+              ? _i640bgq8.FeedbackEligibility.fromJson(data)
+              : null)
           as T;
     }
     if (t == _isc.getType<_izw8z7ou.Greeting?>()) {
@@ -234,6 +245,7 @@ class Protocol extends _isc.SerializationManager {
       _idvb5xlo.WalletChallenge => 'WalletChallenge',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
+      _i640bgq8.FeedbackEligibility => 'FeedbackEligibility',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
       _ibbrviw7.Hire => 'Hire',
@@ -270,6 +282,8 @@ class Protocol extends _isc.SerializationManager {
         return 'ChainSubmission';
       case _i4si20vg.CreateHireResult():
         return 'CreateHireResult';
+      case _i640bgq8.FeedbackEligibility():
+        return 'FeedbackEligibility';
       case _izw8z7ou.Greeting():
         return 'Greeting';
       case _ikpil6ki.BackendHealth():
@@ -330,6 +344,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'CreateHireResult') {
       return deserialize<_i4si20vg.CreateHireResult>(data['data']);
+    }
+    if (dataClassName == 'FeedbackEligibility') {
+      return deserialize<_i640bgq8.FeedbackEligibility>(data['data']);
     }
     if (dataClassName == 'Greeting') {
       return deserialize<_izw8z7ou.Greeting>(data['data']);

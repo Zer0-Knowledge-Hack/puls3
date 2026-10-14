@@ -51,6 +51,10 @@ typedef HireLifecycleScope =
 /// Applying the same submission again is harmless: the hire is already funded
 /// by its transaction and the effect answers ok without reading the chain.
 ///
+/// After a successful `give_feedback`, [onFeedbackGiven] checks that the hire
+/// exists and is `completed` and answers ok; confirming the submission is
+/// what makes it the hire's `feedbackReference`.
+///
 /// The tracker only calls this for transactions the server relayed, and
 /// [StoredSubmission.hireId] ties the transaction to its hire. Never call it
 /// with a transaction hash a client supplied: anyone can replay a public
@@ -122,6 +126,25 @@ final class HireEscrowEffects implements EscrowEffects {
     return await _repositories(
       (repository) => _fund(repository, HireId(hireId), submission, event),
     );
+  }
+
+  @override
+  Future<EffectResult> onFeedbackGiven(StoredSubmission submission) async {
+    final hireId = submission.hireId;
+    // A give_feedback the server relayed always carries its hire; without it
+    // no retry can fix the submission, so it is a terminal mismatch.
+    if (hireId == null) return _mismatch(null);
+    return await _lifecycle((hires, preparations) async {
+      final hire = await hires.findHire(hireId);
+      // Feedback of a hire that does not exist or is not completed is not
+      // the hire's: terminal, not retried.
+      if (hire == null || hire.status != HireStatus.completed) {
+        return _mismatch(null);
+      }
+      // The reference is derived from this confirmed submission (see
+      // `FeedbackService`), so there is nothing more to store.
+      return const EffectResult.ok();
+    });
   }
 
   Future<EffectResult> _fund(

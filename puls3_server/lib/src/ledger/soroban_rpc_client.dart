@@ -253,6 +253,25 @@ final class SorobanRpcClient {
     return sequence;
   }
 
+  /// Unix seconds of the most recent ledger (`getLatestLedger.closeTime`).
+  ///
+  /// This is the clock `release` compares with `approval_deadline`. A result
+  /// without a numeric `closeTime` is a [LedgerUnavailable].
+  Future<int> latestLedgerCloseTime() async {
+    const method = 'getLatestLedger';
+    final result = await _call(method, {});
+    final closeTime = result['closeTime'];
+    final parsed = switch (closeTime) {
+      final int value => value,
+      final String value => int.tryParse(value),
+      _ => null,
+    };
+    if (parsed == null) {
+      throw LedgerUnavailable('$method answered no closeTime');
+    }
+    return parsed;
+  }
+
   /// `getEvents` with `xdrFormat: "json"`.
   ///
   /// A ledger range and a cursor are mutually exclusive: pass [startLedger]

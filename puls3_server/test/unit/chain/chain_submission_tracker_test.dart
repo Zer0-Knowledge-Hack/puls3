@@ -93,6 +93,10 @@ final class _FlakyStore implements ChainSubmissionStore {
       _inner.listSubmitted(limit: limit);
 
   @override
+  Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes) =>
+      _inner.hasSubmitted(purposes);
+
+  @override
   Future<bool> markConfirmed(int id) =>
       failTransitions ? throw StateError('db down') : _inner.markConfirmed(id);
 
@@ -319,6 +323,132 @@ void main() {
     );
   });
 
+  group('relay call failures', () {
+    const hireId = 4;
+
+    /// A hire with [prior] failed envelopes of [purpose], then a `submitted`
+    /// one the tracker handles. Returns the submitted record.
+    Future<StoredSubmission> attempt(
+      SubmissionPurpose purpose, {
+      required int prior,
+    }) async {
+      for (var i = 0; i < prior; i++) {
+        serial++;
+        final failed = await store.insertSubmitted(
+          purpose: purpose,
+          transactionHash: serial.toRadixString(16).padLeft(64, '0'),
+          signedEnvelopeXdr: 'envelope-$serial',
+          validUntil: _validUntil,
+          preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+          hireId: hireId,
+        );
+        await store.markFailed(
+          failed.id,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+      }
+      serial++;
+      return store.insertSubmitted(
+        purpose: purpose,
+        transactionHash: serial.toRadixString(16).padLeft(64, '0'),
+        signedEnvelopeXdr: 'envelope-$serial',
+        validUntil: _validUntil,
+        preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+        hireId: hireId,
+      );
+    }
+
+    /// Makes the tracker fail [s] with the failure named by [code].
+    void failWith(StoredSubmission s, String code) {
+      switch (code) {
+        case SubmissionOutcomeCode.transactionFailed:
+          ledger.lookups[s.transactionHash] = TransactionLookup(
+            status: TransactionStatus.failed,
+            latestLedgerCloseTime: _start,
+          );
+        case SubmissionOutcomeCode.preparationExpired:
+          ledger.closeTime = _validUntil.add(const Duration(seconds: 1));
+        case SubmissionOutcomeCode.submissionRejected:
+          ledger.sends[s.signedEnvelopeXdr] = const RpcRequestRejected(
+            -32602,
+            'invalid transaction',
+            'sendTransaction answered JSON-RPC error -32602',
+          );
+      }
+    }
+
+    const codes = [
+      SubmissionOutcomeCode.transactionFailed,
+      SubmissionOutcomeCode.preparationExpired,
+      SubmissionOutcomeCode.submissionRejected,
+    ];
+
+    for (final purpose in [
+      SubmissionPurpose.release,
+      SubmissionPurpose.claimRefund,
+    ]) {
+      for (final code in codes) {
+        test('the third failed ${purpose.wireName} ($code) is '
+            'EscrowCallFailed', () async {
+          final s = await attempt(purpose, prior: 2);
+          failWith(s, code);
+
+          await tracker.pass(store);
+
+          await expectState(
+            s,
+            SubmissionState.failed,
+            SubmissionOutcomeCode.escrowCallFailed,
+          );
+        });
+
+        test('the second failed ${purpose.wireName} ($code) keeps its '
+            'code', () async {
+          final s = await attempt(purpose, prior: 1);
+          failWith(s, code);
+
+          await tracker.pass(store);
+
+          await expectState(s, SubmissionState.failed, code);
+        });
+      }
+    }
+
+    test(
+      'failures of another purpose do not count towards the third',
+      () async {
+        final release = await attempt(SubmissionPurpose.release, prior: 2);
+        final refund = await attempt(SubmissionPurpose.claimRefund, prior: 0);
+        await store.markFailed(
+          release.id,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+        failWith(refund, SubmissionOutcomeCode.transactionFailed);
+
+        await tracker.pass(store);
+
+        await expectState(
+          refund,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+      },
+    );
+
+    test('a third failed fund keeps its code', () async {
+      final s = await attempt(SubmissionPurpose.fund, prior: 2);
+      failWith(s, SubmissionOutcomeCode.transactionFailed);
+
+      await tracker.pass(store);
+
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
+  });
+
   group('SUCCESS of createJob', () {
     test('applies the JobCreated effect and confirms', () async {
       final s = await submit(SubmissionPurpose.createJob);
@@ -402,6 +532,65 @@ void main() {
     });
   });
 
+  group('SUCCESS of giveFeedback', () {
+    test(
+      'applies the feedback effect and confirms, with no escrow event',
+      () async {
+        final s = await submit(SubmissionPurpose.giveFeedback);
+        ledger.lookups[s.transactionHash] = _success();
+
+        await tracker.pass(store);
+
+        expect(effects.feedbackGiven, [s.id]);
+        await expectState(s, SubmissionState.confirmed);
+      },
+    );
+
+    test('a failed effect fails with its code', () async {
+      final s = await submit(SubmissionPurpose.giveFeedback);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.result = EffectResult.failed(SubmissionOutcomeCode.jobMismatch);
+
+      await tracker.pass(store);
+
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobMismatch,
+      );
+    });
+
+    test(
+      'an effect that throws leaves it submitted for the next pass',
+      () async {
+        final s = await submit(SubmissionPurpose.giveFeedback);
+        ledger.lookups[s.transactionHash] = _success();
+        effects.error = StateError('db down');
+
+        final summary = await tracker.pass(store);
+
+        expect(summary.errors, 1);
+        await expectState(s, SubmissionState.submitted);
+      },
+    );
+
+    test('FAILED on chain fails TransactionFailed without an effect', () async {
+      final s = await submit(SubmissionPurpose.giveFeedback);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.feedbackGiven, isEmpty);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
+  });
+
   test('SUCCESS of a purpose without an effect yet stays submitted and is '
       'logged once', () async {
     final s = await submit(SubmissionPurpose.complete);
@@ -417,10 +606,33 @@ void main() {
     );
   });
 
+  test('SUCCESS of release confirms without a job event', () async {
+    final release = await submit(SubmissionPurpose.release);
+    final refund = await submit(SubmissionPurpose.claimRefund);
+    ledger.lookups[release.transactionHash] = _success();
+    ledger.lookups[refund.transactionHash] = _success();
+
+    final summary = await tracker.pass(store);
+
+    expect(summary.confirmed, 2);
+    await expectState(release, SubmissionState.confirmed);
+    await expectState(refund, SubmissionState.confirmed);
+  });
+
+  test('a missing release envelope is sent again', () async {
+    final release = await submit(SubmissionPurpose.release);
+
+    final summary = await tracker.pass(store);
+
+    expect(summary.resent, 1);
+    expect(ledger.resent, [release.signedEnvelopeXdr]);
+    expect(ledger.lookedUp, [release.transactionHash]);
+  });
+
   test('purposes with their own outcome codes are not tracked yet and are '
       'logged once', () async {
     final wallet = await submit(SubmissionPurpose.setAgentWallet);
-    final release = await submit(SubmissionPurpose.release);
+    final release = await submit(SubmissionPurpose.submit);
     ledger.closeTime = _validUntil.add(const Duration(minutes: 1));
 
     await tracker.pass(store);
@@ -490,7 +702,7 @@ void main() {
     test('is called for every record left submitted, at the pass '
         'time', () async {
       final flaky = _FlakyStore(store, failTransitions: false);
-      final untracked = await submit(SubmissionPurpose.release);
+      final untracked = await submit(SubmissionPurpose.submit);
       final successDefault = await submit(SubmissionPurpose.complete);
       final resent = await submit(SubmissionPurpose.fund);
       final waiting = await submit(SubmissionPurpose.fund);
@@ -560,7 +772,7 @@ void main() {
     test('a recordCheck that throws is counted and the pass goes on', () async {
       final flaky = _FlakyStore(store, failTransitions: false)
         ..failChecks = true;
-      final first = await submit(SubmissionPurpose.release);
+      final first = await submit(SubmissionPurpose.submit);
       final second = await submit(SubmissionPurpose.fund);
       ledger.lookups[second.transactionHash] = _success(jobFunded: _jobFunded);
       final third = await submit(SubmissionPurpose.complete);

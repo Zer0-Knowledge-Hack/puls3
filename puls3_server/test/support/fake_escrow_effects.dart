@@ -10,6 +10,7 @@ final class FakeEscrowEffects implements EscrowEffects {
 
   final created = <int>[];
   final funded = <int>[];
+  final feedbackGiven = <int>[];
 
   @override
   Future<EffectResult> onJobCreated(
@@ -26,6 +27,12 @@ final class FakeEscrowEffects implements EscrowEffects {
     JobFundedEvent event,
   ) async {
     funded.add(submission.id);
+    return _answer();
+  }
+
+  @override
+  Future<EffectResult> onFeedbackGiven(StoredSubmission submission) async {
+    feedbackGiven.add(submission.id);
     return _answer();
   }
 

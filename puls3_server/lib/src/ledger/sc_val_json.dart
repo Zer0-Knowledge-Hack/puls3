@@ -83,6 +83,13 @@ Map<String, Object?> readMap(Object? value) {
   return result;
 }
 
+/// The elements of a `vec`, each in its raw JSON form.
+List<Object?> readVec(Object? value) {
+  final items = _inner(value, 'vec');
+  if (items is! List) throw _mismatch('vec', value);
+  return items;
+}
+
 final _hex = RegExp(r'^[0-9a-fA-F]*$');
 
 Object? _inner(Object? value, String type) {

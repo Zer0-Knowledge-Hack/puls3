@@ -38,9 +38,9 @@ const _effectCodes = {
   SubmissionOutcomeCode.jobEvidenceUnavailable,
 };
 
-/// Applies the domain effect of a successful escrow transaction (api.md
+/// Applies the domain effect of a successful relayed transaction (api.md
 /// relay step 5): record the job id after `create_job`, `Hire.fund` after
-/// `fund`.
+/// `fund`, confirm the rating after `give_feedback`.
 ///
 /// The tracker marks the submission `confirmed` or `failed` only after an
 /// effect returns, so a crash in between applies the effect again on the
@@ -60,6 +60,14 @@ abstract interface class EscrowEffects {
     StoredSubmission submission,
     JobFundedEvent event,
   );
+
+  /// After a successful `give_feedback` ([SubmissionPurpose.giveFeedback]).
+  ///
+  /// No event is needed: the signed envelope is the one the server prepared
+  /// for this hire, so a successful transaction is the registry recording
+  /// the hire's feedback. Confirming the submission is what exposes it as the
+  /// hire's `feedbackReference` (no column stores it).
+  Future<EffectResult> onFeedbackGiven(StoredSubmission submission);
 }
 
 /// Accepts every effect without changing anything, and logs it. Used until
@@ -91,6 +99,16 @@ final class NoopEscrowEffects implements EscrowEffects {
       ChainLogLevel.info,
       'No escrow effect for job ${event.jobId} funded by submission '
       '${submission.id}',
+    );
+    return const EffectResult.ok();
+  }
+
+  @override
+  Future<EffectResult> onFeedbackGiven(StoredSubmission submission) async {
+    _log(
+      ChainLogLevel.info,
+      'No effect for the feedback of hire ${submission.hireId} given by '
+      'submission ${submission.id}',
     );
     return const EffectResult.ok();
   }
