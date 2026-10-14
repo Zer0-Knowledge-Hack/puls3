@@ -15,10 +15,6 @@ import 'chain_submission_store.dart';
 import 'escrow_deadline.dart';
 import 'submission_values.dart';
 
-/// How many failed envelopes of one server call a hire may accumulate
-/// before the deadline pass stops building another.
-const maxEscrowCallAttempts = 3;
-
 /// The calls the relay account signs. Only one of them is in flight at a
 /// time (see [RelayEscrowCallSender]).
 const _relayPurposes = {
@@ -176,6 +172,12 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
       return;
     }
 
+    // This envelope is the failed + 1th: the one that uses the last attempt
+    // is labelled EscrowCallFailed.
+    final rejected = escrowCallFailureCode(
+      priorFailures: failed,
+      code: SubmissionOutcomeCode.submissionRejected,
+    );
     try {
       final result = await _send(record.signedEnvelopeXdr);
       switch (result.status) {
@@ -188,20 +190,14 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
             ChainLogLevel.warning,
             'The node refused submission ${record.id}: ${result.errorResultXdr}',
           );
-          await _submissions.markFailed(
-            record.id,
-            SubmissionOutcomeCode.submissionRejected,
-          );
+          await _submissions.markFailed(record.id, rejected);
       }
     } on RpcRequestRejected catch (e) {
       _log(
         ChainLogLevel.warning,
         'The node rejected submission ${record.id}: $e',
       );
-      await _submissions.markFailed(
-        record.id,
-        SubmissionOutcomeCode.submissionRejected,
-      );
+      await _submissions.markFailed(record.id, rejected);
     } on LedgerException catch (e) {
       _log(
         ChainLogLevel.warning,

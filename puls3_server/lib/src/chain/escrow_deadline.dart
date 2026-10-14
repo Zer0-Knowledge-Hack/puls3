@@ -1,4 +1,23 @@
 import '../ledger/escrow_job.dart';
+import 'submission_values.dart';
+
+/// How many failed envelopes of one server call a hire may accumulate
+/// before the deadline pass stops building another.
+const maxEscrowCallAttempts = 3;
+
+/// The code to store when a `release` or `claim_refund` envelope fails with
+/// [code].
+///
+/// [priorFailures] counts the failed envelopes of the same hire and call
+/// before this one. The failure that uses the last of
+/// [maxEscrowCallAttempts] is `EscrowCallFailed` (api.md); earlier ones keep
+/// [code].
+String escrowCallFailureCode({
+  required int priorFailures,
+  required String code,
+}) => priorFailures + 1 >= maxEscrowCallAttempts
+    ? SubmissionOutcomeCode.escrowCallFailed
+    : code;
 
 /// A permissionless escrow call the tracker may submit.
 ///
