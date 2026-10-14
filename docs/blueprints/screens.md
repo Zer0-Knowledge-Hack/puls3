@@ -166,7 +166,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 |---|---|---|
 | Loading | The stepper with the active step and its explanation; the sheet can be closed while the wallet prompt is open. | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
 | Empty | Not applicable: the sheet opens only with a valid manifest. | — |
-| Error | The failed step with the reason and a recovery action: **Try again** from that step, **Prepare again** after an expiry, **Use current account** after an account switch. | [1440](wireframes/S08-deploy-sheet-error-1440.png) · [390](wireframes/S08-deploy-sheet-error-390.png) |
+| Error | The failed step with the reason and a recovery action: **Try again** from that step, **Prepare again** after an expiry, **Use current account** after an account switch. **Cancel** closes the sheet. A declined signature reads "Signature rejected" / "The deployment was cancelled in your wallet." | [1440](wireframes/S08-deploy-sheet-error-1440.png) · [390](wireframes/S08-deploy-sheet-error-390.png) |
 | Success | "Agent deployed" with `Agent.id`, the transaction and **View on explorer**, **Open agent** (→ S03). A demo backend says "Demo deploy only" and links nothing. | [1440](wireframes/S08-deploy-sheet-success-1440.png) · [390](wireframes/S08-deploy-sheet-success-390.png) |
 
 **Actions:** **Open agent** → S03. **Back to Studio** → S07.
