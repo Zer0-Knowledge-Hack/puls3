@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../deploy/deploy_gateway.dart';
 import '../hire/hire_flow_store.dart';
 import '../hire/hire_gateway.dart';
+import '../studio/studio_gateway.dart';
 import 'agent_catalog.dart';
 import 'wallet_controller.dart';
 
@@ -14,6 +15,7 @@ class AppScope extends InheritedWidget {
     required this.catalog,
     required this.wallet,
     required this.deployGateway,
+    required this.studioGateway,
     required this.hireGateway,
     required this.hireFlowStore,
     required super.child,
@@ -22,6 +24,9 @@ class AppScope extends InheritedWidget {
   final AgentCatalog catalog;
   final WalletController wallet;
   final DeployGateway deployGateway;
+
+  /// Drafts, test runs and My agents (#35).
+  final StudioGateway studioGateway;
   final HireGateway hireGateway;
 
   /// Unfinished hires, so a closed sheet or a reload resumes them.
@@ -38,6 +43,7 @@ class AppScope extends InheritedWidget {
       catalog != oldWidget.catalog ||
       wallet != oldWidget.wallet ||
       deployGateway != oldWidget.deployGateway ||
+      studioGateway != oldWidget.studioGateway ||
       hireGateway != oldWidget.hireGateway ||
       hireFlowStore != oldWidget.hireFlowStore;
 }

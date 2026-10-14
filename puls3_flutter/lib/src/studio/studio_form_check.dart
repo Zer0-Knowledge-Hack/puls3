@@ -46,10 +46,15 @@ class StudioFormValues {
 
 /// The result of checking the form against the domain manifest rules.
 class StudioFormCheck {
-  const StudioFormCheck({required this.errors, this.manifest});
+  const StudioFormCheck({required this.errors, this.draft, this.manifest});
 
   /// The first problem of each field, as text for the builder.
   final Map<StudioField, String> errors;
+
+  /// What can be saved as a draft (F8): the typed fields, complete or not.
+  /// Null when a value is refused outright (above a maximum) or a field
+  /// cannot be read (a price or a count that is not a number).
+  final AgentManifestDraft? draft;
 
   /// The deployable manifest; null while any rule is broken.
   final AgentManifest? manifest;
@@ -106,6 +111,7 @@ StudioFormCheck checkStudioForm(
   String? text(String value) => value.trim().isEmpty ? null : value.trim();
 
   List<ManifestProblem> problems;
+  AgentManifestDraft? saved;
   AgentManifest? manifest;
   try {
     final draft = AgentManifestDraft(
@@ -120,6 +126,7 @@ StudioFormCheck checkStudioForm(
       outputMaxChars: outputMax,
       price: price,
     );
+    if (errors.isEmpty) saved = draft;
     final rules = policy ?? studioModelPolicy;
     problems = draft.problemsForDeploy(rules);
     if (problems.isEmpty && errors.isEmpty) {
@@ -134,7 +141,35 @@ StudioFormCheck checkStudioForm(
     final (field, message) = describeManifestProblem(problem);
     error(field, message);
   }
-  return StudioFormCheck(errors: Map.unmodifiable(errors), manifest: manifest);
+  return StudioFormCheck(
+    errors: Map.unmodifiable(errors),
+    draft: saved,
+    manifest: manifest,
+  );
+}
+
+/// The form values for a saved [draft], for "Continue editing" and "Edit"
+/// (F8, F10). A model the Studio no longer offers is left unselected.
+StudioFormValues studioFormValuesFor(AgentManifestDraft draft) {
+  final model = draft.model;
+  return StudioFormValues(
+    name: draft.name ?? '',
+    description: draft.description ?? '',
+    skills: [for (final skill in draft.skills ?? const <Skill>[]) skill.name],
+    model: model == null
+        ? null
+        : studioModelOptions
+              .where((o) => o.provider == model.provider && o.id == model.id)
+              .firstOrNull,
+    systemPrompt: draft.systemPrompt ?? '',
+    inputMaxChars: draft.inputMaxChars?.toString() ?? '',
+    outputType: draft.outputType ?? OutputType.text,
+    outputMaxChars: draft.outputMaxChars?.toString() ?? '',
+    price: switch (draft.price) {
+      final price? => formatUsdc(price.stroops),
+      null => '',
+    },
+  );
 }
 
 /// The kebab-case skill id for a display [name], for example

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
+import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/wallet_session.dart';
@@ -147,6 +148,7 @@ Future<void> _pumpDetail(
         wallet ?? TestWallet(initialAddress: _consumer),
       ),
       deployGateway: FakeDeployGateway(),
+      studioGateway: FakeStudioGateway(),
       hireGateway: gateway,
       hireFlowStore: MemoryHireFlowStore(),
       child: MaterialApp.router(

@@ -1336,6 +1336,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "reputation-registry"
+version = "0.1.0"
+dependencies = [
+ "identity-registry",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "rfc6979"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
