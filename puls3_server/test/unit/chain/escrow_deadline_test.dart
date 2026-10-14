@@ -1,5 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/chain/escrow_deadline.dart';
+import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:test/test.dart';
 
@@ -100,6 +101,35 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('escrowCallFailureCode', () {
+    test('keeps the failure code until the last attempt is used', () {
+      for (final prior in [0, 1]) {
+        expect(
+          escrowCallFailureCode(
+            priorFailures: prior,
+            code: SubmissionOutcomeCode.transactionFailed,
+          ),
+          SubmissionOutcomeCode.transactionFailed,
+          reason: '$prior prior failure(s)',
+        );
+      }
+    });
+
+    test('the failure that uses the last attempt is EscrowCallFailed', () {
+      expect(maxEscrowCallAttempts, 3);
+      for (final prior in [maxEscrowCallAttempts - 1, maxEscrowCallAttempts]) {
+        expect(
+          escrowCallFailureCode(
+            priorFailures: prior,
+            code: SubmissionOutcomeCode.submissionRejected,
+          ),
+          SubmissionOutcomeCode.escrowCallFailed,
+          reason: '$prior prior failure(s)',
+        );
+      }
     });
   });
 

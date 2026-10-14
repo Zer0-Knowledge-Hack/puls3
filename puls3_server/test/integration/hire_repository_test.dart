@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_server/src/chain/submission_values.dart';
+import 'package:puls3_server/src/generated/protocol.dart' show ChainSubmission;
 import 'package:puls3_server/src/hire/serverpod_hire_repository.dart';
+import 'package:serverpod/serverpod.dart' show Session;
 import 'package:test/test.dart';
 
 import 'test_tools/serverpod_test_tools.dart';
@@ -224,6 +227,155 @@ void main() {
 
         expect(await repo.preparedExpiry(hire.id), 1700000000);
         expect(await repo.preparedExpiry(HireId(999999999)), isNull);
+      });
+
+      group('settlement derived from confirmed release and claim_refund', () {
+        var serial = 0;
+
+        Future<Hire> funded(ServerpodHireRepository repo) async {
+          serial++;
+          final hire = await repo.create(
+            agentId: AgentId(7),
+            consumer: StellarAddress.parse(_alice),
+            price: UsdcAmount.stroops(5000000),
+            manifestVersion: 1,
+            expiredAt: 1700000000,
+          );
+          return repo.recordPayment(
+            hire,
+            Payment(
+              transaction: TransactionHash.parse(
+                serial.toRadixString(16).padLeft(64, '0'),
+              ),
+              hireId: hire.id,
+              payer: StellarAddress.parse(_alice),
+              payee: StellarAddress.parse(_provider),
+              amount: UsdcAmount.stroops(5000000),
+            ),
+            900 + serial,
+          );
+        }
+
+        Future<void> relay(
+          Session session,
+          Hire hire,
+          SubmissionPurpose purpose,
+          SubmissionState state,
+        ) async {
+          serial++;
+          await ChainSubmission.db.insertRow(
+            session,
+            ChainSubmission(
+              purpose: purpose.wireName,
+              transaction: 'e${serial.toRadixString(16).padLeft(63, '0')}',
+              state: state.wireName,
+              updatedAt: DateTime.utc(2026, 10, 14),
+              hireId: hire.id.value,
+              sendAttempts: 0,
+            ),
+          );
+        }
+
+        Future<void> expectBoth(
+          ServerpodHireRepository repo,
+          Hire hire,
+          HireStatus status,
+        ) async {
+          expect((await repo.findHire(hire.id.value))!.status, status);
+          expect((await repo.findById(hire.id))!.status, status);
+        }
+
+        test('a confirmed release completes the hire', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+          await expectBoth(repo, hire, HireStatus.funded);
+
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.release,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.completed);
+        });
+
+        test('a confirmed claim_refund expires the hire', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.claimRefund,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.expired);
+        });
+
+        test('a submitted or failed release leaves the hire funded', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.release,
+            SubmissionState.failed,
+          );
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.release,
+            SubmissionState.submitted,
+          );
+
+          await expectBoth(repo, hire, HireStatus.funded);
+        });
+
+        test('release wins when both calls are confirmed', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.claimRefund,
+            SubmissionState.confirmed,
+          );
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.release,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.completed);
+        });
+
+        test('an unfunded hire stays open whatever was confirmed', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await repo.create(
+            agentId: AgentId(7),
+            consumer: StellarAddress.parse(_alice),
+            price: UsdcAmount.stroops(5000000),
+            manifestVersion: 1,
+            expiredAt: 1700000000,
+          );
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.release,
+            SubmissionState.confirmed,
+          );
+
+          expect((await repo.findById(hire.id))!.status, HireStatus.open);
+        });
       });
 
       test('one migration creates only hire and hire_payment', () {

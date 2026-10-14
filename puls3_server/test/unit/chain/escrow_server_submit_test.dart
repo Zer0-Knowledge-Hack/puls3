@@ -35,13 +35,14 @@ final _now = DateTime.utc(2026, 10, 13, 12);
 
 final class _Accounts implements ChainAccounts {
   Object? failure;
+  var sequence = 8;
   final specs = <EnvelopeSpec>[];
 
   @override
   Future<int> sequenceOf(StellarAddress account) async {
     final failure = this.failure;
     if (failure != null) throw failure;
-    return 8;
+    return sequence;
   }
 
   @override
@@ -244,6 +245,62 @@ void main() {
     expect(record.state, SubmissionState.failed);
     expect(record.errorCode, SubmissionOutcomeCode.submissionRejected);
     expect(record.sendAttempts, 0);
+  });
+
+  test('the third refused release is labelled EscrowCallFailed', () async {
+    answer = const SendTransactionResult(
+      status: SendTransactionStatus.error,
+      hash: 'ab',
+      errorResultXdr: 'AAAA',
+    );
+
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      accounts.sequence = 8 + i;
+      await sender().send(hireId: 4, jobId: 3, call: EscrowServerCall.release);
+    }
+
+    expect(store.all.map((row) => row.errorCode), [
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.escrowCallFailed,
+    ]);
+  });
+
+  test('a third rejected claim_refund request is EscrowCallFailed, and '
+      'a failed fund of the hire does not count', () async {
+    final fund = await store.insertSubmitted(
+      purpose: SubmissionPurpose.fund,
+      transactionHash: 'f' * 64,
+      signedEnvelopeXdr: 'fund',
+      validUntil: _now,
+      preparationId: 'prep-fund',
+      hireId: 4,
+    );
+    await store.markFailed(fund.id, SubmissionOutcomeCode.transactionFailed);
+    sendFailure = const RpcRequestRejected(-32600, 'invalid', 'no');
+
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      accounts.sequence = 8 + i;
+      await sender().send(
+        hireId: 4,
+        jobId: 3,
+        call: EscrowServerCall.claimRefund,
+      );
+    }
+
+    final refunds = store.all.where(
+      (row) => row.purpose == SubmissionPurpose.claimRefund,
+    );
+    expect(refunds.map((row) => row.errorCode), [
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.escrowCallFailed,
+    ]);
+    expect(fund.id, store.all.first.id);
+    expect(
+      store.all.first.errorCode,
+      SubmissionOutcomeCode.transactionFailed,
+    );
   });
 
   test('a rejected request fails the record and an unreachable node '

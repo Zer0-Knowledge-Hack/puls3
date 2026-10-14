@@ -2,6 +2,7 @@ import '../ledger/ledger_errors.dart';
 import '../ledger/soroban_rpc_client.dart';
 import 'chain_log.dart';
 import 'chain_submission_store.dart';
+import 'escrow_deadline.dart';
 import 'escrow_effects.dart';
 import 'submission_ledger.dart';
 import 'submission_values.dart';
@@ -19,6 +20,12 @@ const defaultTrackerBatchLimit = 100;
 const _untrackedPurposes = {
   SubmissionPurpose.setAgentWallet,
   SubmissionPurpose.submit,
+};
+
+/// The permissionless calls whose third failure is `EscrowCallFailed`.
+const _relayPurposes = {
+  SubmissionPurpose.release,
+  SubmissionPurpose.claimRefund,
 };
 
 /// What one [ChainSubmissionTracker.pass] did, for logging.
@@ -289,14 +296,39 @@ final class ChainSubmissionTracker {
 
   /// Always settles the record: `markFailed` either sets `failed` or finds
   /// it already final.
+  ///
+  /// A `release` or `claim_refund` that fails after two failed envelopes of
+  /// the same hire and call is stored as `EscrowCallFailed` instead of
+  /// [code]: it is the failure that uses the last attempt (api.md).
   Future<bool> _fail(
     ChainSubmissionStore store,
     StoredSubmission submission,
     String code,
     TrackerPassSummary summary,
   ) async {
-    if (await store.markFailed(submission.id, code)) summary.failed++;
+    final stored = await _failureCode(store, submission, code);
+    if (await store.markFailed(submission.id, stored)) summary.failed++;
     return true;
+  }
+
+  Future<String> _failureCode(
+    ChainSubmissionStore store,
+    StoredSubmission submission,
+    String code,
+  ) async {
+    final hireId = submission.hireId;
+    if (hireId == null || !_relayPurposes.contains(submission.purpose)) {
+      return code;
+    }
+    final prior = (await store.listByHire(hireId))
+        .where(
+          (row) =>
+              row.id != submission.id &&
+              row.purpose == submission.purpose &&
+              row.state == SubmissionState.failed,
+        )
+        .length;
+    return escrowCallFailureCode(priorFailures: prior, code: code);
   }
 
   void _untracked(StoredSubmission submission, TrackerPassSummary summary) {

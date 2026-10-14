@@ -69,6 +69,11 @@ final class HireRow {
 
   /// The wire status (api.md, "Hire escrow states"): null until the job
   /// exists, then `open`, and `funded` once a payment is recorded.
+  ///
+  /// A funded hire reads `completed` or `expired` once a server-signed
+  /// `release` or `claim_refund` is confirmed. That is the one status
+  /// derived on read from `chain_submission` instead of stored (ADR-0005
+  /// D4); the store has no write for it.
   final HireStatus? status;
 
   /// The client-visible hire: no runtime or feedback fields, which this

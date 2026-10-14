@@ -7,6 +7,8 @@ import 'catalog_reader.dart';
 /// How long an agent's reputation is reused before the registry is read again.
 const reputationCacheTtl = Duration(seconds: 60);
 
+const _unreadableMessage = 'The agent reputation cannot be read right now.';
+
 /// What the catalog shows of an agent's reputation.
 typedef AgentReputation = ({double rating, int paidHireCount});
 
@@ -50,9 +52,7 @@ final class ReputationCache {
       return value;
     } on Exception {
       if (cached != null) return cached.value;
-      throw AgentCatalogUnavailable(
-        message: 'The agent reputation cannot be read right now.',
-      );
+      throw AgentCatalogUnavailable(message: _unreadableMessage);
     }
   }
 }
@@ -61,6 +61,12 @@ final class ReputationCache {
 /// [CatalogReader], with the #11 reputation function and no formula of its
 /// own. An agent without feedback keeps the #11 empty-input value and stays
 /// listed.
+///
+/// [list] isolates failures per agent: one whose reputation cannot be read
+/// keeps its inner summary (the wire defaults, 4.0 and 0) and is not cached,
+/// so one unreadable agent does not hide the catalog. It still throws
+/// [AgentCatalogUnavailable] when no agent can be read. [get] never
+/// degrades: a rating that failed to refresh must not look like a real one.
 final class ReputationCatalogReader implements CatalogReader {
   ReputationCatalogReader({
     required CatalogReader inner,
@@ -74,7 +80,21 @@ final class ReputationCatalogReader implements CatalogReader {
   @override
   Future<List<AgentSummary>> list() async {
     final agents = await _inner.list();
-    return Future.wait(agents.map(_withReputation));
+    var unreadable = 0;
+    final listed = await Future.wait(
+      agents.map((agent) async {
+        try {
+          return await _withReputation(agent);
+        } on AgentCatalogUnavailable {
+          unreadable++;
+          return agent;
+        }
+      }),
+    );
+    if (agents.isNotEmpty && unreadable == agents.length) {
+      throw AgentCatalogUnavailable(message: _unreadableMessage);
+    }
+    return listed;
   }
 
   @override

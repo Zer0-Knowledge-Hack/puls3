@@ -323,6 +323,132 @@ void main() {
     );
   });
 
+  group('relay call failures', () {
+    const hireId = 4;
+
+    /// A hire with [prior] failed envelopes of [purpose], then a `submitted`
+    /// one the tracker handles. Returns the submitted record.
+    Future<StoredSubmission> attempt(
+      SubmissionPurpose purpose, {
+      required int prior,
+    }) async {
+      for (var i = 0; i < prior; i++) {
+        serial++;
+        final failed = await store.insertSubmitted(
+          purpose: purpose,
+          transactionHash: serial.toRadixString(16).padLeft(64, '0'),
+          signedEnvelopeXdr: 'envelope-$serial',
+          validUntil: _validUntil,
+          preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+          hireId: hireId,
+        );
+        await store.markFailed(
+          failed.id,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+      }
+      serial++;
+      return store.insertSubmitted(
+        purpose: purpose,
+        transactionHash: serial.toRadixString(16).padLeft(64, '0'),
+        signedEnvelopeXdr: 'envelope-$serial',
+        validUntil: _validUntil,
+        preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+        hireId: hireId,
+      );
+    }
+
+    /// Makes the tracker fail [s] with the failure named by [code].
+    void failWith(StoredSubmission s, String code) {
+      switch (code) {
+        case SubmissionOutcomeCode.transactionFailed:
+          ledger.lookups[s.transactionHash] = TransactionLookup(
+            status: TransactionStatus.failed,
+            latestLedgerCloseTime: _start,
+          );
+        case SubmissionOutcomeCode.preparationExpired:
+          ledger.closeTime = _validUntil.add(const Duration(seconds: 1));
+        case SubmissionOutcomeCode.submissionRejected:
+          ledger.sends[s.signedEnvelopeXdr] = const RpcRequestRejected(
+            -32602,
+            'invalid transaction',
+            'sendTransaction answered JSON-RPC error -32602',
+          );
+      }
+    }
+
+    const codes = [
+      SubmissionOutcomeCode.transactionFailed,
+      SubmissionOutcomeCode.preparationExpired,
+      SubmissionOutcomeCode.submissionRejected,
+    ];
+
+    for (final purpose in [
+      SubmissionPurpose.release,
+      SubmissionPurpose.claimRefund,
+    ]) {
+      for (final code in codes) {
+        test('the third failed ${purpose.wireName} ($code) is '
+            'EscrowCallFailed', () async {
+          final s = await attempt(purpose, prior: 2);
+          failWith(s, code);
+
+          await tracker.pass(store);
+
+          await expectState(
+            s,
+            SubmissionState.failed,
+            SubmissionOutcomeCode.escrowCallFailed,
+          );
+        });
+
+        test('the second failed ${purpose.wireName} ($code) keeps its '
+            'code', () async {
+          final s = await attempt(purpose, prior: 1);
+          failWith(s, code);
+
+          await tracker.pass(store);
+
+          await expectState(s, SubmissionState.failed, code);
+        });
+      }
+    }
+
+    test(
+      'failures of another purpose do not count towards the third',
+      () async {
+        final release = await attempt(SubmissionPurpose.release, prior: 2);
+        final refund = await attempt(SubmissionPurpose.claimRefund, prior: 0);
+        await store.markFailed(
+          release.id,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+        failWith(refund, SubmissionOutcomeCode.transactionFailed);
+
+        await tracker.pass(store);
+
+        await expectState(
+          refund,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+      },
+    );
+
+    test('a third failed fund keeps its code', () async {
+      final s = await attempt(SubmissionPurpose.fund, prior: 2);
+      failWith(s, SubmissionOutcomeCode.transactionFailed);
+
+      await tracker.pass(store);
+
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
+  });
+
   group('SUCCESS of createJob', () {
     test('applies the JobCreated effect and confirms', () async {
       final s = await submit(SubmissionPurpose.createJob);

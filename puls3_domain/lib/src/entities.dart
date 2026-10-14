@@ -326,7 +326,11 @@ final class Feedback {
     }
   }
 
-  final HireId hireId;
+  /// The puls3 hire this feedback was left for. Null for a registry record
+  /// that is not bound to a puls3 hire (ADR-0005 D5): it matches no hire,
+  /// so [Hire.recordFeedback] and the submit use case reject it as
+  /// [FeedbackDoesNotMatchHire].
+  final HireId? hireId;
   final AgentId agentId;
   final StellarAddress client;
 

@@ -220,6 +220,23 @@ void main() {
       expect(registry.given, isEmpty);
     });
 
+    test('feedback bound to no puls3 hire is rejected, never matched '
+        'by absence', () async {
+      final unbound = Feedback(
+        hireId: null,
+        agentId: AgentId(0),
+        client: consumer,
+        score: 4,
+      );
+      expect(unbound.hireId, isNull);
+
+      await expectLater(
+        useCase()(completed(), unbound),
+        throwsA(isA<FeedbackDoesNotMatchHire>()),
+      );
+      expect(registry.given, isEmpty);
+    });
+
     test('the owner rating its own agent is rejected', () async {
       await expectLater(
         useCase(agentOwner: consumer)(completed(), feedbackBy(consumer)),
