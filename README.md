@@ -195,6 +195,55 @@ assets/brand/    Logos, marks, favicons, fonts
 design/          Design sources (logo lab)
 ```
 
+## Build and run
+
+Prerequisites (the versions CI uses): **Flutter 3.44.4** (bundles Dart 3.12.2), **Serverpod CLI 4.0.4**, and **Docker**. Rust and the Stellar CLI are only needed for the contracts. Machine setup: [CONTRIBUTING.md §1](CONTRIBUTING.md#1-set-up-your-machine).
+
+```bash
+# 1. Clone and install the Dart workspace (domain, server, client, app)
+git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
+cd puls3
+flutter pub get
+
+# 2. Local secrets (random, machine-only) and the public root config
+./scripts/setup-local-secrets.sh   # creates puls3_server/.env + config/passwords.yaml
+cp .env.example .env               # public configuration; no real secret needed
+
+# 3. Start the local database (development DB on 8090)
+cd puls3_server
+docker compose up -d postgres      # add `redis` too if you enable it in config/development.yaml
+
+# 4. Run the server (API on http://localhost:8080)
+set -a; . ../.env; set +a
+dart bin/main.dart --apply-migrations
+
+# 5. Run the Flutter web app against it (second terminal)
+cd ../puls3_flutter
+flutter run -d chrome
+```
+
+The app reads the server URL from [`puls3_flutter/assets/config.json`](puls3_flutter/assets/config.json) (`http://localhost:8080`); override it with `--dart-define=PULS3_API_URL=<url>`. Stop the server with `Ctrl+C`, then `docker compose stop`.
+
+`scripts/setup-local-secrets.sh` writes `puls3_server/.env` (Postgres/Redis passwords) and `puls3_server/config/passwords.yaml` with random values; `.env.example` copied to the root `.env` is public configuration. **No real secret is required** to run locally.
+
+### Quality gates
+
+```bash
+# Domain (pure Dart)
+cd puls3_domain
+dart analyze --fatal-infos && dart test
+
+# Server (uses the test database on 9090 and the test Redis on 9091)
+cd ../puls3_server
+docker compose up -d postgres_test redis_test
+dart analyze --fatal-infos && dart test test/unit test/hire test/ledger
+
+# App
+cd ../puls3_flutter
+flutter analyze --fatal-infos && flutter test
+flutter build web --release
+```
+
 ## Hackathon Note (Stellar Odyssey Perú)
 
 Per rules §8.1, this project existed prior to the Stellar Odyssey event. The codebase before the hackathon kickoff (Sep 19, 2026) was established at commit [`8bd23dc26605906683f32e2c177a2c7bde018db6`](https://github.com/Zer0-Knowledge-Hack/puls3/commit/8bd23dc26605906683f32e2c177a2c7bde018db6). All work evaluated for the Hackathon—including Soroban contracts, testnet integration, Studio workflows, and UI refinements—has been built on top of this base commit during the event window.
