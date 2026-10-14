@@ -1,0 +1,124 @@
+{
+  "schema": "puls3.integration-manifest/v1",
+  "id": "tia",
+  "name": "TIA Remittance API",
+  "description": "Pay-per-call USD/MXN remittance data for AI agents, settled in USDC on Stellar via x402. Prices are per call, in USDC stroops (7 decimals).",
+  "provider": {
+    "name": "TIA",
+    "homepage": "https://tia-stellar.vercel.app",
+    "repository": "https://github.com/Edgadafi/remesa-liquidez",
+    "license": "MIT",
+    "erc8004": null
+  },
+  "openapi": {
+    "url": "https://raw.githubusercontent.com/Edgadafi/remesa-liquidez/main/docs/tia-openapi.yaml",
+    "note": "TIA publishes this OpenAPI 3.1 document; a provider-served URL is preferred over the repository URL. The operation list below is the puls3 overlay (price and payment per operation); schemas come from this document."
+  },
+  "discovery": {
+    "health": "https://x402.holatia.app/health",
+    "note": "GET /health is free and lists every paid route with its current price; read it instead of assuming a price."
+  },
+  "environments": {
+    "stellar:pubnet": {
+      "baseUrl": "https://x402.holatia.app",
+      "payment": {
+        "x402Version": 2,
+        "scheme": "exact",
+        "network": "stellar:pubnet",
+        "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+        "payTo": "GBRMBOEGDTF72FP72D7OQLICBXVTSG25GYWZ3W7TNCLD47NEYVU7JUBS",
+        "facilitator": "https://channels.openzeppelin.com/x402",
+        "maxTimeoutSeconds": 300,
+        "feesSponsored": true
+      }
+    },
+    "stellar:testnet": {
+      "baseUrl": "https://remesa-tia-testnet.vercel.app",
+      "payment": {
+        "x402Version": 2,
+        "scheme": "exact",
+        "network": "stellar:testnet",
+        "asset": null,
+        "payTo": null,
+        "facilitator": "https://x402.org/facilitator",
+        "note": "Testnet handshake host. Asset and payTo are whatever this host advertises in the 402 PAYMENT-REQUIRED header; read it before signing. Prices stay in cents on both networks."
+      }
+    }
+  },
+  "operations": [
+    {
+      "operationId": "getQuote",
+      "tool": "tia_get_quote",
+      "method": "GET",
+      "path": "/v1/quote",
+      "summary": "USD/MXN ticker: Bitso last, bid/ask, spread and spread %, 24h volume, vwap, high/low.",
+      "price": { "asset": "USDC", "amount": 1000000 },
+      "input": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "operationId": "getRoute",
+      "tool": "tia_get_route",
+      "method": "GET",
+      "path": "/v1/route",
+      "summary": "Compare USD to MXN rails (Bitso spot, USDC via Stellar, SPEI wire) for a USD amount: total cost, effective rate, ETA and per-option assumptions.",
+      "price": { "asset": "USDC", "amount": 2500000 },
+      "input": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50000,
+            "description": "USD amount, inclusive range 1 to 50000."
+          }
+        },
+        "required": ["amount"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "operationId": "createAlert",
+      "tool": "tia_create_alert",
+      "method": "POST",
+      "path": "/v1/alert",
+      "summary": "Register a one-shot USD/MXN threshold alert with webhook delivery. TIA marks this endpoint experimental: do not build on it yet.",
+      "experimental": true,
+      "price": { "asset": "USDC", "amount": 1000000 },
+      "input": {
+        "type": "object",
+        "properties": {
+          "threshold": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1000, "description": "MXN per USD." },
+          "direction": { "type": "string", "enum": ["above", "below"] },
+          "webhookUrl": { "type": "string", "maxLength": 500 }
+        },
+        "required": ["threshold", "direction", "webhookUrl"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "freeOperations": [
+    { "operationId": "getHealth", "method": "GET", "path": "/health" }
+  ],
+  "safety": {
+    "maxSpendPerCall": 2500000,
+    "allowedNetworks": ["stellar:pubnet", "stellar:testnet"],
+    "allowedPayTo": {
+      "stellar:pubnet": ["GBRMBOEGDTF72FP72D7OQLICBXVTSG25GYWZ3W7TNCLD47NEYVU7JUBS"]
+    },
+    "note": "allowedPayTo for testnet is read from the 402 header and pinned per environment at listing time; the server refuses any payTo, asset or network outside this allow-list."
+  },
+  "listing": {
+    "status": "verified",
+    "verifiedBy": "puls3",
+    "verifiedAt": "2026-10-09",
+    "evidence": {
+      "unpaidProbe": "curl -i https://x402.holatia.app/v1/quote returns 402 with PAYMENT-REQUIRED",
+      "mainnetPaymentTx": "b5fc310f086d3e4e170384fec0ccd1485c9b348559a12f61aa1ec9f2b5695e0d",
+      "replayProtection": "replaying the same payment returns 409 payment_replayed"
+    }
+  }
+}
