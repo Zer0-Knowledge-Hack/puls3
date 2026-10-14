@@ -68,6 +68,7 @@ WalletSession _walletSession(Client client, String configJson) {
     storeSession: client.auth.updateSignedInUser,
     serverSigningKey: auth.serverSigningKey,
     homeDomain: auth.homeDomain,
+    webAuthDomain: auth.webAuthDomain,
   );
 }
 

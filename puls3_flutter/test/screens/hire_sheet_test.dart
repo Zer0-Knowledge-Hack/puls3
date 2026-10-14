@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
+import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/hire/fake_hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
@@ -299,6 +300,7 @@ Future<void> pumpSheet(
         catalog: AgentCatalog(InMemoryAgentRepository([agent])),
         wallet: WalletController(wallet),
         deployGateway: FakeDeployGateway(),
+        studioGateway: FakeStudioGateway(),
         hireGateway: gateway ?? FakeHireGateway(delay: Duration.zero),
         hireFlowStore: store ?? MemoryHireFlowStore(),
         child: Scaffold(
@@ -411,6 +413,7 @@ void main() {
           catalog: AgentCatalog(InMemoryAgentRepository([_onChainAgent])),
           wallet: WalletController(TestWallet(initialAddress: 'GUSER123')),
           deployGateway: FakeDeployGateway(),
+          studioGateway: FakeStudioGateway(),
           hireGateway: ScriptedHireGateway(),
           hireFlowStore: MemoryHireFlowStore(),
           child: MaterialApp.router(

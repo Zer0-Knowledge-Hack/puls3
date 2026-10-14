@@ -10,13 +10,17 @@ import 'hire/hire_flow_store.dart';
 import 'hire/hire_gateway.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
+import 'screens/brand_screen.dart';
 import 'screens/hire_detail_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/market_screen.dart';
+import 'screens/my_agents_screen.dart';
 import 'screens/studio_screen.dart';
 import 'state/agent_catalog.dart';
 import 'state/app_scope.dart';
 import 'state/wallet_controller.dart';
+import 'studio/fake_studio_gateway.dart';
+import 'studio/studio_gateway.dart';
 import 'theme/breakpoints.dart';
 import 'theme/puls3_theme.dart';
 import 'wallet/wallet_port.dart';
@@ -27,13 +31,26 @@ GoRouter buildRouter({String initialLocation = '/'}) {
     initialLocation: initialLocation,
     routes: [
       GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
+      GoRoute(path: '/brand', builder: (context, state) => const BrandScreen()),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.uri.path, child: child),
         routes: [
           GoRoute(
             path: '/studio',
-            builder: (context, state) => const StudioScreen(),
+            builder: (context, state) {
+              final query = state.uri.queryParameters;
+              return StudioScreen(
+                // A new key per draft, so opening another one resets the form.
+                key: ValueKey(state.uri.query),
+                draftId: int.tryParse(query['draft'] ?? ''),
+                newVersion: query['edit'] == '1',
+              );
+            },
+          ),
+          GoRoute(
+            path: '/studio/agents',
+            builder: (context, state) => const MyAgentsScreen(),
           ),
           GoRoute(
             path: '/market',
@@ -63,6 +80,7 @@ class Puls3App extends StatefulWidget {
     required this.wallet,
     this.demoRepository,
     this.deployGateway,
+    this.studioGateway,
     this.hireGateway,
     this.hireFlowStore,
     this.healthCheck,
@@ -80,6 +98,10 @@ class Puls3App extends StatefulWidget {
   /// The deploy backend. Until the register/deploy endpoint (#18) exists
   /// it defaults to [FakeDeployGateway], which the flow labels as a demo.
   final DeployGateway? deployGateway;
+
+  /// Drafts, test runs and My agents. Until `StudioEndpoint` (#35) exists
+  /// it defaults to [FakeStudioGateway], which the Studio labels as a demo.
+  final StudioGateway? studioGateway;
 
   /// The hire backend (#91). It defaults to [FakeHireGateway], which the
   /// flow labels as a demo, until the server accepts wallet sessions (#136).
@@ -105,9 +127,20 @@ class _Puls3AppState extends State<Puls3App> {
   );
   late final DeployGateway _deployGateway =
       widget.deployGateway ?? FakeDeployGateway();
+  late final StudioGateway _studioGateway =
+      widget.studioGateway ?? FakeStudioGateway();
   late final HireGateway _hireGateway = widget.hireGateway ?? FakeHireGateway();
   late final HireFlowStore _hireFlowStore =
       widget.hireFlowStore ?? createHireFlowStore();
+
+  @override
+  void initState() {
+    super.initState();
+    // The banner reports a failed health check, but routes that hide it
+    // (/brand) leave the future unwatched; mark the error as handled so it
+    // is not reported as uncaught. The banner still receives it.
+    widget.healthCheck?.ignore();
+  }
 
   @override
   void dispose() {
@@ -126,6 +159,7 @@ class _Puls3AppState extends State<Puls3App> {
       catalog: _catalog,
       wallet: _wallet,
       deployGateway: _deployGateway,
+      studioGateway: _studioGateway,
       hireGateway: _hireGateway,
       hireFlowStore: _hireFlowStore,
       child: MaterialApp.router(
@@ -136,7 +170,16 @@ class _Puls3AppState extends State<Puls3App> {
         builder: (context, child) => Column(
           children: [
             if (widget.healthCheck != null)
-              _BackendStatus(healthCheck: widget.healthCheck!),
+              // The public brand page does not depend on the backend.
+              ListenableBuilder(
+                listenable: _router.routeInformationProvider,
+                builder: (context, _) =>
+                    _hidesBackendStatus(
+                      _router.routeInformationProvider.value.uri.path,
+                    )
+                    ? const SizedBox.shrink()
+                    : _BackendStatus(healthCheck: widget.healthCheck!),
+              ),
             Expanded(child: child ?? const SizedBox.shrink()),
           ],
         ),
@@ -144,6 +187,9 @@ class _Puls3AppState extends State<Puls3App> {
     );
   }
 }
+
+/// Routes that hide the backend status banner.
+bool _hidesBackendStatus(String path) => path == '/brand';
 
 class _BackendStatus extends StatelessWidget {
   const _BackendStatus({required this.healthCheck});

@@ -339,6 +339,19 @@ reads `PULS3_API_URL` and `PULS3_HIRE` from the environment; set
 `PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
 stay the labelled demo.
 
+With `PULS3_HIRE=server` the Pages build also needs the SEP-10 values the app
+checks every sign-in challenge against before the wallet is prompted (#136),
+and fails without them. All three are public:
+
+| Pages variable | Value for this deployment |
+|---|---|
+| `PULS3_AUTH_SERVER_SIGNING_KEY` | the `G…` account of the `walletAuthSigningKey` password (today `GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG`) |
+| `PULS3_AUTH_HOME_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |
+| `PULS3_AUTH_WEB_AUTH_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |
+
+If `walletAuthSigningKey` is rotated, update `PULS3_AUTH_SERVER_SIGNING_KEY`
+and rebuild Pages, or every sign-in is refused before the wallet prompt.
+
 | | URL |
 |---|---|
 | API server | `https://puls3-hub-on-stellar.api.serverpod.space/` |

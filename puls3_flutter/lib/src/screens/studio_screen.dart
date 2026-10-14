@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:puls3_domain/puls3_domain.dart' show AgentManifest, OutputType;
+import 'package:go_router/go_router.dart';
+import 'package:puls3_domain/puls3_domain.dart'
+    show AgentManifestDraft, OutputType;
 
-import '../domain/agent_draft.dart';
 import '../domain/usdc.dart';
+import '../state/app_scope.dart';
 import '../studio/studio_form_check.dart';
+import '../studio/studio_gateway.dart';
 import '../studio/studio_models.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
@@ -13,14 +16,23 @@ import '../ui/atoms/section_label.dart';
 import '../ui/molecules/agent_card.dart';
 import '../ui/organisms/agent_form.dart';
 import '../ui/organisms/site_footer.dart';
-import 'deploy_sheet.dart';
+import 'playground.dart';
+import 'studio_deploy.dart';
+import 'wallet_sheet.dart';
 
-/// `/studio` (S07, flow F4): the agent builder with a live Marketplace
-/// preview. The container: it owns the form state and checks it with the
-/// domain manifest rules (#34) on every change. Deploy stays disabled until
-/// the manifest is valid.
+/// `/studio` (S07, flows F4, F8, F9, F10): the agent builder with a live
+/// Marketplace preview. The container: it owns the form state and checks it
+/// with the domain manifest rules (#34) on every change, saves drafts and
+/// opens the playground through the [StudioGateway]. Deploy and Test run
+/// stay disabled until the manifest is valid.
 class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key});
+  const StudioScreen({super.key, this.draftId, this.newVersion = false});
+
+  /// A saved draft to open (`/studio?draft=n`, F8 "Continue editing").
+  final int? draftId;
+
+  /// Opens the live [draftId] as a new draft for version n+1 (F10).
+  final bool newVersion;
 
   @override
   State<StudioScreen> createState() => _StudioScreenState();
@@ -51,6 +63,28 @@ class _StudioScreenState extends State<StudioScreen> {
   /// empty form does not open as a wall of errors.
   final Set<StudioField> _touched = {};
 
+  /// The saved draft this form edits, and its latest known revision.
+  int? _draftId;
+  int? _revision;
+
+  /// The wire document last saved, to tell unsaved changes apart.
+  String? _savedJson;
+
+  /// The live version an edit replaces (F10), for the banner.
+  int? _replacesVersion;
+
+  bool _loadingDraft = false;
+  bool _saving = false;
+  String? _saveError;
+
+  /// The server's `InvalidManifest` problems, under their fields until the
+  /// field is edited again (F8-3).
+  final Map<StudioField, String> _serverErrors = {};
+  bool _conflict = false;
+
+  /// The draft the desktop playground runs, once opened.
+  StudioDraft? _playground;
+
   late final Map<TextEditingController, StudioField> _fieldOf = {
     _name: StudioField.name,
     _description: StudioField.description,
@@ -66,6 +100,11 @@ class _StudioScreenState extends State<StudioScreen> {
     for (final MapEntry(key: controller, value: field) in _fieldOf.entries) {
       controller.addListener(() => _touch(field));
     }
+    final draftId = widget.draftId;
+    if (draftId != null) {
+      _loadingDraft = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _open(draftId));
+    }
   }
 
   @override
@@ -76,7 +115,14 @@ class _StudioScreenState extends State<StudioScreen> {
     super.dispose();
   }
 
-  void _touch(StudioField field) => setState(() => _touched.add(field));
+  String? get _owner => AppScope.of(context).wallet.address;
+
+  StudioGateway get _gateway => AppScope.of(context).studioGateway;
+
+  void _touch(StudioField field) => setState(() {
+    _touched.add(field);
+    _serverErrors.remove(field);
+  });
 
   StudioFormValues get _values => StudioFormValues(
     name: _name.text,
@@ -107,16 +153,185 @@ class _StudioScreenState extends State<StudioScreen> {
   /// Shows every remaining problem, for "What is missing?".
   void _revealAll() => setState(() => _touched.addAll(StudioField.values));
 
-  Future<void> _deploy(AgentManifest manifest) async {
-    final draft = AgentDraft(
-      name: manifest.name,
-      description: manifest.description,
-      model: _model!.label,
-      systemPrompt: manifest.systemPrompt,
-      skills: [for (final s in manifest.skills) s.name],
-      priceUsdcStroops: manifest.price.stroops,
+  /// Loads a saved draft into the form (F8 "Continue editing", F10 "Edit").
+  Future<void> _open(int draftId) async {
+    if (!mounted) return;
+    final owner = _owner;
+    if (owner == null) {
+      setState(() {
+        _loadingDraft = false;
+        _saveError = 'Connect the wallet that owns this draft to open it.';
+      });
+      return;
+    }
+    try {
+      final draft = await _gateway.getDraft(draftId, owner: owner);
+      if (!mounted) return;
+      setState(() {
+        _fill(studioFormValuesFor(draft.manifest));
+        if (widget.newVersion && draft.deployState == DraftDeployState.live) {
+          // Version n stays live and immutable: the edit is a new draft.
+          _replacesVersion = draft.liveVersion ?? 1;
+        } else {
+          _draftId = draft.draftId;
+          _revision = draft.revision;
+          _savedJson = _json(draft.manifest);
+        }
+        _loadingDraft = false;
+      });
+    } on StudioGatewayException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDraft = false;
+        _saveError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDraft = false;
+        _saveError = 'The draft could not be loaded. Try again.';
+      });
+    }
+  }
+
+  void _fill(StudioFormValues values) {
+    _name.text = values.name;
+    _description.text = values.description;
+    _prompt.text = values.systemPrompt;
+    _inputMax.text = values.inputMaxChars;
+    _outputMax.text = values.outputMaxChars;
+    _price.text = values.price;
+    _model = values.model;
+    _outputType = values.outputType;
+    _skills
+      ..clear()
+      ..addAll(values.skills);
+    _touched.addAll(StudioField.values);
+  }
+
+  /// The domain draft has no value equality: compare wire documents.
+  static String _json(AgentManifestDraft draft) => '${draft.toJson()}';
+
+  bool _unsaved(AgentManifestDraft? current) =>
+      _draftId == null || current == null || _json(current) != _savedJson;
+
+  /// Saves the form as a draft (F8) and returns it, or null when it was not
+  /// saved; the reason is shown under the buttons.
+  Future<StudioDraft?> _save(
+    AgentManifestDraft manifest, {
+    bool overwrite = false,
+  }) async {
+    var owner = _owner;
+    if (owner == null) {
+      // F8: connect, then the save continues with the same form.
+      await showWalletSheet(context);
+      if (!mounted) return null;
+      owner = _owner;
+      if (owner == null) return null;
+    }
+    setState(() {
+      _saving = true;
+      _saveError = null;
+      _conflict = false;
+      _serverErrors.clear();
+    });
+    String? error;
+    final problems = <StudioField, String>{};
+    var conflict = false;
+    try {
+      final draft = await _gateway.saveDraft(
+        manifest,
+        owner: owner,
+        draftId: _draftId,
+        revision: _revision,
+        overwrite: overwrite,
+      );
+      if (!mounted) return null;
+      setState(() {
+        _draftId = draft.draftId;
+        _revision = draft.revision;
+        _savedJson = _json(manifest);
+        _saving = false;
+      });
+      return draft;
+    } on StudioDraftConflict catch (e) {
+      conflict = true;
+      error = e.message;
+    } on StudioInvalidDraft catch (e) {
+      error = e.message;
+      for (final problem in e.problems) {
+        final (field, message) = describeManifestProblem(problem);
+        problems.putIfAbsent(field, () => message);
+      }
+    } on StudioGatewayException catch (e) {
+      error = 'Not saved: ${e.message}';
+    } catch (_) {
+      error = 'Not saved: the server did not answer. Your text stays.';
+    }
+    if (!mounted) return null;
+    setState(() {
+      _saving = false;
+      _conflict = conflict;
+      _saveError = error;
+      _serverErrors.addAll(problems);
+      _touched.addAll(StudioField.values);
+    });
+    return null;
+  }
+
+  /// "Reload" after a conflict: the newer saved revision replaces the edits.
+  Future<void> _reload() async {
+    final draftId = _draftId;
+    if (draftId == null) return;
+    setState(() {
+      _conflict = false;
+      _saveError = null;
+      _loadingDraft = true;
+    });
+    await _open(draftId);
+  }
+
+  /// Test run (F9): saves unsaved changes first, then opens the playground
+  /// beside the preview, or as a sheet on phones.
+  Future<void> _testRun(AgentManifestDraft manifest) async {
+    if (_unsaved(manifest) && await _save(manifest) == null) return;
+    if (!mounted) return;
+    final owner = _owner;
+    final draftId = _draftId;
+    if (owner == null || draftId == null) return;
+    final draft = StudioDraft(
+      draftId: draftId,
+      manifest: manifest,
+      revision: _revision ?? 1,
     );
-    await showDeploySheet(context, draft);
+    final wide =
+        MediaQuery.sizeOf(context).width >= Puls3Breakpoints.studioTwoColumn;
+    if (wide) {
+      setState(() => _playground = draft);
+    } else {
+      await showPlaygroundSheet(
+        context,
+        draft: draft,
+        gateway: _gateway,
+        owner: owner,
+        onDeploy: () => _deploy(manifest),
+      );
+    }
+  }
+
+  /// Deploy (F4). With a wallet connected the draft is saved first, so My
+  /// agents lists it as live once it is.
+  Future<void> _deploy(AgentManifestDraft manifest) async {
+    if (_owner != null && _unsaved(manifest)) {
+      if (await _save(manifest) == null || !mounted) return;
+    }
+    if (!mounted) return;
+    await deployStudioManifest(
+      context,
+      manifest,
+      draftId: _draftId,
+      owner: _owner,
+    );
   }
 
   @override
@@ -133,11 +348,18 @@ class _StudioScreenState extends State<StudioScreen> {
 
   Widget _buildBody(BuildContext context) {
     final check = checkStudioForm(_values);
-    final manifest = check.manifest;
+    // A draft needs at least a name to be listed in My agents.
+    final saveable = _name.text.trim().isEmpty ? null : check.draft;
+    final deployable = check.manifest != null ? saveable : null;
+    final owner = AppScope.of(context).wallet.address;
+    final playground = _playground;
     final shown = {
       for (final MapEntry(key: field, value: message) in check.errors.entries)
         if (_touched.contains(field)) field: message,
     };
+    for (final MapEntry(key: field, value: message) in _serverErrors.entries) {
+      shown.putIfAbsent(field, () => message);
+    }
     final wide =
         MediaQuery.sizeOf(context).width >= Puls3Breakpoints.studioTwoColumn;
 
@@ -166,6 +388,7 @@ class _StudioScreenState extends State<StudioScreen> {
 
     final name = _name.text.trim();
     final description = _description.text.trim();
+    final busy = _saving || _loadingDraft;
     final preview = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -200,8 +423,75 @@ class _StudioScreenState extends State<StudioScreen> {
           label: 'Deploy to Stellar',
           icon: Icons.rocket_launch_outlined,
           expand: true,
-          onPressed: manifest == null ? null : () => _deploy(manifest),
+          onPressed: deployable == null || busy
+              ? null
+              : () => _deploy(deployable),
         ),
+        const SizedBox(height: Puls3Spacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: PrimaryButton(
+                key: const Key('studio-save'),
+                label: _saving ? 'Saving…' : 'Save draft',
+                icon: Icons.save_outlined,
+                variant: PrimaryButtonVariant.outline,
+                isLoading: _saving,
+                expand: true,
+                onPressed: saveable == null || busy
+                    ? null
+                    : () => _save(saveable),
+              ),
+            ),
+            const SizedBox(width: Puls3Spacing.sm),
+            Expanded(
+              child: PrimaryButton(
+                key: const Key('studio-test-run'),
+                label: 'Test run',
+                icon: Icons.play_arrow_rounded,
+                variant: PrimaryButtonVariant.outline,
+                expand: true,
+                onPressed: deployable == null || busy
+                    ? null
+                    : () => _testRun(deployable),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Puls3Spacing.xs),
+        _SaveStatus(
+          saving: _saving,
+          revision: _draftId == null ? null : _revision,
+          unsaved: _draftId != null && _unsaved(saveable),
+          error: _saveError,
+          conflict: _conflict,
+          isDemo: _gateway.isDemo,
+          walletConnected: owner != null,
+          onReload: _reload,
+          onKeepMine: saveable == null
+              ? null
+              : () => _save(saveable, overwrite: true),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('studio-my-agents'),
+            onPressed: () => context.go('/studio/agents'),
+            icon: const Icon(Icons.list_alt_rounded, size: 18),
+            label: const Text('My agents'),
+          ),
+        ),
+        if (wide && playground != null && owner != null) ...[
+          const SizedBox(height: Puls3Spacing.md),
+          Playground(
+            // A fresh panel for each saved revision.
+            key: ValueKey('playground-${playground.draftId}-$_revision'),
+            draft: playground,
+            gateway: _gateway,
+            owner: owner,
+            onClose: () => setState(() => _playground = null),
+          ),
+        ],
       ],
     );
 
@@ -222,6 +512,14 @@ class _StudioScreenState extends State<StudioScreen> {
           'Design an agent, give it a price, deploy it with its own wallet.',
           style: Puls3Text.lead,
         ),
+        if (_loadingDraft) ...[
+          const SizedBox(height: Puls3Spacing.md),
+          const LinearProgressIndicator(key: Key('studio-loading-draft')),
+        ],
+        if (_replacesVersion case final version?) ...[
+          const SizedBox(height: Puls3Spacing.md),
+          _VersionBanner(version: version),
+        ],
         const SizedBox(height: Puls3Spacing.xl),
         if (wide)
           Row(
@@ -239,6 +537,109 @@ class _StudioScreenState extends State<StudioScreen> {
         ],
         const SizedBox(height: Puls3Spacing.xxl),
       ],
+    );
+  }
+}
+
+/// F10: editing a live agent makes a new version; hirers keep the old one.
+class _VersionBanner extends StatelessWidget {
+  const _VersionBanner({required this.version});
+
+  final int version;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('studio-version-banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(Puls3Spacing.sm),
+      decoration: BoxDecoration(
+        color: Puls3Colors.surface,
+        borderRadius: Puls3Radius.mdAll,
+        border: Border.all(color: Puls3Colors.lavender),
+      ),
+      child: Text(
+        'Editing creates version ${version + 1}. Hirers keep version '
+        '$version until you deploy.',
+        style: Puls3Text.body,
+      ),
+    );
+  }
+}
+
+/// Saved, unsaved, or why a save failed (F8-3, F8-4).
+class _SaveStatus extends StatelessWidget {
+  const _SaveStatus({
+    required this.saving,
+    required this.revision,
+    required this.unsaved,
+    required this.error,
+    required this.conflict,
+    required this.isDemo,
+    required this.walletConnected,
+    required this.onReload,
+    required this.onKeepMine,
+  });
+
+  final bool saving;
+  final int? revision;
+  final bool unsaved;
+  final String? error;
+  final bool conflict;
+  final bool isDemo;
+  final bool walletConnected;
+  final VoidCallback onReload;
+  final VoidCallback? onKeepMine;
+
+  @override
+  Widget build(BuildContext context) {
+    final error = this.error;
+    if (error != null) {
+      return Column(
+        key: const Key('studio-save-error'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            error,
+            style: Puls3Text.bodyMuted.copyWith(color: Puls3Colors.accent),
+          ),
+          if (conflict)
+            Wrap(
+              spacing: Puls3Spacing.xs,
+              children: [
+                TextButton(
+                  key: const Key('studio-conflict-reload'),
+                  onPressed: onReload,
+                  child: const Text('Reload'),
+                ),
+                TextButton(
+                  key: const Key('studio-conflict-keep'),
+                  onPressed: onKeepMine,
+                  child: const Text('Keep mine'),
+                ),
+              ],
+            ),
+        ],
+      );
+    }
+    final revision = this.revision;
+    final String? text;
+    if (saving) {
+      text = null;
+    } else if (revision == null) {
+      text = walletConnected
+          ? null
+          : 'Connect your wallet to save drafts and test runs.';
+    } else if (unsaved) {
+      text = 'Unsaved changes · revision $revision';
+    } else {
+      text = 'Saved · revision $revision${isDemo ? ' (demo)' : ''}';
+    }
+    if (text == null) return const SizedBox.shrink();
+    return Text(
+      text,
+      key: const Key('studio-save-status'),
+      style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
     );
   }
 }

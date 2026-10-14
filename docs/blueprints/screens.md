@@ -96,10 +96,10 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 | State | What the user sees |
 |---|---|
-| Loading | **Confirm & sign** shows "Signing…" and the current step: creating the hire, "Sign the escrow job (1 of 2)", "Sign the payment (2 of 2)", sending to the escrow. |
-| Empty | No task typed: **Confirm & sign** is disabled. |
-| Error | "Payment failed" with the reason (wallet rejected, not signed in, preparation expired, missing USDC, server unavailable) and **Try again**, which resumes from the failed step without creating a second hire. |
-| Success | "Payment sent to the escrow" with `Hire.id`, the transaction and **View on StellarExpert**. A demo backend says "Demo signature only" and links nothing. |
+| Loading | **Confirm & sign** shows "Signing…" and the current step: the wallet sign-in ("Sign in with your wallet: it only proves the account is yours", SEP-10, #149), creating the hire, "Sign the escrow job in your wallet (1 of 2)", "Sign the payment in your wallet (2 of 2)", sending the payment to the escrow. |
+| Empty | No task typed: **Confirm & sign** is disabled. An unfinished hire with this agent is resumed instead: its task is shown and locked, with "You have an unfinished hire with this agent. Confirming resumes it, so you are never charged twice." |
+| Error | "Payment failed" with the reason and **Try again**, which resumes from the failed step without creating a second hire. Before any signature, the wallet's testnet funds are checked (#159): no account on testnet, no USDC trustline, or less USDC than `Agent.price`, each with "Nothing was signed". Other reasons: wallet rejected, sign-in unavailable, preparation expired, payment could not be prepared, server unavailable. |
+| Success | While the payment confirms: "Payment sent, confirming on Stellar…" with `Hire.id`, the transaction and **View on StellarExpert**. Once confirmed: "Payment held by the escrow". A demo backend says "Demo signature only" and links nothing. |
 
 **Actions:** **Confirm & sign** → wallet prompts (S09 first if no wallet). **View hire** → S06. **Back to Marketplace** → S02.
 
@@ -137,7 +137,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Actions:** **Approve** → wallet signs `complete` → **Completed**. **Reject and refund** (optional reason) → wallet signs `reject` → **Rejected**; hidden after the deadline. **Rate** → S10.
 
-**Components:** `ScreenHeader`, `ProgressStepRow`, `SectionLabel`, `KeyValueRow`, `AddressBadge`, `PrimaryButton`, `ErrorBanner`.
+**Components:** `HireDetailView` (the read-only screen today), `ScreenHeader`, `ProgressStepRow`, `SectionLabel`, `KeyValueRow`, `AddressBadge`, `PrimaryButton`, `ErrorBanner`.
 
 ### S07-studio
 
@@ -145,12 +145,12 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Data:** the manifest draft, named as `AgentManifestDraft`: `name`, `description`, `skills` (`Skill.name`, kebab-case `Skill.id`), `model` (`ModelId.provider`, `ModelId.id`), `systemPrompt`, `inputType` and `inputMaxChars`, `outputType` and `outputMaxChars`, `price`. The preview is the Marketplace card.
 
-| State | What the user sees |
-|---|---|
-| Loading | The form renders at once (drafts from the server, #35, will show a skeleton). |
-| Empty | A blank form; **Deploy** disabled; "N fields to complete". |
-| Error | The domain's problems (`ManifestProblem`) under each edited field; **What is missing?** shows the rest; **Deploy** stays disabled. |
-| Success | "Ready to deploy" and **Deploy to Stellar** enabled. |
+| State | What the user sees | Wireframe |
+|---|---|---|
+| Loading | The form renders at once (drafts from the server, #35, will show a skeleton). | [1440](wireframes/S07-studio-loading-1440.png) · [390](wireframes/S07-studio-loading-390.png) |
+| Empty | A blank form; **Deploy** disabled; "N fields to complete". | [1440](wireframes/S07-studio-empty-1440.png) · [390](wireframes/S07-studio-empty-390.png) |
+| Error | The domain's problems (`ManifestProblem`) under each edited field; **What is missing?** shows the rest; **Deploy** stays disabled. | [1440](wireframes/S07-studio-error-1440.png) · [390](wireframes/S07-studio-error-390.png) |
+| Success | "Ready to deploy" and **Deploy to Stellar** enabled. | [1440](wireframes/S07-studio-1440.png) · [390](wireframes/S07-studio-390.png) |
 
 **Actions:** **Deploy to Stellar** → S08 (S09 first if no wallet). **Save draft** (F8). **Test run** → S11 (F9). **My agents** → S12 (F11). When editing a live agent, a banner says the edit becomes version *n+1* (F10).
 
@@ -162,12 +162,12 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Data:** the steps (preparing, waiting for signature, registering on-chain, activating, live), the agent's `Agent.id`, the registration transaction and `Agent.wallet` once live.
 
-| State | What the user sees |
-|---|---|
-| Loading | The stepper with the active step and its explanation; the sheet can be closed while the wallet prompt is open. |
-| Empty | Not applicable: the sheet opens only with a valid manifest. |
-| Error | The failed step with the reason and a recovery action: **Try again** from that step, **Prepare again** after an expiry, **Use current account** after an account switch. |
-| Success | "Agent deployed" with `Agent.id`, the transaction and **View on explorer**, **Open agent** (→ S03). A demo backend says "Demo deploy only" and links nothing. |
+| State | What the user sees | Wireframe |
+|---|---|---|
+| Loading | The stepper with the active step and its explanation; the sheet can be closed while the wallet prompt is open. | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
+| Empty | Not applicable: the sheet opens only with a valid manifest. | — |
+| Error | The failed step with the reason and a recovery action: **Try again** from that step, **Prepare again** after an expiry, **Use current account** after an account switch. | [1440](wireframes/S08-deploy-sheet-error-1440.png) · [390](wireframes/S08-deploy-sheet-error-390.png) |
+| Success | "Agent deployed" with `Agent.id`, the transaction and **View on explorer**, **Open agent** (→ S03). A demo backend says "Demo deploy only" and links nothing. | [1440](wireframes/S08-deploy-sheet-success-1440.png) · [390](wireframes/S08-deploy-sheet-success-390.png) |
 
 **Actions:** **Open agent** → S03. **Back to Studio** → S07.
 
@@ -179,12 +179,12 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Data:** the draft's `StudioDraft.draftId`, `inputType` and `inputMaxChars`, `outputType`; after a run, `TestRunResult.output` and `TestRunResult.remainingDailyRuns`.
 
-| State | What the user sees |
-|---|---|
-| Loading | **Running…** with the input locked, and a note that the run stops at the runtime timeout. |
-| Empty | The input box with its counter (`0 / inputMaxChars`), **Run** disabled until there is text, and "Test runs are free and limited per day". |
-| Error | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed` / `RuntimeUnavailable`: the safe reason in an `ErrorBanner` with **Try again**. Over `inputMaxChars`: inline error under the input. |
-| Success | The output (text, or Markdown when `outputType` is `markdown`), labelled "Test run: not paid, nothing on chain", with **Copy** and "N runs left today". |
+| State | What the user sees | Wireframe |
+|---|---|---|
+| Loading | **Running…** with the input locked, and a note that the run stops at the runtime timeout. | [1440](wireframes/S11-playground-loading-1440.png) · [390](wireframes/S11-playground-loading-390.png) |
+| Empty | The input box with its counter (`0 / inputMaxChars`), **Run** disabled until there is text, and "Test runs are free and limited per day". | [1440](wireframes/S11-playground-empty-1440.png) · [390](wireframes/S11-playground-empty-390.png) |
+| Error | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed` / `RuntimeUnavailable`: the safe reason in an `ErrorBanner` with **Try again**. Over `inputMaxChars`: inline error under the input. | [1440](wireframes/S11-playground-error-1440.png) · [390](wireframes/S11-playground-error-390.png) |
+| Success | The output (text, or Markdown when `outputType` is `markdown`), labelled "Test run: not paid, nothing on chain", with **Copy** and "N runs left today". | [1440](wireframes/S11-playground-1440.png) · [390](wireframes/S11-playground-390.png) |
 
 **Actions:** **Run** → `testRun`. **Try again**. **Copy** output. **Close** (phone) → S07. **Deploy** → S08 (F4).
 
@@ -196,12 +196,12 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Data:** for each row, `StudioDraft.draftId`, `manifest.name`, `manifest.price`, `StudioDraft.deployState`, the live `ManifestVersion` and `Agent.id` once deployed, and the deploy step from `DeploySession.state` / `retryFromStep` when a deploy is in progress or failed.
 
-| State | What the user sees |
-|---|---|
-| Loading | Skeleton rows (`SkeletonBox`) under the **Drafts** and **Live** headers. |
-| Empty | `EmptyState`: "No agents yet" and **Create your first agent** (→ S07). |
-| Error | `ErrorBanner`: "Could not load your agents" and **Retry**. |
-| Success | Rows grouped as **Drafts**, **Deploying or failed** and **Live**. Each `AgentVersionRow` shows the name, a state label, the version (live rows) and the price, with its action. |
+| State | What the user sees | Wireframe |
+|---|---|---|
+| Loading | Skeleton rows (`SkeletonBox`) under the **Drafts** and **Live** headers. | [1440](wireframes/S12-my-agents-loading-1440.png) · [390](wireframes/S12-my-agents-loading-390.png) |
+| Empty | `EmptyState`: "No agents yet" and **Create your first agent** (→ S07). | [1440](wireframes/S12-my-agents-empty-1440.png) · [390](wireframes/S12-my-agents-empty-390.png) |
+| Error | `ErrorBanner`: "Could not load your agents" and **Retry**. | [1440](wireframes/S12-my-agents-error-1440.png) · [390](wireframes/S12-my-agents-error-390.png) |
+| Success | Rows grouped as **Drafts**, **Deploying or failed** and **Live**. Each `AgentVersionRow` shows the name, a state label, the version (live rows) and the price, with its action. | [1440](wireframes/S12-my-agents-1440.png) · [390](wireframes/S12-my-agents-390.png) |
 
 **Actions:** **Continue editing** → S07 (F8). **Resume deploy** → S08 at its step. **View** → S03. **Edit** → S07 as version *n+1* (F10). **New agent** → S07.
 
@@ -257,6 +257,7 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `PriceTag` | `AgentCard`, `AgentDetailView`, `AgentMiniCard`, `HirePaymentView` | S01, S02, S03, S04, S05, S07 |
 | `PrimaryButton` | screens, `AgentDetailView`, `EmptyState`, `HirePaymentView`, `WalletPanel`, deploy panels | S01, S03, S04, S06, S07, S08, S09, S10 |
 | `Puls3Logo` | `TopBar`, `SiteFooter`, landing | all |
+| `Puls3Mark` | the logo's mark alone (no screen uses it yet) | — |
 | `PulseBackground` | landing | S01 |
 | `RatingBadge` | `AgentCard`, `AgentDetailView` | S02, S03 |
 | `SectionLabel` | `AgentDetailView`, `AgentForm`, landing, Studio | S01, S03, S06, S07 |
@@ -278,8 +279,8 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `KeyValueRow` | `AgentDetailView`, `HirePaymentView` | S03, S04, S06 |
 | `ProgressStepRow` | `DeployStepper` | S06, S08 |
 | `ScreenHeader` | planned pages | S05, S06, S12 |
-| `AgentVersionRow` *(new)* | `MyAgentsList` | S12 |
-| `TestRunResultCard` *(new)* | `PlaygroundPanel` | S11 |
+| `AgentVersionRow` | `MyAgentsList` | S12 |
+| `TestRunResultCard` | `PlaygroundPanel` | S11 |
 | `WalletChip` | `TopBar` | all |
 
 ### Organisms
@@ -290,9 +291,10 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `AgentForm` | S07 |
 | `AgentGrid`, `AgentGridSkeleton` | S02 |
 | `HirePaymentView` | S04 |
+| `HireDetailView` | S06 |
 | `SiteFooter` | S01, S02, S03, S07 |
 | `TopBar` | all (app shell) |
 | `WalletPanel` | S09 |
 | `DeployFlowView`, `DeployStepper`, `DeployPhaseCard`, `DeployErrorPanel`, `DeploySuccess` | S08 |
-| `PlaygroundPanel` *(new)* | S11 |
-| `MyAgentsList` *(new)* | S12 |
+| `PlaygroundPanel` | S11 |
+| `MyAgentsList` | S12 |
