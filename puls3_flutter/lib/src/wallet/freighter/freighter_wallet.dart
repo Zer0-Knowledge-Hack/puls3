@@ -89,6 +89,7 @@ final class FreighterWallet implements WalletPort {
       account: session.address,
       serverSigningKey: challenge.serverSigningKey,
       homeDomain: challenge.homeDomain,
+      webAuthDomain: challenge.webAuthDomain,
       now: DateTime.now(),
     );
     return _signAndVerify(unsigned, challenge.transactionXdr, session);
@@ -306,15 +307,18 @@ final class FreighterWallet implements WalletPort {
 /// - the first one is `<home domain> auth` with [account] as its source;
 /// - the transaction source is not [account], and every other operation's
 ///   source is the transaction source (the server);
+/// - a `web_auth_domain` operation from the server is present;
 /// - time bounds are set and include [now];
-/// - when known, the source is [serverSigningKey] and the first operation is
-///   `<homeDomain> auth`.
+/// - the server (the transaction source) signed it on Testnet;
+/// - when known, the source is [serverSigningKey], the first operation is
+///   `<homeDomain> auth` and the `web_auth_domain` value is [webAuthDomain].
 void assertSep10Challenge(
   Transaction tx, {
   required String account,
   required DateTime now,
   String? serverSigningKey,
   String? homeDomain,
+  String? webAuthDomain,
 }) {
   Never refuse(String reason) => throw WalletInvalidPayload(reason);
 
@@ -348,6 +352,19 @@ void assertSep10Challenge(
       refuse('A sign-in challenge operation is for another account.');
     }
   }
+  final webAuth = operations
+      .skip(1)
+      .whereType<ManageDataOperation>()
+      .where((op) => op.name == 'web_auth_domain')
+      .firstOrNull;
+  if (webAuth == null) {
+    refuse('The sign-in challenge does not name its auth server.');
+  }
+  if (webAuthDomain != null &&
+      utf8.decode(webAuth.value ?? const [], allowMalformed: true) !=
+          webAuthDomain) {
+    refuse('The sign-in challenge is not for this server.');
+  }
   final bounds = tx.preconditions?.timeBounds;
   if (bounds == null || bounds.maxTime == 0) {
     refuse('The sign-in challenge has no expiry.');
@@ -355,5 +372,13 @@ void assertSep10Challenge(
   final seconds = now.toUtc().millisecondsSinceEpoch ~/ 1000;
   if (seconds < bounds.minTime || seconds > bounds.maxTime) {
     refuse('The sign-in challenge has expired. Try again.');
+  }
+  // Only the server's own signature proves the challenge came from it.
+  final serverKey = KeyPair.fromAccountId(server);
+  final hash = tx.hash(Network.TESTNET);
+  if (!tx.signatures.any(
+    (s) => serverKey.verify(hash, s.signature.signature),
+  )) {
+    refuse('The sign-in challenge is not signed by the puls3 server.');
   }
 }

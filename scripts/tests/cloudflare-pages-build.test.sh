@@ -82,13 +82,50 @@ else
   bad "passes PULS3_API_URL as a dart-define" "$(cat "$log")"
 fi
 
-# 4. PULS3_HIRE from the Pages environment selects the hire backend.
+# 4. PULS3_HIRE from the Pages environment selects the hire backend, and the
+#    SEP-10 pins (#136) become dart-defines.
+server_key=GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG
+pins=(
+  PULS3_AUTH_SERVER_SIGNING_KEY=$server_key
+  PULS3_AUTH_HOME_DOMAIN=example.api.serverpod.space
+  PULS3_AUTH_WEB_AUTH_DOMAIN=example.api.serverpod.space
+)
 log="$WORK/hire"
-run_build "$log" PULS3_API_URL=https://example.api.serverpod.space/ PULS3_HIRE=server
-if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_API_URL=https://example.api.serverpod.space/ --dart-define=HIRE=server" "$log"; then
-  ok "passes PULS3_HIRE as the HIRE dart-define"
+run_build "$log" PULS3_API_URL=https://example.api.serverpod.space/ PULS3_HIRE=server "${pins[@]}"
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_API_URL=https://example.api.serverpod.space/ --dart-define=HIRE=server --dart-define=PULS3_AUTH_SERVER_SIGNING_KEY=$server_key --dart-define=PULS3_AUTH_HOME_DOMAIN=example.api.serverpod.space --dart-define=PULS3_AUTH_WEB_AUTH_DOMAIN=example.api.serverpod.space" "$log"; then
+  ok "passes PULS3_HIRE and the SEP-10 pins as dart-defines"
 else
-  bad "passes PULS3_HIRE as the HIRE dart-define" "$(cat "$log")"
+  bad "passes PULS3_HIRE and the SEP-10 pins as dart-defines" "$(cat "$log")"
+fi
+
+# 4b. A real-hire build without every SEP-10 pin stops before cloning.
+for missing in PULS3_AUTH_SERVER_SIGNING_KEY PULS3_AUTH_HOME_DOMAIN PULS3_AUTH_WEB_AUTH_DOMAIN; do
+  log="$WORK/hire-no-$missing"
+  kept=()
+  for pin in "${pins[@]}"; do
+    [ "${pin%%=*}" = "$missing" ] || kept+=("$pin")
+  done
+  if run_build "$log" PULS3_HIRE=server "${kept[@]}"; then
+    bad "PULS3_HIRE=server without $missing exits non-zero" "exit 0"
+  elif grep -q '^git' "$log"; then
+    bad "PULS3_HIRE=server without $missing stops before cloning" "$(cat "$log")"
+  elif grep -q "needs $missing" "$log.out"; then
+    ok "PULS3_HIRE=server without $missing fails closed"
+  else
+    bad "PULS3_HIRE=server without $missing names the variable" "$(cat "$log.out")"
+  fi
+done
+
+# 4c. A server key that is not a public G… address is refused, unechoed.
+log="$WORK/secret-key"
+# Seed-shaped, built at run time so the secret scan never sees a literal.
+secret="S$(printf 'A%.0s' {1..55})"
+if run_build "$log" PULS3_AUTH_SERVER_SIGNING_KEY=$secret; then
+  bad "a secret seed as the server key exits non-zero" "exit 0"
+elif grep -q "$secret" "$log.out"; then
+  bad "a refused server key is never echoed" "$(cat "$log.out")"
+else
+  ok "a secret seed as the server key is refused without echoing it"
 fi
 
 # 5. A failed clone stops the build before Flutter runs.
