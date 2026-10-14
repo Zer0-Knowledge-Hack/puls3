@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:puls3_domain/puls3_domain.dart' show OutputType;
+import 'package:puls3_domain/puls3_domain.dart' show ModelPolicy, OutputType;
 
 import '../studio/studio_gateway.dart';
 import '../theme/breakpoints.dart';
@@ -33,6 +33,8 @@ class Playground extends StatefulWidget {
 
 class _PlaygroundState extends State<Playground> {
   final _input = TextEditingController();
+  final _secret = TextEditingController();
+  final _accountId = TextEditingController();
   PlaygroundStatus _status = PlaygroundStatus.idle;
   TestRunResult? _result;
   String? _error;
@@ -40,6 +42,8 @@ class _PlaygroundState extends State<Playground> {
   @override
   void dispose() {
     _input.dispose();
+    _secret.dispose();
+    _accountId.dispose();
     super.dispose();
   }
 
@@ -49,6 +53,20 @@ class _PlaygroundState extends State<Playground> {
       _error = null;
     });
     try {
+      if (!widget.gateway.isDemo) {
+        final provider = widget.draft.manifest.model?.provider;
+        if (provider == null) {
+          throw const StudioUnavailable('The test runner is unavailable.');
+        }
+        await widget.gateway.saveProviderCredential(
+          provider: provider,
+          secret: _secret.text,
+          accountId: provider == ModelPolicy.freeProvider
+              ? _accountId.text.trim()
+              : null,
+          owner: widget.owner,
+        );
+      }
       final result = await widget.gateway.testRun(
         widget.draft.draftId,
         _input.text,
@@ -116,6 +134,12 @@ class _PlaygroundState extends State<Playground> {
       remainingDailyRuns: _result?.remainingDailyRuns,
       errorMessage: _error,
       isDemo: widget.gateway.isDemo,
+      credentialSecret: widget.gateway.isDemo ? null : _secret,
+      credentialAccountId:
+          widget.gateway.isDemo ||
+              widget.draft.manifest.model?.provider != ModelPolicy.freeProvider
+          ? null
+          : _accountId,
       onCopy: _copy,
       onClose: widget.onClose,
       onDeploy: widget.onDeploy,

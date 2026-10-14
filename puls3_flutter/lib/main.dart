@@ -8,10 +8,14 @@ import 'src/app.dart';
 import 'src/data/agent_repository.dart';
 import 'src/data/app_config.dart';
 import 'src/data/server_agent_repository.dart';
+import 'src/deploy/deploy_gateway.dart';
+import 'src/deploy/server_deploy_gateway.dart';
 import 'src/hire/hire_gateway.dart';
 import 'src/hire/server_hire_gateway.dart';
 import 'src/hire/wallet_funds.dart';
 import 'src/hire/wallet_session.dart';
+import 'src/studio/server_studio_gateway.dart';
+import 'src/studio/studio_gateway.dart';
 import 'src/wallet/freighter/create_freighter_bridge.dart';
 import 'src/wallet/freighter/freighter_wallet.dart';
 import 'src/wallet/mock_wallet.dart';
@@ -72,6 +76,53 @@ WalletSession _walletSession(Client client, String configJson) {
   );
 }
 
+/// Which Studio backend the app uses: `demo` (default, labelled, stores
+/// nothing) or `server` for `StudioEndpoint` (#35):
+/// `--dart-define=STUDIO=server`. Drafts need a wallet session (#136).
+const _studioKind = String.fromEnvironment('STUDIO', defaultValue: 'demo');
+
+StudioGateway? _createStudioGateway(
+  Client client,
+  WalletPort wallet,
+  String configJson,
+) => switch (_studioKind) {
+  'demo' => null,
+  'server' => ServerStudioGateway(
+    saveDraft: client.studio.saveDraft,
+    getDraft: client.studio.getDraft,
+    listDrafts: client.studio.listDrafts,
+    testRun: client.studio.testRun,
+    saveProviderCredential: client.studio.saveProviderCredential,
+    wallet: wallet,
+    session: _walletSession(client, configJson),
+  ),
+  _ => throw StateError(
+    'Unknown STUDIO "$_studioKind": use "demo" or "server".',
+  ),
+};
+
+/// The same switch as Studio. `server` signs `register_full` and
+/// `set_agent_wallet` for real; `demo` keeps the labelled stand-in.
+DeployGateway? _createDeployGateway(
+  Client client,
+  WalletPort wallet,
+  String configJson,
+) => switch (_studioKind) {
+  'demo' => null,
+  'server' => ServerDeployGateway(
+    prepareDeploy: client.studio.prepareDeploy,
+    submitRegistration: client.studio.submitRegistration,
+    getDeploySession: client.studio.getDeploySession,
+    prepareWalletAuthorization: client.studio.prepareWalletAuthorization,
+    submitWalletAuthorization: client.studio.submitWalletAuthorization,
+    wallet: wallet,
+    session: _walletSession(client, configJson),
+  ),
+  _ => throw StateError(
+    'Unknown STUDIO "$_studioKind": use "demo" or "server".',
+  ),
+};
+
 /// Starts the demo shell and verifies the generated Serverpod client connection.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,6 +132,7 @@ Future<void> main() async {
     // Stores the wallet session (#136) and sends it on every call.
     ..authSessionManager = FlutterAuthSessionManager();
 
+  final wallet = _createWallet();
   runApp(
     Puls3App(
       // The server catalog (#17). When it is unreachable the bundled demo
@@ -90,8 +142,10 @@ Future<void> main() async {
         byId: (id) => client.agent.get(id),
       ),
       demoRepository: AssetAgentRepository(),
-      wallet: _createWallet(),
+      wallet: wallet,
       hireGateway: _createHireGateway(client, configJson),
+      studioGateway: _createStudioGateway(client, wallet, configJson),
+      deployGateway: _createDeployGateway(client, wallet, configJson),
       healthCheck: client.health.check().then((health) => health.version),
     ),
   );

@@ -1,0 +1,5 @@
+### The model a draft names. Never a credential (ADR-0004).
+class: ManifestModel
+fields:
+  provider: String
+  id: String

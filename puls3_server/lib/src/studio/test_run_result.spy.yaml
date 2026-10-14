@@ -1,0 +1,6 @@
+### The answer of a Studio test run (api.md, TestRunResult).
+class: TestRunResult
+fields:
+  output: String
+  ### Runs left for this builder today, after this one.
+  remainingDailyRuns: int

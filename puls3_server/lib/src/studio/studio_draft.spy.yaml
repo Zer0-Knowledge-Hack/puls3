@@ -1,0 +1,11 @@
+### A saved draft as its owner sees it (api.md, StudioDraft).
+class: StudioDraft
+fields:
+  draftId: int
+  manifest: AgentManifestDraft
+  revision: int
+  ### draft, deploying, failed, or live.
+  deployState: String
+  liveVersion: int?
+  agentId: String?
+  retryFromStep: int?

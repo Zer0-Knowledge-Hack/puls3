@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:stellar_dart/stellar_dart.dart' as stellar;
 
+import '../ledger/envelope_codec.dart';
+import '../ledger/stellar_envelope_codec.dart';
 import 'agent_wallet_custody.dart';
 import 'agent_wallet_store.dart';
 import 'secret_cipher.dart';
@@ -69,3 +71,41 @@ final class StellarAgentWalletCustody implements AgentWalletCustody {
 
 /// ed25519 seed length in bytes.
 const _seedLength = 32;
+
+/// Signs a prepared envelope with a custodied agent key.
+///
+/// The plaintext seed is decrypted inside this adapter and never returned.
+abstract interface class AgentEnvelopeSigner {
+  Future<String> sign(PreparedEnvelope envelope, StellarAddress address);
+}
+
+/// [AgentEnvelopeSigner] over the encrypted rows [custody] stored.
+final class CustodiedEnvelopeSigner implements AgentEnvelopeSigner {
+  CustodiedEnvelopeSigner({
+    required AgentWalletStore wallets,
+    required SecretCipher cipher,
+    required StellarEnvelopeCodec codec,
+  }) : _wallets = wallets,
+       _cipher = cipher,
+       _codec = codec;
+
+  final AgentWalletStore _wallets;
+  final SecretCipher _cipher;
+  final StellarEnvelopeCodec _codec;
+
+  @override
+  Future<String> sign(PreparedEnvelope envelope, StellarAddress address) async {
+    final stored = await _wallets.findByAddress(address);
+    if (stored == null) {
+      throw const AgentWalletCustodyUnavailable(
+        'No custodied key for this agent wallet',
+      );
+    }
+    final seed = await _cipher.decrypt(
+      stored.secret,
+      aad: utf8.encode(address.value),
+    );
+    final key = stellar.StellarPrivateKey.fromBase32(utf8.decode(seed));
+    return _codec.sign(envelope, key);
+  }
+}

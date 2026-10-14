@@ -1,0 +1,5 @@
+### A draft price. [asset] is USDC and [amount] is stroops.
+class: ManifestPrice
+fields:
+  asset: String
+  amount: int

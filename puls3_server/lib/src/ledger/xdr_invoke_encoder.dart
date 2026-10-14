@@ -34,7 +34,23 @@ sealed class ScArg {
     if (value.length != 32) {
       throw ArgumentError.value(value.length, 'value.length', 'must be 32');
     }
-    return _Bytes32(Uint8List.fromList(value));
+    return _Bytes(Uint8List.fromList(value));
+  }
+
+  /// An `SCV_BYTES` argument of any length.
+  factory ScArg.bytes(Uint8List value) => _Bytes(Uint8List.fromList(value));
+
+  /// An `SCV_SYMBOL` argument.
+  const factory ScArg.symbol(String value) = _Symbol;
+
+  /// An `SCV_VEC` argument. An empty list is a present, zero-length vector.
+  const factory ScArg.vec(List<ScArg> value) = _Vec;
+
+  /// An `SCV_MAP` argument. Keys are symbols and are written in
+  /// lexicographic order, which is the order the host accepts.
+  factory ScArg.map(Map<String, ScArg> value) {
+    final keys = value.keys.toList()..sort();
+    return _Map([for (final key in keys) (key, value[key]!)]);
   }
 
   void _write(XdrWriter out);
@@ -104,8 +120,8 @@ final class _I128 extends ScArg {
     ..uint64(value);
 }
 
-final class _Bytes32 extends ScArg {
-  const _Bytes32(this.value) : super._();
+final class _Bytes extends ScArg {
+  const _Bytes(this.value) : super._();
 
   final Uint8List value;
 
@@ -114,6 +130,54 @@ final class _Bytes32 extends ScArg {
     ..uint32(_scvBytes)
     ..uint32(value.length)
     ..opaque(value);
+}
+
+final class _Symbol extends ScArg {
+  const _Symbol(this.value) : super._();
+
+  final String value;
+
+  @override
+  void _write(XdrWriter out) => out
+    ..uint32(_scvSymbol)
+    ..string(value);
+}
+
+final class _Vec extends ScArg {
+  const _Vec(this.value) : super._();
+
+  final List<ScArg> value;
+
+  @override
+  void _write(XdrWriter out) {
+    out
+      ..uint32(_scvVec)
+      ..uint32(1)
+      ..uint32(value.length);
+    for (final item in value) {
+      item._write(out);
+    }
+  }
+}
+
+final class _Map extends ScArg {
+  const _Map(this.entries) : super._();
+
+  final List<(String, ScArg)> entries;
+
+  @override
+  void _write(XdrWriter out) {
+    out
+      ..uint32(_scvMap)
+      ..uint32(1)
+      ..uint32(entries.length);
+    for (final (key, value) in entries) {
+      out
+        ..uint32(_scvSymbol)
+        ..string(key);
+      value._write(out);
+    }
+  }
 }
 
 final class _Void extends ScArg {
@@ -138,6 +202,9 @@ const _scvU64 = 5;
 const _scvI128 = 10;
 const _scvBytes = 13;
 const _scvString = 14;
+const _scvSymbol = 15;
+const _scvVec = 16;
+const _scvMap = 17;
 const _scvAddress = 18;
 
 /// An unsigned `TransactionEnvelope` (base64 XDR) that invokes [function] on
