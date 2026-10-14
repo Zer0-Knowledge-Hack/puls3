@@ -122,13 +122,13 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
   }
 
   @override
-  Future<List<HireRow>> listWithJob({int limit = 100}) async {
+  Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100}) async {
     if (limit < 1) {
       throw ArgumentError.value(limit, 'limit', 'must be at least 1');
     }
     final records = await HireRecord.db.find(
       session,
-      where: (t) => t.jobId.notEquals(null),
+      where: (t) => t.jobId.notEquals(null) & (t.id > afterId),
       orderBy: (t) => t.id,
       limit: limit,
     );

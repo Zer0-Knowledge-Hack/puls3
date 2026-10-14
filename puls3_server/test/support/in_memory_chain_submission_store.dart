@@ -78,6 +78,14 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes) async =>
+      _rows.values.any(
+        (r) =>
+            r.state == SubmissionState.submitted &&
+            purposes.contains(r.purpose),
+      );
+
+  @override
   Future<bool> markConfirmed(int id) async =>
       _transition(id, SubmissionState.confirmed, null);
 
