@@ -57,6 +57,8 @@ Checked 2026-10-10 against the **official rules PDF** (the primary source) and t
 | 8 | AI-tool use disclosed | ✅ | [§5](#5-text-description-for-the-submission-form) |
 | 9 | Submission entered on BuilderBase | ⏳ **pending** (human task) | Screenshot/email to be posted on #4 before the deadline |
 
+> **Wallet warning (expected).** Freighter may show a **Blockaid** warning when connecting to `puls3-4lw.pages.dev` — a **domain-reputation false positive** on the shared Cloudflare Pages domain, raised before any signature. Connecting only shares your public address; every transaction is shown in Freighter before you sign, and the source is public in this repository. Tracked with the host on #31.
+
 ## 3. Judging criteria → evidence
 
 ### Does it work (30%)
@@ -74,11 +76,11 @@ Checked 2026-10-10 against the **official rules PDF** (the primary source) and t
 **Honesty note (important for this criterion).** The full hire runs end-to-end: **catalog → wallet sign-in → hire → create_job → fund → on-chain verification → agent run**. The live server serves the catalog and the wallet/hire endpoints — verified 2026-10-14: `health/check` = `1.0.0+8e6f98a-dirty`; `/walletAuth/createChallenge` → 400 and `/hire/createHire` → 401 (deployed) — and the public app is the `2bb61a4` build in **server** mode. The end-to-end chain evidence is the server escrow relay run below. Two parts are **not** wired to the server yet and must not be presented as real in the video:
 
 - **Studio deploy** uses `FakeDeployGateway` in the app ([`puls3_flutter/lib/src/deploy/fake_deploy_gateway.dart`](../../puls3_flutter/lib/src/deploy/fake_deploy_gateway.dart)); the server deploy endpoints are #18/#35. The UI already labels its result as a demo.
-- **Rating/reputation** is UI-only today (agents show `rating: 0.0`; no feedback endpoint); the Reputation Registry is #14.
+- **Rating/reputation:** the feedback endpoint (`puls3_server/lib/src/feedback`) and the Reputation Registry (#14) are implemented in the repo (#21); the **public UI still shows the empty rating** (`rating: 0.0`), and the **deployed server may not serve the feedback endpoint until the next deploy**.
 
 The agent **runtime** is implemented (`puls3_server/lib/src/runtime/`); whether the runtime and the chain tracker are enabled is configuration (`PULS3_RUNTIME_ENABLED` and the tracker settings), not a code default a judge can assume.
 
-**Which agents can complete a real hire.** Only `agt-006` (Copy Forge) and `agt-007` (Support Relay) have manifests (`puls3_server/lib/src/runtime/demo_manifests.dart`); the other six fail their run as `manifest_unavailable` and the USDC waits in escrow until `expired_at`. Hire one of those two in the demo.
+**Which agents can complete a real hire.** In the repo, all eight demo agents have manifests (#180 merged). On the **deployed server**, only `agt-006` (Copy Forge) and `agt-007` (Support Relay) have them until the next `scloud` deploy; the other six fail their run as `manifest_unavailable` and the USDC waits in escrow until `expired_at`. Hire one of those two in the demo.
 
 ### Use of the Serverpod stack (25%)
 
@@ -105,7 +107,7 @@ The agent **runtime** is implemented (`puls3_server/lib/src/runtime/`); whether 
 | Agent runtime with provider adapters and a timeout contract | `puls3_server/lib/src/runtime/agent_runner.dart`, `runtime/adapters/anthropic_runtime.dart`, `runtime/adapters/workers_ai_runtime.dart` |
 | ERC-8183 escrow and ERC-8004-aligned identity on Soroban | `contracts/contracts/escrow/`, `contracts/contracts/identity-registry/`, [ADR-0005](../adr/0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) |
 | Catalog indexer (bootstrap + event cursor, chain as source of truth) | `puls3_server/lib/src/agent/catalog_indexer.dart` |
-| Five ADRs and a spike library | [`docs/adr/`](../adr/), [`docs/spikes/`](../spikes/) |
+| Six ADRs (0001–0006) plus the #74 drop-in review | [`docs/adr/`](../adr/), [`docs/spikes/`](../spikes/) |
 
 ### Usefulness (20%)
 
@@ -124,8 +126,8 @@ Target: **< 2:00**, English, YouTube or Vimeo, public. The rules say presentatio
 |---|---|---|
 | 1. What puls3 is | 0:00–0:10 | Title card + one line: "Create AI agents, find them, and pay them per task in USDC on Stellar." |
 | 2. Marketplace (live) | 0:10–0:25 | The web app loads the catalog **from the deployed Serverpod server**; open an agent detail (skills, price, on-chain wallet). |
-| 3. Connect wallet | 0:25–0:40 | Connect Freighter (links the wallet). The SEP-10 sign-in prompt comes with the hire, at **Confirm & sign** — not on connect. |
-| 4. Hire and pay | 0:40–1:05 | Hire **Support Relay (0.10 USDC)** or **Copy Forge (0.30 USDC)** — the only agents with manifests. Enter a task, then three wallet prompts: sign in (SEP-10), `create_job`, `fund`; show "Verifying payment…" → `funded`; open the escrow tx on stellar.expert. (With #159, a wallet short on testnet USDC is stopped before the first prompt.) |
+| 3. Connect wallet | 0:25–0:40 | Connect Freighter (links the wallet); if the **Blockaid** warning appears, acknowledge it in one line (see §2). The SEP-10 sign-in prompt comes with the hire, at **Confirm & sign** — not on connect. |
+| 4. Hire and pay | 0:40–1:05 | Hire **Support Relay (0.10 USDC)** or **Copy Forge (0.30 USDC)** — the only agents with manifests on the deployed server. Enter a task, then three wallet prompts: sign in (SEP-10), `create_job`, `fund`; show "Verifying payment…" → `funded`; open the escrow tx on stellar.expert. (With #159, a wallet short on testnet USDC is stopped before the first prompt.) |
 | 5. Agent runs, result | 1:05–1:30 | The server runs the agent after the payment is verified and returns the result; open **View hire** (`/hires/:id`). The app has no accept/`complete` step yet, so show job 3's on-chain `complete` from the evidence section (§3) rather than recording one. |
 | 6. On-chain + stack recap | 1:30–1:45 | The escrow contract and completed job on stellar.expert; the Serverpod health response naming the deployed commit. |
 | 7. Close | 1:45–1:55 | Stack (Flutter + Serverpod 4 + Soroban), repo link, live links. State plainly that Studio deploy and rating are next (#18/#35, #14). |
