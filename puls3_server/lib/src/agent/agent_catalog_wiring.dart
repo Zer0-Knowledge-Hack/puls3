@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
-import '../feedback/reputation_calls.dart';
+import '../feedback/reputation_wiring.dart';
+import '../ledger/contract_reader.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
@@ -27,7 +28,9 @@ http.Client? _sharedHttpClient;
 CatalogReader? _chainCatalog;
 
 /// The reputation read and its 60 s cache, built once per process: a cache
-/// built per request would never be hit. The registry is unwired until #14.
+/// built per request would never be hit. Its registry is the one of the first
+/// request's configuration: `PULS3_STELLAR_REPUTATION_REGISTRY`, or unwired
+/// (every agent without feedback) while that is unset.
 ReputationCache? _reputationCache;
 
 /// How many times the on-chain fallback was built. Tests assert it stays 1.
@@ -48,12 +51,20 @@ void resetChainCatalog() {
   reputationCacheBuilds = 0;
 }
 
-ReputationCache _reputation() {
+ReputationCache _reputation(StellarConfig config) {
   final cached = _reputationCache;
   if (cached != null) return cached;
   reputationCacheBuilds++;
+  final rpc = SorobanRpcClient(
+    httpClient: _sharedHttpClient ??= http.Client(),
+    url: config.rpcUrl,
+    timeout: _rpcTimeout,
+  );
   return _reputationCache = ReputationCache(
-    registry: const UnwiredReputationRegistry(),
+    registry: reputationRegistryFor(
+      config,
+      ContractReader(rpc, source: config.simulationSource),
+    ),
   );
 }
 
@@ -109,6 +120,6 @@ CatalogReader buildAgentCatalogReader(
       ),
       fallback: fallback,
     ),
-    cache: _reputation(),
+    cache: _reputation(config),
   );
 }
