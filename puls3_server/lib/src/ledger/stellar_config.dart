@@ -79,6 +79,9 @@ final class StellarConfig {
     simulationSource: StellarAddress.parse(
       'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
     ),
+    reputationRegistry: StellarAddress.parse(
+      'CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4',
+    ),
   );
 
   final Uri rpcUrl;
@@ -91,10 +94,9 @@ final class StellarConfig {
 
   /// The Reputation Registry (#14), or `null` while none is configured.
   ///
-  /// `contracts/deployments/testnet.json` holds `reputation_registry: null`
-  /// until the registry is deployed, so [testnet] has none and
-  /// `PULS3_STELLAR_REPUTATION_REGISTRY` must set it. Without it the feedback
-  /// and reputation features stay unwired (`UnwiredReputationCalls`).
+  /// [testnet] has the registry recorded in `contracts/deployments/testnet.json`;
+  /// `PULS3_STELLAR_REPUTATION_REGISTRY` overrides it. Without any id the
+  /// feedback and reputation features stay unwired (`UnwiredReputationCalls`).
   final StellarAddress? reputationRegistry;
 
   /// An existing account used only as the source of unsigned simulations.

@@ -30,9 +30,9 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 times out after 8 seconds.
 
 `PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
-(#14). It has no testnet default, because `contracts/deployments/testnet.json`
-keeps `reputation_registry: null` until the registry is deployed. While it is
-unset, `FeedbackEndpoint.prepareFeedback` fails with `HireConfigurationMissing`
+(#14). Its testnet default is the deployed registry
+`CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`, recorded in `contracts/deployments/testnet.json`. While it is
+unset on another network, `FeedbackEndpoint.prepareFeedback` fails with `HireConfigurationMissing`
 and every agent shows the #11 empty-input rating (`4.0`, `0` paid hires). Once
 set, the catalog reads each agent's feedback from the registry (cached for 60
 seconds) and `prepareFeedback` builds the real `give_feedback` call. The value

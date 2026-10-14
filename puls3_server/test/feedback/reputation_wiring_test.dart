@@ -50,7 +50,7 @@ void main() {
     });
 
     test('stays unwired, failing closed, while the registry is unset', () {
-      final calls = reputationCallsFor(StellarConfig.testnet);
+      final calls = reputationCallsFor(_withoutRegistry());
 
       expect(calls, isA<UnwiredReputationCalls>());
       expect(
@@ -73,13 +73,21 @@ void main() {
     });
 
     test('has no feedback to read while the registry is unset', () async {
-      final registry = reputationRegistryFor(
-        StellarConfig.testnet,
-        _reader(StellarConfig.testnet),
-      );
+      final config = _withoutRegistry();
+      final registry = reputationRegistryFor(config, _reader(config));
 
       expect(registry, isA<UnwiredReputationRegistry>());
       expect(await registry.feedbacksOf(AgentId(7)), isEmpty);
     });
   });
 }
+
+/// The testnet config with no Reputation Registry configured.
+StellarConfig _withoutRegistry() => StellarConfig(
+  rpcUrl: StellarConfig.testnet.rpcUrl,
+  networkPassphrase: StellarConfig.testnet.networkPassphrase,
+  usdcSac: StellarConfig.testnet.usdcSac,
+  identityRegistry: StellarConfig.testnet.identityRegistry,
+  escrow: StellarConfig.testnet.escrow,
+  simulationSource: StellarConfig.testnet.simulationSource,
+);

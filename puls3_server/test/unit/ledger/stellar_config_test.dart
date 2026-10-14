@@ -55,16 +55,19 @@ void main() {
       );
     });
 
-    test('the Reputation Registry is unset until it is configured', () {
+    test('the Reputation Registry defaults to the deployed testnet one', () {
+      final deployed = StellarConfig.testnet.reputationRegistry;
+
+      expect(deployed, isNotNull);
       expect(
         StellarConfig.fromEnvironment(const {}).reputationRegistry,
-        isNull,
+        deployed,
       );
       expect(
         StellarConfig.fromEnvironment(const {
           'PULS3_STELLAR_REPUTATION_REGISTRY': '',
         }).reputationRegistry,
-        isNull,
+        deployed,
       );
     });
 
