@@ -31,8 +31,8 @@ const _highestScore = 5;
 /// are left out. Tags are not a filter: they carry no puls3 meaning.
 ///
 /// The registry stores no hire and no comment, so the returned [Feedback] has
-/// the `feedback_index` of the record as its `hireId` (the registry key, not a
-/// puls3 hire) and an empty comment. Only `score` feeds `reputationOf`.
+/// no `hireId` (null: the `feedback_index` is the registry key, not a puls3
+/// hire) and an empty comment. Only `score` feeds `reputationOf`.
 ///
 /// Reading is not gated by completed hires: the registry accepts feedback
 /// from any address, so a score written straight to the contract is counted.
@@ -114,7 +114,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
       return null;
     }
     return Feedback(
-      hireId: HireId(index),
+      hireId: null,
       agentId: agent,
       client: client,
       score: score.toInt(),

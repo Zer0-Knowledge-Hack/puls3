@@ -40,6 +40,8 @@ void main() {
       expect(feedback.single.score, 4);
       expect(feedback.single.client, _alice);
       expect(feedback.single.agentId, AgentId(7));
+      // The registry stores no hire: feedback_index is not a puls3 hire id.
+      expect(feedback.single.hireId, isNull);
       // A page with the client, the empty page that ends the list, the last
       // index and the one feedback.
       expect(chain.requests, hasLength(4));
