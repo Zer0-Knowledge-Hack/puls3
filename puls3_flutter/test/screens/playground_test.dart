@@ -189,8 +189,7 @@ void main() {
 }
 
 final class _LiveGateway extends FakeStudioGateway {
-  _LiveGateway({required Iterable<(String owner, StudioDraft draft)> seed})
-    : super(delay: Duration.zero, seed: seed);
+  _LiveGateway({required super.seed}) : super(delay: Duration.zero);
 
   String? provider;
   String? secret;
