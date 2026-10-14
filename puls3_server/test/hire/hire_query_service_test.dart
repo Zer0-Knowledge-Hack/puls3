@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
+import 'package:puls3_server/src/hire/hire_lifecycle_store.dart' show HireRow;
 import 'package:puls3_server/src/hire/hire_query_service.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
@@ -138,6 +139,84 @@ void main() {
 
     expect(detail.escrowSubmission?.transaction, fund.transactionHash);
     expect(detail.escrowSubmission?.purpose, 'fund');
+  });
+
+  group('feedback of a completed hire', () {
+    Future<HireRow> completed() => rig.hire(status: HireStatus.completed);
+
+    test('has no feedback before one is given', () async {
+      final hire = await completed();
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.feedbackSubmission, isNull);
+      expect(detail.hire.feedbackReference, isNull);
+    });
+
+    test('a confirmed give_feedback is the reference after a reload', () async {
+      final hire = await completed();
+      final rated = await rig.record(hire.id, SubmissionPurpose.giveFeedback);
+      await rig.submissions.markConfirmed(rated.id);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.hire.feedbackReference, rated.transactionHash);
+      expect(detail.hire.status, 'completed');
+      expect(detail.feedbackSubmission?.transaction, rated.transactionHash);
+      expect(detail.feedbackSubmission?.purpose, 'giveFeedback');
+      expect(detail.feedbackSubmission?.state, 'confirmed');
+    });
+
+    test('a give_feedback still pending is already the reference', () async {
+      final hire = await completed();
+      final rated = await rig.record(hire.id, SubmissionPurpose.giveFeedback);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.hire.feedbackReference, rated.transactionHash);
+      expect(detail.feedbackSubmission?.state, 'submitted');
+    });
+
+    test('a failed give_feedback is shown but is no reference', () async {
+      final hire = await completed();
+      final failed = await rig.record(
+        hire.id,
+        SubmissionPurpose.giveFeedback,
+        failedWith: SubmissionOutcomeCode.transactionFailed,
+      );
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.hire.feedbackReference, isNull);
+      expect(detail.feedbackSubmission?.transaction, failed.transactionHash);
+      expect(detail.feedbackSubmission?.state, 'failed');
+    });
+
+    test('a retry after a failure replaces the failed one', () async {
+      final hire = await completed();
+      await rig.record(
+        hire.id,
+        SubmissionPurpose.giveFeedback,
+        failedWith: SubmissionOutcomeCode.transactionFailed,
+      );
+      final retry = await rig.record(hire.id, SubmissionPurpose.giveFeedback);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.hire.feedbackReference, retry.transactionHash);
+      expect(detail.feedbackSubmission?.transaction, retry.transactionHash);
+    });
+
+    test('the escrow submission stays the latest escrow call', () async {
+      final hire = await completed();
+      final fund = await rig.record(hire.id, SubmissionPurpose.fund);
+      await rig.record(hire.id, SubmissionPurpose.giveFeedback);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.escrowSubmission?.transaction, fund.transactionHash);
+      expect(detail.escrowSubmission?.purpose, 'fund');
+    });
   });
 
   test(

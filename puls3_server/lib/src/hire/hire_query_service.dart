@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../chain/chain_submission_store.dart';
+import '../chain/submission_values.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
 import '../runtime/hire_run_store.dart';
@@ -38,9 +39,12 @@ final class HireQueryService {
     final agent = await _agentOf(hire.agentId);
     final run = await _runs.find(hireId);
     final submissions = await _submissions.listByHire(hireId);
-    final latest = submissions.isEmpty
-        ? null
-        : submissions.reduce((a, b) => b.id > a.id ? b : a);
+    // The rating is its own record: a give_feedback is never the hire's
+    // escrow submission (api.md, HireDetail).
+    final escrow = _latest(
+      submissions.where((s) => s.purpose != SubmissionPurpose.giveFeedback),
+    );
+    final feedback = _feedbackOf(submissions);
     // Run progress is only shown while the hire is funded (api.md, "Hire
     // escrow states"); later states come from the escrow.
     final showsRun = hire.status == HireStatus.funded;
@@ -49,6 +53,10 @@ final class HireQueryService {
       hire: hire.toProtocol().copyWith(
         runtimeStatus: showsRun ? run?.state.runtimeStatus.name : null,
         failureReason: showsRun ? run?.failureReason : null,
+        // Derived like `FeedbackService.submit` does: no column stores it.
+        feedbackReference: feedback != null && !_failed(feedback)
+            ? feedback.transactionHash
+            : null,
       ),
       agent: agent,
       input: hire.input ?? '',
@@ -60,8 +68,27 @@ final class HireQueryService {
               hire.expiredAt * 1000,
               isUtc: true,
             ),
-      escrowSubmission: latest?.toProtocol(),
+      escrowSubmission: escrow?.toProtocol(),
+      feedbackSubmission: feedback?.toProtocol(),
     );
+  }
+
+  static StoredSubmission? _latest(Iterable<StoredSubmission> submissions) =>
+      submissions.isEmpty
+      ? null
+      : submissions.reduce((a, b) => b.id > a.id ? b : a);
+
+  static bool _failed(StoredSubmission submission) =>
+      submission.state == SubmissionState.failed;
+
+  /// The hire's rating: its `giveFeedback` that is not `failed` (the one that
+  /// makes the hire rated), else the latest failed attempt so the client can
+  /// show why it did not go through.
+  static StoredSubmission? _feedbackOf(List<StoredSubmission> submissions) {
+    final given = submissions.where(
+      (s) => s.purpose == SubmissionPurpose.giveFeedback,
+    );
+    return _latest(given.where((s) => !_failed(s))) ?? _latest(given);
   }
 
   Future<AgentSummary> _agentOf(int registryId) async {
