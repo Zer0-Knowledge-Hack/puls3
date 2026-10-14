@@ -89,11 +89,21 @@ void main() {
         ),
       );
 
+      final rated = await effects.onFeedbackGiven(
+        _submission(SubmissionPurpose.giveFeedback),
+      );
+
       expect(created, isA<EffectOk>());
       expect(funded, isA<EffectOk>());
+      expect(rated, isA<EffectOk>());
       expect(logged, [
         allOf(startsWith('info'), contains('job 3'), contains('submission 1')),
         allOf(startsWith('info'), contains('job 3'), contains('submission 1')),
+        allOf(
+          startsWith('info'),
+          contains('feedback'),
+          contains('submission 1'),
+        ),
       ]);
     });
   });

@@ -12,7 +12,23 @@
       "symbol": "P3AGENT"
     }
   },
-  "reputation_registry": null,
+  "reputation_registry": {
+    "contract_id": "CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4",
+    "wasm_hash_sha256": "d6db222a028d6b6d83ab81cd38814e3c191365ea3cf2012e3706e39273ad0a13",
+    "deploy_tx": "64a7e5815787b975a837af832b71dae527149643ce0aae6b205dbc54c50cad9b",
+    "deployed_at_utc": "2026-10-14T10:41:36Z",
+    "constructor": {
+      "owner": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY",
+      "identity_registry": "CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ"
+    },
+    "test_feedback": {
+      "agent_id": 7,
+      "client": "GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H",
+      "value": 5,
+      "value_decimals": 0,
+      "tx": "d95d2fed0f9a790b79040dc4183249bdc27084d90cfeea09caf4cc57d1591294"
+    }
+  },
   "escrow": {
     "contract_id": "CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2",
     "wasm_hash_sha256": "15f98ea5e667da8af4a2bda3cc7e55232e7aa7ca03032d0e1572043a6c76e12e",

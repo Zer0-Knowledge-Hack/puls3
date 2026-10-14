@@ -705,4 +705,31 @@ void main() {
       );
     });
   });
+
+  test('sign attaches one signature that verifies and keeps the hash', () {
+    final key = stellar.StellarPrivateKey.fromBytes(Uint8List(32)..[0] = 7);
+    final source = StellarAddress.parse(key.toPublicKey().toAddress().address);
+    final prepared = _codec.build(
+      EnvelopeSpec(
+        source: source,
+        accountSequence: 4,
+        contract: _escrow,
+        function: 'release',
+        args: [ScArg.u64(3)],
+        inclusionFee: _inclusionFee,
+        validUntil: _validUntil,
+      ),
+      SimulationData(
+        transactionData: _createSimulation().transactionData,
+        minResourceFee: 100,
+      ),
+    );
+
+    final signed = _codec.parse(_codec.sign(prepared, key));
+
+    expect(signed.signatures, hasLength(1));
+    expect(signed.hash, prepared.hash);
+    expect(signed.body, prepared.body);
+    expect(_codec.verify(signed, source, prepared.hash), SignatureCheck.valid);
+  });
 }

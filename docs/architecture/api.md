@@ -82,7 +82,6 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 
 | Field | Earlier shape | Target issue |
 |---|---|---|
-| `rating`, `paidHireCount` | `AgentSummary`, `AgentDetail` | #21 (reputation in catalog) |
 | `active` | `AgentSummary`, `AgentDetail` | #18 (register flow activates the agent) |
 | `owner` | [`Agent`](models/agent.spy.yaml) | #17 (catalog with on-chain indexing) |
 | Structured skills (`name`, `description`, `tags`) | [`Skill`](models/skill.spy.yaml) | #35 (manifest from Agent Studio) |
@@ -242,7 +241,7 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
 | Relay and chain | `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `TransactionFailed`, `ChainUnavailable` |
 | Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed` |
-| Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback` |
+| Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback`, `FeedbackFromAgentOwner` |
 
 `AgentEndpoint` does not use these error codes yet: it raises the typed `AgentCatalogUnavailable` and returns `null` for an unknown id, so `CatalogUnavailable` and `ChainDataUnavailable` are currently unused (see [Agent catalog](#agent-catalog)).
 
@@ -263,9 +262,10 @@ The escrow contract enforces an allow-listed token and the amount (`fund`'s `exp
 ADR-0005 D5 removes the server's `authorize_feedback` step: the Reputation Registry is a Stellar 8004 drop-in (#14), and the paid-hire rule is proven by a completed escrow job, not by the registry.
 
 - **Eligibility.** The client of a `completed` hire, with no `feedbackReference` yet. `getFeedbackEligibility` reads this from the hire without side effects.
-- **Outcome.** When `give_feedback` is confirmed, the tracker stores its reference in `Hire.feedbackReference`. The hire status does not change.
-- **Reputation reads.** Readers count feedback only from clients with completed jobs (D5). Client-side reputation, from rejects made from `submitted` (D8), is derived from job history and is not exposed by this contract.
-- The `give_feedback` arguments follow the #14 drop-in interface, not yet fixed.
+- **Outcome.** No column stores the reference. The hire's `feedbackReference` is the transaction of its `give_feedback` submission that is not `failed`, so it is set when the wallet-signed call is relayed and the hire reports it after a reload (`getHire`). The tracker confirms the submission once the transaction succeeds on chain (`feedbackSubmission.state` becomes `confirmed`); a failed transaction leaves `feedbackSubmission.state: failed` and no reference, and the hire can be rated again. The hire status does not change.
+- **Reputation reads.** The catalog reads the registry's feedback per agent and applies the #11 function. It counts every non-revoked feedback of a puls3 score on the registry; it does not yet filter by clients with completed jobs (D5), because the registry accepts feedback from any address. Client-side reputation, from rejects made from `submitted` (D8), is derived from job history and is not exposed by this contract.
+- **`give_feedback` arguments.** The call is the Reputation Registry of #14: `give_feedback(caller, agent_id, value, value_decimals, tag1, tag2, endpoint, feedback_uri, feedback_hash)`. `caller` is the client, `agent_id` the hire's agent, `value` the score (1 to 5) with `value_decimals` 0; `tag1`, `tag2`, `endpoint` and `feedback_uri` are empty and `feedback_hash` is 32 zero bytes. The registry has no field for the hire or the comment, so the comment is validated (at most 500 characters) but not stored on chain; "one rating per hire" is enforced by the server.
+- **Configuration.** The registry contract id is `PULS3_STELLAR_REPUTATION_REGISTRY` (`NetworkConfig.reputationRegistryContractId`); `contracts/deployments/testnet.json` holds it under `reputation_registry` once deployed. While it is unset, `prepareFeedback` fails with `HireConfigurationMissing` and the catalog shows the #11 empty-input values (`4.0`, `0`).
 
 ### Response shapes not copied from the domain
 
@@ -288,9 +288,9 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `CreateHireResult` | `hire: Hire`, `preparedCreateJob: PreparedTransaction?` |
 | `HireSummary` | `hire: Hire`, `agentName` |
 | `HireDetail` | `hire: Hire`, `agent: AgentSummary` (the catalog entry whose `registryId` is `hire.agentId`), `input`, `result?`, `payment?`, `jobId?`, `expiresAt?` (the job's `expired_at`), `approvalDeadline?` (the job's `approval_deadline`, set once the job is submitted), `rejectReason?`, `escrowSubmission: ChainSubmission?`, `feedbackSubmission: ChainSubmission?`, `paymentExplorerUrl?` |
-| `FeedbackEligibility` | `hireId`, `eligible: bool` |
+| `FeedbackEligibility` | `hireId`, `eligible: bool`, `reason: String?` (the code of the broken rule: `HireNotCompleted`, `HireAlreadyRated` or `FeedbackFromAgentOwner`) |
 
-**`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline`, `rejectReason` and `feedbackSubmission` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`.
+**`getHire` as served today (#20).** `hire.runtimeStatus` and `hire.failureReason` are set only while `hire.status` is `funded`; later states come from the escrow. `result` is the agent run's output, returned as soon as the run succeeds, so it can be set while the hire is still `funded`, before `submit` (#97) lands. `payment`, `paymentExplorerUrl`, `approvalDeadline` and `rejectReason` are not set yet; the `fund` transaction is `hire.paymentTransaction`, and its link is `escrowSubmission.explorerUrl` while that submission's purpose is `fund`. `escrowSubmission` is the latest escrow call and never a `give_feedback`; the rating is `feedbackSubmission`, with `hire.feedbackReference` set from it unless it failed (see [Feedback](#feedback)). The server does not persist the escrow states after `funded` yet, so a hire cannot reach `completed` and rating cannot be reached end to end until the `submit`, `complete` and `reject` effects land.
 
 `PreparedTransaction.purpose` is one of `registerFull`, `setAgentWallet`, `createJob`, `fund`, `complete`, `reject`, `giveFeedback`. `ChainSubmission.purpose` is one of those or `submit`, `release`, `claimRefund` (server-signed, never prepared for a wallet, so `preparationId` is null).
 
@@ -393,7 +393,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | F7-3 | Client validation mirrors the domain; `FeedbackEndpoint.prepareFeedback(hireId, score, comment)` validates authoritatively (`InvalidFeedback`) and returns the unsigned `give_feedback` envelope with the client as source. |
 | F7-4 | The wallet signs the prepared envelope; `FeedbackEndpoint.submitFeedback(hireId, preparationId, signedTransactionXdr)` verifies, persists, and submits it. `WalletRejected` is client-only: stay on S10. |
 | F7-5 | Poll `HireEndpoint.getHire` until `feedbackSubmission` is final. `HireAlreadyRated` shows "You already rated this hire" and returns to S06. |
-| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `AgentEndpoint.get(id)`. Planned: the rating is not served yet (#21). |
+| F7-6 | `feedbackSubmission.state: confirmed` and `hire.feedbackReference` is set; refresh with `AgentEndpoint.get(id)`, whose `rating` and `paidHireCount` come from the #11 reputation function (`rating` is 4.0 and `paidHireCount` 0 for an agent without feedback). While `PULS3_STELLAR_REPUTATION_REGISTRY` is unset, every agent shows those empty-input values. |
 
 ## Ownership and non-goals
 
@@ -456,4 +456,5 @@ Both decisions were made by the product owner on 2026-09-30. They resolve the tw
 | RPC providers other than SDF Testnet returning contract events and state | #30 | Funding verification reads the job and its event |
 | Server-side submission with `stellar_dart` | #18, #19 | Relay implementation path; spike passed (stellar_dart 2.3.0, `puls3_server/test/spike`); the pure-Dart fallback is `package:crypto` + ed25519 with hand-written XDR behind the same adapter. |
 | A Freighter-signed SEP-10 challenge recorded as a vector | #136 | The server verifies the signed transaction (`signedChallengeXdr`), not `signMessage`. A manual Freighter check is still required. |
-| `give_feedback` arguments in the Stellar 8004 drop-in | #14 | `prepareFeedback` builds that call |
+| Reputation Registry deployed on testnet (done: `CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`), its id in `contracts/deployments/testnet.json`; `PULS3_STELLAR_REPUTATION_REGISTRY` only to override it | #14, #15 | Without it `prepareFeedback` fails closed and the catalog shows the empty-input reputation |
+| Server persistence of `submitted`, `completed`, `rejected`, `expired` (the `submit`, `complete` and `reject` effects) | #97 | A hire cannot be rated until it is `completed` |

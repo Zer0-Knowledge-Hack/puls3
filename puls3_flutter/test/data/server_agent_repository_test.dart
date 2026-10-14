@@ -10,6 +10,7 @@ AgentSummary summary({
   String? wallet = 'GABC',
   String? model = 'gpt-x',
   List<String> skills = const ['on-chain-analytics', 'monitoring'],
+  double? rating,
 }) => AgentSummary(
   id: id,
   registryId: 1,
@@ -19,6 +20,7 @@ AgentSummary summary({
   priceUsdcStroops: 5000000,
   wallet: wallet,
   model: model,
+  rating: rating,
 );
 
 void main() {
@@ -58,7 +60,19 @@ void main() {
       expect(agent.skills, ['On-chain analytics', 'Monitoring']);
       expect(agent.model, 'gpt-x');
       expect(agent.stellarAddress, 'GABC');
-      expect(agent.rating, 0.0);
+      // The summary carries no explicit rating: the server's empty-input
+      // value (4.0, #11) comes through, not an invented 0.0.
+      expect(agent.rating, 4.0);
+    });
+
+    test('maps the rating the server computed', () async {
+      final repository = ServerAgentRepository(
+        () async => [summary(rating: 4.57)],
+      );
+
+      final agent = (await repository.fetchAgents()).single;
+
+      expect(agent.rating, 4.57);
     });
 
     test('returned lists are unmodifiable', () async {

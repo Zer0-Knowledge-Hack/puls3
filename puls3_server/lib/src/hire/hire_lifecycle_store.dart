@@ -127,4 +127,14 @@ abstract interface class HireLifecycleStore {
   ///
   /// Throws [StateError] when the hire does not exist.
   Future<JobBinding> bindJob(int hireId, int jobId, {required int expiredAt});
+
+  /// Hires that already have an escrow job and an id above [afterId],
+  /// oldest first (by id), at most [limit]. A hire without a job is not a
+  /// candidate for a server-signed `release` or `claim_refund`.
+  ///
+  /// The deadline pass pages through every hire with [afterId], so hires
+  /// past the first [limit] are swept too.
+  ///
+  /// Throws [ArgumentError] when [limit] is below 1.
+  Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100});
 }

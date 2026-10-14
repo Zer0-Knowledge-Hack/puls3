@@ -140,6 +140,11 @@ abstract interface class ChainSubmissionStore {
   /// Throws [ArgumentError] when [limit] is below 1.
   Future<List<StoredSubmission>> listSubmitted({int limit = 100});
 
+  /// Whether a record of one of [purposes] is still `submitted`, for any
+  /// hire. The deadline pass uses it to keep one relay transaction in
+  /// flight, so two envelopes never share the relay account's sequence.
+  Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes);
+
   /// Sets `confirmed` if the record is still `submitted`. Returns whether
   /// it changed.
   Future<bool> markConfirmed(int id);

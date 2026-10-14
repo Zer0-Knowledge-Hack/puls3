@@ -67,6 +67,19 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
     return JobBinding.bound;
   }
 
+  @override
+  Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100}) async {
+    if (limit < 1) {
+      throw ArgumentError.value(limit, 'limit', 'must be at least 1');
+    }
+    final bound = [
+      for (final row in _rows.values)
+        if (row.jobId != null && row.id > afterId) _view(row)!,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+    if (bound.length <= limit) return bound;
+    return bound.sublist(0, limit);
+  }
+
   HireRow? _view(HireRow? row) {
     if (row == null || !statusOverride.containsKey(row.id)) return row;
     return HireRow(

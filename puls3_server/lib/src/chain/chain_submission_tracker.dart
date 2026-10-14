@@ -12,15 +12,13 @@ const defaultResendAfter = Duration(seconds: 30);
 /// How many `submitted` records one pass handles at most.
 const defaultTrackerBatchLimit = 100;
 
-/// Purposes whose final outcomes use codes this tracker does not set yet:
-/// `setAgentWallet` expires as `AuthorizationExpired`, and server-signed
-/// calls fail as `EscrowCallFailed` after bounded retries (api.md). They are
-/// left `submitted` until their rules are implemented.
+/// Purposes whose final outcomes use codes this tracker does not set yet.
+/// `setAgentWallet` expires as `AuthorizationExpired`, and `submit` fails as
+/// `EscrowCallFailed` after bounded retries (api.md). They stay `submitted`.
+/// `release` and `claimRefund` are confirmed when the transaction succeeds.
 const _untrackedPurposes = {
   SubmissionPurpose.setAgentWallet,
   SubmissionPurpose.submit,
-  SubmissionPurpose.release,
-  SubmissionPurpose.claimRefund,
 };
 
 /// What one [ChainSubmissionTracker.pass] did, for logging.
@@ -71,8 +69,8 @@ final class TrackerPassSummary {
 /// - `FAILED`: fails `TransactionFailed`.
 /// - `SUCCESS`: `createJob` and `fund` need their escrow event (else
 ///   `JobEvidenceUnavailable`) and the [EscrowEffects] result decides
-///   `confirmed` or the failure code. Other purposes stay `submitted` until
-///   their effects exist.
+///   `confirmed` or the failure code; `giveFeedback` needs no event. Other
+///   purposes stay `submitted` until their effects exist.
 ///
 /// The chain time is the lookup's latest ledger close time, because the
 /// envelope time bounds are checked against it. Only when the node does not
@@ -259,6 +257,11 @@ final class ChainSubmissionTracker {
         result = event == null
             ? null
             : await _effects.onFunded(submission, event);
+      case SubmissionPurpose.giveFeedback:
+        result = await _effects.onFeedbackGiven(submission);
+      case SubmissionPurpose.release || SubmissionPurpose.claimRefund:
+        if (await store.markConfirmed(submission.id)) summary.confirmed++;
+        return true;
       default:
         _untracked(submission, summary);
         return false;

@@ -17,6 +17,8 @@ import 'package:puls3_client/src/protocol/agent/agent_summary.dart'
 import 'package:puls3_client/src/protocol/auth/wallet_challenge.dart'
     as _ig3t6cu4;
 import 'package:puls3_client/src/protocol/create_hire_result.dart' as _iyigzt6l;
+import 'package:puls3_client/src/protocol/feedback/feedback_eligibility.dart'
+    as _isro3926;
 import 'package:puls3_client/src/protocol/greetings/greeting.dart' as _igee0kk1;
 import 'package:puls3_client/src/protocol/health/backend_health.dart'
     as _iur07860;
@@ -138,6 +140,66 @@ class EndpointWalletAuth extends _isc.EndpointRef {
       'signedChallengeXdr': signedChallengeXdr,
     },
     authenticated: false,
+  );
+}
+
+/// Lets the consumer of a completed hire rate it (api.md, `FeedbackEndpoint`).
+///
+/// It shares the session and services seams of [HireEndpoint]: every method
+/// first resolves the caller through the session wallet and only then builds
+/// the services, so a caller without a session reaches no store and no chain.
+/// The call is relayed, never signed, by the server; the registry call comes
+/// from `ReputationCalls` (`PULS3_STELLAR_REPUTATION_REGISTRY`).
+/// {@category Endpoint}
+class EndpointFeedback extends _isc.EndpointRef {
+  EndpointFeedback(_isc.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'feedback';
+
+  /// Whether the caller may rate hire [hireId] and, when not, why. [client]
+  /// must be the session wallet.
+  _ida.Future<_isro3926.FeedbackEligibility> getFeedbackEligibility(
+    int hireId,
+    String client,
+  ) => caller.callServerEndpoint<_isro3926.FeedbackEligibility>(
+    'feedback',
+    'getFeedbackEligibility',
+    {
+      'hireId': hireId,
+      'client': client,
+    },
+  );
+
+  /// The unsigned `give_feedback` of hire [hireId], with [score] and
+  /// [comment], for the session wallet to sign.
+  _ida.Future<_iy6q6dct.PreparedTransaction> prepareFeedback(
+    int hireId,
+    int score,
+    String comment,
+  ) => caller.callServerEndpoint<_iy6q6dct.PreparedTransaction>(
+    'feedback',
+    'prepareFeedback',
+    {
+      'hireId': hireId,
+      'score': score,
+      'comment': comment,
+    },
+  );
+
+  /// Verifies the wallet-signed envelope of [preparationId] and relays it.
+  _ida.Future<_iytku71p.HireDetail> submitFeedback(
+    int hireId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) => caller.callServerEndpoint<_iytku71p.HireDetail>(
+    'feedback',
+    'submitFeedback',
+    {
+      'hireId': hireId,
+      'preparationId': preparationId,
+      'signedTransactionXdr': signedTransactionXdr,
+    },
   );
 }
 
@@ -322,6 +384,7 @@ class Client extends _isc.ServerpodClientShared {
     agent = EndpointAgent(this);
     jwtRefresh = EndpointJwtRefresh(this);
     walletAuth = EndpointWalletAuth(this);
+    feedback = EndpointFeedback(this);
     greeting = EndpointGreeting(this);
     health = EndpointHealth(this);
     hire = EndpointHire(this);
@@ -333,6 +396,8 @@ class Client extends _isc.ServerpodClientShared {
   late final EndpointJwtRefresh jwtRefresh;
 
   late final EndpointWalletAuth walletAuth;
+
+  late final EndpointFeedback feedback;
 
   late final EndpointGreeting greeting;
 
@@ -347,6 +412,7 @@ class Client extends _isc.ServerpodClientShared {
     'agent': agent,
     'jwtRefresh': jwtRefresh,
     'walletAuth': walletAuth,
+    'feedback': feedback,
     'greeting': greeting,
     'health': health,
     'hire': hire,

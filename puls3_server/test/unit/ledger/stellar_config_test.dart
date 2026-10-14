@@ -39,6 +39,8 @@ void main() {
         'PULS3_STELLAR_IDENTITY_REGISTRY': StellarConfig.testnet.usdcSac.value,
         'PULS3_STELLAR_ESCROW': StellarConfig.testnet.identityRegistry.value,
         'PULS3_STELLAR_SIMULATION_SOURCE': _bob,
+        'PULS3_STELLAR_REPUTATION_REGISTRY':
+            StellarConfig.testnet.identityRegistry.value,
       });
 
       expect(config.rpcUrl, Uri.parse('https://rpc.example.test'));
@@ -47,6 +49,43 @@ void main() {
       expect(config.identityRegistry, StellarConfig.testnet.usdcSac);
       expect(config.escrow, StellarConfig.testnet.identityRegistry);
       expect(config.simulationSource, StellarAddress.parse(_bob));
+      expect(
+        config.reputationRegistry,
+        StellarConfig.testnet.identityRegistry,
+      );
+    });
+
+    test('the Reputation Registry defaults to the deployed testnet one', () {
+      final deployed = StellarConfig.testnet.reputationRegistry;
+
+      expect(deployed, isNotNull);
+      expect(
+        StellarConfig.fromEnvironment(const {}).reputationRegistry,
+        deployed,
+      );
+      expect(
+        StellarConfig.fromEnvironment(const {
+          'PULS3_STELLAR_REPUTATION_REGISTRY': '',
+        }).reputationRegistry,
+        deployed,
+      );
+    });
+
+    test('an invalid Reputation Registry address throws', () {
+      expect(
+        () => StellarConfig.fromEnvironment(const {
+          'PULS3_STELLAR_REPUTATION_REGISTRY': 'not-an-address',
+        }),
+        throwsA(isA<InvalidStellarAddress>()),
+      );
+    });
+
+    test('the Reputation Registry takes part in equality', () {
+      final configured = StellarConfig.fromEnvironment({
+        'PULS3_STELLAR_REPUTATION_REGISTRY': StellarConfig.testnet.escrow.value,
+      });
+
+      expect(configured, isNot(StellarConfig.testnet));
     });
 
     test('an invalid address throws', () {
@@ -100,6 +139,24 @@ void main() {
         StellarConfig.testnet.simulationSource.value,
         (escrow['constructor']! as Map<String, Object?>)['admin'],
       );
+    });
+
+    test('the Reputation Registry id follows the deployment record', () {
+      final deployment =
+          jsonDecode(
+                File(
+                  '../contracts/deployments/testnet.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, Object?>;
+      // The slot is `null` until #14 is deployed; then it holds
+      // `{"contract_id": ...}` like the other registries.
+      final slot = deployment['reputation_registry'];
+      final expected = slot == null
+          ? null
+          : (slot as Map<String, Object?>)['contract_id'];
+
+      expect(StellarConfig.testnet.reputationRegistry?.value, expected);
     });
   });
 }

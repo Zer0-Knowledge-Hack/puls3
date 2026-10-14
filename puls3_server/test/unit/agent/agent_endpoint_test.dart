@@ -100,7 +100,7 @@ void main() {
     expect(agents.single.id, 'agt-001');
   });
 
-  test('AgentSummary exposes exactly the catalog fields and no rating', () {
+  test('AgentSummary exposes the catalog fields and the reputation fields', () {
     final json = _agent().toJson();
 
     expect(
@@ -114,11 +114,16 @@ void main() {
         'priceUsdcStroops',
         'wallet',
         'model',
+        'rating',
+        'paidHireCount',
       },
     );
-    expect(
-      json.keys.where((k) => k.contains(RegExp('rating|reputation'))),
-      isEmpty,
-    );
+  });
+
+  test('a summary built without reputation has the empty-input values', () {
+    final json = _agent().toJson();
+
+    expect(json['rating'], 4.0);
+    expect(json['paidHireCount'], 0);
   });
 }

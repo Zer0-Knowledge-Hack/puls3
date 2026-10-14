@@ -18,6 +18,7 @@ import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
 import '../agent/agent_endpoint.dart' as _i6aufbii;
 import '../auth/jwt_refresh_endpoint.dart' as _inwq3ztq;
 import '../auth/wallet_auth_endpoint.dart' as _i3i6b0lz;
+import '../feedback/feedback_endpoint.dart' as _i3n4p88h;
 import '../greetings/greeting_endpoint.dart' as _il624ik7;
 import '../health/health_endpoint.dart' as _id9paj9q;
 import '../hire/hire_endpoint.dart' as _icdhibuq;
@@ -42,6 +43,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'walletAuth',
+          null,
+        ),
+      'feedback': _i3n4p88h.FeedbackEndpoint()
+        ..initialize(
+          server,
+          'feedback',
           null,
         ),
       'greeting': _il624ik7.GreetingEndpoint()
@@ -178,6 +185,99 @@ class Endpoints extends _is.EndpointDispatch {
                         params['wallet'],
                         params['signedChallengeXdr'],
                       ),
+        ),
+      },
+    );
+    connectors['feedback'] = _is.EndpointConnector(
+      name: 'feedback',
+      endpoint: endpoints['feedback']!,
+      methodConnectors: {
+        'getFeedbackEligibility': _is.MethodConnector(
+          name: 'getFeedbackEligibility',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'client': _is.ParameterDescription(
+              name: 'client',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['feedback'] as _i3n4p88h.FeedbackEndpoint)
+                  .getFeedbackEligibility(
+                    session,
+                    params['hireId'],
+                    params['client'],
+                  ),
+        ),
+        'prepareFeedback': _is.MethodConnector(
+          name: 'prepareFeedback',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'score': _is.ParameterDescription(
+              name: 'score',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'comment': _is.ParameterDescription(
+              name: 'comment',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['feedback'] as _i3n4p88h.FeedbackEndpoint)
+                  .prepareFeedback(
+                    session,
+                    params['hireId'],
+                    params['score'],
+                    params['comment'],
+                  ),
+        ),
+        'submitFeedback': _is.MethodConnector(
+          name: 'submitFeedback',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'preparationId': _is.ParameterDescription(
+              name: 'preparationId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'signedTransactionXdr': _is.ParameterDescription(
+              name: 'signedTransactionXdr',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['feedback'] as _i3n4p88h.FeedbackEndpoint)
+                  .submitFeedback(
+                    session,
+                    params['hireId'],
+                    params['preparationId'],
+                    params['signedTransactionXdr'],
+                  ),
         ),
       },
     );

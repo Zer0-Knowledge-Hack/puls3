@@ -29,6 +29,15 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
+`PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
+(#14). Its testnet default is the deployed registry
+`CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`, recorded in `contracts/deployments/testnet.json`. While it is
+unset on another network, `FeedbackEndpoint.prepareFeedback` fails with `HireConfigurationMissing`
+and every agent shows the #11 empty-input rating (`4.0`, `0` paid hires). Once
+set, the catalog reads each agent's feedback from the registry (cached for 60
+seconds) and `prepareFeedback` builds the real `give_feedback` call. The value
+is public, like the other contract ids.
+
 With no indexed rows and a chain that cannot be read, the on-chain fallback
 throws the serializable `AgentCatalogUnavailable` exception; an outage is never
 an empty list, and an unknown id is never reported as an outage.
@@ -575,7 +584,7 @@ How each row of `docs/infra/secrets.md` (#30) maps to Serverpod Cloud:
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper` | Platform-managed. No action |
 | `serverSideSessionKeyHashPepper` | Not used: the server issues JWTs only |
 | `mySharedPassword` | Unused template entry. Do not set |
-| `walletAuthSigningKey`, `workersAiApiToken`, `anthropicApiKey` (optional), and the planned server key for server-signed submissions | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
+| `walletAuthSigningKey`, `escrowRelaySigningKey` (optional `S…` that signs permissionless `release` and `claim_refund`; without it the tracker still runs and those calls stay off), `workersAiApiToken`, `anthropicApiKey` (optional) | `scloud password set <name> --from-file <file>`. The server reads it with `getPassword('<name>')` (injected as `SERVERPOD_PASSWORD_<name>`) |
 | Stellar CLI keys (deployer, escrow admin, agent wallet, test client, test USDC issuer) | Never. They stay in the Stellar CLI config of the person who runs the scripts |
 
 Use `scloud variable set --secret <NAME> --from-file <file>` only for a secret
