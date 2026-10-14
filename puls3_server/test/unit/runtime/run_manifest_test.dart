@@ -15,6 +15,19 @@ const _manifest = RunManifest(
   outputMaxChars: 4000,
 );
 
+/// The `id` metadata of every agent of the demo seed,
+/// `contracts/deployments/demo-agents.json`.
+const _demoSeedAgentIds = [
+  'agt-001',
+  'agt-002',
+  'agt-003',
+  'agt-004',
+  'agt-005',
+  'agt-006',
+  'agt-007',
+  'agt-008',
+];
+
 void main() {
   late FakeLedger registry;
   late SeededRunManifestSource source;
@@ -69,8 +82,8 @@ void main() {
   });
 
   group('demo manifests', () {
-    test('seed at least two demo agents at version 1', () {
-      expect(demoManifests.length, greaterThanOrEqualTo(2));
+    test('seed every demo agent at version 1', () {
+      expect(demoManifests.length, _demoSeedAgentIds.length);
       for (final MapEntry(key: id, value: versions) in demoManifests.entries) {
         expect(versions.keys, contains(1), reason: id);
       }
@@ -95,8 +108,21 @@ void main() {
       }
     });
 
-    test('are keyed by agents that exist in the demo seed', () {
-      expect(demoManifests.keys, containsAll(['agt-006', 'agt-007']));
+    test('cover every agent of the demo seed, so no paid hire fails', () {
+      // A hire of an agent with no manifest fails with `manifest_unavailable`
+      // and leaves the USDC in the escrow until its deadline (#20).
+      expect(demoManifests.keys, containsAll(_demoSeedAgentIds));
+    });
+
+    test('the agents that would need chain data work only on pasted data', () {
+      // `docs/spikes/agent-definition.md`: the runtime has no tools, so these
+      // three take the data as input text and never invent it.
+      for (final id in ['agt-001', 'agt-002', 'agt-005']) {
+        final prompt = demoManifests[id]![1]!.systemPrompt;
+
+        expect(prompt, contains('the user pastes'), reason: id);
+        expect(prompt, contains('Never invent'), reason: id);
+      }
     });
   });
 }
