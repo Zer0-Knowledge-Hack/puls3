@@ -74,7 +74,10 @@ final class EscrowDeadlineSweep {
     for (final hire in hires) {
       final job = await _jobs.escrowJob(hire.jobId);
       if (job == null) continue;
-      final expired = await _expiry.isExpired(hire.jobId);
+      // Only a funded job can be refunded: skip the second read otherwise.
+      final expired =
+          job.state == EscrowJobState.funded &&
+          await _expiry.isExpired(hire.jobId);
       final call = dueEscrowServerCall(
         job: job,
         isExpired: expired,

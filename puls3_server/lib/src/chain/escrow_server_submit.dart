@@ -19,6 +19,13 @@ import 'submission_values.dart';
 /// before the deadline pass stops building another.
 const maxEscrowCallAttempts = 3;
 
+/// The calls the relay account signs. Only one of them is in flight at a
+/// time (see [RelayEscrowCallSender]).
+const _relayPurposes = {
+  SubmissionPurpose.release,
+  SubmissionPurpose.claimRefund,
+};
+
 /// The relay account behind the Serverpod password `escrowRelaySigningKey`.
 ///
 /// A missing or blank password means deadline submissions stay off. A value
@@ -55,10 +62,16 @@ EscrowRelayAccount? relaySigningAccount(String? raw) {
 
 /// Builds, signs, persists and sends one permissionless escrow call.
 ///
-/// A hire with a non-final submission is skipped: one escrow submission is
-/// in flight at a time. The envelope is stored before it is sent. A node
-/// that cannot be reached leaves the record `submitted` so the tracker can
-/// send the same envelope again.
+/// Nothing is built while any relay call is still `submitted`, for any
+/// hire: the relay account's sequence is read from the ledger, so a second
+/// envelope built before the first is applied would reuse it and the node
+/// would refuse it (`txBadSeq`), using up one of the hire's attempts. A
+/// hire with a non-final submission is skipped too: one escrow submission
+/// per hire is in flight at a time.
+///
+/// The envelope is stored before it is sent. A node that cannot be reached
+/// leaves the record `submitted` so the tracker can send the same envelope
+/// again.
 final class RelayEscrowCallSender implements EscrowServerCallSender {
   RelayEscrowCallSender({
     required ChainSubmissionStore submissions,
@@ -100,6 +113,7 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
     required EscrowServerCall call,
   }) async {
     final purpose = _purpose(call);
+    if (await _submissions.hasSubmitted(_relayPurposes)) return;
     final existing = await _submissions.listByHire(hireId);
     if (existing.any((row) => !row.state.isFinal)) return;
     final failed = existing
@@ -197,8 +211,17 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
   }
 }
 
-/// One deadline pass: list hires with a job, read the ledger clock, and
-/// send the call the contract allows. A read of a hire does not run this.
+/// How many hires one deadline pass reads from the escrow. Each one costs a
+/// `get_job` simulation (and `is_expired` for a funded job), every tracker
+/// interval.
+const defaultDeadlineBatchLimit = 20;
+
+/// One deadline pass: list a page of hires with a job, read the ledger
+/// clock, and send the call the contract allows. A read of a hire does not
+/// run this.
+///
+/// Each pass reads the hires after [afterId]; [pass] returns where the next
+/// one starts, back to 0 after the last page, so every hire is swept.
 final class EscrowDeadlineRunner {
   EscrowDeadlineRunner({
     required EscrowJobReader jobs,
@@ -207,7 +230,8 @@ final class EscrowDeadlineRunner {
     required HireLifecycleStore hires,
     required Future<int> Function() ledgerTime,
     required ChainLog log,
-    this.limit = 100,
+    this.afterId = 0,
+    this.limit = defaultDeadlineBatchLimit,
   }) : _jobs = jobs,
        _expiry = expiry,
        _sender = sender,
@@ -221,17 +245,19 @@ final class EscrowDeadlineRunner {
   final HireLifecycleStore _hires;
   final Future<int> Function() _ledgerTime;
   final ChainLog _log;
+  final int afterId;
   final int limit;
 
-  Future<void> pass() async {
+  /// Sweeps one page and returns the `afterId` of the next pass.
+  Future<int> pass() async {
     final int time;
     try {
       time = await _ledgerTime();
     } on LedgerException catch (e) {
       _log(ChainLogLevel.warning, 'Deadline pass skipped: $e');
-      return;
+      return afterId;
     }
-    final rows = await _hires.listWithJob(limit: limit);
+    final rows = await _hires.listWithJob(afterId: afterId, limit: limit);
     final due = [
       for (final row in rows)
         if (row.jobId != null) DueEscrowHire(hireId: row.id, jobId: row.jobId!),
@@ -243,8 +269,9 @@ final class EscrowDeadlineRunner {
       ledgerTime: time,
     ).pass(due);
     if (sent > 0) {
-      _log(ChainLogLevel.info, 'Deadline pass submitted $sent escrow call(s)');
+      _log(ChainLogLevel.info, 'Deadline pass found $sent due escrow call(s)');
     }
+    return rows.length < limit ? 0 : rows.last.id;
   }
 }
 

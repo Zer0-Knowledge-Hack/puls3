@@ -49,6 +49,7 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   final reader = SorobanLedger(rpc, stellar);
   final codec = StellarEnvelopeCodec.forPassphrase(stellar.networkPassphrase);
   var reportedMissingRelayConfig = false;
+  var deadlineAfterId = 0;
   final tracker = ChainSubmissionTracker(
     ledger: SorobanSubmissionLedger(rpc, escrow: stellar.escrow),
     effects: HireEscrowEffects(
@@ -88,7 +89,8 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
           try {
             final fees = HireRelayConfig(env);
             final submissions = ServerpodChainSubmissionStore(session);
-            await EscrowDeadlineRunner(
+            deadlineAfterId = await EscrowDeadlineRunner(
+              afterId: deadlineAfterId,
               jobs: reader,
               expiry: reader,
               hires: ServerpodHireRepository(session),

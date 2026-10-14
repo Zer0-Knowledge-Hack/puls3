@@ -67,6 +67,22 @@ final class _Jobs implements EscrowJobReader, EscrowExpiryReader {
   Future<bool> isExpired(int jobId) async => expired;
 }
 
+/// Records which jobs a pass read; every job is still open.
+final class _RecordingJobs implements EscrowJobReader, EscrowExpiryReader {
+  _RecordingJobs(this.read);
+
+  final List<int> read;
+
+  @override
+  Future<EscrowJob?> escrowJob(int jobId) async {
+    read.add(jobId);
+    return _job(EscrowJobState.open);
+  }
+
+  @override
+  Future<bool> isExpired(int jobId) async => false;
+}
+
 EscrowJob _job(EscrowJobState state) => EscrowJob(
   client: _source,
   provider: _provider,
@@ -178,6 +194,43 @@ void main() {
     expect(codec.built, hasLength(1));
   });
 
+  test('one relay call is in flight at a time, across hires', () async {
+    // The relay sequence comes from the ledger: a second envelope built
+    // before the first is applied would reuse it (txBadSeq).
+    await sender().send(hireId: 4, jobId: 3, call: EscrowServerCall.release);
+    await sender().send(
+      hireId: 5,
+      jobId: 9,
+      call: EscrowServerCall.claimRefund,
+    );
+
+    expect(codec.built, hasLength(1));
+    expect(sent, hasLength(1));
+
+    await store.markConfirmed(store.all.single.id);
+    await sender().send(
+      hireId: 5,
+      jobId: 9,
+      call: EscrowServerCall.claimRefund,
+    );
+
+    expect(codec.built, hasLength(2));
+    expect(store.all.last.hireId, 5);
+    expect(store.all.last.purpose, SubmissionPurpose.claimRefund);
+  });
+
+  test('a refused relay call does not hold back the next hire', () async {
+    answer = const SendTransactionResult(
+      status: SendTransactionStatus.error,
+      hash: 'ab',
+      errorResultXdr: 'AAAA',
+    );
+    await sender().send(hireId: 4, jobId: 3, call: EscrowServerCall.release);
+    await sender().send(hireId: 5, jobId: 9, call: EscrowServerCall.release);
+
+    expect(codec.built, hasLength(2));
+  });
+
   test('a node ERROR fails the record as SubmissionRejected', () async {
     answer = const SendTransactionResult(
       status: SendTransactionStatus.error,
@@ -267,6 +320,47 @@ void main() {
     expect(store.all.single.purpose, SubmissionPurpose.release);
     expect(sent, hasLength(1));
   });
+
+  test(
+    'the deadline pass pages through every hire, then starts over',
+    () async {
+      final hires = InMemoryHireLifecycleStore();
+      final ids = <int>[];
+      for (var i = 0; i < 3; i++) {
+        final hire = await hires.insertHire(
+          NewHire(
+            consumer: _source.value,
+            agentId: 7,
+            price: 5000000,
+            manifestVersion: 1,
+            expiredAt: _expiredAt,
+            requestId: 'request-$i',
+            input: 'triage',
+          ),
+        );
+        await hires.bindJob(hire.id, 10 + i, expiredAt: _expiredAt);
+        ids.add(hire.id);
+      }
+      final read = <int>[];
+      final jobs = _RecordingJobs(read);
+
+      Future<int> pass(int afterId) => EscrowDeadlineRunner(
+        jobs: jobs,
+        expiry: jobs,
+        sender: sender(),
+        hires: hires,
+        ledgerTime: () async => _deadline,
+        log: ignoreChainLog,
+        afterId: afterId,
+        limit: 2,
+      ).pass();
+
+      final next = await pass(0);
+      expect(next, ids[1]);
+      expect(await pass(next), 0, reason: 'the last page starts over');
+      expect(read, [10, 11, 12]);
+    },
+  );
 
   test('a blank relay password stays off and a bad one is not echoed', () {
     expect(relaySigningAccount(null), isNull);

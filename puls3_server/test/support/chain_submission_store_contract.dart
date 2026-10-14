@@ -261,6 +261,33 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(limited.map((s) => s.id), [first.id]);
   });
 
+  test(
+    'hasSubmitted sees only submitted records of the given purposes',
+    () async {
+      create();
+      expect(await repo.hasSubmitted({SubmissionPurpose.release}), isFalse);
+
+      final release = await insert(
+        preparationId: null,
+        purpose: SubmissionPurpose.release,
+      );
+      await insert(transactionHash: _txB);
+
+      expect(
+        await repo.hasSubmitted({
+          SubmissionPurpose.release,
+          SubmissionPurpose.claimRefund,
+        }),
+        isTrue,
+      );
+      expect(await repo.hasSubmitted({SubmissionPurpose.claimRefund}), isFalse);
+      expect(await repo.hasSubmitted(const {}), isFalse);
+
+      await repo.markConfirmed(release.id);
+      expect(await repo.hasSubmitted({SubmissionPurpose.release}), isFalse);
+    },
+  );
+
   test('listSubmitted rejects a limit below 1', () async {
     create();
 
@@ -314,14 +341,15 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
   test('limit or more untracked records do not starve a fund record '
       '(REL-001)', () async {
     create();
-    final release = await insert(
+    // Fillers of the purposes the tracker still leaves untracked.
+    final submit = await insert(
       preparationId: null,
-      purpose: SubmissionPurpose.release,
+      purpose: SubmissionPurpose.submit,
     );
-    final refund = await insert(
+    final agentWallet = await insert(
       transactionHash: _txB,
-      preparationId: null,
-      purpose: SubmissionPurpose.claimRefund,
+      preparationId: 'prep-agent-wallet',
+      purpose: SubmissionPurpose.setAgentWallet,
     );
     clock = clock.add(const Duration(seconds: 1));
     final fund = await insert(transactionHash: _txC);
@@ -340,8 +368,8 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     await tracker.pass(repo);
 
     expect(first.untracked, 2);
-    expect(next.map((s) => s.id), [fund.id, release.id]);
-    expect(next.map((s) => s.id), isNot(contains(refund.id)));
+    expect(next.map((s) => s.id), [fund.id, submit.id]);
+    expect(next.map((s) => s.id), isNot(contains(agentWallet.id)));
     expect(ledger.lookedUp, [fund.transactionHash]);
   });
 

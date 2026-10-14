@@ -88,6 +88,10 @@ final class _RacingStore implements ChainSubmissionStore {
       _inner.listSubmitted(limit: limit);
 
   @override
+  Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes) =>
+      _inner.hasSubmitted(purposes);
+
+  @override
   Future<bool> markConfirmed(int id) => _inner.markConfirmed(id);
 
   @override
