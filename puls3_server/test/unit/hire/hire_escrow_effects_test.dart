@@ -159,6 +159,76 @@ void main() {
     );
   });
 
+  group('onFeedbackGiven', () {
+    Future<int> completedHire({
+      HireStatus? status = HireStatus.completed,
+    }) async {
+      final row = await lifecycle.insertHire(
+        const NewHire(
+          consumer: 'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H',
+          agentId: 7,
+          price: _price,
+          manifestVersion: 1,
+          expiredAt: _expiredAt,
+          requestId: 'req-1',
+          input: 'hello',
+        ),
+      );
+      lifecycle.statusOverride[row.id] = status;
+      return row.id;
+    }
+
+    Future<EffectResult> given(StoredSubmission submission) =>
+        effects(repo).onFeedbackGiven(submission);
+
+    test('confirms the feedback of a completed hire', () async {
+      final id = await completedHire();
+
+      final result = await given(
+        _submission(hireId: id, purpose: SubmissionPurpose.giveFeedback),
+      );
+
+      expect(result, isA<EffectOk>());
+    });
+
+    test('applying it twice is harmless', () async {
+      final id = await completedHire();
+      final submission = _submission(
+        hireId: id,
+        purpose: SubmissionPurpose.giveFeedback,
+      );
+
+      expect(await given(submission), isA<EffectOk>());
+      expect(await given(submission), isA<EffectOk>());
+    });
+
+    test('a submission without a hire is a terminal mismatch', () async {
+      final result = await given(
+        _submission(hireId: null, purpose: SubmissionPurpose.giveFeedback),
+      );
+
+      expect(result, mismatch(null));
+    });
+
+    test('an unknown hire is a terminal mismatch', () async {
+      final result = await given(
+        _submission(hireId: 99, purpose: SubmissionPurpose.giveFeedback),
+      );
+
+      expect(result, mismatch(null));
+    });
+
+    test('a hire that is not completed is a terminal mismatch', () async {
+      final id = await completedHire(status: HireStatus.funded);
+
+      final result = await given(
+        _submission(hireId: id, purpose: SubmissionPurpose.giveFeedback),
+      );
+
+      expect(result, mismatch(null));
+    });
+  });
+
   group('onFunded accepts the funding', () {
     test('pays the hire and stores the payment with the job id', () async {
       final result = await fund();

@@ -402,6 +402,65 @@ void main() {
     });
   });
 
+  group('SUCCESS of giveFeedback', () {
+    test(
+      'applies the feedback effect and confirms, with no escrow event',
+      () async {
+        final s = await submit(SubmissionPurpose.giveFeedback);
+        ledger.lookups[s.transactionHash] = _success();
+
+        await tracker.pass(store);
+
+        expect(effects.feedbackGiven, [s.id]);
+        await expectState(s, SubmissionState.confirmed);
+      },
+    );
+
+    test('a failed effect fails with its code', () async {
+      final s = await submit(SubmissionPurpose.giveFeedback);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.result = EffectResult.failed(SubmissionOutcomeCode.jobMismatch);
+
+      await tracker.pass(store);
+
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobMismatch,
+      );
+    });
+
+    test(
+      'an effect that throws leaves it submitted for the next pass',
+      () async {
+        final s = await submit(SubmissionPurpose.giveFeedback);
+        ledger.lookups[s.transactionHash] = _success();
+        effects.error = StateError('db down');
+
+        final summary = await tracker.pass(store);
+
+        expect(summary.errors, 1);
+        await expectState(s, SubmissionState.submitted);
+      },
+    );
+
+    test('FAILED on chain fails TransactionFailed without an effect', () async {
+      final s = await submit(SubmissionPurpose.giveFeedback);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.feedbackGiven, isEmpty);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
+  });
+
   test('SUCCESS of a purpose without an effect yet stays submitted and is '
       'logged once', () async {
     final s = await submit(SubmissionPurpose.complete);
