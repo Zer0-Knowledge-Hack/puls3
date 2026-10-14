@@ -54,6 +54,7 @@ class WalletSession {
     SessionWalletStore? walletStore,
     this.serverSigningKey,
     this.homeDomain,
+    this.webAuthDomain,
   }) : _walletStore = walletStore ?? InMemorySessionWalletStore();
 
   final CreateChallengeCall _createChallenge;
@@ -65,6 +66,7 @@ class WalletSession {
   /// From `config.json` `auth` when the app has it; checked by the wallet.
   final String? serverSigningKey;
   final String? homeDomain;
+  final String? webAuthDomain;
 
   /// Makes sure the stored session belongs to [wallet], signing in with
   /// [sign] when it does not. A session of another wallet is dropped first.
@@ -87,6 +89,7 @@ class WalletSession {
         networkPassphrase: challenge.networkPassphrase,
         serverSigningKey: serverSigningKey,
         homeDomain: homeDomain,
+        webAuthDomain: webAuthDomain,
       ),
     );
     final session = await _verifyChallenge(

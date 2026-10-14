@@ -47,20 +47,52 @@ void main() {
       );
       expect(auth.serverSigningKey, 'GSERVER');
       expect(auth.homeDomain, 'puls3.example');
+      expect(auth.webAuthDomain, 'puls3.example');
     });
 
     test('a static build config without auth gives nulls', () {
       final auth = readAuthConfig('{"apiUrl":"http://localhost:8080"}');
       expect(auth.serverSigningKey, isNull);
       expect(auth.homeDomain, isNull);
+      expect(auth.webAuthDomain, isNull);
     });
 
     test('empty values count as missing', () {
       final auth = readAuthConfig(
-        '{"auth":{"serverSigningKey":"","homeDomain":""}}',
+        '{"auth":{"serverSigningKey":"","homeDomain":"","webAuthDomain":""}}',
       );
       expect(auth.serverSigningKey, isNull);
       expect(auth.homeDomain, isNull);
+      expect(auth.webAuthDomain, isNull);
+    });
+
+    test('build-time pins win over the file, blank pins do not', () {
+      final auth = readAuthConfig(
+        '{"auth":{"serverSigningKey":"GFILE","homeDomain":"file.example",'
+        '"webAuthDomain":"file.example"}}',
+        overrides: const {
+          'serverSigningKey': 'GPINNED',
+          'homeDomain': ' ',
+          'webAuthDomain': 'pinned.example',
+        },
+      );
+      expect(auth.serverSigningKey, 'GPINNED');
+      expect(auth.homeDomain, 'file.example');
+      expect(auth.webAuthDomain, 'pinned.example');
+    });
+
+    test('a static build gets every value from its pins', () {
+      final auth = readAuthConfig(
+        '{"apiUrl":"https://x"}',
+        overrides: const {
+          'serverSigningKey': 'GPINNED',
+          'homeDomain': 'pinned.example',
+          'webAuthDomain': 'pinned.example',
+        },
+      );
+      expect(auth.serverSigningKey, 'GPINNED');
+      expect(auth.homeDomain, 'pinned.example');
+      expect(auth.webAuthDomain, 'pinned.example');
     });
   });
 }

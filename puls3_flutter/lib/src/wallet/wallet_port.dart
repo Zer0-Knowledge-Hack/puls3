@@ -10,6 +10,7 @@ class SignInChallenge {
     required this.networkPassphrase,
     this.serverSigningKey,
     this.homeDomain,
+    this.webAuthDomain,
   });
 
   /// Base64 challenge transaction envelope, as the server issued it.
@@ -25,6 +26,10 @@ class SignInChallenge {
   /// The server's home domain, when known: the first operation must be
   /// `<homeDomain> auth`.
   final String? homeDomain;
+
+  /// The server's `web_auth_domain`, when known: the value of the
+  /// challenge's `web_auth_domain` operation.
+  final String? webAuthDomain;
 }
 
 /// Port for anything that can hold a Stellar account and sign transactions
