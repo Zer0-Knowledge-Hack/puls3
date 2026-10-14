@@ -86,7 +86,7 @@ Everything below can be opened on [stellar.expert](https://stellar.expert/explor
 
 The registry owner and original deployer is `GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R`. The test job's `deliverable` and `reason` are SHA-256 hashes of the fixed strings `puls3 testnet evidence deliverable` (`179090692d43733fb69b57dca35e077a5af50ad0a37138b76c3e050027bc0665`) and `puls3 testnet evidence approval` (`2e15dea8c223c8d0abb27717972b7e88b8d7968d846652e275e39ab5bf0f88bc`), so anyone can recompute them.
 
-Escrow configuration: `fee_bps` 0, `approval_window` 86400 s, `max_expiry` 2592000 s, no treasury. The escrow admin is `GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY`. The **Reputation Registry is not deployed**: `reputation_registry` is `null` in `testnet.json` and no address is claimed for it.
+Escrow configuration: `fee_bps` 0, `approval_window` 86400 s, `max_expiry` 2592000 s, no treasury. The escrow admin is `GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY`. The Reputation Registry (#14) is deployed at `CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`, recorded in `testnet.json`.
 
 #### Escrow rail (job 3, the evidence of record)
 

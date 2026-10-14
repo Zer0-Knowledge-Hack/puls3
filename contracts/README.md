@@ -14,7 +14,7 @@ contracts/
     └── placeholder/        # sample contract so CI has something to build and test (#29)
 ```
 
-Each contract is a crate under `contracts/<name>/` that takes `soroban-sdk` from the workspace. The Reputation Registry (#14) has no crate yet and is not deployed.
+Each contract is a crate under `contracts/<name>/` that takes `soroban-sdk` from the workspace. The Reputation Registry (#14) lives in `contracts/reputation-registry`.
 
 Deploy and seed scripts live in [`../scripts/`](../scripts/): `deploy-testnet.sh` (registry), `deploy-escrow-testnet.sh` (escrow, USDC allow-list, test job, direct payment) and `seed-demo-agents.sh`. How to verify what they deployed: [`../docs/verification/onchain.md`](../docs/verification/onchain.md).
 
@@ -83,8 +83,11 @@ Then build, test, format, and lint as above.
 
 Testnet deploy of the Identity Registry (#13), demo-agent seed data (#15) and the
 Agent Escrow contract (see [Escrow deploy](#escrow-deploy)).
-The Reputation Registry (#14) is not deployed; `deployments/testnet.json`
-keeps a `reputation_registry: null` slot for it.
+The Reputation Registry (#14) is deployed on testnet as `CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4`
+(owner `GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY`, bound to the
+Identity Registry) and recorded in `deployments/testnet.json` with its deploy
+transaction and one test feedback. It is deployed by hand with
+`stellar contract deploy`, not by `scripts/deploy-testnet.sh`.
 
 ### Prerequisites
 
