@@ -192,6 +192,25 @@ PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
+### Feedback proof on testnet (#179)
+
+`tool/e2e_feedback_testnet.dart` continues the funded hire of the relay proof:
+the agent fixture signs `submit` directly, the server releases the job after
+`approval_deadline` through the chain tracker's deadline pass (it needs the
+`escrowRelaySigningKey` password), the hire reads `completed`, and the
+consumer rates it with `prepareFeedback` and `submitFeedback`. It exits
+non-zero unless the hire has a `feedbackReference` and `AgentEndpoint.get`
+counts the new rating. It is an ops proof and has no unit test.
+
+Both secrets come from the environment and are never printed. The run waits
+for the approval window, so it can take as long as the window (30 minutes at
+most).
+
+```bash
+cd puls3_server
+PULS3_E2E_HIRE_ID=<hire id printed by the relay proof> PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" PULS3_E2E_AGENT_SECRET="$(stellar keys secret agent)" dart run tool/e2e_feedback_testnet.dart
+```
+
 ## Wallet sign-in
 
 Hires need a wallet session (#136). The app asks
