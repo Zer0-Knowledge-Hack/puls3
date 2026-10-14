@@ -53,6 +53,9 @@ final class FakeReputationCalls implements ReputationCalls {
 final class FakeReputationRegistry implements ReputationRegistry {
   final given = <Feedback>[];
   Exception? failure;
+
+  /// Agents whose reads fail while every other agent still reads.
+  final unreadable = <AgentId>{};
   var reads = 0;
 
   @override
@@ -63,6 +66,7 @@ final class FakeReputationRegistry implements ReputationRegistry {
   Future<List<Feedback>> feedbacksOf(AgentId agent) async {
     reads++;
     if (failure != null) throw failure!;
+    if (unreadable.contains(agent)) throw Exception('agent $agent unreadable');
     return given.where((f) => f.agentId == agent).toList();
   }
 }

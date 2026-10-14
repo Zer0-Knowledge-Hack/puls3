@@ -173,6 +173,61 @@ void main() {
       );
     });
 
+    test('list keeps an agent whose reputation cannot be read, with the '
+        'default values', () async {
+      registry.given.addAll([_feedback(7, 5, 1), _feedback(8, 1, 2)]);
+      registry.unreadable.add(AgentId(8));
+
+      final agents = await reader.list();
+
+      expect(agents.map((a) => a.registryId), [7, 8]);
+      final readable = agents.first;
+      final degraded = agents.last;
+      expect(readable.rating, reputationOf(registry.given.take(1)));
+      expect(readable.paidHireCount, 1);
+      expect(degraded.rating, reputationPriorMean);
+      expect(degraded.paidHireCount, 0);
+      expect(degraded.name, 'Agent 8');
+    });
+
+    test('a degraded agent is read again, not cached', () async {
+      registry.unreadable.add(AgentId(8));
+      await reader.list();
+      final reads = registry.reads;
+      registry.unreadable.clear();
+      registry.given.add(_feedback(8, 5, 2));
+
+      final again = await reader.list();
+
+      expect(registry.reads, greaterThan(reads));
+      expect(again.last.paidHireCount, 1);
+      expect(again.last.rating, reputationOf(registry.given));
+    });
+
+    test('get of an unreadable agent still throws, even when list degrades '
+        'it', () async {
+      registry.unreadable.add(AgentId(8));
+
+      expect((await reader.list()).last.paidHireCount, 0);
+      await expectLater(
+        reader.get('agt-002'),
+        throwsA(isA<AgentCatalogUnavailable>()),
+      );
+      expect((await reader.get('agt-001'))!.registryId, 7);
+    });
+
+    test(
+      'when no agent can be read, list is AgentCatalogUnavailable',
+      () async {
+        registry.unreadable.addAll([AgentId(7), AgentId(8)]);
+
+        await expectLater(
+          reader.list(),
+          throwsA(isA<AgentCatalogUnavailable>()),
+        );
+      },
+    );
+
     test('an inner failure is passed through untouched', () async {
       final failure = AgentCatalogUnavailable(message: 'chain down');
       inner.failure = failure;
