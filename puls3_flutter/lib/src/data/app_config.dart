@@ -10,22 +10,41 @@ const String apiUrlOverride = String.fromEnvironment('PULS3_API_URL');
 
 /// Returns the Serverpod API URL: [override] when it is not blank, otherwise
 /// the `apiUrl` field of [configJson] (the bundled `assets/config.json`).
+/// The wallet sign-in values pinned at build time (#136), for builds whose
+/// `config.json` has no `auth` (Cloudflare Pages). Empty means "use
+/// `assets/config.json`". All three are public: the server key is a `G…`
+/// account address, never a secret.
+const Map<String, String> authConfigOverrides = {
+  'serverSigningKey': String.fromEnvironment('PULS3_AUTH_SERVER_SIGNING_KEY'),
+  'homeDomain': String.fromEnvironment('PULS3_AUTH_HOME_DOMAIN'),
+  'webAuthDomain': String.fromEnvironment('PULS3_AUTH_WEB_AUTH_DOMAIN'),
+};
+
 /// The wallet sign-in values the server publishes in `config.json` `auth`
-/// (#136): its public signing key and home domain. The bundled config of a
-/// static build (Cloudflare Pages) has no `auth`, so both may be null.
-({String? serverSigningKey, String? homeDomain}) readAuthConfig(
-  String configJson,
-) {
+/// (#136): its public signing key, its home domain and its
+/// `web_auth_domain`. A non-blank entry of [overrides] wins over the file.
+/// The bundled config of a static build (Cloudflare Pages) has no `auth`, so
+/// each one is null unless the build pins it.
+({String? serverSigningKey, String? homeDomain, String? webAuthDomain})
+readAuthConfig(
+  String configJson, {
+  Map<String, String> overrides = authConfigOverrides,
+}) {
   final config = jsonDecode(configJson);
   final auth = config is Map<String, dynamic> ? config['auth'] : null;
-  String? text(Object? value) =>
-      value is String && value.isNotEmpty ? value : null;
-  return auth is Map<String, dynamic>
-      ? (
-          serverSigningKey: text(auth['serverSigningKey']),
-          homeDomain: text(auth['homeDomain']),
-        )
-      : (serverSigningKey: null, homeDomain: null);
+  final block = auth is Map<String, dynamic> ? auth : const {};
+  String? read(String field) {
+    final override = overrides[field]?.trim() ?? '';
+    if (override.isNotEmpty) return override;
+    final value = block[field];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  return (
+    serverSigningKey: read('serverSigningKey'),
+    homeDomain: read('homeDomain'),
+    webAuthDomain: read('webAuthDomain'),
+  );
 }
 
 String resolveApiUrl(String configJson, {String override = apiUrlOverride}) {

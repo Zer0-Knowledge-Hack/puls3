@@ -110,6 +110,18 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes) async {
+    if (purposes.isEmpty) return false;
+    final count = await ChainSubmission.db.count(
+      _session,
+      where: (t) =>
+          t.state.equals(SubmissionState.submitted.wireName) &
+          t.purpose.inSet({for (final p in purposes) p.wireName}),
+    );
+    return count > 0;
+  }
+
+  @override
   Future<bool> markConfirmed(int id) =>
       _transition(id, SubmissionState.confirmed, null);
 

@@ -310,6 +310,28 @@ void main() {
 
       expect(client.getLatestLedger, _throwsUnavailable);
     });
+
+    test('latestLedgerCloseTime reads closeTime as unix seconds', () async {
+      final client = _client(
+        MockClient((_) async => _json(_fixture('get_latest_ledger.json'))),
+      );
+
+      expect(await client.latestLedgerCloseTime(), 1791423372);
+    });
+
+    test('a result without closeTime is LedgerUnavailable', () {
+      final client = _client(
+        MockClient(
+          (_) async => _json({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'result': {'sequence': 5079957},
+          }),
+        ),
+      );
+
+      expect(client.latestLedgerCloseTime, _throwsUnavailable);
+    });
   });
 
   group('getEvents', () {
