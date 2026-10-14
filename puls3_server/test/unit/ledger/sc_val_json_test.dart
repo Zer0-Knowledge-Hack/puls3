@@ -193,4 +193,27 @@ void main() {
       expect(() => readMap(null), _throwsUnavailable);
     });
   });
+
+  group('vec', () {
+    test('keeps the raw elements in order', () {
+      final items = readVec(const {
+        'vec': [
+          {'u32': 1},
+          {'u32': 2},
+        ],
+      });
+
+      expect(items.map(readU32), [1, 2]);
+    });
+
+    test('an empty vec has no elements', () {
+      expect(readVec(const {'vec': []}), isEmpty);
+    });
+
+    test('rejects a value that is not a vec', () {
+      expect(() => readVec(const {'map': []}), _throwsUnavailable);
+      expect(() => readVec(const {'vec': 'x'}), _throwsUnavailable);
+      expect(() => readVec('void'), _throwsUnavailable);
+    });
+  });
 }

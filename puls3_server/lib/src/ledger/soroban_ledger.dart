@@ -23,6 +23,7 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart';
 
 import '../agent/registry_reader.dart';
+import 'contract_reader.dart';
 import 'escrow_job.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
@@ -40,11 +41,6 @@ const _registryAgentNotFound = 3;
 /// Escrow `JobNotFound`: there is no job with that id.
 const _escrowJobNotFound = 1;
 
-/// Fee and sequence of the unsigned simulation envelopes. The RPC does not
-/// charge or check them, so any existing source account works with `0`.
-const _simulationFee = 100;
-const _simulationSequence = 0;
-
 /// Reads the Stellar chain through Soroban RPC. It never signs or submits,
 /// although the [SorobanRpcClient] it uses can submit.
 ///
@@ -53,10 +49,19 @@ const _simulationSequence = 0;
 /// the adapter cannot read is a [LedgerException] instead.
 final class SorobanLedger
     implements LedgerPort, RegistryReader, EscrowJobReader, AgentOwnerReader {
-  SorobanLedger(this._rpc, this._config);
+  SorobanLedger(this._rpc, this._config)
+    : _reader = ContractReader(_rpc, source: _config.simulationSource);
 
   final SorobanRpcClient _rpc;
   final StellarConfig _config;
+  final ContractReader _reader;
+
+  Future<Object?> _read(
+    StellarAddress contract,
+    String function,
+    List<ScArg> args, {
+    Set<int> absentErrors = const {},
+  }) => _reader.read(contract, function, args, absentErrors: absentErrors);
 
   /// Registry `agent_exists`.
   Future<bool> agentExists(AgentId id) async => readBool(
@@ -135,46 +140,5 @@ final class SorobanLedger
       transaction: transaction,
       usdcSac: _config.usdcSac,
     );
-  }
-
-  /// Simulates `function` on [contract] and returns its raw ScVal JSON, or
-  /// `null` when the contract failed with one of [absentErrors].
-  Future<Object?> _read(
-    StellarAddress contract,
-    String function,
-    List<ScArg> args, {
-    Set<int> absentErrors = const {},
-  }) async {
-    final result = await _rpc.simulateTransaction(
-      encodeInvokeEnvelope(
-        source: _config.simulationSource,
-        fee: _simulationFee,
-        sequence: _simulationSequence,
-        contract: contract,
-        function: function,
-        args: args,
-      ),
-    );
-    if (result.containsKey('restorePreamble')) {
-      throw LedgerUnavailable('$function needs its archived state restored');
-    }
-    final error = result['error'];
-    if (error is String && error.isNotEmpty) {
-      final number = contractErrorCode(error);
-      if (number == null) {
-        throw LedgerUnavailable('$function simulation failed');
-      }
-      if (absentErrors.contains(number)) return null;
-      throw LedgerContractError(number, '$function failed with #$number');
-    }
-    final results = result['results'];
-    if (results is! List || results.isEmpty) {
-      throw LedgerUnavailable('$function simulation returned no result');
-    }
-    final first = results.first;
-    if (first is! Map || !first.containsKey('returnValueJson')) {
-      throw LedgerUnavailable('$function simulation result has no value');
-    }
-    return first['returnValueJson'];
   }
 }

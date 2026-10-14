@@ -2,6 +2,8 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/feedback/reputation_calls.dart';
 import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
 
+import 'reputation_registry_contract.dart';
+
 /// The contract the fake calls go to: a registry, not the escrow.
 final fakeReputationRegistry = StellarAddress.parse(
   'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
@@ -63,4 +65,30 @@ final class FakeReputationRegistry implements ReputationRegistry {
     if (failure != null) throw failure!;
     return given.where((f) => f.agentId == agent).toList();
   }
+}
+
+/// The shared contract suite's view of [FakeReputationRegistry]. Revoked
+/// feedback is not kept, as the real registry's reads skip it.
+final class FakeReputationRegistryRig implements ReputationRegistryRig {
+  final _fake = FakeReputationRegistry();
+  var _next = 1;
+
+  @override
+  ReputationRegistry get registry => _fake;
+
+  @override
+  void seed(SeededFeedback entry) {
+    if (entry.revoked) return;
+    _fake.given.add(
+      Feedback(
+        hireId: HireId(_next++),
+        agentId: entry.agent,
+        client: entry.client,
+        score: entry.score,
+      ),
+    );
+  }
+
+  @override
+  void breakReads() => _fake.failure = Exception('the registry is down');
 }
