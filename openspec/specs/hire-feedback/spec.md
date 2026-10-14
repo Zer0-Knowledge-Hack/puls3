@@ -76,10 +76,27 @@ The server MUST expose `getFeedbackEligibility`, `prepareFeedback` and `submitFe
 
 ### Requirement: Registry behind a port
 
-The domain MUST define a `ReputationRegistry` port with in-memory fakes. No Soroban adapter is in scope (#14).
+The domain MUST define a `ReputationRegistry` port with in-memory fakes. The server MUST provide a Soroban adapter that reads the Reputation Registry of #14 and a `ReputationCalls` that builds its `give_feedback`, both used only when `PULS3_STELLAR_REPUTATION_REGISTRY` is set; while it is unset they MUST be the unwired ones (`prepareFeedback` fails with `HireConfigurationMissing`, no agent has feedback). The fake and the Soroban adapter MUST pass one shared contract suite for reads.
 
 #### Scenario: Offline tests
 
 - GIVEN no network, database or chain
 - WHEN the domain and endpoint tests run
 - THEN they pass using only the fakes
+
+### Requirement: Hire detail exposes the feedback
+
+`getHire` MUST return the hire's `giveFeedback` submission as `feedbackSubmission`, separate from `escrowSubmission`, and MUST set `hire.feedbackReference` to its transaction unless it `failed`. A relayed `giveFeedback` that succeeds on chain MUST become `confirmed` through the chain tracker.
+
+#### Scenario: Reload after rating
+
+- GIVEN a hire whose `giveFeedback` submission is confirmed
+- WHEN `getHire` is called
+- THEN `feedbackSubmission.state` is `confirmed` and `hire.feedbackReference` is its transaction
+- AND `escrowSubmission` is the latest escrow call, not the rating
+
+#### Scenario: Failed rating
+
+- GIVEN a hire whose only `giveFeedback` submission failed
+- WHEN `getHire` is called
+- THEN `feedbackSubmission.state` is `failed` and `hire.feedbackReference` is null

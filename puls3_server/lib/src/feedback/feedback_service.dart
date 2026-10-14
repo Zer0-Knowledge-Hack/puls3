@@ -23,8 +23,9 @@ const _probeScore = 1;
 /// never signs and the Reputation Registry ABI (#14) stays behind a port.
 ///
 /// A hire is rated once a `giveFeedback` submission of it exists that is not
-/// `failed`; its transaction is the hire's `feedbackReference`. No column
-/// stores it, so no migration is needed.
+/// `failed`; its transaction is the hire's `feedbackReference`, which
+/// `HireQueryService.getHire` derives the same way. No column stores it, so no
+/// migration is needed.
 final class FeedbackService {
   FeedbackService({
     required HireLifecycleStore hires,
@@ -75,8 +76,8 @@ final class FeedbackService {
   /// [comment], when the hire may be rated.
   ///
   /// Fails with the errors of [eligibility], `InvalidFeedback`,
-  /// `SubmissionInProgress`, `InvalidHireTransition` or the configuration
-  /// error of the unwired registry.
+  /// `SubmissionInProgress`, `InvalidHireTransition` or
+  /// `HireConfigurationMissing` while no registry is configured.
   Future<PreparedTransaction> prepare(
     StellarAddress wallet,
     int hireId,

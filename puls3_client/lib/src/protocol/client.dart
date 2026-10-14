@@ -148,8 +148,8 @@ class EndpointWalletAuth extends _isc.EndpointRef {
 /// It shares the session and services seams of [HireEndpoint]: every method
 /// first resolves the caller through the session wallet and only then builds
 /// the services, so a caller without a session reaches no store and no chain.
-/// The call is relayed, never signed, by the server; the Reputation Registry
-/// itself is wired in #14.
+/// The call is relayed, never signed, by the server; the registry call comes
+/// from `ReputationCalls` (`PULS3_STELLAR_REPUTATION_REGISTRY`).
 /// {@category Endpoint}
 class EndpointFeedback extends _isc.EndpointRef {
   EndpointFeedback(_isc.EndpointCaller caller) : super(caller);

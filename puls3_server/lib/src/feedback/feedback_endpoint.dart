@@ -10,8 +10,8 @@ import 'feedback_service.dart';
 /// It shares the session and services seams of [HireEndpoint]: every method
 /// first resolves the caller through the session wallet and only then builds
 /// the services, so a caller without a session reaches no store and no chain.
-/// The call is relayed, never signed, by the server; the Reputation Registry
-/// itself is wired in #14.
+/// The call is relayed, never signed, by the server; the registry call comes
+/// from `ReputationCalls` (`PULS3_STELLAR_REPUTATION_REGISTRY`).
 class FeedbackEndpoint extends Endpoint {
   /// A request without an access token is HTTP 401 before the method runs.
   @override
