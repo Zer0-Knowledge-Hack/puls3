@@ -75,18 +75,55 @@ void main() {
             if (step.status == status) step.title,
         ],
     };
+    // Only what runs end to end today is live (review on #175): the
+    // Studio is a labelled demo until #35, the runner has no live results
+    // yet, and approving or rejecting from the app is not built.
     expect(byStatus[FlowStepStatus.live], [
-      'Create an agent',
       'Discover and hire',
       'Pay into escrow',
       'Verify the payment',
     ]);
     expect(byStatus[FlowStepStatus.inDevelopment], [
+      'Create an agent',
       'Register its identity',
       'Publish',
       'Run the task',
+      'Result and release',
     ]);
-    expect(byStatus[FlowStepStatus.planned], ['Result and release']);
+    expect(byStatus[FlowStepStatus.planned], isEmpty);
+  });
+
+  test('copy never claims Studio deploy as shipped', () {
+    // What builders get: hirers already see the catalog agents' on-chain
+    // identity today, so their copy is not checked here.
+    final copy = [
+      for (final p in landingProblems) p.answer,
+      ...landingAudiences.first.points,
+      for (final c in landingComparison) c.puls3,
+      for (final f in landingFaqs) f.answer,
+    ];
+    for (final line in copy) {
+      final claimsIdentity =
+          line.contains('Identity Registry') ||
+          line.contains('on-chain id') ||
+          line.contains('Soroban registry') ||
+          line.contains('on-chain identity');
+      // Only promises to the builder: agents already in the catalog do
+      // have an on-chain identity today.
+      final aboutBuilder =
+          line.contains('Studio') ||
+          line.toLowerCase().contains('your agent') ||
+          line.contains('Builders');
+      if (claimsIdentity && aboutBuilder) {
+        expect(
+          line.contains('coming') ||
+              line.contains('Coming') ||
+              line.contains('once Studio deploy ships'),
+          isTrue,
+          reason: 'reads as shipped: "$line"',
+        );
+      }
+    }
   });
 
   testWidgets('every flow step shows its number, title and status', (
@@ -98,7 +135,8 @@ void main() {
       expect(find.byKey(Key('flow-step-$i')), findsOneWidget);
     }
     // Legend plus one pill per step.
-    expect(find.text('Planned'), findsNWidgets(2));
+    // The legend lists every status; no step is planned any more.
+    expect(find.text('Planned'), findsOneWidget);
     expect(find.text('In development'), findsWidgets);
   });
 

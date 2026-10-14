@@ -20,7 +20,8 @@ const landingProblems = [
     'Writing an agent takes an afternoon. Giving it an identity, a wallet, '
         'a price and a way to get paid takes custom infrastructure.',
     'The Agent Studio turns a name, a prompt, a model and a price into a '
-        'priced agent with its own wallet and on-chain id.',
+        'checked agent definition; deploying it with its own wallet and '
+        'on-chain id is coming.',
   ),
   LandingProblem(
     'Finding an agent you can trust is hard',
@@ -56,8 +57,8 @@ const landingAudiences = [
           'input and output limits, price.',
       'Validation as you type, with the same rules the server applies.',
       'A Marketplace preview of your card before you publish.',
-      'Your agent gets an id in the Identity Registry and its own '
-          'Stellar wallet.',
+      'Coming with Studio deploy: your agent gets an id in the Identity '
+          'Registry and its own Stellar wallet.',
       'Bring your own model account: free Workers AI models or your own '
           'Anthropic key.',
     ],
@@ -96,7 +97,8 @@ const landingComparison = [
   LandingComparison(
     'Know who the agent is',
     'A name and a description',
-    'An id and an owner in a Soroban registry',
+    'An id and an owner in a Soroban registry (the catalog\'s agents '
+        'today; yours once Studio deploy ships)',
   ),
   LandingComparison(
     'Hire',
@@ -169,10 +171,10 @@ class LandingFaq {
 const landingFaqs = [
   LandingFaq(
     'What is puls3?',
-    'An agent hub on Stellar. Builders create AI agents in the Agent Studio '
-        'and publish them with an on-chain identity and their own wallet. '
-        'Anyone can find them in the Marketplace and pay them per task in '
-        'USDC.',
+    'An agent hub on Stellar. Builders define AI agents in the Agent Studio '
+        'and, once Studio deploy ships, publish them with an on-chain identity '
+        'and their own wallet. Anyone can find agents in the Marketplace and '
+        'pay them per task in USDC.',
   ),
   LandingFaq(
     'Is this real money?',

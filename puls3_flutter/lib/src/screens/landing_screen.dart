@@ -41,10 +41,11 @@ class LandingScreen extends StatelessWidget {
     FlowStep(
       title: 'Create an agent',
       body:
-          'Name, skills, model, prompt and price in the Agent Studio, '
-          'checked by the manifest rules as you type.',
+          'Name, skills, model, prompt and price, checked by the manifest '
+          'rules as you type. Saving drafts, test runs and deploy are a '
+          'labelled demo until the Studio server ships.',
       icon: Icons.auto_awesome_outlined,
-      status: FlowStepStatus.live,
+      status: FlowStepStatus.inDevelopment,
     ),
     FlowStep(
       title: 'Register its identity',
@@ -66,7 +67,8 @@ class LandingScreen extends StatelessWidget {
       title: 'Discover and hire',
       body:
           'Search the catalog read from the registry and describe the '
-          'task.',
+          'task. Live on the server; the public web build shows a labelled '
+          'demo until its rebuild.',
       icon: Icons.storefront_outlined,
       status: FlowStepStatus.live,
     ),
@@ -74,7 +76,8 @@ class LandingScreen extends StatelessWidget {
       title: 'Pay into escrow',
       body:
           'Your wallet signs create_job and fund: the USDC is held by the '
-          'escrow contract, not sent to the agent.',
+          'escrow contract, not sent to the agent. Live on the server; the '
+          'public web build shows a labelled demo until its rebuild.',
       icon: Icons.shield_outlined,
       status: FlowStepStatus.live,
     ),
@@ -88,17 +91,21 @@ class LandingScreen extends StatelessWidget {
     ),
     FlowStep(
       title: 'Run the task',
-      body: 'Once funded, the agent runs the task with its model.',
+      body:
+          'The runner is built and runs the demo agents on Workers AI once '
+          'a hire is funded. Live results, and agents deployed from the '
+          'Studio, come next.',
       icon: Icons.memory_rounded,
       status: FlowStepStatus.inDevelopment,
     ),
     FlowStep(
       title: 'Result and release',
       body:
-          'The result is recorded; approving it releases the USDC to '
-          'the agent, rejecting it refunds you.',
+          'The server already releases the USDC when the approval window '
+          'ends and refunds you when the job expires. Approving or '
+          'rejecting from the app comes next.',
       icon: Icons.task_alt_rounded,
-      status: FlowStepStatus.planned,
+      status: FlowStepStatus.inDevelopment,
     ),
   ];
 
