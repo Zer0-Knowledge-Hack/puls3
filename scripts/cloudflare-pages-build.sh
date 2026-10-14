@@ -24,12 +24,12 @@ if [ -n "${PULS3_AUTH_SERVER_SIGNING_KEY:-}" ] &&
   echo "PULS3_AUTH_SERVER_SIGNING_KEY must be the server's public G… address." >&2
   exit 1
 fi
-# A real hire signs in with the wallet, so it must not run with unpinned
-# challenge checks.
-if [ "${PULS3_HIRE:-}" = server ]; then
+# A real hire or Studio signs in with the wallet, so it must not run with
+# unpinned challenge checks.
+if [ "${PULS3_HIRE:-}" = server ] || [ "${PULS3_STUDIO:-}" = server ]; then
   for name in "${auth_vars[@]}"; do
     if [ -z "${!name:-}" ]; then
-      echo "PULS3_HIRE=server needs $name (see puls3_server/README.md)." >&2
+      echo "PULS3_HIRE=server or PULS3_STUDIO=server needs $name (see puls3_server/README.md)." >&2
       exit 1
     fi
   done
@@ -54,6 +54,11 @@ for name in "${auth_vars[@]}"; do
     build_args+=("--dart-define=$name=${!name}")
   fi
 done
+# Set PULS3_STUDIO=server so the public Studio saves, test-runs and deploys
+# for real. Unset keeps the labelled demo.
+if [ -n "${PULS3_STUDIO:-}" ]; then
+  build_args+=("--dart-define=STUDIO=$PULS3_STUDIO")
+fi
 
 cd "$REPO_ROOT/puls3_flutter"
 flutter build web "${build_args[@]}"
