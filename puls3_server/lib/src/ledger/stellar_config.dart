@@ -12,6 +12,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 /// | `PULS3_STELLAR_USDC_SAC` | [usdcSac] |
 /// | `PULS3_STELLAR_IDENTITY_REGISTRY` | [identityRegistry] |
 /// | `PULS3_STELLAR_ESCROW` | [escrow] |
+/// | `PULS3_STELLAR_REPUTATION_REGISTRY` | [reputationRegistry] |
 /// | `PULS3_STELLAR_SIMULATION_SOURCE` | [simulationSource] |
 final class StellarConfig {
   const StellarConfig({
@@ -21,6 +22,7 @@ final class StellarConfig {
     required this.identityRegistry,
     required this.escrow,
     required this.simulationSource,
+    this.reputationRegistry,
   });
 
   /// Builds the configuration from [env] (normally `Platform.environment`).
@@ -53,6 +55,10 @@ final class StellarConfig {
         'PULS3_STELLAR_SIMULATION_SOURCE',
         testnet.simulationSource,
       ),
+      reputationRegistry: switch (read('PULS3_STELLAR_REPUTATION_REGISTRY')) {
+        final value? => StellarAddress.parse(value),
+        null => testnet.reputationRegistry,
+      },
     );
   }
 
@@ -83,6 +89,14 @@ final class StellarConfig {
   final StellarAddress identityRegistry;
   final StellarAddress escrow;
 
+  /// The Reputation Registry (#14), or `null` while none is configured.
+  ///
+  /// `contracts/deployments/testnet.json` holds `reputation_registry: null`
+  /// until the registry is deployed, so [testnet] has none and
+  /// `PULS3_STELLAR_REPUTATION_REGISTRY` must set it. Without it the feedback
+  /// and reputation features stay unwired (`UnwiredReputationCalls`).
+  final StellarAddress? reputationRegistry;
+
   /// An existing account used only as the source of unsigned simulations.
   final StellarAddress simulationSource;
 
@@ -94,7 +108,8 @@ final class StellarConfig {
       other.usdcSac == usdcSac &&
       other.identityRegistry == identityRegistry &&
       other.escrow == escrow &&
-      other.simulationSource == simulationSource;
+      other.simulationSource == simulationSource &&
+      other.reputationRegistry == reputationRegistry;
 
   @override
   int get hashCode => Object.hash(
@@ -104,5 +119,6 @@ final class StellarConfig {
     identityRegistry,
     escrow,
     simulationSource,
+    reputationRegistry,
   );
 }
