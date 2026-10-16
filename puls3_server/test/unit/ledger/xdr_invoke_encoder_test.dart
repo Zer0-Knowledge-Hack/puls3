@@ -233,6 +233,32 @@ void main() {
       });
     });
 
+    test('encodes an empty vector and a symbol-keyed map', () {
+      final envelope = encodeInvokeEnvelope(
+        source: _source,
+        fee: 100,
+        sequence: 0,
+        contract: _registry,
+        function: 'register_full',
+        args: [
+          ScArg.vec(const []),
+          ScArg.map({
+            'value': ScArg.bytes(Uint8List.fromList([1, 2])),
+            'key': const ScArg.string('manifestHash'),
+          }),
+        ],
+      );
+      final hex = _hex(envelope);
+      expect(hex.contains('00000010' '00000001' '00000000'), isTrue);
+      // Map keys are written in order: "key", then "value".
+      expect(
+        hex.contains(
+          '00000011' '00000001' '00000002' '0000000f' '00000003' '6b657900',
+        ),
+        isTrue,
+      );
+    });
+
     test('encodes a sequence above 2^32 as a big-endian int64', () {
       final envelope = encodeInvokeEnvelope(
         source: _source,

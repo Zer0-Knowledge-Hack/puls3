@@ -27,7 +27,22 @@ abstract interface class DeployGateway {
 
   /// Binds the agent wallet, publishes the registration file and activates
   /// the agent. Returns the agent's payment wallet.
+  ///
+  /// When [walletAuthorization] returns an entry, the flow signs it with
+  /// [WalletPort.signAuthEntry] and calls [submitWalletAuthorization] first.
+  /// The demo returns null and signs only the registration.
   Future<String> activate(Registration registration);
+
+  /// The `set_agent_wallet` authorization entry the builder must sign, or
+  /// null when this step needs no second signature.
+  Future<String?> walletAuthorization(Registration registration);
+
+  /// Submits the signed authorization entry. Called only when
+  /// [walletAuthorization] returned an entry.
+  Future<void> submitWalletAuthorization(
+    Registration registration,
+    String signedAuthorizationEntry,
+  );
 }
 
 /// A registration the server prepared and the wallet must sign unchanged.

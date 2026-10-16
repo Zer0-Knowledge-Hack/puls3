@@ -34,6 +34,21 @@ final class RunManifest {
   );
 }
 
+/// A [RunManifest] whose model call uses the builder's credential, not the
+/// team provider token. [owner] is the builder wallet that stored it.
+final class OwnedRunManifest extends RunManifest {
+  const OwnedRunManifest({
+    required this.owner,
+    required super.provider,
+    required super.modelId,
+    required super.systemPrompt,
+    required super.inputMaxChars,
+    required super.outputMaxChars,
+  });
+
+  final String owner;
+}
+
 /// Finds the manifest a hire runs: the agent's manifest at the version the
 /// hire pinned (`Hire.manifestVersion`).
 abstract interface class RunManifestSource {

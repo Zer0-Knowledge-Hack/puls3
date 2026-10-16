@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -148,6 +149,8 @@ class DeployFlowController extends ChangeNotifier {
   PreparedDeploy? _prepared;
   String? _signed;
   Registration? _registration;
+  String? _authEntry;
+  String? _signedAuth;
 
   DeployStep get step => _step;
   DeployError? get error => _error;
@@ -177,6 +180,8 @@ class DeployFlowController extends ChangeNotifier {
       _prepared = null;
       _signed = null;
       _registration = null;
+      _authEntry = null;
+      _signedAuth = null;
     }
     return _run();
   }
@@ -223,6 +228,36 @@ class DeployFlowController extends ChangeNotifier {
             ),
           );
       _registration = registration;
+
+      final entry =
+          _authEntry ??
+          await _attempt<String?>(
+            DeployStep.activating,
+            () async => _backend(_gateway.walletAuthorization(registration)),
+          );
+      _authEntry = entry;
+      if (entry != null && entry.isNotEmpty) {
+        final signedAuth =
+            _signedAuth ??
+            await _attempt<String>(DeployStep.activating, () async {
+              if (_wallet.address == null) {
+                await _waitForWallet(_wallet.connect());
+              }
+              if (_wallet.address != _builder) throw const _AccountChanged();
+              return _waitForWallet(
+                _isTransactionEnvelope(entry)
+                    ? _wallet.signTransaction(entry)
+                    : _wallet.signAuthEntry(entry),
+              );
+            });
+        _signedAuth = signedAuth;
+        await _attempt<void>(
+          DeployStep.activating,
+          () async => _backend(
+            _gateway.submitWalletAuthorization(registration, signedAuth),
+          ),
+        );
+      }
 
       final agentWallet = await _attempt<String>(
         DeployStep.activating,
@@ -425,4 +460,17 @@ class _Cancelled implements Exception {
 class _InvalidResponse implements Exception {
   const _InvalidResponse(this.reason);
   final String reason;
+}
+
+/// Soroban auth entries start with credential type 0 or 1. A transaction
+/// envelope starts with type 2. A version update reuses the second deploy
+/// step for another builder-signed transaction.
+bool _isTransactionEnvelope(String xdr) {
+  try {
+    final bytes = base64Decode(xdr);
+    if (bytes.length < 4) return false;
+    return ByteData.sublistView(bytes).getUint32(0) == 2;
+  } on FormatException {
+    return false;
+  }
 }

@@ -19,7 +19,7 @@ Future<void> deployStudioManifest(
   final gateway = AppScope.of(context).studioGateway;
   return showDeploySheet(
     context,
-    agentDraftFor(manifest),
+    agentDraftFor(manifest, draftId: draftId),
     onLive: draftId == null || owner == null
         ? null
         : (result) => gateway.recordDeploy(
@@ -33,7 +33,7 @@ Future<void> deployStudioManifest(
 }
 
 /// The deploy flow's snapshot of a deployable [manifest].
-AgentDraft agentDraftFor(AgentManifestDraft manifest) {
+AgentDraft agentDraftFor(AgentManifestDraft manifest, {int? draftId}) {
   final model = manifest.model;
   final option = model == null
       ? null
@@ -47,5 +47,6 @@ AgentDraft agentDraftFor(AgentManifestDraft manifest) {
     systemPrompt: manifest.systemPrompt ?? '',
     skills: [for (final s in manifest.skills ?? const []) s.name],
     priceUsdcStroops: manifest.price?.stroops ?? 0,
+    draftId: draftId,
   );
 }

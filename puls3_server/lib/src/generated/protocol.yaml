@@ -22,3 +22,14 @@ hire:
   - prepareReject:
   - getHire:
   - submitEscrowCall:
+studio:
+  - saveDraft:
+  - getDraft:
+  - listDrafts:
+  - testRun:
+  - saveProviderCredential:
+  - prepareDeploy:
+  - submitRegistration:
+  - getDeploySession:
+  - prepareWalletAuthorization:
+  - submitWalletAuthorization:

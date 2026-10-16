@@ -10,6 +10,8 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'package:puls3_server/src/generated/studio/agent_manifest_draft.dart'
+    as _isgb9y1j;
 import 'package:serverpod/serverpod.dart' as _is;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _iacs;
@@ -22,6 +24,7 @@ import '../feedback/feedback_endpoint.dart' as _i3n4p88h;
 import '../greetings/greeting_endpoint.dart' as _il624ik7;
 import '../health/health_endpoint.dart' as _id9paj9q;
 import '../hire/hire_endpoint.dart' as _icdhibuq;
+import '../studio/studio_endpoint.dart' as _i442jbsr;
 
 class Endpoints extends _is.EndpointDispatch {
   @override
@@ -67,6 +70,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'hire',
+          null,
+        ),
+      'studio': _i442jbsr.StudioEndpoint()
+        ..initialize(
+          server,
+          'studio',
           null,
         ),
     };
@@ -498,6 +507,259 @@ class Endpoints extends _is.EndpointDispatch {
                     params['hireId'],
                     params['preparationId'],
                     params['signedTransactionXdr'],
+                  ),
+        ),
+      },
+    );
+    connectors['studio'] = _is.EndpointConnector(
+      name: 'studio',
+      endpoint: endpoints['studio']!,
+      methodConnectors: {
+        'saveDraft': _is.MethodConnector(
+          name: 'saveDraft',
+          params: {
+            'draft': _is.ParameterDescription(
+              name: 'draft',
+              type: _is.getType<_isgb9y1j.AgentManifestDraft>(),
+              nullable: false,
+            ),
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int?>(),
+              nullable: true,
+            ),
+            'revision': _is.ParameterDescription(
+              name: 'revision',
+              type: _is.getType<int?>(),
+              nullable: true,
+            ),
+            'overwrite': _is.ParameterDescription(
+              name: 'overwrite',
+              type: _is.getType<bool?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['studio'] as _i442jbsr.StudioEndpoint).saveDraft(
+                    session,
+                    params['draft'],
+                    params['draftId'],
+                    params['revision'],
+                    params['overwrite'],
+                  ),
+        ),
+        'getDraft': _is.MethodConnector(
+          name: 'getDraft',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['studio'] as _i442jbsr.StudioEndpoint).getDraft(
+                    session,
+                    params['draftId'],
+                  ),
+        ),
+        'listDrafts': _is.MethodConnector(
+          name: 'listDrafts',
+          params: {},
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .listDrafts(session),
+        ),
+        'testRun': _is.MethodConnector(
+          name: 'testRun',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'input': _is.ParameterDescription(
+              name: 'input',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['studio'] as _i442jbsr.StudioEndpoint).testRun(
+                    session,
+                    params['draftId'],
+                    params['input'],
+                  ),
+        ),
+        'saveProviderCredential': _is.MethodConnector(
+          name: 'saveProviderCredential',
+          params: {
+            'provider': _is.ParameterDescription(
+              name: 'provider',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'secret': _is.ParameterDescription(
+              name: 'secret',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'accountId': _is.ParameterDescription(
+              name: 'accountId',
+              type: _is.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .saveProviderCredential(
+                    session,
+                    params['provider'],
+                    params['secret'],
+                    params['accountId'],
+                  ),
+        ),
+        'prepareDeploy': _is.MethodConnector(
+          name: 'prepareDeploy',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'builder': _is.ParameterDescription(
+              name: 'builder',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .prepareDeploy(
+                    session,
+                    params['draftId'],
+                    params['builder'],
+                  ),
+        ),
+        'submitRegistration': _is.MethodConnector(
+          name: 'submitRegistration',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'preparationId': _is.ParameterDescription(
+              name: 'preparationId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'signedTransactionXdr': _is.ParameterDescription(
+              name: 'signedTransactionXdr',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .submitRegistration(
+                    session,
+                    params['draftId'],
+                    params['preparationId'],
+                    params['signedTransactionXdr'],
+                  ),
+        ),
+        'getDeploySession': _is.MethodConnector(
+          name: 'getDeploySession',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .getDeploySession(
+                    session,
+                    params['draftId'],
+                  ),
+        ),
+        'prepareWalletAuthorization': _is.MethodConnector(
+          name: 'prepareWalletAuthorization',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .prepareWalletAuthorization(
+                    session,
+                    params['draftId'],
+                  ),
+        ),
+        'submitWalletAuthorization': _is.MethodConnector(
+          name: 'submitWalletAuthorization',
+          params: {
+            'draftId': _is.ParameterDescription(
+              name: 'draftId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'preparationId': _is.ParameterDescription(
+              name: 'preparationId',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'signedAuthorizationEntryXdr': _is.ParameterDescription(
+              name: 'signedAuthorizationEntryXdr',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .submitWalletAuthorization(
+                    session,
+                    params['draftId'],
+                    params['preparationId'],
+                    params['signedAuthorizationEntryXdr'],
                   ),
         ),
       },

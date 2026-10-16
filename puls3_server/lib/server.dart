@@ -11,6 +11,7 @@ import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 import 'src/health/health_endpoint.dart';
 import 'src/runtime/agent_runtime_wiring.dart';
+import 'src/studio/registration_route.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -46,6 +47,7 @@ void run(List<String> args) async {
   // These are used by the default page.
   pod.webServer.addRoute(RootRoute(), '/');
   pod.webServer.addRoute(RootRoute(), '/index.html');
+  pod.webServer.addRoute(RegistrationRoute(), '/registry/:hash');
 
   // Serve all files in the web/static relative directory under /.
   // These are used by the default web page.

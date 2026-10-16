@@ -1,0 +1,29 @@
+### Server-only deploy of one Studio draft. The client sees [DeploySession].
+class: StudioDeployRecord
+table: studio_deploy
+serverOnly: true
+fields:
+  draftId: int
+  owner: String
+  state: String
+  agentWallet: String
+  registrationUri: String
+  ### Draft document that was hashed and registered. The prompt stays here.
+  manifestJson: String?
+  preparationId: String?
+  unsignedEnvelopeXdr: String?
+  authorizationEntryXdr: String?
+  signatureExpirationLedger: int?
+  registrationHash: String?
+  walletTxHash: String?
+  registryAgentId: int?
+  expiresAt: DateTime?
+  failureCode: String?
+  retryFromStep: int?
+  ### JSON [WalletAuthDraft], enough to rebuild set_agent_wallet.
+  walletAuthJson: String?
+  updatedAt: DateTime
+indexes:
+  studio_deploy_draft_idx:
+    fields: draftId
+    unique: true

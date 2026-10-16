@@ -53,4 +53,13 @@ class FakeDeployGateway implements DeployGateway {
     await Future<void>.delayed(activateDelay);
     return _ids.accountAddress();
   }
+
+  @override
+  Future<String?> walletAuthorization(Registration registration) async => null;
+
+  @override
+  Future<void> submitWalletAuthorization(
+    Registration registration,
+    String signedAuthorizationEntry,
+  ) async {}
 }

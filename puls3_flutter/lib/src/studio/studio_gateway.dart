@@ -41,6 +41,15 @@ abstract interface class StudioGateway {
     required String owner,
   });
 
+  /// Stores the builder's provider credential for later test runs. The
+  /// secret is not returned. Workers AI also needs [accountId].
+  Future<void> saveProviderCredential({
+    required String provider,
+    required String secret,
+    String? accountId,
+    required String owner,
+  });
+
   /// Records the outcome of a deploy started from the Studio. The server
   /// tracks its own deploy sessions (`getDeploySession`), so its adapter
   /// ignores this; the demo needs it to list the agent as live.

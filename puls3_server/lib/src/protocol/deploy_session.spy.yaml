@@ -1,0 +1,15 @@
+### One deploy, as the Studio client polls it (api.md, Deploy session).
+class: DeploySession
+fields:
+  ### awaitingRegistrationSignature, registrationSubmitted,
+  ### awaitingWalletAuthorization, walletAuthorizationSubmitted, publishing,
+  ### active, or failed.
+  state: String
+  preparation: PreparedTransaction?
+  ### Identity Registry id, set once register_full is confirmed.
+  agentId: int?
+  ### Custodied payment wallet, a G… address.
+  agentWallet: String?
+  ### ChainSubmission error code, or PublicationFailed.
+  failureCode: String?
+  retryFromStep: int?

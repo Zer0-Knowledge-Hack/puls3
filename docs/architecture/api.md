@@ -40,8 +40,11 @@ This is the boundary between the Flutter app and Serverpod for the MVP. The app 
 | `ConfigEndpoint` | `getNetworkConfig` | — | `NetworkConfig` | No | `ConfigurationUnavailable` |
 | `AgentEndpoint` | `list` | — | `List<AgentSummary>` | No | `AgentCatalogUnavailable` (typed exception, see [Agent catalog](#agent-catalog)) |
 | `AgentEndpoint` | `get` | `id: String` (metadata id, for example `agt-001`) | `AgentSummary?` (`null` for an unknown id) | No | `AgentCatalogUnavailable` (typed exception) |
-| `StudioEndpoint` | `saveDraft` | `draft: AgentManifestDraft` | `StudioDraft` | Yes | `InvalidManifest`, `DraftNotOwned`, `DraftVersionConflict` |
+| `StudioEndpoint` | `saveDraft` | `draft: AgentManifestDraft`, `draftId: int?`, `revision: int?`, `overwrite: bool?` | `StudioDraft` | Yes | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict` |
+| `StudioEndpoint` | `getDraft` | `draftId: int` | `StudioDraft` | Yes | `DraftNotFound`, `DraftNotOwned` |
+| `StudioEndpoint` | `listDrafts` | — | `List<StudioDraft>` | Yes | |
 | `StudioEndpoint` | `testRun` | `draftId: int`, `input: String` | `TestRunResult` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed` |
+| `StudioEndpoint` | `saveProviderCredential` | `provider: String`, `secret: String`, `accountId: String?` | — | Yes | `RuntimeUnavailable` |
 | `StudioEndpoint` | `prepareDeploy` | `draftId: int`, `builder: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidStellarAddress`, `WalletMismatch`, `InvalidManifest`, `AgentWalletCreationFailed`, `SubmissionInProgress`, `ChainUnavailable` |
 | `StudioEndpoint` | `submitRegistration` | `draftId: int`, `preparationId: String`, `signedTransactionXdr: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature` |
 | `StudioEndpoint` | `getDeploySession` | `draftId: int` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned` |
@@ -282,7 +285,7 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 
 **Manifest wire mapping.** Dart fields are flat camelCase; the JSON (the hash input) is nested snake_case: `systemPrompt` ↔ `system_prompt`, `inputType` and `inputMaxChars` ↔ `input.type` and `input.max_chars`, `outputType` and `outputMaxChars` ↔ `output.type` and `output.max_chars`, `price` (`UsdcAmount`) ↔ `price: {asset: "USDC", amount: stroops}`, `model` ↔ `model: {provider, id}`. A deployed manifest adds `schema` and `version`. `fromJson` reports every mismatch as an `InvalidManifest` problem and never throws a type error. See [domain model](../domain/model.md).
 | `StudioDraft` | `draftId`, `manifest`, `revision`, `deployState` |
-| `TestRunResult` | `output`, `remainingDailyRuns` |
+| `TestRunResult` | `output`, `remainingDailyRuns`. `TestQuotaExceeded` sets `details.resetsAt` to the UTC instant the quota resets. `AgentExecutionFailed` sets `details.reason` to a safe runtime code such as `timeout`, never the prompt or the provider body |
 | [`PreparedTransaction`](models/prepared_transaction.spy.yaml) | `preparationId`, `purpose`, `signer`, `networkPassphrase`, `unsignedTransactionXdr?`, `authorizationEntryXdr?`, `transaction?`, `signatureExpirationLedger?`, `expiresAt` |
 | [`ChainSubmission`](models/chain_submission.spy.yaml) | `preparationId?`, `purpose`, `transaction`, `state` (`submitted`, `confirmed`, `failed`), `errorCode?`, `explorerUrl?`, `updatedAt` |
 | `DeploySession` | `draftId`, `state`, `preparation: PreparedTransaction?`, `registration: ChainSubmission?`, `walletAuthorization: ChainSubmission?`, `agentId?`, `failureCode?`, `retryFromStep?`, `result: DeployResult?` |

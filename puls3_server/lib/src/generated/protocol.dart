@@ -13,6 +13,8 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:puls3_server/src/generated/agent/agent_summary.dart'
     as _ih3rdrku;
+import 'package:puls3_server/src/generated/studio/studio_draft.dart'
+    as _i3089e9p;
 import 'package:serverpod/protocol.dart' as _isp;
 import 'package:serverpod/serverpod.dart' as _is;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
@@ -29,6 +31,7 @@ import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'auth/wallet_challenge_record.dart' as _i1hfx2wv;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
+import 'deploy_session.dart' as _i4f19055;
 import 'feedback/feedback_eligibility.dart' as _i640bgq8;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
@@ -46,6 +49,15 @@ import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
+import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
+import 'studio/manifest_model.dart' as _ihtr58tu;
+import 'studio/manifest_price.dart' as _iyhnvuqa;
+import 'studio/manifest_skill.dart' as _ige837u7;
+import 'studio/studio_agent_version_record.dart' as _irxkujl5;
+import 'studio/studio_deploy_record.dart' as _ie0z856o;
+import 'studio/studio_draft.dart' as _iakoztug;
+import 'studio/studio_draft_record.dart' as _iofpgncb;
+import 'studio/test_run_result.dart' as _if6sgnfl;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
@@ -56,6 +68,7 @@ export 'auth/wallet_challenge.dart';
 export 'auth/wallet_challenge_record.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
+export 'deploy_session.dart';
 export 'feedback/feedback_eligibility.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
@@ -73,6 +86,15 @@ export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
 export 'runtime/hire_run.dart';
+export 'studio/agent_manifest_draft.dart';
+export 'studio/manifest_model.dart';
+export 'studio/manifest_price.dart';
+export 'studio/manifest_skill.dart';
+export 'studio/studio_agent_version_record.dart';
+export 'studio/studio_deploy_record.dart';
+export 'studio/studio_draft.dart';
+export 'studio/studio_draft_record.dart';
+export 'studio/test_run_result.dart';
 
 class Protocol extends _is.DatabaseSerializationManager {
   Protocol._();
@@ -935,6 +957,292 @@ class Protocol extends _is.DatabaseSerializationManager {
       managed: true,
     ),
     _isp.TableDefinition(
+      name: 'studio_agent_version',
+      dartName: 'StudioAgentVersionRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'registryAgentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'version',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'manifestJson',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'studio_agent_version_agent_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'registryAgentId',
+            ),
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'version',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'studio_deploy',
+      dartName: 'StudioDeployRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'draftId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'state',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentWallet',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'registrationUri',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'manifestJson',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'preparationId',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'unsignedEnvelopeXdr',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'authorizationEntryXdr',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'signatureExpirationLedger',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'registrationHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'walletTxHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'registryAgentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'expiresAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'failureCode',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'retryFromStep',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'walletAuthJson',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'studio_deploy_draft_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'draftId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'studio_draft',
+      dartName: 'StudioDraftRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'revision',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'manifestJson',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'deployState',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'liveVersion',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'retryFromStep',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'studio_draft_owner_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'owner',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
       name: 'wallet_account',
       dartName: 'WalletAccount',
       schema: 'public',
@@ -1157,6 +1465,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _i4si20vg.CreateHireResult) {
       return _i4si20vg.CreateHireResult.fromJson(data) as T;
     }
+    if (t == _i4f19055.DeploySession) {
+      return _i4f19055.DeploySession.fromJson(data) as T;
+    }
     if (t == _i640bgq8.FeedbackEligibility) {
       return _i640bgq8.FeedbackEligibility.fromJson(data) as T;
     }
@@ -1208,6 +1519,33 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _iw9spjs5.HireRunRecord) {
       return _iw9spjs5.HireRunRecord.fromJson(data) as T;
     }
+    if (t == _i1fcn02s.AgentManifestDraft) {
+      return _i1fcn02s.AgentManifestDraft.fromJson(data) as T;
+    }
+    if (t == _ihtr58tu.ManifestModel) {
+      return _ihtr58tu.ManifestModel.fromJson(data) as T;
+    }
+    if (t == _iyhnvuqa.ManifestPrice) {
+      return _iyhnvuqa.ManifestPrice.fromJson(data) as T;
+    }
+    if (t == _ige837u7.ManifestSkill) {
+      return _ige837u7.ManifestSkill.fromJson(data) as T;
+    }
+    if (t == _irxkujl5.StudioAgentVersionRecord) {
+      return _irxkujl5.StudioAgentVersionRecord.fromJson(data) as T;
+    }
+    if (t == _ie0z856o.StudioDeployRecord) {
+      return _ie0z856o.StudioDeployRecord.fromJson(data) as T;
+    }
+    if (t == _iakoztug.StudioDraft) {
+      return _iakoztug.StudioDraft.fromJson(data) as T;
+    }
+    if (t == _iofpgncb.StudioDraftRecord) {
+      return _iofpgncb.StudioDraftRecord.fromJson(data) as T;
+    }
+    if (t == _if6sgnfl.TestRunResult) {
+      return _if6sgnfl.TestRunResult.fromJson(data) as T;
+    }
     if (t == _is.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
               ? _it6c3ckv.AgentCatalogUnavailable.fromJson(data)
@@ -1247,6 +1585,10 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_i4si20vg.CreateHireResult?>()) {
       return (data != null ? _i4si20vg.CreateHireResult.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_i4f19055.DeploySession?>()) {
+      return (data != null ? _i4f19055.DeploySession.fromJson(data) : null)
           as T;
     }
     if (t == _is.getType<_i640bgq8.FeedbackEligibility?>()) {
@@ -1319,12 +1661,75 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _iw9spjs5.HireRunRecord.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_i1fcn02s.AgentManifestDraft?>()) {
+      return (data != null ? _i1fcn02s.AgentManifestDraft.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ihtr58tu.ManifestModel?>()) {
+      return (data != null ? _ihtr58tu.ManifestModel.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_iyhnvuqa.ManifestPrice?>()) {
+      return (data != null ? _iyhnvuqa.ManifestPrice.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ige837u7.ManifestSkill?>()) {
+      return (data != null ? _ige837u7.ManifestSkill.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_irxkujl5.StudioAgentVersionRecord?>()) {
+      return (data != null
+              ? _irxkujl5.StudioAgentVersionRecord.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _is.getType<_ie0z856o.StudioDeployRecord?>()) {
+      return (data != null ? _ie0z856o.StudioDeployRecord.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_iakoztug.StudioDraft?>()) {
+      return (data != null ? _iakoztug.StudioDraft.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_iofpgncb.StudioDraftRecord?>()) {
+      return (data != null ? _iofpgncb.StudioDraftRecord.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_if6sgnfl.TestRunResult?>()) {
+      return (data != null ? _if6sgnfl.TestRunResult.fromJson(data) : null)
+          as T;
+    }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_ige837u7.ManifestSkill>) {
+      return (data as List)
+              .map((e) => deserialize<_ige837u7.ManifestSkill>(e))
+              .toList()
+          as T;
+    }
+    if (t == _is.getType<List<_ige837u7.ManifestSkill>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_ige837u7.ManifestSkill>(e))
+                    .toList()
+              : null)
+          as T;
+    }
+    if (t == _is.getType<List<String>?>()) {
+      return (data != null
+              ? (data as List).map((e) => deserialize<String>(e)).toList()
+              : null)
+          as T;
     }
     if (t == List<_ih3rdrku.AgentSummary>) {
       return (data as List)
               .map((e) => deserialize<_ih3rdrku.AgentSummary>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i3089e9p.StudioDraft>) {
+      return (data as List)
+              .map((e) => deserialize<_i3089e9p.StudioDraft>(e))
               .toList()
           as T;
     }
@@ -1352,6 +1757,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _i1hfx2wv.WalletChallengeRecord => 'WalletChallengeRecord',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
+      _i4f19055.DeploySession => 'DeploySession',
       _i640bgq8.FeedbackEligibility => 'FeedbackEligibility',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
@@ -1369,6 +1775,15 @@ class Protocol extends _is.DatabaseSerializationManager {
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _iw9spjs5.HireRunRecord => 'HireRunRecord',
+      _i1fcn02s.AgentManifestDraft => 'AgentManifestDraft',
+      _ihtr58tu.ManifestModel => 'ManifestModel',
+      _iyhnvuqa.ManifestPrice => 'ManifestPrice',
+      _ige837u7.ManifestSkill => 'ManifestSkill',
+      _irxkujl5.StudioAgentVersionRecord => 'StudioAgentVersionRecord',
+      _ie0z856o.StudioDeployRecord => 'StudioDeployRecord',
+      _iakoztug.StudioDraft => 'StudioDraft',
+      _iofpgncb.StudioDraftRecord => 'StudioDraftRecord',
+      _if6sgnfl.TestRunResult => 'TestRunResult',
       _ => null,
     };
   }
@@ -1403,6 +1818,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'ChainSubmission';
       case _i4si20vg.CreateHireResult():
         return 'CreateHireResult';
+      case _i4f19055.DeploySession():
+        return 'DeploySession';
       case _i640bgq8.FeedbackEligibility():
         return 'FeedbackEligibility';
       case _izw8z7ou.Greeting():
@@ -1437,6 +1854,24 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'Puls3ApiException';
       case _iw9spjs5.HireRunRecord():
         return 'HireRunRecord';
+      case _i1fcn02s.AgentManifestDraft():
+        return 'AgentManifestDraft';
+      case _ihtr58tu.ManifestModel():
+        return 'ManifestModel';
+      case _iyhnvuqa.ManifestPrice():
+        return 'ManifestPrice';
+      case _ige837u7.ManifestSkill():
+        return 'ManifestSkill';
+      case _irxkujl5.StudioAgentVersionRecord():
+        return 'StudioAgentVersionRecord';
+      case _ie0z856o.StudioDeployRecord():
+        return 'StudioDeployRecord';
+      case _iakoztug.StudioDraft():
+        return 'StudioDraft';
+      case _iofpgncb.StudioDraftRecord():
+        return 'StudioDraftRecord';
+      case _if6sgnfl.TestRunResult():
+        return 'TestRunResult';
     }
     className = _iais.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -1493,6 +1928,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'CreateHireResult') {
       return deserialize<_i4si20vg.CreateHireResult>(data['data']);
     }
+    if (dataClassName == 'DeploySession') {
+      return deserialize<_i4f19055.DeploySession>(data['data']);
+    }
     if (dataClassName == 'FeedbackEligibility') {
       return deserialize<_i640bgq8.FeedbackEligibility>(data['data']);
     }
@@ -1543,6 +1981,33 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'HireRunRecord') {
       return deserialize<_iw9spjs5.HireRunRecord>(data['data']);
+    }
+    if (dataClassName == 'AgentManifestDraft') {
+      return deserialize<_i1fcn02s.AgentManifestDraft>(data['data']);
+    }
+    if (dataClassName == 'ManifestModel') {
+      return deserialize<_ihtr58tu.ManifestModel>(data['data']);
+    }
+    if (dataClassName == 'ManifestPrice') {
+      return deserialize<_iyhnvuqa.ManifestPrice>(data['data']);
+    }
+    if (dataClassName == 'ManifestSkill') {
+      return deserialize<_ige837u7.ManifestSkill>(data['data']);
+    }
+    if (dataClassName == 'StudioAgentVersionRecord') {
+      return deserialize<_irxkujl5.StudioAgentVersionRecord>(data['data']);
+    }
+    if (dataClassName == 'StudioDeployRecord') {
+      return deserialize<_ie0z856o.StudioDeployRecord>(data['data']);
+    }
+    if (dataClassName == 'StudioDraft') {
+      return deserialize<_iakoztug.StudioDraft>(data['data']);
+    }
+    if (dataClassName == 'StudioDraftRecord') {
+      return deserialize<_iofpgncb.StudioDraftRecord>(data['data']);
+    }
+    if (dataClassName == 'TestRunResult') {
+      return deserialize<_if6sgnfl.TestRunResult>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
@@ -1605,6 +2070,12 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _i7gyvijy.HirePaymentRecord.t;
       case _iw9spjs5.HireRunRecord:
         return _iw9spjs5.HireRunRecord.t;
+      case _irxkujl5.StudioAgentVersionRecord:
+        return _irxkujl5.StudioAgentVersionRecord.t;
+      case _ie0z856o.StudioDeployRecord:
+        return _ie0z856o.StudioDeployRecord.t;
+      case _iofpgncb.StudioDraftRecord:
+        return _iofpgncb.StudioDraftRecord.t;
     }
     return null;
   }
