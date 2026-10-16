@@ -36,6 +36,10 @@ class ScriptedGateway implements DeployGateway {
   final submissions = <Completer<Registration>>[];
   final activations = <Completer<String>>[];
   final signedPayloads = <String>[];
+  final signedAuthEntries = <String>[];
+
+  /// When set, activating asks the wallet to sign this entry.
+  String? authorizationEntry;
 
   @override
   Future<PreparedDeploy> prepare(AgentDraft draft, {required String builder}) {
@@ -61,6 +65,18 @@ class ScriptedGateway implements DeployGateway {
     final call = Completer<String>();
     activations.add(call);
     return call.future;
+  }
+
+  @override
+  Future<String?> walletAuthorization(Registration registration) async =>
+      authorizationEntry;
+
+  @override
+  Future<void> submitWalletAuthorization(
+    Registration registration,
+    String signedAuthorizationEntry,
+  ) async {
+    signedAuthEntries.add(signedAuthorizationEntry);
   }
 
   static const prepared = PreparedDeploy(
@@ -264,6 +280,22 @@ void main() {
       // The skeletons were replaced by the confirmed values.
       expect(find.text('#42'), findsOneWidget);
       expect(find.text('aa11bb22…00112233'), findsOneWidget);
+    });
+
+    testWidgets('activating signs the agent wallet entry before it finishes', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      h.gateway.authorizationEntry = 'auth-entry';
+      await h.pump();
+      await h.completePrepare();
+      await h.sign();
+      await h.completeRegistration();
+      expect(h.gateway.activations, isEmpty);
+      await h.sign();
+
+      expect(h.gateway.signedAuthEntries.single, endsWith('auth-entry'));
+      expect(h.gateway.activations, hasLength(1));
     });
 
     testWidgets('live: id, transaction, copy, explorer and open agent', (

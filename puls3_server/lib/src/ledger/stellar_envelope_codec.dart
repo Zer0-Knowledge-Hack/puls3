@@ -25,7 +25,8 @@ const _maxUint32 = 0xffffffff;
 /// The envelope is written by hand, so the Soroban data and authorization
 /// entries from a simulation go in as the bytes the node sent. `stellar_dart`
 /// reads envelopes back, hashes them and verifies signatures.
-final class StellarEnvelopeCodec implements EnvelopeCodec {
+final class StellarEnvelopeCodec
+    implements EnvelopeCodec, AddressAuthAssembler {
   StellarEnvelopeCodec(this._network);
 
   /// A codec for the network with [passphrase]: Stellar's public, test or
@@ -49,7 +50,43 @@ final class StellarEnvelopeCodec implements EnvelopeCodec {
         throw const UnsupportedAuthorization();
       }
     }
+    return _envelope(
+      spec: spec,
+      fee: fee,
+      auth: auth,
+      transactionData: base64Decode(sim.transactionData),
+    );
+  }
 
+  /// Like [build], but keeps every simulated authorization entry, including
+  /// `ADDRESS` credentials the source signature does not cover.
+  ///
+  /// `set_agent_wallet` needs this: the agent account is the source, and the
+  /// builder signs a separate entry. [build] refuses that entry on purpose
+  /// so a hire relay never submits someone else's authorization.
+  @override
+  PreparedEnvelope assembleAllowingAddressAuth(
+    EnvelopeSpec spec,
+    SimulationData sim,
+  ) {
+    final fee = spec.inclusionFee + sim.minResourceFee;
+    if (fee < 0 || fee > _maxUint32) {
+      throw ArgumentError.value(fee, 'fee', 'does not fit in a uint32');
+    }
+    return _envelope(
+      spec: spec,
+      fee: fee,
+      auth: [for (final entry in sim.auth) base64Decode(entry)],
+      transactionData: base64Decode(sim.transactionData),
+    );
+  }
+
+  PreparedEnvelope _envelope({
+    required EnvelopeSpec spec,
+    required int fee,
+    required List<Uint8List> auth,
+    required Uint8List transactionData,
+  }) {
     final body = XdrWriter()
       ..uint32(_keyTypeEd25519)
       ..opaque(rawKey(spec.source))
@@ -75,7 +112,7 @@ final class StellarEnvelopeCodec implements EnvelopeCodec {
     }
     body
       ..uint32(_txExtSorobanData)
-      ..raw(base64Decode(sim.transactionData));
+      ..raw(transactionData);
 
     final envelope = XdrWriter()
       ..uint32(_envelopeTypeTx)

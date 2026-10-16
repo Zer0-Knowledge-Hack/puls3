@@ -19,6 +19,7 @@ import 'package:puls3_server/src/generated/auth/wallet_challenge.dart'
     as _ievkkkll;
 import 'package:puls3_server/src/generated/create_hire_result.dart'
     as _iba6uw0u;
+import 'package:puls3_server/src/generated/deploy_session.dart' as _i16upqdg;
 import 'package:puls3_server/src/generated/feedback/feedback_eligibility.dart'
     as _i3lyiuyx;
 import 'package:puls3_server/src/generated/greetings/greeting.dart'
@@ -28,6 +29,12 @@ import 'package:puls3_server/src/generated/health/backend_health.dart'
 import 'package:puls3_server/src/generated/hire_detail.dart' as _i0z7bvay;
 import 'package:puls3_server/src/generated/prepared_transaction.dart'
     as _ip1gnsd7;
+import 'package:puls3_server/src/generated/studio/agent_manifest_draft.dart'
+    as _isgb9y1j;
+import 'package:puls3_server/src/generated/studio/studio_draft.dart'
+    as _i3089e9p;
+import 'package:puls3_server/src/generated/studio/test_run_result.dart'
+    as _im38p3p3;
 import 'package:serverpod/serverpod.dart' as _is;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
     as _iacs;
@@ -178,6 +185,8 @@ class TestEndpoints {
   late final _HealthEndpoint health;
 
   late final _HireEndpoint hire;
+
+  late final _StudioEndpoint studio;
 }
 
 class _InternalTestEndpoints extends TestEndpoints
@@ -212,6 +221,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     hire = _HireEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    studio = _StudioEndpoint(
       endpoints,
       serializationManager,
     );
@@ -856,6 +869,360 @@ class _HireEndpoint {
                   _localCallContext.arguments,
                 )
                 as _ida.Future<_i0z7bvay.HireDetail>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _StudioEndpoint {
+  _StudioEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<_i3089e9p.StudioDraft> saveDraft(
+    _ist.TestSessionBuilder sessionBuilder,
+    _isgb9y1j.AgentManifestDraft draft,
+    int? draftId,
+    int? revision,
+    bool? overwrite,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'saveDraft',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'saveDraft',
+          parameters: _ist.testObjectToJson({
+            'draft': draft,
+            'draftId': draftId,
+            'revision': revision,
+            'overwrite': overwrite,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i3089e9p.StudioDraft>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i3089e9p.StudioDraft> getDraft(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'getDraft',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'getDraft',
+          parameters: _ist.testObjectToJson({'draftId': draftId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i3089e9p.StudioDraft>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<List<_i3089e9p.StudioDraft>> listDrafts(
+    _ist.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'listDrafts',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'listDrafts',
+          parameters: _ist.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<List<_i3089e9p.StudioDraft>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_im38p3p3.TestRunResult> testRun(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+    String input,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'testRun',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'testRun',
+          parameters: _ist.testObjectToJson({
+            'draftId': draftId,
+            'input': input,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_im38p3p3.TestRunResult>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<void> saveProviderCredential(
+    _ist.TestSessionBuilder sessionBuilder,
+    String provider,
+    String secret,
+    String? accountId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'saveProviderCredential',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'saveProviderCredential',
+          parameters: _ist.testObjectToJson({
+            'provider': provider,
+            'secret': secret,
+            'accountId': accountId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<void>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i16upqdg.DeploySession> prepareDeploy(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+    String builder,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'prepareDeploy',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'prepareDeploy',
+          parameters: _ist.testObjectToJson({
+            'draftId': draftId,
+            'builder': builder,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i16upqdg.DeploySession>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i16upqdg.DeploySession> submitRegistration(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'submitRegistration',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'submitRegistration',
+          parameters: _ist.testObjectToJson({
+            'draftId': draftId,
+            'preparationId': preparationId,
+            'signedTransactionXdr': signedTransactionXdr,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i16upqdg.DeploySession>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i16upqdg.DeploySession> getDeploySession(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'getDeploySession',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'getDeploySession',
+          parameters: _ist.testObjectToJson({'draftId': draftId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i16upqdg.DeploySession>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i16upqdg.DeploySession> prepareWalletAuthorization(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'prepareWalletAuthorization',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'prepareWalletAuthorization',
+          parameters: _ist.testObjectToJson({'draftId': draftId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i16upqdg.DeploySession>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i16upqdg.DeploySession> submitWalletAuthorization(
+    _ist.TestSessionBuilder sessionBuilder,
+    int draftId,
+    String preparationId,
+    String signedAuthorizationEntryXdr,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'submitWalletAuthorization',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'submitWalletAuthorization',
+          parameters: _ist.testObjectToJson({
+            'draftId': draftId,
+            'preparationId': preparationId,
+            'signedAuthorizationEntryXdr': signedAuthorizationEntryXdr,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i16upqdg.DeploySession>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

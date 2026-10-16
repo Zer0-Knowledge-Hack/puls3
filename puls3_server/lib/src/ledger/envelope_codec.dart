@@ -180,6 +180,17 @@ abstract final class EnvelopeField {
 ///
 /// It is the only place that knows the XDR layout. `stellar_dart` is behind
 /// it; the pure-Dart fallback of the spike would be a second adapter.
+/// Builds an envelope that keeps address authorization entries.
+///
+/// Hire relays use [EnvelopeCodec.build], which refuses those entries.
+/// `set_agent_wallet` uses this because the builder signs one of them.
+abstract interface class AddressAuthAssembler {
+  PreparedEnvelope assembleAllowingAddressAuth(
+    EnvelopeSpec spec,
+    SimulationData sim,
+  );
+}
+
 abstract interface class EnvelopeCodec {
   /// The unsigned envelope for [spec]: sequence `accountSequence + 1`, fee
   /// `inclusionFee + minResourceFee`, time bounds `[0, validUntil]`, and

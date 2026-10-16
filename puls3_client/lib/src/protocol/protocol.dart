@@ -13,6 +13,8 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:puls3_client/src/protocol/agent/agent_summary.dart'
     as _i78wn19p;
+import 'package:puls3_client/src/protocol/studio/studio_draft.dart'
+    as _ixd6q1kd;
 import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
     as _iacc;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
@@ -23,6 +25,7 @@ import 'agent/agent_summary.dart' as _ipe500bk;
 import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
+import 'deploy_session.dart' as _i4f19055;
 import 'feedback/feedback_eligibility.dart' as _i640bgq8;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
@@ -36,11 +39,18 @@ import 'hire_detail.dart' as _ipbsq2gs;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
+import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
+import 'studio/manifest_model.dart' as _ihtr58tu;
+import 'studio/manifest_price.dart' as _iyhnvuqa;
+import 'studio/manifest_skill.dart' as _ige837u7;
+import 'studio/studio_draft.dart' as _iakoztug;
+import 'studio/test_run_result.dart' as _if6sgnfl;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
 export 'auth/wallet_challenge.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
+export 'deploy_session.dart';
 export 'feedback/feedback_eligibility.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
@@ -54,6 +64,12 @@ export 'hire_detail.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
+export 'studio/agent_manifest_draft.dart';
+export 'studio/manifest_model.dart';
+export 'studio/manifest_price.dart';
+export 'studio/manifest_skill.dart';
+export 'studio/studio_draft.dart';
+export 'studio/test_run_result.dart';
 export 'client.dart';
 
 class Protocol extends _isc.SerializationManager {
@@ -105,6 +121,9 @@ class Protocol extends _isc.SerializationManager {
     if (t == _i4si20vg.CreateHireResult) {
       return _i4si20vg.CreateHireResult.fromJson(data) as T;
     }
+    if (t == _i4f19055.DeploySession) {
+      return _i4f19055.DeploySession.fromJson(data) as T;
+    }
     if (t == _i640bgq8.FeedbackEligibility) {
       return _i640bgq8.FeedbackEligibility.fromJson(data) as T;
     }
@@ -144,6 +163,24 @@ class Protocol extends _isc.SerializationManager {
     if (t == _i5rj3edu.Puls3ApiException) {
       return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
     }
+    if (t == _i1fcn02s.AgentManifestDraft) {
+      return _i1fcn02s.AgentManifestDraft.fromJson(data) as T;
+    }
+    if (t == _ihtr58tu.ManifestModel) {
+      return _ihtr58tu.ManifestModel.fromJson(data) as T;
+    }
+    if (t == _iyhnvuqa.ManifestPrice) {
+      return _iyhnvuqa.ManifestPrice.fromJson(data) as T;
+    }
+    if (t == _ige837u7.ManifestSkill) {
+      return _ige837u7.ManifestSkill.fromJson(data) as T;
+    }
+    if (t == _iakoztug.StudioDraft) {
+      return _iakoztug.StudioDraft.fromJson(data) as T;
+    }
+    if (t == _if6sgnfl.TestRunResult) {
+      return _if6sgnfl.TestRunResult.fromJson(data) as T;
+    }
     if (t == _isc.getType<_it6c3ckv.AgentCatalogUnavailable?>()) {
       return (data != null
               ? _it6c3ckv.AgentCatalogUnavailable.fromJson(data)
@@ -163,6 +200,10 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _isc.getType<_i4si20vg.CreateHireResult?>()) {
       return (data != null ? _i4si20vg.CreateHireResult.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_i4f19055.DeploySession?>()) {
+      return (data != null ? _i4f19055.DeploySession.fromJson(data) : null)
           as T;
     }
     if (t == _isc.getType<_i640bgq8.FeedbackEligibility?>()) {
@@ -220,12 +261,61 @@ class Protocol extends _isc.SerializationManager {
       return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
           as T;
     }
+    if (t == _isc.getType<_i1fcn02s.AgentManifestDraft?>()) {
+      return (data != null ? _i1fcn02s.AgentManifestDraft.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_ihtr58tu.ManifestModel?>()) {
+      return (data != null ? _ihtr58tu.ManifestModel.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_iyhnvuqa.ManifestPrice?>()) {
+      return (data != null ? _iyhnvuqa.ManifestPrice.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_ige837u7.ManifestSkill?>()) {
+      return (data != null ? _ige837u7.ManifestSkill.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_iakoztug.StudioDraft?>()) {
+      return (data != null ? _iakoztug.StudioDraft.fromJson(data) : null) as T;
+    }
+    if (t == _isc.getType<_if6sgnfl.TestRunResult?>()) {
+      return (data != null ? _if6sgnfl.TestRunResult.fromJson(data) : null)
+          as T;
+    }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_ige837u7.ManifestSkill>) {
+      return (data as List)
+              .map((e) => deserialize<_ige837u7.ManifestSkill>(e))
+              .toList()
+          as T;
+    }
+    if (t == _isc.getType<List<_ige837u7.ManifestSkill>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_ige837u7.ManifestSkill>(e))
+                    .toList()
+              : null)
+          as T;
+    }
+    if (t == _isc.getType<List<String>?>()) {
+      return (data != null
+              ? (data as List).map((e) => deserialize<String>(e)).toList()
+              : null)
+          as T;
     }
     if (t == List<_i78wn19p.AgentSummary>) {
       return (data as List)
               .map((e) => deserialize<_i78wn19p.AgentSummary>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_ixd6q1kd.StudioDraft>) {
+      return (data as List)
+              .map((e) => deserialize<_ixd6q1kd.StudioDraft>(e))
               .toList()
           as T;
     }
@@ -245,6 +335,7 @@ class Protocol extends _isc.SerializationManager {
       _idvb5xlo.WalletChallenge => 'WalletChallenge',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
+      _i4f19055.DeploySession => 'DeploySession',
       _i640bgq8.FeedbackEligibility => 'FeedbackEligibility',
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
@@ -258,6 +349,12 @@ class Protocol extends _isc.SerializationManager {
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
+      _i1fcn02s.AgentManifestDraft => 'AgentManifestDraft',
+      _ihtr58tu.ManifestModel => 'ManifestModel',
+      _iyhnvuqa.ManifestPrice => 'ManifestPrice',
+      _ige837u7.ManifestSkill => 'ManifestSkill',
+      _iakoztug.StudioDraft => 'StudioDraft',
+      _if6sgnfl.TestRunResult => 'TestRunResult',
       _ => null,
     };
   }
@@ -282,6 +379,8 @@ class Protocol extends _isc.SerializationManager {
         return 'ChainSubmission';
       case _i4si20vg.CreateHireResult():
         return 'CreateHireResult';
+      case _i4f19055.DeploySession():
+        return 'DeploySession';
       case _i640bgq8.FeedbackEligibility():
         return 'FeedbackEligibility';
       case _izw8z7ou.Greeting():
@@ -308,6 +407,18 @@ class Protocol extends _isc.SerializationManager {
         return 'PreparedTransaction';
       case _i5rj3edu.Puls3ApiException():
         return 'Puls3ApiException';
+      case _i1fcn02s.AgentManifestDraft():
+        return 'AgentManifestDraft';
+      case _ihtr58tu.ManifestModel():
+        return 'ManifestModel';
+      case _iyhnvuqa.ManifestPrice():
+        return 'ManifestPrice';
+      case _ige837u7.ManifestSkill():
+        return 'ManifestSkill';
+      case _iakoztug.StudioDraft():
+        return 'StudioDraft';
+      case _if6sgnfl.TestRunResult():
+        return 'TestRunResult';
     }
     className = _iaic.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -344,6 +455,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'CreateHireResult') {
       return deserialize<_i4si20vg.CreateHireResult>(data['data']);
+    }
+    if (dataClassName == 'DeploySession') {
+      return deserialize<_i4f19055.DeploySession>(data['data']);
     }
     if (dataClassName == 'FeedbackEligibility') {
       return deserialize<_i640bgq8.FeedbackEligibility>(data['data']);
@@ -383,6 +497,24 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'Puls3ApiException') {
       return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);
+    }
+    if (dataClassName == 'AgentManifestDraft') {
+      return deserialize<_i1fcn02s.AgentManifestDraft>(data['data']);
+    }
+    if (dataClassName == 'ManifestModel') {
+      return deserialize<_ihtr58tu.ManifestModel>(data['data']);
+    }
+    if (dataClassName == 'ManifestPrice') {
+      return deserialize<_iyhnvuqa.ManifestPrice>(data['data']);
+    }
+    if (dataClassName == 'ManifestSkill') {
+      return deserialize<_ige837u7.ManifestSkill>(data['data']);
+    }
+    if (dataClassName == 'StudioDraft') {
+      return deserialize<_iakoztug.StudioDraft>(data['data']);
+    }
+    if (dataClassName == 'TestRunResult') {
+      return deserialize<_if6sgnfl.TestRunResult>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);

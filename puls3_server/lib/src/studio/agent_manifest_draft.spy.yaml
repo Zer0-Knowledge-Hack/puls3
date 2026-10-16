@@ -1,0 +1,15 @@
+### An editable agent manifest (ADR-0004). No version: a draft has none.
+### Fields are flat camelCase. The domain wire document, which is what gets
+### hashed, is nested snake_case and is not this model.
+class: AgentManifestDraft
+fields:
+  name: String?
+  description: String?
+  skills: List<ManifestSkill>?
+  model: ManifestModel?
+  systemPrompt: String?
+  inputType: String?
+  inputMaxChars: int?
+  outputType: String?
+  outputMaxChars: int?
+  price: ManifestPrice?

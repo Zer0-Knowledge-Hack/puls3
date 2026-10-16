@@ -1,0 +1,22 @@
+### Server-only row for a Studio draft. The prompt lives in [manifestJson]
+### and is never returned to a wallet that does not own the row.
+class: StudioDraftRecord
+table: studio_draft
+serverOnly: true
+fields:
+  ### Session wallet that owns the draft, a G… address.
+  owner: String
+  ### Starts at 1 and increases on every successful save.
+  revision: int
+  ### Domain wire JSON of the draft (`AgentManifestDraft.toJson`).
+  manifestJson: String
+  ### draft, deploying, failed, or live.
+  deployState: String
+  liveVersion: int?
+  ### Catalog id once the agent is listed.
+  agentId: String?
+  retryFromStep: int?
+  updatedAt: DateTime
+indexes:
+  studio_draft_owner_idx:
+    fields: owner

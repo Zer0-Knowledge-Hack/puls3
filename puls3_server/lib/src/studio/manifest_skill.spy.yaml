@@ -1,0 +1,7 @@
+### One skill on an agent manifest draft (ADR-0004). Transport only.
+class: ManifestSkill
+fields:
+  id: String
+  name: String
+  description: String?
+  tags: List<String>?

@@ -7,6 +7,7 @@ class AgentDraft {
     required this.systemPrompt,
     required this.skills,
     required this.priceUsdcStroops,
+    this.draftId,
   });
 
   final String name;
@@ -15,4 +16,7 @@ class AgentDraft {
   final String systemPrompt;
   final List<String> skills;
   final int priceUsdcStroops;
+
+  /// The saved Studio draft, when this snapshot came from one.
+  final int? draftId;
 }

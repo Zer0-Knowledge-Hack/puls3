@@ -91,12 +91,14 @@ final class HireRunner {
     DateTime Function() now = DateTime.now,
     ChainLog log = ignoreChainLog,
     int batchSize = 10,
+    Future<String> Function(RunManifest manifest, String input)? execute,
   }) : _manifests = manifests,
        _runner = runner,
        _staleAfter = staleAfter,
        _now = now,
        _log = log,
-       _batchSize = batchSize;
+       _batchSize = batchSize,
+       _execute = execute;
 
   final RunManifestSource _manifests;
   final AgentRunner _runner;
@@ -104,6 +106,7 @@ final class HireRunner {
   final DateTime Function() _now;
   final ChainLog _log;
   final int _batchSize;
+  final Future<String> Function(RunManifest manifest, String input)? _execute;
 
   /// Fails interrupted runs, then runs up to one batch of queued ones, one at
   /// a time.
@@ -207,7 +210,10 @@ final class HireRunner {
 
     final String output;
     try {
-      output = await _runner.run(manifest.task(queued.input));
+      final execute = _execute;
+      output = execute == null
+          ? await _runner.run(manifest.task(queued.input))
+          : await execute(manifest, queued.input);
     } on RuntimeFailure catch (failure) {
       if (isRetryable(failure) && queued.attempts < retryBackoff.length) {
         return _retry(queued, runs, failure);

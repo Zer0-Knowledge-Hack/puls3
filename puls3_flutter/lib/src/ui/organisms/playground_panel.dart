@@ -41,6 +41,8 @@ class PlaygroundPanel extends StatelessWidget {
     this.onCopy,
     this.onClose,
     this.onDeploy,
+    this.credentialSecret,
+    this.credentialAccountId,
   });
 
   final TextEditingController inputController;
@@ -68,6 +70,12 @@ class PlaygroundPanel extends StatelessWidget {
 
   /// Opens the deploy sheet (F4); null hides the action.
   final VoidCallback? onDeploy;
+
+  /// The builder's provider token. Null hides the field (the demo).
+  final TextEditingController? credentialSecret;
+
+  /// Cloudflare account id. Null hides the field.
+  final TextEditingController? credentialAccountId;
 
   @override
   Widget build(BuildContext context) {
@@ -103,16 +111,58 @@ class PlaygroundPanel extends StatelessWidget {
             style: Puls3Text.bodyMuted,
           ),
           const SizedBox(height: Puls3Spacing.sm),
-          ListenableBuilder(
-            listenable: inputController,
-            builder: (context, _) => _InputAndRun(
-              controller: inputController,
-              maxChars: inputMaxChars,
-              locked: running,
-              canRun: status != PlaygroundStatus.quotaExceeded,
-              running: running,
-              onRun: onRun,
+          if (credentialSecret != null) ...[
+            TextField(
+              key: const Key('playground-credential'),
+              controller: credentialSecret,
+              enabled: !running,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(
+                labelText: 'Provider token',
+                hintText: 'Stored for your test runs',
+              ),
             ),
+            const SizedBox(height: Puls3Spacing.sm),
+          ],
+          if (credentialAccountId != null) ...[
+            TextField(
+              key: const Key('playground-account'),
+              controller: credentialAccountId,
+              enabled: !running,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: const InputDecoration(
+                labelText: 'Cloudflare account id',
+              ),
+            ),
+            const SizedBox(height: Puls3Spacing.sm),
+          ],
+          ListenableBuilder(
+            listenable: Listenable.merge([
+              inputController,
+              credentialSecret,
+              credentialAccountId,
+            ]),
+            builder: (context, _) {
+              final secret = credentialSecret;
+              final account = credentialAccountId;
+              final credentialsReady =
+                  secret == null ||
+                  (secret.text.trim().isNotEmpty &&
+                      (account == null || account.text.trim().isNotEmpty));
+              return _InputAndRun(
+                controller: inputController,
+                maxChars: inputMaxChars,
+                locked: running,
+                canRun:
+                    status != PlaygroundStatus.quotaExceeded &&
+                    credentialsReady,
+                running: running,
+                onRun: onRun,
+              );
+            },
           ),
           if (running) ...[
             const SizedBox(height: Puls3Spacing.sm),
