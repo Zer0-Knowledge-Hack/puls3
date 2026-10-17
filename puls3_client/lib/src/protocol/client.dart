@@ -17,6 +17,7 @@ import 'package:puls3_client/src/protocol/agent/agent_summary.dart'
 import 'package:puls3_client/src/protocol/auth/wallet_challenge.dart'
     as _ig3t6cu4;
 import 'package:puls3_client/src/protocol/create_hire_result.dart' as _iyigzt6l;
+import 'package:puls3_client/src/protocol/deploy_session.dart' as _itdvkthf;
 import 'package:puls3_client/src/protocol/feedback/feedback_eligibility.dart'
     as _isro3926;
 import 'package:puls3_client/src/protocol/greetings/greeting.dart' as _igee0kk1;
@@ -25,6 +26,12 @@ import 'package:puls3_client/src/protocol/health/backend_health.dart'
 import 'package:puls3_client/src/protocol/hire_detail.dart' as _iytku71p;
 import 'package:puls3_client/src/protocol/prepared_transaction.dart'
     as _iy6q6dct;
+import 'package:puls3_client/src/protocol/studio/agent_manifest_draft.dart'
+    as _itfnkyvu;
+import 'package:puls3_client/src/protocol/studio/studio_draft.dart'
+    as _ixd6q1kd;
+import 'package:puls3_client/src/protocol/studio/test_run_result.dart'
+    as _i31e8pql;
 import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
     as _iacc;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
@@ -343,6 +350,145 @@ class EndpointHire extends _isc.EndpointRef {
   );
 }
 
+/// Drafts and test runs for the signed-in builder (api.md, `StudioEndpoint`).
+///
+/// The owner is the session wallet. A draft's prompt is returned only to
+/// that wallet. A test run uses the builder's provider credential, never
+/// the team Workers AI token, and it creates no hire. Deploy prepares
+/// `register_full` and `set_agent_wallet` for the same wallet to sign.
+/// {@category Endpoint}
+class EndpointStudio extends _isc.EndpointRef {
+  EndpointStudio(_isc.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'studio';
+
+  /// Creates a draft, or saves a new revision of [draftId].
+  ///
+  /// [revision] must be the revision the caller last read, unless
+  /// [overwrite] is true ("Keep mine").
+  _ida.Future<_ixd6q1kd.StudioDraft> saveDraft(
+    _itfnkyvu.AgentManifestDraft draft,
+    int? draftId,
+    int? revision,
+    bool? overwrite,
+  ) => caller.callServerEndpoint<_ixd6q1kd.StudioDraft>(
+    'studio',
+    'saveDraft',
+    {
+      'draft': draft,
+      'draftId': draftId,
+      'revision': revision,
+      'overwrite': overwrite,
+    },
+  );
+
+  /// One of the caller's drafts.
+  _ida.Future<_ixd6q1kd.StudioDraft> getDraft(int draftId) =>
+      caller.callServerEndpoint<_ixd6q1kd.StudioDraft>(
+        'studio',
+        'getDraft',
+        {'draftId': draftId},
+      );
+
+  /// The caller's drafts, oldest id first. Other wallets' prompts are absent.
+  _ida.Future<List<_ixd6q1kd.StudioDraft>> listDrafts() =>
+      caller.callServerEndpoint<List<_ixd6q1kd.StudioDraft>>(
+        'studio',
+        'listDrafts',
+        {},
+      );
+
+  /// Runs a saved draft once. No hire and no payment.
+  _ida.Future<_i31e8pql.TestRunResult> testRun(
+    int draftId,
+    String input,
+  ) => caller.callServerEndpoint<_i31e8pql.TestRunResult>(
+    'studio',
+    'testRun',
+    {
+      'draftId': draftId,
+      'input': input,
+    },
+  );
+
+  /// Stores the builder's provider credential for later test runs. The
+  /// secret is not returned.
+  _ida.Future<void> saveProviderCredential(
+    String provider,
+    String secret,
+    String? accountId,
+  ) => caller.callServerEndpoint<void>(
+    'studio',
+    'saveProviderCredential',
+    {
+      'provider': provider,
+      'secret': secret,
+      'accountId': accountId,
+    },
+  );
+
+  /// Prepares `register_full` for [draftId], creating the agent wallet.
+  _ida.Future<_itdvkthf.DeploySession> prepareDeploy(
+    int draftId,
+    String builder,
+  ) => caller.callServerEndpoint<_itdvkthf.DeploySession>(
+    'studio',
+    'prepareDeploy',
+    {
+      'draftId': draftId,
+      'builder': builder,
+    },
+  );
+
+  /// Submits the signed `register_full` and returns the session.
+  _ida.Future<_itdvkthf.DeploySession> submitRegistration(
+    int draftId,
+    String preparationId,
+    String signedTransactionXdr,
+  ) => caller.callServerEndpoint<_itdvkthf.DeploySession>(
+    'studio',
+    'submitRegistration',
+    {
+      'draftId': draftId,
+      'preparationId': preparationId,
+      'signedTransactionXdr': signedTransactionXdr,
+    },
+  );
+
+  /// The current deploy. Refreshes a submitted transaction from the chain.
+  _ida.Future<_itdvkthf.DeploySession> getDeploySession(int draftId) =>
+      caller.callServerEndpoint<_itdvkthf.DeploySession>(
+        'studio',
+        'getDeploySession',
+        {'draftId': draftId},
+      );
+
+  /// Prepares the builder's `set_agent_wallet` authorization entry.
+  _ida.Future<_itdvkthf.DeploySession> prepareWalletAuthorization(
+    int draftId,
+  ) => caller.callServerEndpoint<_itdvkthf.DeploySession>(
+    'studio',
+    'prepareWalletAuthorization',
+    {'draftId': draftId},
+  );
+
+  /// Submits the signed authorization entry inside the agent-signed envelope.
+  _ida.Future<_itdvkthf.DeploySession> submitWalletAuthorization(
+    int draftId,
+    String preparationId,
+    String signedAuthorizationEntryXdr,
+  ) => caller.callServerEndpoint<_itdvkthf.DeploySession>(
+    'studio',
+    'submitWalletAuthorization',
+    {
+      'draftId': draftId,
+      'preparationId': preparationId,
+      'signedAuthorizationEntryXdr': signedAuthorizationEntryXdr,
+    },
+  );
+}
+
 class Modules {
   Modules(Client client) {
     serverpod_auth_idp = _iaic.Caller(client);
@@ -388,6 +534,7 @@ class Client extends _isc.ServerpodClientShared {
     greeting = EndpointGreeting(this);
     health = EndpointHealth(this);
     hire = EndpointHire(this);
+    studio = EndpointStudio(this);
     modules = Modules(this);
   }
 
@@ -405,6 +552,8 @@ class Client extends _isc.ServerpodClientShared {
 
   late final EndpointHire hire;
 
+  late final EndpointStudio studio;
+
   late final Modules modules;
 
   @override
@@ -416,6 +565,7 @@ class Client extends _isc.ServerpodClientShared {
     'greeting': greeting,
     'health': health,
     'hire': hire,
+    'studio': studio,
   };
 
   @override

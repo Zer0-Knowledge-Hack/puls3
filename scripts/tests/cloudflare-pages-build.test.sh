@@ -98,6 +98,15 @@ else
   bad "passes PULS3_HIRE and the SEP-10 pins as dart-defines" "$(cat "$log")"
 fi
 
+# 4a. PULS3_STUDIO=server selects the Studio backend on the same build.
+log="$WORK/studio"
+run_build "$log" PULS3_API_URL=https://example.api.serverpod.space/ PULS3_HIRE=server PULS3_STUDIO=server "${pins[@]}"
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_API_URL=https://example.api.serverpod.space/ --dart-define=HIRE=server --dart-define=PULS3_AUTH_SERVER_SIGNING_KEY=$server_key --dart-define=PULS3_AUTH_HOME_DOMAIN=example.api.serverpod.space --dart-define=PULS3_AUTH_WEB_AUTH_DOMAIN=example.api.serverpod.space --dart-define=STUDIO=server" "$log"; then
+  ok "passes PULS3_STUDIO as a dart-define"
+else
+  bad "passes PULS3_STUDIO as a dart-define" "$(cat "$log")"
+fi
+
 # 4b. A real-hire build without every SEP-10 pin stops before cloning.
 for missing in PULS3_AUTH_SERVER_SIGNING_KEY PULS3_AUTH_HOME_DOMAIN PULS3_AUTH_WEB_AUTH_DOMAIN; do
   log="$WORK/hire-no-$missing"

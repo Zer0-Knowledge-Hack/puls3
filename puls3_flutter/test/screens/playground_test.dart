@@ -137,4 +137,83 @@ void main() {
     expect(find.text('You used today\'s test runs.'), findsOneWidget);
     expect(run(tester).onPressed, isNull);
   });
+
+  testWidgets('a live runner asks for the provider account before it runs', (
+    tester,
+  ) async {
+    Puls3Fonts.useGoogleFonts = false;
+    final studio = _LiveGateway(seed: [(testOwner, savedDraft(1))]);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: Puls3Theme.dark(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Playground(
+              draft: savedDraft(1),
+              gateway: studio,
+              owner: testOwner,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byKey(const Key('playground-input')), 'hello');
+    await tester.pump();
+    expect(run(tester).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+    expect(run(tester).onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const Key('playground-run')));
+    await tester.pump();
+    expect(studio.provider, 'workers-ai');
+    expect(studio.secret, 'builder-token');
+    expect(studio.accountId, 'builder-account');
+    expect(find.byKey(const Key('playground-result')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('playground-result')),
+        matching: find.textContaining('builder-token'),
+      ),
+      findsNothing,
+    );
+  });
+}
+
+final class _LiveGateway extends FakeStudioGateway {
+  _LiveGateway({required super.seed}) : super(delay: Duration.zero);
+
+  String? provider;
+  String? secret;
+  String? accountId;
+
+  @override
+  bool get isDemo => false;
+
+  @override
+  Future<void> saveProviderCredential({
+    required String provider,
+    required String secret,
+    String? accountId,
+    required String owner,
+  }) async {
+    this.provider = provider;
+    this.secret = secret;
+    this.accountId = accountId;
+  }
+
+  @override
+  Future<TestRunResult> testRun(
+    int draftId,
+    String input, {
+    required String owner,
+  }) async => TestRunResult(output: 'five bullets', remainingDailyRuns: 19);
 }

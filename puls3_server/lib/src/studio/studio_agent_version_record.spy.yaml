@@ -1,0 +1,15 @@
+### One published snapshot of a Studio agent. In-flight hires keep the
+### version they paid for. The prompt stays in this server-only row.
+class: StudioAgentVersionRecord
+table: studio_agent_version
+serverOnly: true
+fields:
+  registryAgentId: int
+  version: int
+  owner: String
+  manifestJson: String
+  updatedAt: DateTime
+indexes:
+  studio_agent_version_agent_idx:
+    fields: registryAgentId, version
+    unique: true

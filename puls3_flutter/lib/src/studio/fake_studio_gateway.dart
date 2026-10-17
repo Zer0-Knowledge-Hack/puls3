@@ -118,6 +118,14 @@ class FakeStudioGateway implements StudioGateway {
   }
 
   @override
+  Future<void> saveProviderCredential({
+    required String provider,
+    required String secret,
+    String? accountId,
+    required String owner,
+  }) async {}
+
+  @override
   Future<void> recordDeploy(
     int draftId, {
     required String owner,
