@@ -75,8 +75,29 @@ confirms `createJob` and `fund` from their escrow events. After a successful
 pays the hire only if the job matches it (state `Funded`; client and
 evaluator are the consumer; provider, token, budget and `expired_at` as
 prepared); otherwise the submission fails as `JobMismatch` with the mismatching
-field. Recording the job id after `createJob` is a no-op until the hire
-lifecycle lands (#96).
+field. When a transaction carries several escrow events, the effect uses the
+one that belongs to the hire (the hire's job id for `fund`; client, agent,
+price and prepared expiry for `createJob`); zero or several matches fail as
+`JobMismatch` on `job_id`.
+
+A successful transaction whose escrow event is not visible yet stays
+`submitted` for up to 3 passes before it fails as `JobEvidenceUnavailable`.
+That count lives in memory, so a restart starts it again.
+
+A `fund` or other record that is not found after its time bounds fails as
+`PreparationExpired` only while the node still retains the ledgers since the
+record was created (`oldestLedgerCloseTime` of `getTransaction`, or 24 hours
+when the node does not report it). Past that window the transaction may have
+landed unseen, so it fails as `OutcomeUnknown`, and every `prepare…` call for
+that hire raises `OutcomeUnknown` until the record is resolved by hand. An
+expired `fund` is first reconciled through the escrow job: `Funded` or later
+pays the hire, `Open` is `PreparationExpired`.
+
+`complete`, `reject` and `registerFull` are confirmed when the transaction
+succeeds but change nothing else (#97). Until then the hire status does not
+move, so the app may offer `prepareComplete` again and the contract rejects it
+as `TransactionFailed`. Recording the job id after `createJob` is a no-op until
+the hire lifecycle lands (#96).
 
 | Variable | Default | Meaning |
 |---|---|---|
