@@ -142,7 +142,8 @@ The adapter MUST decode simulation and event values from the RPC JSON format int
 
 ### Requirement: LedgerUnavailable on infrastructure failure
 
-The adapter MUST throw an adapter-level `LedgerUnavailable` error when the HTTP call fails (non-2xx status, timeout, connection error), when the JSON-RPC response contains an `error`, or when a simulation response contains a `restorePreamble`. The domain `LedgerPort` signature MUST remain unchanged. A legitimate "not found" or "not paid" result MUST NOT be reported as `LedgerUnavailable`.
+The adapter MUST throw an adapter-level `LedgerUnavailable` error when the HTTP call fails (non-2xx status, timeout, connection error), when the JSON-RPC response contains an `error`, when a simulation response contains a `restorePreamble`, or when `sendTransaction` returns a transaction hash different from the expected one. The domain `LedgerPort` signature MUST remain unchanged. A legitimate "not found" or "not paid" result MUST NOT be reported as `LedgerUnavailable`.
+(Previously: the hash-mismatch trigger did not exist.)
 
 #### Scenario: HTTP 5xx
 
@@ -177,3 +178,24 @@ All adapter logic MUST depend only on an injected `http.Client`, so unit tests r
 - GIVEN no network, database or cache is available
 - WHEN `dart test test/unit/ledger/` runs in `puls3_server`
 - THEN all ledger tests pass using `MockClient` and recorded fixtures
+### Requirement: sendTransaction verifies the expected hash
+
+`sendTransaction(envelopeXdr, expectedHash)` MUST receive the expected transaction hash and MUST throw `LedgerUnavailable` when the hash in the RPC response differs from it. On a match it MUST behave as before. `SubmissionLedger.resend`, `escrow_relay_service`, `studio_deploy_service`, `escrow_server_submit`, the e2e tool and all test fakes MUST pass the expected hash. A stored record MUST NOT be modified by a mismatch.
+
+#### Scenario: Hash matches
+
+- GIVEN the RPC returns the same hash as `expectedHash`
+- WHEN `sendTransaction` is called
+- THEN the send result is returned normally
+
+#### Scenario: Hash mismatch
+
+- GIVEN the RPC returns a hash different from `expectedHash`
+- WHEN `sendTransaction` is called
+- THEN `LedgerUnavailable` is thrown
+
+#### Scenario: Resend keeps the record
+
+- GIVEN a `submitted` record and a mismatching resend
+- WHEN the tracker resends
+- THEN the record stays `submitted` with its original hash
