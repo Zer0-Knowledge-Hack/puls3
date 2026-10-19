@@ -17,11 +17,15 @@ final class FakeSubmissionLedger implements SubmissionLedger {
   final lookups = <String, Object>{};
 
   /// Answers of [resend], by envelope: a [SendTransactionResult] or a
-  /// [LedgerException]. Unknown envelopes answer `PENDING`.
+  /// [LedgerException]. Unknown envelopes answer `PENDING` with the expected
+  /// hash.
   final sends = <String, Object>{};
 
   final lookedUp = <String>[];
   final resent = <String>[];
+
+  /// The expected hash of every [resend], in call order.
+  final resentHashes = <String>[];
 
   @override
   Future<TransactionLookup> lookup(String hash) async {
@@ -37,13 +41,17 @@ final class FakeSubmissionLedger implements SubmissionLedger {
   }
 
   @override
-  Future<SendTransactionResult> resend(String envelopeXdr) async {
+  Future<SendTransactionResult> resend(
+    String envelopeXdr,
+    String expectedHash,
+  ) async {
     resent.add(envelopeXdr);
+    resentHashes.add(expectedHash);
     final answer =
         sends[envelopeXdr] ??
         SendTransactionResult(
           status: SendTransactionStatus.pending,
-          hash: 'f' * 64,
+          hash: expectedHash,
         );
     if (answer is LedgerException) throw answer;
     return answer as SendTransactionResult;

@@ -209,6 +209,9 @@ void main() {
         jobs: stack.ledger,
         usdc: StellarConfig.testnet.usdcSac,
       );
+      final preparedRow = (await stack.preparations.findByPreparationId(
+        prepared.preparationId,
+      ))!;
       final event = JobCreatedEvent(
         jobId: 4242,
         client: wallet,
@@ -217,11 +220,11 @@ void main() {
         agentId: AgentId(7),
         token: StellarConfig.testnet.usdcSac,
         budget: BigInt.from(5000000),
-        expiredAt: 1,
+        expiredAt: preparedRow.jobExpiredAt!,
       );
 
-      final first = await effects.onJobCreated(stored, event);
-      final second = await effects.onJobCreated(stored, event);
+      final first = await effects.onJobCreated(stored, [event]);
+      final second = await effects.onJobCreated(stored, [event]);
 
       expect(first, isA<EffectOk>());
       expect(second, isA<EffectOk>());
@@ -244,7 +247,7 @@ void main() {
         preparationId: otherPrepared.preparationId,
         hireId: other.hire.id,
       );
-      final clash = await effects.onJobCreated(otherStored, event);
+      final clash = await effects.onJobCreated(otherStored, [event]);
       expect(clash, isA<EffectFailed>());
       expect((await stack.hires.findHire(other.hire.id))!.jobId, isNull);
     });

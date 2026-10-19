@@ -95,6 +95,7 @@ void main() {
     expect(submitted.state, 'registrationSubmitted');
     expect(submitted.registrationHash, prepared.registrationHash);
     expect(rig.sent, hasLength(1));
+    expect(rig.sentHashes, [prepared.registrationHash]);
 
     rig.transactions.next = const ChainTx(ChainTxStatus.success, agentId: 42);
     final confirmed = await rig.service.getDeploySession(
@@ -369,7 +370,7 @@ final class _Rig {
       accounts: accounts,
       codec: codec,
       assembler: assembler,
-      sender: _Sender(sent),
+      sender: _Sender(sent, sentHashes),
       transactions: transactions,
       funder: _Funder(),
       signer: _Signer(),
@@ -391,6 +392,7 @@ final class _Rig {
   late final _Transactions transactions;
   late final StudioDeployService service;
   final sent = <String>[];
+  final sentHashes = <String>[];
   final owner = StellarAddress.parse(_owner);
   final manifest = AgentManifestDraft(
     name: 'Copy Forge',
@@ -508,20 +510,27 @@ final class _Assembler implements AddressAuthAssembler {
 }
 
 final class _Sender implements SubmissionLedger {
-  _Sender(this.sent);
+  _Sender(this.sent, this.sentHashes);
 
   final List<String> sent;
+
+  /// The expected hash of every send, in call order.
+  final List<String> sentHashes;
 
   @override
   Future<TransactionLookup> lookup(String hash) =>
       throw UnimplementedError();
 
   @override
-  Future<SendTransactionResult> resend(String envelopeXdr) async {
+  Future<SendTransactionResult> resend(
+    String envelopeXdr,
+    String expectedHash,
+  ) async {
     sent.add(envelopeXdr);
-    return const SendTransactionResult(
+    sentHashes.add(expectedHash);
+    return SendTransactionResult(
       status: SendTransactionStatus.pending,
-      hash: 'ab',
+      hash: expectedHash,
     );
   }
 }

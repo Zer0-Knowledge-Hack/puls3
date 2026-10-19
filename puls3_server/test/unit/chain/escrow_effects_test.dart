@@ -60,6 +60,16 @@ void main() {
   });
 
   group('NoopEscrowEffects', () {
+    test('cannot reconcile an expired fund', () async {
+      final effects = const NoopEscrowEffects();
+
+      final answer = await effects.reconcileExpiredFund(
+        _submission(SubmissionPurpose.fund),
+      );
+
+      expect(answer, isA<ExpiredFundUnknown>());
+    });
+
     test('accepts every effect and logs it', () async {
       final logged = <String>[];
       final effects = NoopEscrowEffects(
@@ -68,25 +78,29 @@ void main() {
 
       final created = await effects.onJobCreated(
         _submission(SubmissionPurpose.createJob),
-        JobCreatedEvent(
-          jobId: 3,
-          client: _address,
-          provider: _address,
-          evaluator: _address,
-          agentId: AgentId(7),
-          token: _address,
-          budget: BigInt.one,
-          expiredAt: 1,
-        ),
+        [
+          JobCreatedEvent(
+            jobId: 3,
+            client: _address,
+            provider: _address,
+            evaluator: _address,
+            agentId: AgentId(7),
+            token: _address,
+            budget: BigInt.one,
+            expiredAt: 1,
+          ),
+        ],
       );
       final funded = await effects.onFunded(
         _submission(SubmissionPurpose.fund),
-        JobFundedEvent(
-          jobId: 3,
-          client: _address,
-          amount: BigInt.one,
-          feeBps: 0,
-        ),
+        [
+          JobFundedEvent(
+            jobId: 3,
+            client: _address,
+            amount: BigInt.one,
+            feeBps: 0,
+          ),
+        ],
       );
 
       final rated = await effects.onFeedbackGiven(

@@ -81,7 +81,7 @@ final class HireEscrowEffects implements EscrowEffects {
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
-    JobCreatedEvent event,
+    List<JobCreatedEvent> events,
   ) async {
     final hireId = submission.hireId;
     // Like a fund, a create_job the server relayed always carries its hire.
@@ -101,9 +101,20 @@ final class HireEscrowEffects implements EscrowEffects {
           'submission ${submission.id} has no prepared create_job expiry',
         );
       }
+      final matches = events
+          .where(
+            (event) =>
+                event.client.value == hire.consumer &&
+                event.agentId.value == hire.agentId &&
+                event.budget == BigInt.from(hire.price) &&
+                event.expiredAt == expiredAt,
+          )
+          .toList();
+      // Zero or several candidates cannot be bound to the hire with proof.
+      if (matches.length != 1) return _mismatch(_jobIdField);
       final binding = await hires.bindJob(
         hireId,
-        event.jobId,
+        matches.single.jobId,
         expiredAt: expiredAt,
       );
       return switch (binding) {
@@ -116,15 +127,26 @@ final class HireEscrowEffects implements EscrowEffects {
   @override
   Future<EffectResult> onFunded(
     StoredSubmission submission,
-    JobFundedEvent event,
+    List<JobFundedEvent> events,
   ) async {
     final hireId = submission.hireId;
     // A fund submission the server relayed always carries its hire; if it
     // does not, no retry can ever fix it, so it is a terminal mismatch
     // rather than an error the tracker would retry forever.
     if (hireId == null) return _mismatch(null);
+    final row = await _lifecycle(
+      (hires, preparations) => hires.findHire(hireId),
+    );
+    // An unknown hire cannot appear later: terminal, not retried.
+    if (row == null) return _mismatch(null);
+    final jobId = row.jobId;
+    // The hire is bound to one job at create_job: only the event of that job
+    // can fund it. Zero or several candidates are not provable.
+    final matches = events.where((event) => event.jobId == jobId).toList();
+    if (matches.length != 1) return _mismatch(_jobIdField);
     return await _repositories(
-      (repository) => _fund(repository, HireId(hireId), submission, event),
+      (repository) =>
+          _fund(repository, HireId(hireId), submission, matches.single),
     );
   }
 
@@ -147,12 +169,57 @@ final class HireEscrowEffects implements EscrowEffects {
     });
   }
 
+  @override
+  Future<ExpiredFund> reconcileExpiredFund(StoredSubmission submission) async {
+    final hireId = submission.hireId;
+    if (hireId == null) return const ExpiredFundUnknown();
+    final row = await _lifecycle(
+      (hires, preparations) => hires.findHire(hireId),
+    );
+    final jobId = row?.jobId;
+    if (jobId == null) return const ExpiredFundUnknown();
+    final job = await _jobs.escrowJob(jobId);
+    if (job == null) return const ExpiredFundUnknown();
+    switch (job.state) {
+      case EscrowJobState.open:
+        return const ExpiredFundNotLanded();
+      case EscrowJobState.expired:
+        return const ExpiredFundUnknown();
+      case EscrowJobState.funded ||
+          EscrowJobState.submitted ||
+          EscrowJobState.completed ||
+          EscrowJobState.rejected:
+        // The job left Open, so the fund landed. It may have moved on since:
+        // the other job checks still apply, only the state is not compared.
+        final event = JobFundedEvent(
+          jobId: jobId,
+          client: job.client,
+          amount: job.budget,
+          feeBps: job.feeBps,
+        );
+        return ExpiredFundLanded(
+          await _repositories(
+            (repository) => _fund(
+              repository,
+              HireId(hireId),
+              submission,
+              event,
+              landedJob: job,
+            ),
+          ),
+        );
+    }
+  }
+
+  /// [landedJob] is a job already read whose fund is proven to have landed:
+  /// its state is checked as `Funded` whatever it is now.
   Future<EffectResult> _fund(
     HireRepository repository,
     HireId hireId,
     StoredSubmission submission,
-    JobFundedEvent event,
-  ) async {
+    JobFundedEvent event, {
+    EscrowJob? landedJob,
+  }) async {
     final hire = await repository.findById(hireId);
     final expiredAt = await repository.preparedExpiry(hireId);
     // An unknown hire cannot appear later: terminal, not retried.
@@ -170,7 +237,7 @@ final class HireEscrowEffects implements EscrowEffects {
         return _mismatch(null);
     }
 
-    final job = await _jobs.escrowJob(event.jobId);
+    final job = landedJob ?? await _jobs.escrowJob(event.jobId);
     if (job == null) {
       return EffectResult.failed(SubmissionOutcomeCode.jobEvidenceUnavailable);
     }
@@ -179,7 +246,7 @@ final class HireEscrowEffects implements EscrowEffects {
 
     final verdict = verifyFunding(
       hire,
-      _fundedJob(event.jobId, job),
+      _fundedJob(event.jobId, job, landed: landedJob != null),
       transaction: TransactionHash.parse(submission.transactionHash),
       usdc: _usdc,
       agentWallet: agentWallet,
@@ -207,21 +274,24 @@ const _providerField = 'provider';
 EffectResult _mismatch(String? field) =>
     EffectResult.failed(SubmissionOutcomeCode.jobMismatch, field: field);
 
-FundedJob _fundedJob(int jobId, EscrowJob job) => FundedJob(
-  jobId: jobId,
-  client: job.client,
-  evaluator: job.evaluator,
-  provider: job.provider,
-  token: job.token,
-  agentId: job.agentId,
-  budget: job.budget,
-  expiredAt: job.expiredAt,
-  state: switch (job.state) {
-    EscrowJobState.open => JobState.open,
-    EscrowJobState.funded => JobState.funded,
-    EscrowJobState.submitted => JobState.submitted,
-    EscrowJobState.completed => JobState.completed,
-    EscrowJobState.rejected => JobState.rejected,
-    EscrowJobState.expired => JobState.expired,
-  },
-);
+FundedJob _fundedJob(int jobId, EscrowJob job, {bool landed = false}) =>
+    FundedJob(
+      jobId: jobId,
+      client: job.client,
+      evaluator: job.evaluator,
+      provider: job.provider,
+      token: job.token,
+      agentId: job.agentId,
+      budget: job.budget,
+      expiredAt: job.expiredAt,
+      state: landed
+          ? JobState.funded
+          : switch (job.state) {
+              EscrowJobState.open => JobState.open,
+              EscrowJobState.funded => JobState.funded,
+              EscrowJobState.submitted => JobState.submitted,
+              EscrowJobState.completed => JobState.completed,
+              EscrowJobState.rejected => JobState.rejected,
+              EscrowJobState.expired => JobState.expired,
+            },
+    );

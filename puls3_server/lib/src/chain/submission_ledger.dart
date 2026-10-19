@@ -20,8 +20,9 @@ final class TransactionLookup {
   const TransactionLookup({
     required this.status,
     this.latestLedgerCloseTime,
-    this.jobCreated,
-    this.jobFunded,
+    this.oldestLedgerCloseTime,
+    this.jobCreated = const [],
+    this.jobFunded = const [],
   });
 
   final TransactionStatus status;
@@ -31,11 +32,18 @@ final class TransactionLookup {
   /// node did not report it.
   final DateTime? latestLedgerCloseTime;
 
-  /// The configured escrow's `job_created` event, on [TransactionStatus.success].
-  final JobCreatedEvent? jobCreated;
+  /// Close time of the oldest ledger the node still retains: a transaction
+  /// sent before this instant can no longer be found. `null` when the node
+  /// did not report it.
+  final DateTime? oldestLedgerCloseTime;
 
-  /// The configured escrow's `job_funded` event, on [TransactionStatus.success].
-  final JobFundedEvent? jobFunded;
+  /// The configured escrow's valid `job_created` events, in order, on
+  /// [TransactionStatus.success]; empty otherwise.
+  final List<JobCreatedEvent> jobCreated;
+
+  /// The configured escrow's valid `job_funded` events, in order, on
+  /// [TransactionStatus.success]; empty otherwise.
+  final List<JobFundedEvent> jobFunded;
 }
 
 /// The chain as the submission tracker needs it.
@@ -48,7 +56,9 @@ abstract interface class SubmissionLedger {
 
   /// Sends a persisted, signed [envelopeXdr] again, unchanged.
   ///
+  /// [expectedHash] is the persisted transaction hash of the envelope.
   /// Throws [RpcRequestRejected] when the node refuses the envelope itself
-  /// and [LedgerUnavailable] when the outcome is unknown.
-  Future<SendTransactionResult> resend(String envelopeXdr);
+  /// and [LedgerUnavailable] when the outcome is unknown, including an
+  /// answer for a hash other than [expectedHash].
+  Future<SendTransactionResult> resend(String envelopeXdr, String expectedHash);
 }

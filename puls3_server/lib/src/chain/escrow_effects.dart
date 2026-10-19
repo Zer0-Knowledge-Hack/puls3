@@ -38,6 +38,31 @@ const _effectCodes = {
   SubmissionOutcomeCode.jobEvidenceUnavailable,
 };
 
+/// What the escrow says about a `fund` whose transaction the node can no
+/// longer find after its `validUntil`.
+sealed class ExpiredFund {
+  const ExpiredFund();
+}
+
+/// The fund landed although the node does not know the transaction: the job
+/// is `Funded` or later. [result] is the fund effect applied to it.
+final class ExpiredFundLanded extends ExpiredFund {
+  const ExpiredFundLanded(this.result);
+
+  final EffectResult result;
+}
+
+/// The job is still `Open`: the fund never landed.
+final class ExpiredFundNotLanded extends ExpiredFund {
+  const ExpiredFundNotLanded();
+}
+
+/// The escrow cannot say: no hire or job id to read, no such job, or an
+/// `Expired` job.
+final class ExpiredFundUnknown extends ExpiredFund {
+  const ExpiredFundUnknown();
+}
+
 /// Applies the domain effect of a successful relayed transaction (api.md
 /// relay step 5): record the job id after `create_job`, `Hire.fund` after
 /// `fund`, confirm the rating after `give_feedback`.
@@ -50,15 +75,18 @@ const _effectCodes = {
 /// and is retried.
 abstract interface class EscrowEffects {
   /// After a successful `create_job` ([SubmissionPurpose.createJob]).
+  /// [events] are all the valid `job_created` events of the transaction, in
+  /// order; the implementation picks the one that belongs to the hire.
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
-    JobCreatedEvent event,
+    List<JobCreatedEvent> events,
   );
 
-  /// After a successful `fund` ([SubmissionPurpose.fund]).
+  /// After a successful `fund` ([SubmissionPurpose.fund]). [events] are all
+  /// the valid `job_funded` events of the transaction, in order.
   Future<EffectResult> onFunded(
     StoredSubmission submission,
-    JobFundedEvent event,
+    List<JobFundedEvent> events,
   );
 
   /// After a successful `give_feedback` ([SubmissionPurpose.giveFeedback]).
@@ -68,6 +96,14 @@ abstract interface class EscrowEffects {
   /// the hire's feedback. Confirming the submission is what exposes it as the
   /// hire's `feedbackReference` (no column stores it).
   Future<EffectResult> onFeedbackGiven(StoredSubmission submission);
+
+  /// For a `fund` that is NOT_FOUND past its `validUntil`: reads the escrow
+  /// job of the submission's hire to tell whether the fund landed anyway
+  /// (the node may have lost the transaction, not the ledger).
+  ///
+  /// Reading the job can fail; the exception leaves the submission
+  /// `submitted` for a later pass.
+  Future<ExpiredFund> reconcileExpiredFund(StoredSubmission submission);
 }
 
 /// Accepts every effect without changing anything, and logs it. Used until
@@ -80,11 +116,11 @@ final class NoopEscrowEffects implements EscrowEffects {
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
-    JobCreatedEvent event,
+    List<JobCreatedEvent> events,
   ) async {
     _log(
       ChainLogLevel.info,
-      'No escrow effect for job ${event.jobId} created by submission '
+      'No escrow effect for job ${_jobIds(events.map((e) => e.jobId))} created by submission '
       '${submission.id}',
     );
     return const EffectResult.ok();
@@ -93,11 +129,11 @@ final class NoopEscrowEffects implements EscrowEffects {
   @override
   Future<EffectResult> onFunded(
     StoredSubmission submission,
-    JobFundedEvent event,
+    List<JobFundedEvent> events,
   ) async {
     _log(
       ChainLogLevel.info,
-      'No escrow effect for job ${event.jobId} funded by submission '
+      'No escrow effect for job ${_jobIds(events.map((e) => e.jobId))} funded by submission '
       '${submission.id}',
     );
     return const EffectResult.ok();
@@ -112,4 +148,10 @@ final class NoopEscrowEffects implements EscrowEffects {
     );
     return const EffectResult.ok();
   }
+
+  @override
+  Future<ExpiredFund> reconcileExpiredFund(StoredSubmission submission) async =>
+      const ExpiredFundUnknown();
 }
+
+String _jobIds(Iterable<int> ids) => ids.join(', ');

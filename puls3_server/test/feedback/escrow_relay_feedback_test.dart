@@ -89,6 +89,24 @@ void main() {
       );
     });
 
+    test(
+      'a record failed with OutcomeUnknown blocks the feedback too',
+      () async {
+        final hire = await rig.hire(status: HireStatus.completed);
+        await rig.record(
+          hire.id,
+          SubmissionPurpose.complete,
+          failedWith: SubmissionOutcomeCode.outcomeUnknown,
+        );
+
+        await expectLater(
+          rig.service.prepareFeedback(_wallet, hire.id, _call),
+          throwsA(api('OutcomeUnknown')),
+        );
+        expect(rig.codec.built, isEmpty);
+      },
+    );
+
     test('another wallet cannot prepare it', () async {
       final hire = await rig.hire(status: HireStatus.completed);
 

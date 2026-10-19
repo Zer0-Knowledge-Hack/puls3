@@ -183,6 +183,19 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(unchanged.errorCode, SubmissionOutcomeCode.submissionRejected);
   });
 
+  test('markFailed accepts OutcomeUnknown', () async {
+    create();
+    final stored = await insert();
+
+    expect(
+      await repo.markFailed(stored.id, SubmissionOutcomeCode.outcomeUnknown),
+      isTrue,
+    );
+    final failed = (await repo.findByPreparation('prep-1'))!;
+    expect(failed.state, SubmissionState.failed);
+    expect(failed.errorCode, 'OutcomeUnknown');
+  });
+
   test('transitions of an unknown id change nothing', () async {
     create();
 

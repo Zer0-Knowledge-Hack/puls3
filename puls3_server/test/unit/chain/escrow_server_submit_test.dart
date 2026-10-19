@@ -105,6 +105,7 @@ void main() {
   late _Accounts accounts;
   late FakeEnvelopeCodec codec;
   late List<String> sent;
+  late List<String> sentHashes;
   late SendTransactionResult answer;
   late Object? sendFailure;
 
@@ -113,8 +114,9 @@ void main() {
     accounts: accounts,
     codec: codec,
     sign: (prepared) => FakeEnvelopeCodec.sign(prepared.envelopeXdr),
-    send: (envelope) {
+    send: (envelope, hash) {
       sent.add(envelope);
+      sentHashes.add(hash);
       final failure = sendFailure;
       if (failure != null) throw failure;
       return Future.value(answer);
@@ -132,6 +134,7 @@ void main() {
     accounts = _Accounts();
     codec = FakeEnvelopeCodec();
     sent = [];
+    sentHashes = [];
     sendFailure = null;
     answer = SendTransactionResult(
       status: SendTransactionStatus.pending,
@@ -172,6 +175,7 @@ void main() {
     expect(record.sendAttempts, 1);
     expect(record.transactionHash, hasLength(64));
     expect(sent, [record.signedEnvelopeXdr]);
+    expect(sentHashes, [record.transactionHash]);
   });
 
   test('claim_refund invokes claim_refund', () async {

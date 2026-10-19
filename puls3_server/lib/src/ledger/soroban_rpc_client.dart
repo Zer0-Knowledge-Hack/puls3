@@ -349,13 +349,24 @@ final class SorobanRpcClient {
   /// A [RpcRequestRejected] means the node refused the envelope itself, so
   /// sending it again cannot succeed. Status `ERROR` is a result, not an
   /// exception.
-  Future<SendTransactionResult> sendTransaction(String envelopeXdr) async {
+  ///
+  /// [expectedHash] is the hash the caller computed for [envelopeXdr]. An
+  /// answer for any other hash (compared as lowercase hex) is a
+  /// [LedgerUnavailable]: the node did not take the envelope the caller
+  /// meant to send.
+  Future<SendTransactionResult> sendTransaction(
+    String envelopeXdr,
+    String expectedHash,
+  ) async {
     const method = 'sendTransaction';
     final result = await _call(method, {'transaction': envelopeXdr});
     final status = _sendStatuses[result['status']];
     final hash = result['hash'];
     if (status == null || hash is! String) {
       throw LedgerUnavailable('$method answered no known status and hash');
+    }
+    if (hash.toLowerCase() != expectedHash.toLowerCase()) {
+      throw LedgerUnavailable('$method answered a different transaction hash');
     }
     final latestLedger = result['latestLedger'];
     final closeTime = result['latestLedgerCloseTime'];

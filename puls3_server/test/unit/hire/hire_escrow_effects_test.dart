@@ -126,13 +126,38 @@ void main() {
     usdc: _usdc,
   );
 
+  /// The hire in the lifecycle store, with [jobId] bound when not null.
+  /// Ids line up with [repo]: both start at 1.
+  Future<void> lifecycleHire({int? jobId = 3}) async {
+    if (lifecycle.all.isEmpty) {
+      await lifecycle.insertHire(
+        const NewHire(
+          consumer: 'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H',
+          agentId: 7,
+          price: _price,
+          manifestVersion: 1,
+          expiredAt: _expiredAt,
+          requestId: 'fund-request',
+          input: 'hello',
+        ),
+      );
+    }
+    if (jobId != null) await lifecycle.bindJob(1, jobId, expiredAt: _expiredAt);
+  }
+
   Future<EffectResult> fund({
     StoredSubmission? submission,
     JobFundedEvent? event,
+    List<JobFundedEvent>? events,
     FakeHireRepository? withRepo,
-  }) => effects(
-    withRepo ?? repo,
-  ).onFunded(submission ?? _submission(), event ?? _event());
+    int? boundJobId = 3,
+  }) async {
+    await lifecycleHire(jobId: boundJobId);
+    return effects(withRepo ?? repo).onFunded(
+      submission ?? _submission(),
+      events ?? [event ?? _event()],
+    );
+  }
 
   Matcher mismatch(String? field) => isA<EffectFailed>()
       .having((r) => r.code, 'code', SubmissionOutcomeCode.jobMismatch)
@@ -245,10 +270,10 @@ void main() {
     });
 
     test('accepts the recorded testnet fund of job 3', () async {
-      final event = firstJobFunded(
+      final event = allJobFunded(
         _fixture('get_transaction_fund_job_3.json'),
         escrow: StellarConfig.testnet.escrow,
-      )!;
+      ).single;
       final recorded = decodeEscrowJob(
         (_fixture('simulate_escrow_job_3.json')['results']! as List)
             .cast<Map<String, Object?>>()
@@ -291,6 +316,28 @@ void main() {
         expect((await repo.findById(hire.id))!.status, HireStatus.funded);
       },
     );
+
+    test('takes the event of the hire job among several', () async {
+      final result = await fund(
+        events: [_event(jobId: 4), _event(), _event(jobId: 5)],
+      );
+
+      expect(result, isA<EffectOk>());
+      expect(repo.jobIds[hire.id.value], 3);
+      expect((await repo.findById(hire.id))!.status, HireStatus.funded);
+    });
+
+    test('takes the event of the hire job when another one is bound', () async {
+      ledger.jobs[4] = _job();
+
+      final result = await fund(
+        events: [_event(jobId: 3), _event(jobId: 4)],
+        boundJobId: 4,
+      );
+
+      expect(result, isA<EffectOk>());
+      expect(repo.jobIds[hire.id.value], 4);
+    });
 
     test('a retry of a funded hire does not read the chain again', () async {
       expect(await fund(), isA<EffectOk>());
@@ -384,6 +431,34 @@ void main() {
       );
     });
 
+    test('job_id: no event is for the hire job', () async {
+      final result = await fund(events: [_event(jobId: 4), _event(jobId: 5)]);
+
+      expect(result, mismatch('job_id'));
+      await expectNotPaid();
+    });
+
+    test('job_id: several events are for the hire job', () async {
+      final result = await fund(events: [_event(), _event()]);
+
+      expect(result, mismatch('job_id'));
+      await expectNotPaid();
+    });
+
+    test('job_id: the hire has no job yet', () async {
+      final result = await fund(boundJobId: null);
+
+      expect(result, mismatch('job_id'));
+      await expectNotPaid();
+    });
+
+    test('job_id: no event at all', () async {
+      final result = await fund(events: const []);
+
+      expect(result, mismatch('job_id'));
+      await expectNotPaid();
+    });
+
     test('no field: the hire is no longer open', () async {
       repo.hires[hire.id.value] = hire.reject();
 
@@ -448,6 +523,116 @@ void main() {
     });
   });
 
+  group('reconcileExpiredFund', () {
+    Future<ExpiredFund> reconcile({
+      StoredSubmission? submission,
+      int? boundJobId = 3,
+    }) async {
+      await lifecycleHire(jobId: boundJobId);
+      return effects(repo).reconcileExpiredFund(submission ?? _submission());
+    }
+
+    const landedStates = [
+      EscrowJobState.funded,
+      EscrowJobState.submitted,
+      EscrowJobState.completed,
+      EscrowJobState.rejected,
+    ];
+    for (final state in landedStates) {
+      test('a job ${state.name} has landed: the hire is paid', () async {
+        ledger.jobs[3] = _job(state: state);
+
+        final answer = await reconcile();
+
+        expect(
+          answer,
+          isA<ExpiredFundLanded>().having(
+            (a) => a.result,
+            'result',
+            isA<EffectOk>(),
+          ),
+        );
+        final stored = (await repo.findById(hire.id))!;
+        expect(stored.status, HireStatus.funded);
+        expect(stored.paymentTransaction?.value, _fundTx);
+        expect(repo.jobIds[hire.id.value], 3);
+      });
+    }
+
+    test('a landed fund of another client is a JobMismatch', () async {
+      ledger.jobs[3] = _job(state: EscrowJobState.completed, client: _stranger);
+
+      final answer = await reconcile();
+
+      expect(
+        answer,
+        isA<ExpiredFundLanded>().having(
+          (a) => a.result,
+          'result',
+          mismatch('client'),
+        ),
+      );
+      await expectNotPaid();
+    });
+
+    test('a landed fund applied twice pays once', () async {
+      ledger.jobs[3] = _job(state: EscrowJobState.submitted);
+
+      await reconcile();
+      final again = await reconcile();
+
+      expect(again, isA<ExpiredFundLanded>());
+      expect(repo.recordPaymentCalls, 1);
+    });
+
+    test('an open job never received the fund', () async {
+      ledger.jobs[3] = _job(state: EscrowJobState.open);
+
+      final answer = await reconcile();
+
+      expect(answer, isA<ExpiredFundNotLanded>());
+      await expectNotPaid();
+    });
+
+    test('an expired job proves nothing', () async {
+      ledger.jobs[3] = _job(state: EscrowJobState.expired);
+
+      expect(await reconcile(), isA<ExpiredFundUnknown>());
+      await expectNotPaid();
+    });
+
+    test('a job the escrow cannot return proves nothing', () async {
+      ledger.jobs.clear();
+
+      expect(await reconcile(), isA<ExpiredFundUnknown>());
+    });
+
+    test('a hire without a job id proves nothing', () async {
+      expect(await reconcile(boundJobId: null), isA<ExpiredFundUnknown>());
+    });
+
+    test('a submission without a hire proves nothing', () async {
+      expect(
+        await reconcile(submission: _submission(hireId: null)),
+        isA<ExpiredFundUnknown>(),
+      );
+    });
+
+    test('a hire the lifecycle store does not know proves nothing', () async {
+      expect(
+        await reconcile(submission: _submission(hireId: 99)),
+        isA<ExpiredFundUnknown>(),
+      );
+    });
+
+    test('a ledger failure propagates so the tracker retries', () async {
+      ledger.jobError = const LedgerUnavailable('RPC down');
+
+      await expectLater(reconcile(), throwsA(isA<LedgerUnavailable>()));
+      await expectNotPaid();
+    });
+  });
+
   group('onJobCreated', () {
     // The job the create_job opened lasts until this instant, which differs
     // from the hire's own expired_at so the effect must copy it.
@@ -490,15 +675,21 @@ void main() {
       );
     }
 
-    JobCreatedEvent created(int jobId) => JobCreatedEvent(
+    JobCreatedEvent created(
+      int jobId, {
+      StellarAddress? client,
+      int agentId = 7,
+      int budget = _price,
+      int expiredAt = preparedExpiry,
+    }) => JobCreatedEvent(
       jobId: jobId,
-      client: _alice,
+      client: client ?? _alice,
       provider: _agentWallet,
       evaluator: _alice,
-      agentId: AgentId(7),
+      agentId: AgentId(agentId),
       token: _usdc,
-      budget: BigInt.from(_price),
-      expiredAt: preparedExpiry,
+      budget: BigInt.from(budget),
+      expiredAt: expiredAt,
     );
 
     test(
@@ -508,7 +699,7 @@ void main() {
 
         final result = await effects(
           repo,
-        ).onJobCreated(p.submission, created(3));
+        ).onJobCreated(p.submission, [created(3)]);
 
         expect(result, isA<EffectOk>());
         final stored = (await lifecycle.findHire(p.row.id))!;
@@ -521,9 +712,11 @@ void main() {
 
     test('applied twice it succeeds and the job id is stored once', () async {
       final p = await pending();
-      await effects(repo).onJobCreated(p.submission, created(3));
+      await effects(repo).onJobCreated(p.submission, [created(3)]);
 
-      final again = await effects(repo).onJobCreated(p.submission, created(3));
+      final again = await effects(
+        repo,
+      ).onJobCreated(p.submission, [created(3)]);
 
       expect(again, isA<EffectOk>());
       expect(lifecycle.all.where((h) => h.jobId == 3), hasLength(1));
@@ -535,11 +728,11 @@ void main() {
       () async {
         final first = await pending();
         final second = await pending(requestId: 'request-2');
-        await effects(repo).onJobCreated(first.submission, created(3));
+        await effects(repo).onJobCreated(first.submission, [created(3)]);
 
         final result = await effects(repo).onJobCreated(
           second.submission,
-          created(3),
+          [created(3)],
         );
 
         expect(result, mismatch('job_id'));
@@ -551,18 +744,76 @@ void main() {
 
     test('a hire that already holds another job is a mismatch', () async {
       final p = await pending();
-      await effects(repo).onJobCreated(p.submission, created(3));
+      await effects(repo).onJobCreated(p.submission, [created(3)]);
 
-      final result = await effects(repo).onJobCreated(p.submission, created(4));
+      final result = await effects(
+        repo,
+      ).onJobCreated(p.submission, [created(4)]);
 
       expect(result, mismatch('job_id'));
       expect((await lifecycle.findHire(p.row.id))!.jobId, 3);
     });
 
+    test('takes the event that matches the hire among several', () async {
+      final p = await pending();
+
+      final result = await effects(repo).onJobCreated(p.submission, [
+        created(8, client: _stranger),
+        created(9, agentId: 8),
+        created(3),
+        created(10, budget: _price + 1),
+        created(11, expiredAt: preparedExpiry + 1),
+      ]);
+
+      expect(result, isA<EffectOk>());
+      expect((await lifecycle.findHire(p.row.id))!.jobId, 3);
+    });
+
+    group('JobMismatch on job_id', () {
+      final cases = <String, JobCreatedEvent Function()>{
+        'client': () => created(3, client: _stranger),
+        'agent': () => created(3, agentId: 8),
+        'budget': () => created(3, budget: _price + 1),
+        'expired_at': () => created(3, expiredAt: preparedExpiry + 1),
+      };
+      for (final entry in cases.entries) {
+        test('no event matches the hire: ${entry.key} differs', () async {
+          final p = await pending();
+
+          final result = await effects(repo).onJobCreated(p.submission, [
+            entry.value(),
+          ]);
+
+          expect(result, mismatch('job_id'));
+          expect((await lifecycle.findHire(p.row.id))!.jobId, isNull);
+        });
+      }
+
+      test('several events match the hire', () async {
+        final p = await pending();
+
+        final result = await effects(repo).onJobCreated(p.submission, [
+          created(3),
+          created(4),
+        ]);
+
+        expect(result, mismatch('job_id'));
+        expect((await lifecycle.findHire(p.row.id))!.jobId, isNull);
+      });
+
+      test('no event at all', () async {
+        final p = await pending();
+
+        final result = await effects(repo).onJobCreated(p.submission, const []);
+
+        expect(result, mismatch('job_id'));
+      });
+    });
+
     test('a submission without a hire is a terminal mismatch', () async {
       final result = await effects(repo).onJobCreated(
         _submission(purpose: SubmissionPurpose.createJob, hireId: null),
-        created(3),
+        [created(3)],
       );
 
       expect(result, mismatch(null));
@@ -584,7 +835,7 @@ void main() {
           unprepared.submission,
         ]) {
           await expectLater(
-            effects(repo).onJobCreated(submission, created(3)),
+            effects(repo).onJobCreated(submission, [created(3)]),
             throwsStateError,
           );
         }

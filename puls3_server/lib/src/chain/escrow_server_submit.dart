@@ -74,7 +74,11 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
     required ChainAccounts accounts,
     required EnvelopeCodec codec,
     required String Function(PreparedEnvelope prepared) sign,
-    required Future<SendTransactionResult> Function(String envelopeXdr) send,
+    required Future<SendTransactionResult> Function(
+      String envelopeXdr,
+      String expectedHash,
+    )
+    send,
     required this.source,
     required this.escrow,
     required this.inclusionFee,
@@ -93,7 +97,11 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
   final ChainAccounts _accounts;
   final EnvelopeCodec _codec;
   final String Function(PreparedEnvelope prepared) _sign;
-  final Future<SendTransactionResult> Function(String envelopeXdr) _send;
+  final Future<SendTransactionResult> Function(
+    String envelopeXdr,
+    String expectedHash,
+  )
+  _send;
   final DateTime Function() _now;
   final ChainLog _log;
 
@@ -179,7 +187,10 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
       code: SubmissionOutcomeCode.submissionRejected,
     );
     try {
-      final result = await _send(record.signedEnvelopeXdr);
+      final result = await _send(
+        record.signedEnvelopeXdr,
+        record.transactionHash,
+      );
       switch (result.status) {
         case SendTransactionStatus.pending || SendTransactionStatus.duplicate:
           await _submissions.recordSend(record.id, _now().toUtc());

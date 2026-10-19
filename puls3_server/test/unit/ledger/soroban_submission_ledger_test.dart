@@ -12,6 +12,8 @@ import 'package:test/test.dart';
 
 const _createJobHash =
     '3baba1832b5a1d44330068acd41d5b09fb8e15faab1ba914829c0a0a62d054fb';
+const _sentHash =
+    '7e1b2f3c4d5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0';
 const _fundHash =
     '43cd3e8455cafdc08d62a644b8f9dd9174994644b2bdd3e57eaa6893aa5c2437';
 
@@ -72,8 +74,8 @@ void main() {
         lookup.latestLedgerCloseTime,
         DateTime.fromMillisecondsSinceEpoch(1791240237 * 1000, isUtc: true),
       );
-      expect(lookup.jobCreated!.jobId, 3);
-      expect(lookup.jobFunded, isNull);
+      expect(lookup.jobCreated.single.jobId, 3);
+      expect(lookup.jobFunded, isEmpty);
     });
 
     test('a successful fund carries its JobFunded event', () async {
@@ -82,10 +84,31 @@ void main() {
       final lookup = await h.ledger.lookup(_fundHash);
 
       expect(lookup.status, TransactionStatus.success);
-      expect(lookup.jobFunded!.jobId, 3);
-      expect(lookup.jobFunded!.amount, BigInt.from(5000000));
-      expect(lookup.jobCreated, isNull);
+      expect(lookup.jobFunded.single.jobId, 3);
+      expect(lookup.jobFunded.single.amount, BigInt.from(5000000));
+      expect(lookup.jobCreated, isEmpty);
     });
+
+    test(
+      'several events of one transaction are all carried, in order',
+      () async {
+        final answer = _edited('get_transaction_fund_job_3.json', (r) {
+          final groups = (r['events']! as Map)['contractEventsJson']! as List;
+          final events = groups.single as List;
+          final funded = events.cast<Map<String, Object?>>().last;
+          final copy = jsonDecode(jsonEncode(funded)) as Map<String, Object?>;
+          (((copy['body']! as Map)['v0']! as Map)['topics']! as List)[1] = {
+            'u64': '4',
+          };
+          events.add(copy);
+        });
+        final h = _ledger(answer);
+
+        final lookup = await h.ledger.lookup(_fundHash);
+
+        expect(lookup.jobFunded.map((e) => e.jobId), [3, 4]);
+      },
+    );
 
     test('events of a contract other than the configured escrow are '
         'ignored', () async {
@@ -100,7 +123,7 @@ void main() {
       final lookup = await h.ledger.lookup(_fundHash);
 
       expect(lookup.status, TransactionStatus.success);
-      expect(lookup.jobFunded, isNull);
+      expect(lookup.jobFunded, isEmpty);
     });
 
     test('NOT_FOUND keeps the chain close time', () async {
@@ -113,8 +136,8 @@ void main() {
         lookup.latestLedgerCloseTime,
         DateTime.fromMillisecondsSinceEpoch(1791146442 * 1000, isUtc: true),
       );
-      expect(lookup.jobCreated, isNull);
-      expect(lookup.jobFunded, isNull);
+      expect(lookup.jobCreated, isEmpty);
+      expect(lookup.jobFunded, isEmpty);
     });
 
     test('FAILED carries no escrow facts', () async {
@@ -128,7 +151,7 @@ void main() {
       final lookup = await h.ledger.lookup(_fundHash);
 
       expect(lookup.status, TransactionStatus.failed);
-      expect(lookup.jobFunded, isNull);
+      expect(lookup.jobFunded, isEmpty);
     });
 
     test('a missing or malformed close time is null', () async {
@@ -171,11 +194,21 @@ void main() {
     test('sends the persisted envelope unchanged', () async {
       final h = _ledger(_fixture('send_transaction_pending.json'));
 
-      final result = await h.ledger.resend('AAAA');
+      final result = await h.ledger.resend('AAAA', _sentHash);
 
       expect(h.requests.single['method'], 'sendTransaction');
       expect(h.requests.single['params'], {'transaction': 'AAAA'});
       expect(result.status, SendTransactionStatus.pending);
+    });
+
+    test('forwards the expected hash: an answer for another hash is '
+        'LedgerUnavailable', () {
+      final h = _ledger(_fixture('send_transaction_pending.json'));
+
+      expect(
+        () => h.ledger.resend('AAAA', _fundHash),
+        throwsA(isA<LedgerUnavailable>()),
+      );
     });
   });
 }

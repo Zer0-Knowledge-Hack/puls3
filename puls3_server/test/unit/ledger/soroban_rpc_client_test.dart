@@ -84,7 +84,7 @@ void main() {
           }),
         );
 
-        await client.sendTransaction('AAAA');
+        await client.sendTransaction('AAAA', _sentHash);
 
         expect(body['method'], 'sendTransaction');
         expect(body['params'], {'transaction': 'AAAA'});
@@ -95,14 +95,14 @@ void main() {
   group('sendTransaction result', () {
     Future<SendTransactionResult> send(String fixture) => _client(
       MockClient((_) async => _json(_fixture(fixture))),
-    ).sendTransaction('AAAA');
+    ).sendTransaction('AAAA', _sentHash);
 
     Future<SendTransactionResult> sendResult(Map<String, Object?> result) =>
         _client(
           MockClient(
             (_) async => _json({'jsonrpc': '2.0', 'id': 1, 'result': result}),
           ),
-        ).sendTransaction('AAAA');
+        ).sendTransaction('AAAA', _sentHash);
 
     test('PENDING carries the hash and the latest ledger', () async {
       final result = await send('send_transaction_pending.json');
@@ -144,6 +144,29 @@ void main() {
       expect(result.errorResultXdr, isNull);
     });
 
+    test('an answer hash that differs from the expected one is '
+        'LedgerUnavailable', () {
+      expect(
+        () => _client(
+          MockClient(
+            (_) async => _json(_fixture('send_transaction_pending.json')),
+          ),
+        ).sendTransaction('AAAA', 'ab' * 32),
+        _throwsUnavailable,
+      );
+    });
+
+    test('the expected hash matches regardless of case', () async {
+      final result = await _client(
+        MockClient(
+          (_) async => _json(_fixture('send_transaction_pending.json')),
+        ),
+      ).sendTransaction('AAAA', _sentHash.toUpperCase());
+
+      expect(result.hash, _sentHash);
+      expect(result.status, SendTransactionStatus.pending);
+    });
+
     test('an unknown status or a missing hash is LedgerUnavailable', () {
       expect(
         () => sendResult({'status': 'SUCCESS', 'hash': _sentHash}),
@@ -166,7 +189,10 @@ void main() {
 
       expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
       expect(() => client.getTransaction('00' * 32), _throwsUnavailable);
-      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
+      expect(
+        () => client.sendTransaction('AAAA', _sentHash),
+        _throwsUnavailable,
+      );
     });
 
     test('HTTP 4xx', () {
@@ -194,7 +220,10 @@ void main() {
       );
 
       expect(() => client.simulateTransaction('AAAA'), _throwsUnavailable);
-      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
+      expect(
+        () => client.sendTransaction('AAAA', _sentHash),
+        _throwsUnavailable,
+      );
     });
 
     test('an http client exception', () {
@@ -224,7 +253,10 @@ void main() {
         ),
       );
       expect(() => client.simulateTransaction('AAAA'), throwsServerError);
-      expect(() => client.sendTransaction('AAAA'), throwsServerError);
+      expect(
+        () => client.sendTransaction('AAAA', _sentHash),
+        throwsServerError,
+      );
     });
 
     test('a JSON-RPC error without a numeric code', () {
@@ -234,7 +266,10 @@ void main() {
         ),
       );
 
-      expect(() => client.sendTransaction('AAAA'), _throwsUnavailable);
+      expect(
+        () => client.sendTransaction('AAAA', _sentHash),
+        _throwsUnavailable,
+      );
     });
 
     test('a body that is not JSON', () {
@@ -274,7 +309,7 @@ void main() {
               .having((e) => e.code, 'code', code)
               .having((e) => e.rpcMessage, 'rpcMessage', 'invalid transaction'),
         );
-        expect(() => client.sendTransaction('AAAA'), throwsRejected);
+        expect(() => client.sendTransaction('AAAA', _sentHash), throwsRejected);
         expect(() => client.getTransaction('00' * 32), throwsRejected);
       });
     }

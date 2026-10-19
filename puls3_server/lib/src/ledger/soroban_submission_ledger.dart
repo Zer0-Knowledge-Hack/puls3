@@ -30,14 +30,17 @@ final class SorobanSubmissionLedger implements SubmissionLedger {
     return TransactionLookup(
       status: status,
       latestLedgerCloseTime: _unixSeconds(tx['latestLedgerCloseTime']),
-      jobCreated: firstJobCreated(tx, escrow: _escrow),
-      jobFunded: firstJobFunded(tx, escrow: _escrow),
+      oldestLedgerCloseTime: _unixSeconds(tx['oldestLedgerCloseTime']),
+      jobCreated: allJobCreated(tx, escrow: _escrow),
+      jobFunded: allJobFunded(tx, escrow: _escrow),
     );
   }
 
   @override
-  Future<SendTransactionResult> resend(String envelopeXdr) =>
-      _rpc.sendTransaction(envelopeXdr);
+  Future<SendTransactionResult> resend(
+    String envelopeXdr,
+    String expectedHash,
+  ) => _rpc.sendTransaction(envelopeXdr, expectedHash);
 }
 
 /// Unix seconds sent as a numeric string or a number, as UTC.

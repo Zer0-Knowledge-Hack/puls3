@@ -58,12 +58,13 @@ final class JobFundedEvent {
   final int feeBps;
 }
 
-/// The first `job_created` event that [escrow] emitted in a successful [tx],
-/// or `null`. Events of other contracts and malformed events are skipped.
-JobCreatedEvent? firstJobCreated(
+/// Every `job_created` event that [escrow] emitted in a successful [tx], in
+/// order. Events of other contracts and malformed events are skipped, so the
+/// list is empty when none is valid.
+List<JobCreatedEvent> allJobCreated(
   Map<String, Object?> tx, {
   required StellarAddress escrow,
-}) => _first(tx, escrow, 'job_created', (jobId, fields) {
+}) => _all(tx, escrow, 'job_created', (jobId, fields) {
   return JobCreatedEvent(
     jobId: jobId,
     client: readAddress(fields('client')),
@@ -76,12 +77,13 @@ JobCreatedEvent? firstJobCreated(
   );
 });
 
-/// The first `job_funded` event that [escrow] emitted in a successful [tx],
-/// or `null`. Events of other contracts and malformed events are skipped.
-JobFundedEvent? firstJobFunded(
+/// Every `job_funded` event that [escrow] emitted in a successful [tx], in
+/// order. Events of other contracts and malformed events are skipped, so the
+/// list is empty when none is valid.
+List<JobFundedEvent> allJobFunded(
   Map<String, Object?> tx, {
   required StellarAddress escrow,
-}) => _first(tx, escrow, 'job_funded', (jobId, fields) {
+}) => _all(tx, escrow, 'job_funded', (jobId, fields) {
   return JobFundedEvent(
     jobId: jobId,
     client: readAddress(fields('client')),
@@ -90,13 +92,14 @@ JobFundedEvent? firstJobFunded(
   );
 });
 
-T? _first<T>(
+List<T> _all<T>(
   Map<String, Object?> tx,
   StellarAddress escrow,
   String name,
   T Function(int jobId, Object? Function(String field) fields) build,
 ) {
-  if (tx['status'] != 'SUCCESS') return null;
+  if (tx['status'] != 'SUCCESS') return const [];
+  final events = <T>[];
   for (final event in contractEvents(tx)) {
     final body = contractEventBody(event, escrow.value);
     if (body == null || body.topics.length != 2) continue;
@@ -107,12 +110,12 @@ T? _first<T>(
       Object? field(String key) => data.containsKey(key)
           ? data[key]
           : throw LedgerUnavailable('$name has no "$key" field');
-      return build(jobId, field);
+      events.add(build(jobId, field));
     } on LedgerUnavailable {
       continue;
     } on InvalidAgentId {
       continue;
     }
   }
-  return null;
+  return events;
 }

@@ -64,6 +64,10 @@ abstract final class SubmissionOutcomeCode {
   static const jobEvidenceUnavailable = 'JobEvidenceUnavailable';
   static const escrowCallFailed = 'EscrowCallFailed';
 
+  /// The transaction can no longer be looked up and nothing else proves
+  /// whether it landed. The hire stays blocked until someone resolves it.
+  static const outcomeUnknown = 'OutcomeUnknown';
+
   static const all = {
     transactionFailed,
     submissionRejected,
@@ -71,6 +75,7 @@ abstract final class SubmissionOutcomeCode {
     jobMismatch,
     jobEvidenceUnavailable,
     escrowCallFailed,
+    outcomeUnknown,
   };
 
   /// Whether [code] is exactly one of [all].

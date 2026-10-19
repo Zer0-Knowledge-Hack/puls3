@@ -93,6 +93,7 @@ void main() {
         'JobEvidenceUnavailable',
       );
       expect(SubmissionOutcomeCode.escrowCallFailed, 'EscrowCallFailed');
+      expect(SubmissionOutcomeCode.outcomeUnknown, 'OutcomeUnknown');
     });
 
     test('all lists every code once', () {
@@ -103,11 +104,14 @@ void main() {
         'JobMismatch',
         'JobEvidenceUnavailable',
         'EscrowCallFailed',
+        'OutcomeUnknown',
       });
+      expect(SubmissionOutcomeCode.all, hasLength(7));
     });
 
     test('isKnown accepts only catalog codes', () {
       expect(SubmissionOutcomeCode.isKnown('JobMismatch'), isTrue);
+      expect(SubmissionOutcomeCode.isKnown('OutcomeUnknown'), isTrue);
       expect(SubmissionOutcomeCode.isKnown('jobMismatch'), isFalse);
       expect(SubmissionOutcomeCode.isKnown('ChainUnavailable'), isFalse);
     });

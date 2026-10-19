@@ -436,6 +436,71 @@ void main() {
       },
     );
 
+    test(
+      'a record failed with OutcomeUnknown blocks every prepare, whatever '
+      'the purpose of the record',
+      () async {
+        final ready = <(String, HireStatus?)>[
+          ('createJob', null),
+          ('fund', HireStatus.open),
+          ('complete', HireStatus.submitted),
+          ('reject', HireStatus.open),
+        ];
+        for (final (index, (purpose, status)) in ready.indexed) {
+          final hire = await rig.hire(status: status);
+          await rig.record(
+            hire.id,
+            SubmissionPurpose.values[index],
+            failedWith: SubmissionOutcomeCode.outcomeUnknown,
+          );
+
+          await expectLater(
+            prepare(purpose, rig, hire.id),
+            throwsA(api('OutcomeUnknown')),
+            reason: purpose,
+          );
+        }
+        expect(rig.preparations.all, isEmpty);
+      },
+    );
+
+    test(
+      'OutcomeUnknown blocks even when a later record failed another way',
+      () async {
+        final hire = await rig.hire();
+        await rig.record(
+          hire.id,
+          SubmissionPurpose.createJob,
+          failedWith: SubmissionOutcomeCode.outcomeUnknown,
+        );
+        await rig.record(
+          hire.id,
+          SubmissionPurpose.fund,
+          failedWith: SubmissionOutcomeCode.preparationExpired,
+        );
+
+        await expectLater(
+          rig.service.prepareCreateJob(rig.wallet, hire.id),
+          throwsA(api('OutcomeUnknown')),
+        );
+      },
+    );
+
+    test('SubmissionInProgress is reported before OutcomeUnknown', () async {
+      final hire = await rig.hire();
+      await rig.record(
+        hire.id,
+        SubmissionPurpose.createJob,
+        failedWith: SubmissionOutcomeCode.outcomeUnknown,
+      );
+      await rig.record(hire.id, SubmissionPurpose.fund);
+
+      await expectLater(
+        rig.service.prepareCreateJob(rig.wallet, hire.id),
+        throwsA(api('SubmissionInProgress')),
+      );
+    });
+
     test('a failed record does not block a new preparation', () async {
       final hire = await rig.hire();
       await rig.record(

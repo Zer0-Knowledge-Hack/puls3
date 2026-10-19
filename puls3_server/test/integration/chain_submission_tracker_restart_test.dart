@@ -60,12 +60,14 @@ void main() {
       ledger.lookups[funded.transactionHash] = TransactionLookup(
         status: TransactionStatus.success,
         latestLedgerCloseTime: _restartAt,
-        jobFunded: JobFundedEvent(
-          jobId: 3,
-          client: _address,
-          amount: BigInt.from(5000000),
-          feeBps: 0,
-        ),
+        jobFunded: [
+          JobFundedEvent(
+            jobId: 3,
+            client: _address,
+            amount: BigInt.from(5000000),
+            feeBps: 0,
+          ),
+        ],
       );
       final effects = FakeEscrowEffects();
       final tracker = ChainSubmissionTracker(

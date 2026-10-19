@@ -34,9 +34,12 @@ final class _ObservingLedger implements SubmissionLedger {
   Future<TransactionLookup> lookup(String hash) => _inner.lookup(hash);
 
   @override
-  Future<SendTransactionResult> resend(String envelopeXdr) async {
+  Future<SendTransactionResult> resend(
+    String envelopeXdr,
+    String expectedHash,
+  ) async {
     await _beforeSend();
-    return _inner.resend(envelopeXdr);
+    return _inner.resend(envelopeXdr, expectedHash);
   }
 }
 
@@ -675,9 +678,9 @@ void main() {
     );
   });
 
-  group('complete and reject settle with #97', () {
+  group('complete and reject are confirmed by the tracker', () {
     test(
-      'a relayed complete stays submitted and leaves the hire alone',
+      'a relayed complete is submitted until the tracker sees it succeed',
       () async {
         final hire = await rig.hire(status: HireStatus.submitted);
         final prepared = await rig.service.prepareComplete(_wallet, hire.id);
@@ -699,7 +702,8 @@ void main() {
     );
 
     test(
-      'a relayed reject stays submitted even when the chain confirms it',
+      'a relayed reject is confirmed without an effect when the chain '
+      'confirms it',
       () async {
         final hire = await rig.hire(status: HireStatus.open);
         final prepared = await rig.service.prepareReject(
@@ -730,11 +734,15 @@ void main() {
 
         expect(record.purpose, 'reject');
         expect(chain.lookedUp, [record.transaction]);
-        expect(summary.untracked, 1);
-        expect(summary.confirmed, 0);
+        expect(summary.untracked, 0);
+        expect(summary.confirmed, 1);
         expect(
           (await rig.submissions.listByHire(hire.id)).single.state,
-          SubmissionState.submitted,
+          SubmissionState.confirmed,
+        );
+        expect(
+          await rig.submissions.hasSubmitted({SubmissionPurpose.reject}),
+          isFalse,
         );
         expect(effects.created, isEmpty);
         expect(effects.funded, isEmpty);

@@ -242,7 +242,7 @@ Future<void> main(List<String> args) async {
       );
       final prepared = codec.build(spec, await wiring.accounts.simulate(spec));
       final signed = _sign(agentKey, codec, prepared.envelopeXdr);
-      final sent = await wiring.sender.resend(signed);
+      final sent = await wiring.sender.resend(signed, prepared.hashHex);
       _ok('submit sent: ${sent.status.name} ${prepared.hashHex}');
       _ok('submit tx: $_explorer/${prepared.hashHex}');
     } else {

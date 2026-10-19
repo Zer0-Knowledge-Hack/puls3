@@ -39,8 +39,8 @@ final _jobFunded = JobFundedEvent(
 );
 
 TransactionLookup _success({
-  JobCreatedEvent? jobCreated,
-  JobFundedEvent? jobFunded,
+  List<JobCreatedEvent> jobCreated = const [],
+  List<JobFundedEvent> jobFunded = const [],
 }) => TransactionLookup(
   status: TransactionStatus.success,
   latestLedgerCloseTime: _start,
@@ -169,6 +169,231 @@ void main() {
     expect(current.errorCode, errorCode);
   }
 
+  group('NOT_FOUND past validUntil', () {
+    /// A NOT_FOUND answer at [closeTime], optionally with the node's oldest
+    /// retained ledger close time.
+    void notFoundAt(
+      StoredSubmission s,
+      DateTime closeTime, {
+      DateTime? oldest,
+    }) {
+      ledger.lookups[s.transactionHash] = TransactionLookup(
+        status: TransactionStatus.notFound,
+        latestLedgerCloseTime: closeTime,
+        oldestLedgerCloseTime: oldest,
+      );
+    }
+
+    final past = _validUntil.add(const Duration(seconds: 1));
+
+    group('fund', () {
+      test('that landed follows the confirm path', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, past);
+        effects.expiredFund = const ExpiredFundLanded(EffectResult.ok());
+
+        final summary = await tracker.pass(store);
+
+        expect(effects.reconciled, [s.id]);
+        expect(summary.confirmed, 1);
+        await expectState(s, SubmissionState.confirmed);
+        expect(ledger.resent, isEmpty);
+      });
+
+      test('that landed with a failed effect fails with its code', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, past);
+        effects.expiredFund = ExpiredFundLanded(
+          EffectResult.failed(
+            SubmissionOutcomeCode.jobMismatch,
+            field: 'client',
+          ),
+        );
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.jobMismatch,
+        );
+      });
+
+      test('whose job is still open expires even past the retention window, '
+          'without OutcomeUnknown', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, past, oldest: s.createdAt.add(const Duration(hours: 1)));
+        effects.expiredFund = const ExpiredFundNotLanded();
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.preparationExpired,
+        );
+      });
+
+      test('with no proof within the retention window expires', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, past, oldest: s.createdAt);
+        effects.expiredFund = const ExpiredFundUnknown();
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.preparationExpired,
+        );
+      });
+
+      test(
+        'with no proof past the retention window is OutcomeUnknown',
+        () async {
+          final s = await submit(SubmissionPurpose.fund);
+          notFoundAt(
+            s,
+            past,
+            oldest: s.createdAt.add(const Duration(seconds: 1)),
+          );
+          effects.expiredFund = const ExpiredFundUnknown();
+
+          await tracker.pass(store);
+
+          await expectState(
+            s,
+            SubmissionState.failed,
+            SubmissionOutcomeCode.outcomeUnknown,
+          );
+        },
+      );
+
+      test('whose reconciliation throws stays submitted', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, past);
+        effects.error = const LedgerUnavailable('RPC down');
+
+        final summary = await tracker.pass(store);
+
+        expect(summary.unavailable, 1);
+        await expectState(s, SubmissionState.submitted);
+      });
+
+      test('not past validUntil is not reconciled', () async {
+        final s = await submit(SubmissionPurpose.fund);
+        notFoundAt(s, _validUntil);
+
+        await tracker.pass(store);
+
+        expect(effects.reconciled, isEmpty);
+        await expectState(s, SubmissionState.submitted);
+      });
+    });
+
+    group('every other purpose', () {
+      const purposes = [
+        SubmissionPurpose.createJob,
+        SubmissionPurpose.giveFeedback,
+        SubmissionPurpose.complete,
+      ];
+      for (final purpose in purposes) {
+        test('${purpose.name} within the retention window expires', () async {
+          final s = await submit(purpose);
+          notFoundAt(s, past, oldest: s.createdAt.subtract(_resendAfter));
+
+          await tracker.pass(store);
+
+          expect(effects.reconciled, isEmpty);
+          await expectState(
+            s,
+            SubmissionState.failed,
+            SubmissionOutcomeCode.preparationExpired,
+          );
+        });
+
+        test(
+          '${purpose.name} past the retention window is OutcomeUnknown',
+          () async {
+            final s = await submit(purpose);
+            notFoundAt(
+              s,
+              past,
+              oldest: s.createdAt.add(const Duration(minutes: 1)),
+            );
+
+            await tracker.pass(store);
+
+            expect(effects.reconciled, isEmpty);
+            await expectState(
+              s,
+              SubmissionState.failed,
+              SubmissionOutcomeCode.outcomeUnknown,
+            );
+          },
+        );
+      }
+    });
+
+    group('without oldestLedgerCloseTime', () {
+      test(
+        'falls back to a retention of 24 hours: inside it expires',
+        () async {
+          final s = await submit(SubmissionPurpose.createJob);
+          notFoundAt(s, s.createdAt.add(const Duration(hours: 24)));
+
+          await tracker.pass(store);
+
+          await expectState(
+            s,
+            SubmissionState.failed,
+            SubmissionOutcomeCode.preparationExpired,
+          );
+        },
+      );
+
+      test('falls back to a retention of 24 hours: beyond it is '
+          'OutcomeUnknown', () async {
+        final s = await submit(SubmissionPurpose.createJob);
+        notFoundAt(
+          s,
+          s.createdAt.add(const Duration(hours: 24, seconds: 1)),
+        );
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.outcomeUnknown,
+        );
+      });
+
+      test('uses the configured rpcRetention', () async {
+        tracker = ChainSubmissionTracker(
+          ledger: ledger,
+          effects: effects,
+          now: () => now,
+          rpcRetention: const Duration(hours: 1),
+          log: ignoreChainLog,
+        );
+        final s = await submit(SubmissionPurpose.createJob);
+        notFoundAt(
+          s,
+          s.createdAt.add(const Duration(hours: 1, seconds: 1)),
+        );
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.outcomeUnknown,
+        );
+      });
+    });
+  });
+
   group('NOT_FOUND', () {
     test('after validUntil by chain time fails PreparationExpired without '
         'resending', () async {
@@ -224,6 +449,7 @@ void main() {
       await tracker.pass(store);
 
       expect(ledger.resent, [s.signedEnvelopeXdr]);
+      expect(ledger.resentHashes, [s.transactionHash]);
       final current = await reload(s);
       expect(current.state, SubmissionState.submitted);
       expect(current.sendAttempts, 1);
@@ -452,7 +678,7 @@ void main() {
   group('SUCCESS of createJob', () {
     test('applies the JobCreated effect and confirms', () async {
       final s = await submit(SubmissionPurpose.createJob);
-      ledger.lookups[s.transactionHash] = _success(jobCreated: _jobCreated);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
 
       await tracker.pass(store);
 
@@ -460,13 +686,133 @@ void main() {
       await expectState(s, SubmissionState.confirmed);
     });
 
-    test('without a JobCreated event fails JobEvidenceUnavailable', () async {
+    test(
+      'hands every JobCreated event of the transaction to the effect',
+      () async {
+        final s = await submit(SubmissionPurpose.createJob);
+        final other = JobCreatedEvent(
+          jobId: 4,
+          client: _address,
+          provider: _address,
+          evaluator: _address,
+          agentId: AgentId(7),
+          token: _address,
+          budget: BigInt.from(5000000),
+          expiredAt: 1791747914,
+        );
+        ledger.lookups[s.transactionHash] = _success(
+          jobCreated: [_jobCreated, other],
+        );
+
+        await tracker.pass(store);
+
+        expect(effects.createdEvents.single.map((e) => e.jobId), [3, 4]);
+      },
+    );
+
+    test('without a JobCreated event waits two passes, then fails '
+        'JobEvidenceUnavailable', () async {
       final s = await submit(SubmissionPurpose.createJob);
-      ledger.lookups[s.transactionHash] = _success(jobFunded: _jobFunded);
+      ledger.lookups[s.transactionHash] = _success(jobFunded: [_jobFunded]);
+
+      final first = await tracker.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      final second = await tracker.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      final third = await tracker.pass(store);
+
+      expect([first.waiting, second.waiting, third.waiting], [1, 1, 0]);
+      expect(third.failed, 1);
+      expect(effects.created, isEmpty);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobEvidenceUnavailable,
+      );
+      expect(
+        logged.where(
+          (m) =>
+              m.startsWith('warning') &&
+              m.contains('Submission ${s.id} succeeded'),
+        ),
+        hasLength(2),
+      );
+    });
+
+    test('an event that shows up on the third pass confirms', () async {
+      final s = await submit(SubmissionPurpose.createJob);
+      ledger.lookups[s.transactionHash] = _success();
 
       await tracker.pass(store);
+      await tracker.pass(store);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
+      await tracker.pass(store);
 
-      expect(effects.created, isEmpty);
+      expect(effects.created, [s.id]);
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('an event that shows up on the second pass confirms and clears the '
+        'counter', () async {
+      final s = await submit(SubmissionPurpose.createJob);
+      ledger.lookups[s.transactionHash] = _success();
+
+      await tracker.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
+      await tracker.pass(store);
+
+      expect(effects.created, [s.id]);
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('a restart resets the counter: a new tracker needs three more '
+        'passes to fail', () async {
+      final s = await submit(SubmissionPurpose.createJob);
+      ledger.lookups[s.transactionHash] = _success();
+
+      await tracker.pass(store);
+      await tracker.pass(store);
+      final restarted = ChainSubmissionTracker(
+        ledger: ledger,
+        effects: effects,
+        now: () => now,
+        resendAfter: _resendAfter,
+        batchLimit: 10,
+        log: (level, message) => logged.add('${level.name}: $message'),
+      );
+      final afterRestart = await restarted.pass(store);
+
+      expect(afterRestart.waiting, 1);
+      expect(afterRestart.failed, 0);
+      await expectState(s, SubmissionState.submitted);
+      await restarted.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      await restarted.pass(store);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobEvidenceUnavailable,
+      );
+    });
+
+    test('an effect that throws after the event shows up resets the '
+        'counter', () async {
+      final s = await submit(SubmissionPurpose.createJob);
+      ledger.lookups[s.transactionHash] = _success();
+
+      await tracker.pass(store);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
+      effects.error = StateError('hire table locked');
+      final thrown = await tracker.pass(store);
+      effects.error = null;
+      ledger.lookups[s.transactionHash] = _success();
+      await tracker.pass(store);
+      await tracker.pass(store);
+
+      expect(thrown.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+      await tracker.pass(store);
       await expectState(
         s,
         SubmissionState.failed,
@@ -476,7 +822,7 @@ void main() {
 
     test('a failed effect fails with its code', () async {
       final s = await submit(SubmissionPurpose.createJob);
-      ledger.lookups[s.transactionHash] = _success(jobCreated: _jobCreated);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
       effects.result = EffectResult.failed(SubmissionOutcomeCode.jobMismatch);
 
       await tracker.pass(store);
@@ -492,7 +838,7 @@ void main() {
   group('SUCCESS of fund', () {
     test('applies the JobFunded effect and confirms', () async {
       final s = await submit(SubmissionPurpose.fund);
-      ledger.lookups[s.transactionHash] = _success(jobFunded: _jobFunded);
+      ledger.lookups[s.transactionHash] = _success(jobFunded: [_jobFunded]);
 
       await tracker.pass(store);
 
@@ -500,12 +846,39 @@ void main() {
       await expectState(s, SubmissionState.confirmed);
     });
 
-    test('without a JobFunded event fails JobEvidenceUnavailable', () async {
+    test(
+      'hands every JobFunded event of the transaction to the effect',
+      () async {
+        final s = await submit(SubmissionPurpose.fund);
+        final other = JobFundedEvent(
+          jobId: 4,
+          client: _address,
+          amount: BigInt.from(5000000),
+          feeBps: 0,
+        );
+        ledger.lookups[s.transactionHash] = _success(
+          jobFunded: [_jobFunded, other],
+        );
+
+        await tracker.pass(store);
+
+        expect(effects.fundedEvents.single.map((e) => e.jobId), [3, 4]);
+      },
+    );
+
+    test('without a JobFunded event waits two passes, then fails '
+        'JobEvidenceUnavailable', () async {
       final s = await submit(SubmissionPurpose.fund);
-      ledger.lookups[s.transactionHash] = _success(jobCreated: _jobCreated);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
 
-      await tracker.pass(store);
+      final first = await tracker.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      final second = await tracker.pass(store);
+      await expectState(s, SubmissionState.submitted);
+      final third = await tracker.pass(store);
 
+      expect([first.waiting, second.waiting, third.waiting], [1, 1, 0]);
+      expect(third.failed, 1);
       expect(effects.funded, isEmpty);
       await expectState(
         s,
@@ -514,9 +887,27 @@ void main() {
       );
     });
 
+    test('each record counts its own empty passes', () async {
+      final early = await submit(SubmissionPurpose.fund);
+      ledger.lookups[early.transactionHash] = _success();
+      await tracker.pass(store);
+      await tracker.pass(store);
+      final late = await submit(SubmissionPurpose.fund);
+      ledger.lookups[late.transactionHash] = _success();
+
+      await tracker.pass(store);
+
+      await expectState(
+        early,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobEvidenceUnavailable,
+      );
+      await expectState(late, SubmissionState.submitted);
+    });
+
     test('a failed effect fails with its code', () async {
       final s = await submit(SubmissionPurpose.fund);
-      ledger.lookups[s.transactionHash] = _success(jobFunded: _jobFunded);
+      ledger.lookups[s.transactionHash] = _success(jobFunded: [_jobFunded]);
       effects.result = EffectResult.failed(
         SubmissionOutcomeCode.jobMismatch,
         field: 'budget',
@@ -591,18 +982,40 @@ void main() {
     });
   });
 
-  test('SUCCESS of a purpose without an effect yet stays submitted and is '
-      'logged once', () async {
+  test('SUCCESS of complete, reject and registerFull confirms without an '
+      'effect or a job event', () async {
+    final complete = await submit(SubmissionPurpose.complete);
+    final reject = await submit(SubmissionPurpose.reject);
+    final registerFull = await submit(SubmissionPurpose.registerFull);
+    for (final s in [complete, reject, registerFull]) {
+      ledger.lookups[s.transactionHash] = _success();
+    }
+
+    final summary = await tracker.pass(store);
+
+    expect(summary.confirmed, 3);
+    expect(summary.untracked, 0);
+    for (final s in [complete, reject, registerFull]) {
+      await expectState(s, SubmissionState.confirmed);
+    }
+    expect(effects.created, isEmpty);
+    expect(effects.funded, isEmpty);
+    expect(effects.feedbackGiven, isEmpty);
+  });
+
+  test('FAILED on chain fails complete with TransactionFailed', () async {
     final s = await submit(SubmissionPurpose.complete);
-    ledger.lookups[s.transactionHash] = _success();
+    ledger.lookups[s.transactionHash] = TransactionLookup(
+      status: TransactionStatus.failed,
+      latestLedgerCloseTime: _start,
+    );
 
     await tracker.pass(store);
-    await tracker.pass(store);
 
-    await expectState(s, SubmissionState.submitted);
-    expect(
-      logged.where((m) => m.contains('submission ${s.id}')),
-      hasLength(1),
+    await expectState(
+      s,
+      SubmissionState.failed,
+      SubmissionOutcomeCode.transactionFailed,
     );
   });
 
@@ -654,7 +1067,7 @@ void main() {
     final down = await submit(SubmissionPurpose.fund);
     final up = await submit(SubmissionPurpose.fund);
     ledger.lookups[down.transactionHash] = const LedgerUnavailable('down');
-    ledger.lookups[up.transactionHash] = _success(jobFunded: _jobFunded);
+    ledger.lookups[up.transactionHash] = _success(jobFunded: [_jobFunded]);
 
     final summary = await tracker.pass(store);
 
@@ -668,8 +1081,8 @@ void main() {
       'pass', () async {
     final s = await submit(SubmissionPurpose.fund);
     final other = await submit(SubmissionPurpose.createJob);
-    ledger.lookups[s.transactionHash] = _success(jobFunded: _jobFunded);
-    ledger.lookups[other.transactionHash] = _success(jobCreated: _jobCreated);
+    ledger.lookups[s.transactionHash] = _success(jobFunded: [_jobFunded]);
+    ledger.lookups[other.transactionHash] = _success(jobCreated: [_jobCreated]);
     effects.error = StateError('hire table locked');
 
     final first = await tracker.pass(store);
@@ -688,7 +1101,7 @@ void main() {
   test('a store transition that throws leaves the record submitted', () async {
     final flaky = _FlakyStore(store);
     final s = await submit(SubmissionPurpose.fund);
-    ledger.lookups[s.transactionHash] = _success(jobFunded: _jobFunded);
+    ledger.lookups[s.transactionHash] = _success(jobFunded: [_jobFunded]);
 
     final first = await tracker.pass(flaky);
     flaky.failTransitions = false;
@@ -703,18 +1116,17 @@ void main() {
         'time', () async {
       final flaky = _FlakyStore(store, failTransitions: false);
       final untracked = await submit(SubmissionPurpose.submit);
-      final successDefault = await submit(SubmissionPurpose.complete);
+      final wallet = await submit(SubmissionPurpose.setAgentWallet);
       final resent = await submit(SubmissionPurpose.fund);
       final waiting = await submit(SubmissionPurpose.fund);
       await flaky.recordSend(waiting.id, now);
       final unavailable = await submit(SubmissionPurpose.fund);
       final throwing = await submit(SubmissionPurpose.createJob);
-      ledger.lookups[successDefault.transactionHash] = _success();
       ledger.lookups[unavailable.transactionHash] = const LedgerUnavailable(
         'down',
       );
       ledger.lookups[throwing.transactionHash] = _success(
-        jobCreated: _jobCreated,
+        jobCreated: [_jobCreated],
       );
       effects.error = StateError('hire table locked');
       now = now.add(const Duration(seconds: 1));
@@ -723,7 +1135,7 @@ void main() {
 
       expect(flaky.checked, [
         untracked.id,
-        successDefault.id,
+        wallet.id,
         resent.id,
         waiting.id,
         unavailable.id,
@@ -731,7 +1143,7 @@ void main() {
       ]);
       for (final s in [
         untracked,
-        successDefault,
+        wallet,
         resent,
         waiting,
         unavailable,
@@ -750,7 +1162,7 @@ void main() {
         validUntil: _start.subtract(const Duration(seconds: 1)),
       );
       ledger.lookups[confirmed.transactionHash] = _success(
-        jobFunded: _jobFunded,
+        jobFunded: [_jobFunded],
       );
       ledger.lookups[failed.transactionHash] = TransactionLookup(
         status: TransactionStatus.failed,
@@ -774,9 +1186,10 @@ void main() {
         ..failChecks = true;
       final first = await submit(SubmissionPurpose.submit);
       final second = await submit(SubmissionPurpose.fund);
-      ledger.lookups[second.transactionHash] = _success(jobFunded: _jobFunded);
-      final third = await submit(SubmissionPurpose.complete);
-      ledger.lookups[third.transactionHash] = _success();
+      ledger.lookups[second.transactionHash] = _success(
+        jobFunded: [_jobFunded],
+      );
+      final third = await submit(SubmissionPurpose.setAgentWallet);
 
       final summary = await tracker.pass(flaky);
 
@@ -810,12 +1223,13 @@ void main() {
     await submit(SubmissionPurpose.fund); // resent
     final waiting = await submit(SubmissionPurpose.fund);
     await store.recordSend(waiting.id, now);
-    final untracked = await submit(SubmissionPurpose.complete);
-    ledger.lookups[confirmed.transactionHash] = _success(jobFunded: _jobFunded);
+    await submit(SubmissionPurpose.setAgentWallet); // untracked
+    ledger.lookups[confirmed.transactionHash] = _success(
+      jobFunded: [_jobFunded],
+    );
     ledger.lookups[failed.transactionHash] = TransactionLookup(
       status: TransactionStatus.failed,
     );
-    ledger.lookups[untracked.transactionHash] = _success();
 
     final summary = await tracker.pass(store);
 

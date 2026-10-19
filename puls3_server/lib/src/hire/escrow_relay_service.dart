@@ -146,6 +146,9 @@ final class EscrowRelayService {
     if (records.any((r) => r.state == SubmissionState.submitted)) {
       throw _api('SubmissionInProgress');
     }
+    // A transaction whose outcome nobody can prove may have moved funds:
+    // nothing new is prepared for the hire until someone resolves it.
+    if (records.any(_outcomeUnknown)) throw _api('OutcomeUnknown');
     if (purpose == SubmissionPurpose.fund && records.any(_fundReachedChain)) {
       throw _api('PaymentAlreadySubmitted');
     }
@@ -358,7 +361,10 @@ final class EscrowRelayService {
   /// Sends the stored envelope once and returns the record as it is after.
   Future<StoredSubmission> _send(StoredSubmission record) async {
     try {
-      final result = await _sender.resend(record.signedEnvelopeXdr);
+      final result = await _sender.resend(
+        record.signedEnvelopeXdr,
+        record.transactionHash,
+      );
       switch (result.status) {
         case SendTransactionStatus.pending || SendTransactionStatus.duplicate:
           await _submissions.recordSend(record.id, _now());
@@ -523,6 +529,10 @@ final class EscrowRelayService {
               status == HireStatus.submitted,
         _ => false,
       };
+
+  static bool _outcomeUnknown(StoredSubmission record) =>
+      record.state == SubmissionState.failed &&
+      record.errorCode == SubmissionOutcomeCode.outcomeUnknown;
 
   /// A `fund` that succeeded on chain although the hire could not be bound
   /// to it: funds moved, so no new funding is prepared.

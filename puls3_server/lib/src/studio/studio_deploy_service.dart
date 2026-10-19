@@ -147,7 +147,7 @@ final class StudioDeployService {
         updatedAt: _now().toUtc(),
       ),
     );
-    await _send(signedTransactionXdr);
+    await _send(signedTransactionXdr, signed.hashHex);
     return await _refresh(submitted) ?? submitted;
   }
 
@@ -318,7 +318,7 @@ final class StudioDeployService {
         updatedAt: _now().toUtc(),
       ),
     );
-    await _send(signed);
+    await _send(signed, prepared.hashHex);
     return await _refresh(submitted) ?? submitted;
   }
 
@@ -493,7 +493,7 @@ final class StudioDeployService {
         updatedAt: _now().toUtc(),
       ),
     );
-    await _send(signedTransactionXdr);
+    await _send(signedTransactionXdr, signed.hashHex);
     return await _refresh(submitted) ?? submitted;
   }
 
@@ -677,9 +677,9 @@ final class StudioDeployService {
     return row;
   }
 
-  Future<void> _send(String envelopeXdr) async {
+  Future<void> _send(String envelopeXdr, String hashHex) async {
     try {
-      await _sender.resend(envelopeXdr);
+      await _sender.resend(envelopeXdr, hashHex);
     } on LedgerException {
       // The record stays submitted. The next read looks the hash up.
     }

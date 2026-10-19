@@ -10,13 +10,24 @@ import 'submission_values.dart';
 /// How long to wait after a send before the same envelope is sent again.
 const defaultResendAfter = Duration(seconds: 30);
 
+/// How long the node is assumed to keep a transaction findable when it does
+/// not report its oldest ledger: Soroban RPC keeps 17280 ledgers by default,
+/// about 24 hours at 5 seconds a ledger.
+const defaultRpcRetention = Duration(hours: 24);
+
+/// How many passes in a row may find no escrow event on a successful
+/// `createJob` or `fund` before the record fails `JobEvidenceUnavailable`.
+/// The node can answer SUCCESS before its event index has caught up.
+const evidencePasses = 3;
+
 /// How many `submitted` records one pass handles at most.
 const defaultTrackerBatchLimit = 100;
 
 /// Purposes whose final outcomes use codes this tracker does not set yet.
 /// `setAgentWallet` expires as `AuthorizationExpired`, and `submit` fails as
 /// `EscrowCallFailed` after bounded retries (api.md). They stay `submitted`.
-/// `release` and `claimRefund` are confirmed when the transaction succeeds.
+/// `release`, `claimRefund`, `complete`, `reject` and `registerFull` are
+/// confirmed when the transaction succeeds, with no hire effect yet (#97).
 const _untrackedPurposes = {
   SubmissionPurpose.setAgentWallet,
   SubmissionPurpose.submit,
@@ -68,16 +79,30 @@ final class TrackerPassSummary {
 /// step 5). Each [pass] reads a batch from the store and, per record:
 ///
 /// - `NOT_FOUND`: once the chain time is past `validUntil` the envelope can
-///   never be included, so the record fails `PreparationExpired`.
-///   Otherwise the persisted envelope is sent again when it was never sent
-///   or was last sent at least `resendAfter` ago. A resend the node refuses
-///   ([RpcRequestRejected]) fails `SubmissionRejected`; an `ERROR` status
-///   is logged and the record waits for its time bounds.
+///   never be included. A `fund` is first reconciled through the escrow job
+///   ([EscrowEffects.reconcileExpiredFund]): landed follows the confirm path,
+///   an open job fails `PreparationExpired`. Without proof the record fails
+///   `PreparationExpired` while the node still retains the ledgers since it
+///   was created (`oldestLedgerCloseTime`, else `rpcRetention`), and
+///   `OutcomeUnknown` beyond that: it may have landed unseen. An expired or
+///   missing job with covered retention also gives `PreparationExpired`: a
+///   fund that landed and was then refunded cannot be told apart from one
+///   that never landed.
+///   Otherwise the persisted envelope is sent again, with its stored hash as
+///   the expected one, when it was never sent or was last sent at least
+///   `resendAfter` ago. A resend the node refuses ([RpcRequestRejected])
+///   fails `SubmissionRejected`; an `ERROR` status is logged and the record
+///   waits for its time bounds.
 /// - `FAILED`: fails `TransactionFailed`.
-/// - `SUCCESS`: `createJob` and `fund` need their escrow event (else
-///   `JobEvidenceUnavailable`) and the [EscrowEffects] result decides
-///   `confirmed` or the failure code; `giveFeedback` needs no event. Other
-///   purposes stay `submitted` until their effects exist.
+/// - `SUCCESS`: `createJob` and `fund` need their escrow event: with none the
+///   record stays `submitted` for [evidencePasses] passes in total (the count
+///   is in memory and a restart starts it again), then fails
+///   `JobEvidenceUnavailable`. The [EscrowEffects] result, given every valid
+///   event of the transaction, decides `confirmed` or the failure code;
+///   `giveFeedback` needs no event. `complete`, `reject` and `registerFull`
+///   are confirmed with no domain effect: until #97 the hire status does not
+///   change, so the app may offer `prepareComplete` again and the contract
+///   then rejects it as `TransactionFailed`.
 ///
 /// The chain time is the lookup's latest ledger close time, because the
 /// envelope time bounds are checked against it. Only when the node does not
@@ -97,12 +122,14 @@ final class ChainSubmissionTracker {
     required ChainLog log,
     DateTime Function()? now,
     Duration resendAfter = defaultResendAfter,
+    Duration rpcRetention = defaultRpcRetention,
     int batchLimit = defaultTrackerBatchLimit,
   }) : _ledger = ledger,
        _effects = effects,
        _log = log,
        _now = now ?? DateTime.now,
        _resendAfter = resendAfter,
+       _rpcRetention = rpcRetention,
        _batchLimit = batchLimit {
     checkListLimit(batchLimit);
   }
@@ -112,10 +139,15 @@ final class ChainSubmissionTracker {
   final ChainLog _log;
   final DateTime Function() _now;
   final Duration _resendAfter;
+  final Duration _rpcRetention;
   final int _batchLimit;
 
   /// Ids already logged as untracked, so each is logged once per tracker.
   final _reportedUntracked = <int>{};
+
+  /// Passes that found no escrow event on a successful transaction, by
+  /// submission id. In memory only: a restart starts counting again.
+  final _missingEvents = <int, int>{};
 
   /// Tracks one batch of [store]. Only a failure to list the batch throws.
   Future<TrackerPassSummary> pass(ChainSubmissionStore store) async {
@@ -123,6 +155,7 @@ final class ChainSubmissionTracker {
     final batch = await store.listSubmitted(limit: _batchLimit);
     summary.listed = batch.length;
     for (final submission in batch) {
+      final before = _missingEvents[submission.id];
       var settled = false;
       try {
         settled = await _track(store, submission, summary);
@@ -139,7 +172,18 @@ final class ChainSubmissionTracker {
           'Tracking submission ${submission.id} failed: $e',
         );
       }
+      // The passes must be consecutive: a pass that did not count a missing
+      // event for this record (it settled, saw an event, or failed to read
+      // the chain) starts the count again.
+      if (settled || _missingEvents[submission.id] == before) {
+        _missingEvents.remove(submission.id);
+      }
       if (!settled) await _recordCheck(store, submission, summary);
+    }
+    if (batch.length < _batchLimit) {
+      // The batch is every `submitted` record: forget the others.
+      final listed = {for (final s in batch) s.id};
+      _missingEvents.removeWhere((id, _) => !listed.contains(id));
     }
     return summary;
   }
@@ -206,12 +250,7 @@ final class ChainSubmissionTracker {
     final now = _now().toUtc();
     final chainNow = lookup.latestLedgerCloseTime ?? now;
     if (chainNow.isAfter(submission.validUntil)) {
-      return _fail(
-        store,
-        submission,
-        SubmissionOutcomeCode.preparationExpired,
-        summary,
-      );
+      return _expired(store, submission, lookup, chainNow, summary);
     }
     final lastSentAt = submission.lastSentAt;
     if (lastSentAt != null && now.difference(lastSentAt) < _resendAfter) {
@@ -220,7 +259,10 @@ final class ChainSubmissionTracker {
     }
     final SendTransactionResult result;
     try {
-      result = await _ledger.resend(submission.signedEnvelopeXdr);
+      result = await _ledger.resend(
+        submission.signedEnvelopeXdr,
+        submission.transactionHash,
+      );
     } on RpcRequestRejected catch (e) {
       _log(
         ChainLogLevel.warning,
@@ -246,41 +288,95 @@ final class ChainSubmissionTracker {
     return false;
   }
 
+  /// The envelope can never be included. A `fund` is first reconciled
+  /// through the escrow job, since the node may simply have lost the
+  /// transaction. Without proof, `PreparationExpired` is only true while the
+  /// node still retains the ledgers since the record was created; beyond
+  /// that the transaction may have landed unseen: `OutcomeUnknown`.
+  Future<bool> _expired(
+    ChainSubmissionStore store,
+    StoredSubmission submission,
+    TransactionLookup lookup,
+    DateTime chainNow,
+    TrackerPassSummary summary,
+  ) async {
+    if (submission.purpose == SubmissionPurpose.fund) {
+      switch (await _effects.reconcileExpiredFund(submission)) {
+        case ExpiredFundLanded(:final result):
+          return _settle(store, submission, result, summary);
+        case ExpiredFundNotLanded():
+          return _fail(
+            store,
+            submission,
+            SubmissionOutcomeCode.preparationExpired,
+            summary,
+          );
+        case ExpiredFundUnknown():
+          break;
+      }
+    }
+    final covered = _retained(lookup, submission, chainNow);
+    return _fail(
+      store,
+      submission,
+      covered
+          ? SubmissionOutcomeCode.preparationExpired
+          : SubmissionOutcomeCode.outcomeUnknown,
+      summary,
+    );
+  }
+
+  /// Whether the node still retains every ledger since [submission] was
+  /// created, so a NOT_FOUND really means the transaction never landed.
+  bool _retained(
+    TransactionLookup lookup,
+    StoredSubmission submission,
+    DateTime chainNow,
+  ) {
+    final oldest = lookup.oldestLedgerCloseTime;
+    if (oldest != null) return !oldest.isAfter(submission.createdAt);
+    return !chainNow.subtract(_rpcRetention).isAfter(submission.createdAt);
+  }
+
   Future<bool> _succeeded(
     ChainSubmissionStore store,
     StoredSubmission submission,
     TransactionLookup lookup,
     TrackerPassSummary summary,
   ) async {
-    final EffectResult? result;
+    final EffectResult result;
     switch (submission.purpose) {
       case SubmissionPurpose.createJob:
-        final event = lookup.jobCreated;
-        result = event == null
-            ? null
-            : await _effects.onJobCreated(submission, event);
+        final events = lookup.jobCreated;
+        if (events.isEmpty) return _missingEvidence(store, submission, summary);
+        result = await _effects.onJobCreated(submission, events);
       case SubmissionPurpose.fund:
-        final event = lookup.jobFunded;
-        result = event == null
-            ? null
-            : await _effects.onFunded(submission, event);
+        final events = lookup.jobFunded;
+        if (events.isEmpty) return _missingEvidence(store, submission, summary);
+        result = await _effects.onFunded(submission, events);
       case SubmissionPurpose.giveFeedback:
         result = await _effects.onFeedbackGiven(submission);
-      case SubmissionPurpose.release || SubmissionPurpose.claimRefund:
+      case SubmissionPurpose.release ||
+          SubmissionPurpose.claimRefund ||
+          SubmissionPurpose.complete ||
+          SubmissionPurpose.reject ||
+          SubmissionPurpose.registerFull:
         if (await store.markConfirmed(submission.id)) summary.confirmed++;
         return true;
       default:
         _untracked(submission, summary);
         return false;
     }
+    return _settle(store, submission, result, summary);
+  }
+
+  Future<bool> _settle(
+    ChainSubmissionStore store,
+    StoredSubmission submission,
+    EffectResult result,
+    TrackerPassSummary summary,
+  ) async {
     switch (result) {
-      case null:
-        return _fail(
-          store,
-          submission,
-          SubmissionOutcomeCode.jobEvidenceUnavailable,
-          summary,
-        );
       case EffectOk():
         if (await store.markConfirmed(submission.id)) summary.confirmed++;
         return true;
@@ -292,6 +388,33 @@ final class ChainSubmissionTracker {
         );
         return _fail(store, submission, code, summary);
     }
+  }
+
+  /// A successful `createJob` or `fund` whose transaction shows no escrow
+  /// event: the record waits for the next [evidencePasses] - 1 passes in case
+  /// the node's event index is late, then fails `JobEvidenceUnavailable`.
+  Future<bool> _missingEvidence(
+    ChainSubmissionStore store,
+    StoredSubmission submission,
+    TrackerPassSummary summary,
+  ) async {
+    final misses = (_missingEvents[submission.id] ?? 0) + 1;
+    if (misses >= evidencePasses) {
+      return _fail(
+        store,
+        submission,
+        SubmissionOutcomeCode.jobEvidenceUnavailable,
+        summary,
+      );
+    }
+    _missingEvents[submission.id] = misses;
+    summary.waiting++;
+    _log(
+      ChainLogLevel.warning,
+      'Submission ${submission.id} succeeded without its escrow event '
+      '(pass $misses of $evidencePasses); it stays submitted',
+    );
+    return false;
   }
 
   /// Always settles the record: `markFailed` either sets `failed` or finds

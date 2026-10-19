@@ -33,6 +33,15 @@ Map<String, Object?> _firstEscrowEvent(Map<String, Object?> tx) {
       .firstWhere((event) => event['contract_id'] == _escrow.value);
 }
 
+/// Appends a copy of the first escrow event of [tx] for job [jobId] after it.
+void _addEvent(Map<String, Object?> tx, int jobId) {
+  final first = _firstEscrowEvent(tx);
+  final copy = jsonDecode(jsonEncode(first)) as Map<String, Object?>;
+  (_v0(copy)['topics']! as List)[1] = {'u64': '$jobId'};
+  final groups = (tx['events']! as Map)['contractEventsJson']! as List;
+  groups.firstWhere((group) => (group as List).contains(first)).add(copy);
+}
+
 Map<String, Object?> _v0(Map<String, Object?> event) =>
     (event['body']! as Map)['v0']! as Map<String, Object?>;
 
@@ -40,9 +49,9 @@ bool _isKey(Object? entry, String symbol) =>
     ((entry! as Map)['key']! as Map)['symbol'] == symbol;
 
 void main() {
-  group('firstJobCreated', () {
+  group('allJobCreated', () {
     test('reads the job_created event of the testnet create_job', () {
-      final event = firstJobCreated(_createJob(), escrow: _escrow)!;
+      final event = allJobCreated(_createJob(), escrow: _escrow).single;
 
       expect(event.jobId, 3);
       expect(event.client, _client);
@@ -54,18 +63,18 @@ void main() {
       expect(event.expiredAt, 1791747914);
     });
 
-    test('is null for a transaction without that event', () {
-      expect(firstJobCreated(_fund(), escrow: _escrow), isNull);
+    test('is empty for a transaction without that event', () {
+      expect(allJobCreated(_fund(), escrow: _escrow), isEmpty);
     });
 
     test('ignores events of another contract', () {
-      expect(firstJobCreated(_createJob(), escrow: _otherContract), isNull);
+      expect(allJobCreated(_createJob(), escrow: _otherContract), isEmpty);
     });
 
-    test('is null unless the transaction succeeded', () {
+    test('is empty unless the transaction succeeded', () {
       final tx = _createJob()..['status'] = 'FAILED';
 
-      expect(firstJobCreated(tx, escrow: _escrow), isNull);
+      expect(allJobCreated(tx, escrow: _escrow), isEmpty);
     });
 
     test('skips an event with a missing field', () {
@@ -75,20 +84,55 @@ void main() {
         (entry) => _isKey(entry, 'budget'),
       );
 
-      expect(firstJobCreated(tx, escrow: _escrow), isNull);
+      expect(allJobCreated(tx, escrow: _escrow), isEmpty);
     });
 
     test('skips an event whose job id topic is malformed', () {
       final tx = _createJob();
       (_v0(_firstEscrowEvent(tx))['topics']! as List)[1] = {'u32': 3};
 
-      expect(firstJobCreated(tx, escrow: _escrow), isNull);
+      expect(allJobCreated(tx, escrow: _escrow), isEmpty);
     });
   });
 
-  group('firstJobFunded', () {
+  group('several events', () {
+    test('every valid job_created is returned in order', () {
+      final tx = _createJob();
+      _addEvent(tx, 4);
+
+      final events = allJobCreated(tx, escrow: _escrow);
+
+      expect(events.map((e) => e.jobId), [3, 4]);
+      expect(events.map((e) => e.budget), everyElement(BigInt.from(5000000)));
+    });
+
+    test('every valid job_funded is returned in order', () {
+      final tx = _fund();
+      _addEvent(tx, 4);
+      _addEvent(tx, 5);
+
+      final events = allJobFunded(tx, escrow: _escrow);
+
+      expect(events.map((e) => e.jobId), [3, 4, 5]);
+    });
+
+    test('a malformed event between valid ones is skipped', () {
+      final tx = _fund();
+      _addEvent(tx, 4);
+      final groups = (tx['events']! as Map)['contractEventsJson']! as List;
+      final events = (groups.single as List).cast<Map<String, Object?>>();
+      // The last event is the copy for job 4: break its job id topic, then
+      // add a valid copy for job 6 after it.
+      (_v0(events.last)['topics']! as List)[1] = {'u32': 4};
+      _addEvent(tx, 6);
+
+      expect(allJobFunded(tx, escrow: _escrow).map((e) => e.jobId), [3, 6]);
+    });
+  });
+
+  group('allJobFunded', () {
     test('reads the job_funded event of the testnet fund', () {
-      final event = firstJobFunded(_fund(), escrow: _escrow)!;
+      final event = allJobFunded(_fund(), escrow: _escrow).single;
 
       expect(event.jobId, 3);
       expect(event.client, _client);
@@ -96,18 +140,18 @@ void main() {
       expect(event.feeBps, 0);
     });
 
-    test('is null for a transaction without that event', () {
-      expect(firstJobFunded(_createJob(), escrow: _escrow), isNull);
+    test('is empty for a transaction without that event', () {
+      expect(allJobFunded(_createJob(), escrow: _escrow), isEmpty);
     });
 
     test('ignores events of another contract', () {
-      expect(firstJobFunded(_fund(), escrow: _otherContract), isNull);
+      expect(allJobFunded(_fund(), escrow: _otherContract), isEmpty);
     });
 
-    test('is null unless the transaction succeeded', () {
+    test('is empty unless the transaction succeeded', () {
       final tx = _fund()..['status'] = 'FAILED';
 
-      expect(firstJobFunded(tx, escrow: _escrow), isNull);
+      expect(allJobFunded(tx, escrow: _escrow), isEmpty);
     });
 
     test('skips an event with a field of another type', () {
@@ -118,7 +162,7 @@ void main() {
       );
       amount['val'] = {'u32': 5};
 
-      expect(firstJobFunded(tx, escrow: _escrow), isNull);
+      expect(allJobFunded(tx, escrow: _escrow), isEmpty);
     });
   });
 }
