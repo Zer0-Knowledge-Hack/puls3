@@ -67,7 +67,6 @@ final class RuntimeLoopConfig {
 }
 
 const _defaultIntervalSeconds = 5;
-const _rpcTimeout = Duration(seconds: 8);
 const _batchSize = 10;
 
 /// Name of the Serverpod password that holds the Anthropic API key (BYOK).
@@ -151,7 +150,7 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     SorobanRpcClient(
       httpClient: httpClient,
       url: stellar.rpcUrl,
-      timeout: _rpcTimeout,
+      timeout: stellar.rpcTimeout,
     ),
     stellar,
   );

@@ -12,8 +12,6 @@ import '../ledger/stellar_config.dart';
 import 'catalog_indexer.dart';
 import 'serverpod_agent_index_repository.dart';
 
-const _rpcTimeout = Duration(seconds: 8);
-
 /// Longest a pass may run before the loop gives up on it, so a hung pass
 /// cannot wedge the indexer.
 const _passTimeout = Duration(minutes: 5);
@@ -78,7 +76,7 @@ TrackerLoop? startCatalogIndexer(Serverpod pod, Map<String, String> env) {
   final rpc = SorobanRpcClient(
     httpClient: httpClient,
     url: stellar.rpcUrl,
-    timeout: _rpcTimeout,
+    timeout: stellar.rpcTimeout,
   );
   const ChainLog log = _consoleLog;
   final registry = SorobanLedger(rpc, stellar);

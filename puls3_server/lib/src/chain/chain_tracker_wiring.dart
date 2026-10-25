@@ -20,8 +20,6 @@ import 'escrow_server_submit.dart';
 import 'serverpod_chain_submission_store.dart';
 import 'tracker_loop.dart';
 
-const _rpcTimeout = Duration(seconds: 8);
-
 /// Longest a pass may run before the loop gives up on it. A full batch of
 /// RPC calls normally takes seconds; this only catches a hung pass, such as
 /// a stuck database call.
@@ -42,7 +40,7 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   final rpc = SorobanRpcClient(
     httpClient: httpClient,
     url: stellar.rpcUrl,
-    timeout: _rpcTimeout,
+    timeout: stellar.rpcTimeout,
   );
   const ChainLog log = _consoleLog;
   final relay = relaySigningAccount(pod.getPassword('escrowRelaySigningKey'));

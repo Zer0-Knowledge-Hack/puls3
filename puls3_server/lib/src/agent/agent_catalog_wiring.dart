@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../chain/chain_log.dart';
 import '../feedback/reputation_wiring.dart';
 import '../ledger/contract_reader.dart';
 import '../ledger/soroban_ledger.dart';
@@ -14,9 +15,6 @@ import 'catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
 import 'reputation_catalog_reader.dart';
 import 'serverpod_agent_index_repository.dart';
-
-/// How long one Soroban RPC call may take before the chain counts as down.
-const _rpcTimeout = Duration(seconds: 8);
 
 /// The HTTP client shared by every catalog read. Created once and reused for
 /// the life of the process, so requests do not open a socket each time.
@@ -58,7 +56,7 @@ ReputationCache _reputation(StellarConfig config) {
   final rpc = SorobanRpcClient(
     httpClient: _sharedHttpClient ??= http.Client(),
     url: config.rpcUrl,
-    timeout: _rpcTimeout,
+    timeout: config.rpcTimeout,
   );
   return _reputationCache = ReputationCache(
     registry: reputationRegistryFor(
@@ -79,17 +77,31 @@ CatalogReader chainCatalog(Map<String, String> environment) {
   );
 }
 
-AgentCatalogService _buildChainCatalog(StellarConfig config, http.Client client) =>
-    AgentCatalogService(
-      SorobanLedger(
-        SorobanRpcClient(
-          httpClient: client,
-          url: config.rpcUrl,
-          timeout: _rpcTimeout,
-        ),
-        config,
-      ),
-    );
+AgentCatalogService _buildChainCatalog(
+  StellarConfig config,
+  http.Client client,
+) => AgentCatalogService(
+  SorobanLedger(
+    SorobanRpcClient(
+      httpClient: client,
+      url: config.rpcUrl,
+      timeout: config.rpcTimeout,
+    ),
+    config,
+  ),
+  log: catalogConsoleLog,
+);
+
+/// Writes a catalog message to the process output: info to stdout, the rest to
+/// stderr, like the other wiring logs.
+void catalogConsoleLog(ChainLogLevel level, String message) {
+  final line = '[agent-catalog] ${level.name}: $message';
+  if (level == ChainLogLevel.info) {
+    stdout.writeln(line);
+  } else {
+    stderr.writeln(line);
+  }
+}
 
 /// Builds the catalog reader for one request: the Postgres index, falling back
 /// to the on-chain catalog while the index is empty, with each agent's
