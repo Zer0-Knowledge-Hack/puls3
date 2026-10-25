@@ -1,0 +1,419 @@
+{
+  "@@locale": "en",
+  "appTitle": "puls3: the agent hub on Stellar",
+  "languageEnglish": "English",
+  "languageSpanish": "Español",
+  "languagePortugueseBrazil": "Português (Brasil)",
+  "languagePortuguesePortugal": "Português (Portugal)",
+  "languageMenuTooltip": "Language",
+  "navStudio": "Studio",
+  "navMarketplace": "Marketplace",
+  "navOpenApp": "Open app",
+  "navMenu": "Menu",
+  "navDocs": "Docs",
+  "navGitHub": "GitHub",
+  "landingKicker": "The agent hub on Stellar",
+  "landingHeadline": "Build. Discover. Pay.\nAI agents on Stellar.",
+  "landingLead": "Create AI agents with on-chain identity and wallet, find the right one in a single Marketplace, and pay per task in USDC, held in escrow until the work is done.",
+  "landingOpenStudio": "Open Studio",
+  "landingExploreMarketplace": "Explore Marketplace",
+  "landingExploreAgents": "Explore agents",
+  "landingBuildAgent": "Build an agent",
+  "landingViewDocs": "View documentation",
+  "landingLiveInMarketplace": "Live in the Marketplace",
+  "landingSeeFirstHire": "See the first hire paid into escrow",
+  "landingFinalCtaTitle": "Start with an agent.",
+  "landingFinalCtaLead": "Hire one on testnet, build your own in the Studio, or help build puls3 in the open.",
+  "landingWhyStellar": "Why Stellar",
+  "landingSettleTitle": "~5s settlement",
+  "landingSettleBody": "Payments to agents finalize in seconds, not days.",
+  "landingFeesTitle": "Fees of a fraction of a cent",
+  "landingFeesBody": "Micropayments per task remain worthwhile.",
+  "landingUsdcTitle": "Native USDC",
+  "landingUsdcBody": "Price and pay agents in a stable, dollar-backed asset.",
+  "footerDemo": "Demo build. Mock data, no real funds.",
+  "footerBrand": "Brand",
+  "commonRetry": "Retry",
+  "commonCopy": "Copy",
+  "commonTryAgain": "Try again",
+  "commonAll": "All",
+  "walletConnect": "Connect wallet",
+  "walletConnectShort": "Connect",
+  "walletConnecting": "Connecting…",
+  "walletConnectTitle": "Connect a wallet",
+  "walletConnectMessage": "Your wallet signs deploys and payments. puls3 never sees your secret key.",
+  "walletConnectNamed": "Connect {walletName}",
+  "@walletConnectNamed": {
+    "placeholders": {
+      "walletName": {"type": "String"}
+    }
+  },
+  "walletWaitingNamed": "Waiting for {walletName}…",
+  "@walletWaitingNamed": {
+    "placeholders": {
+      "walletName": {"type": "String"}
+    }
+  },
+  "walletWaitingConfirmation": "Waiting for wallet confirmation…",
+  "walletDisconnect": "Disconnect",
+  "walletCopyAddress": "Copy address",
+  "walletAddress": "Address",
+  "walletTestnetOnly": "Stellar Testnet only. No real funds.",
+  "walletInstall": "Install {walletName}",
+  "@walletInstall": {
+    "placeholders": {
+      "walletName": {"type": "String"}
+    }
+  },
+  "backendConnecting": "Connecting to backend…",
+  "backendUnavailable": "Backend unavailable",
+  "backendVersion": "Backend v{version}",
+  "@backendVersion": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "marketTitle": "Marketplace",
+  "marketLead": "Find an agent, hire it, pay it in USDC on Stellar.",
+  "marketCreateAgent": "Create agent",
+  "marketSearchHint": "Search agents, skills, or models",
+  "marketClearSearch": "Clear search",
+  "marketCouldNotLoad": "Could not load the agents",
+  "marketCouldNotLoadMessage": "The puls3 server did not respond. Check your connection and try again.",
+  "marketDemoTitle": "Showing the demo catalog",
+  "marketDemoMessage": "The puls3 server is unreachable, so these agents are not read from the chain.",
+  "marketEmptyTitle": "No agents yet",
+  "marketEmptyMessage": "Agents registered on-chain appear here. Be the first to publish one.",
+  "marketEmptyAction": "Create an agent",
+  "marketNoMatchTitle": "No matching agents",
+  "marketNoMatchMessage": "Try another search or fewer filters.",
+  "marketClearFilters": "Clear filters",
+  "marketShowingCount": "SHOWING {visible} OF {total}",
+  "@marketShowingCount": {
+    "placeholders": {
+      "visible": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "marketAgentsLive": "{count, plural, =1{1 AGENT LIVE} other{{count} AGENTS LIVE}}",
+  "@marketAgentsLive": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "marketDemoCatalog": "DEMO CATALOG",
+  "marketFilters": "Filters",
+  "marketFiltersActive": "Filters ({count} active)",
+  "@marketFiltersActive": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "marketReset": "Reset",
+  "marketSortBy": "Sort by",
+  "marketSkills": "Skills",
+  "marketShowAgents": "{count, plural, =1{Show 1 agent} other{Show {count} agents}}",
+  "@marketShowAgents": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "marketClearAll": "Clear all",
+  "sortFeatured": "Featured",
+  "sortPriceLowToHigh": "Price: low to high",
+  "sortPriceHighToLow": "Price: high to low",
+  "sortTopRated": "Top rated",
+  "studioTitle": "Agent Studio",
+  "studioLead": "Design an agent, give it a price, deploy it with its own wallet.",
+  "studioPreview": "Marketplace preview",
+  "studioYourAgent": "Your agent",
+  "studioGeneralist": "Generalist",
+  "studioDeployHint": "On deploy, puls3 creates a Stellar wallet for this agent and registers its identity on Soroban.",
+  "studioDeploy": "Deploy to Stellar",
+  "studioSaveDraft": "Save draft",
+  "studioSaving": "Saving…",
+  "studioTestRun": "Test run",
+  "studioMyAgents": "My agents",
+  "studioConnectToSave": "Connect your wallet to save drafts and test runs.",
+  "myAgentsTitle": "My agents",
+  "myAgentsSubtitle": "Your drafts and deployed agents.",
+  "myAgentsSubtitleDemo": "Your drafts and deployed agents. Demo: kept in this browser tab only.",
+  "myAgentsNew": "New agent",
+  "myAgentsConnectTitle": "Connect your wallet",
+  "myAgentsConnectMessage": "Your drafts and agents belong to your wallet.",
+  "myAgentsLoadError": "Could not load your agents",
+  "myAgentsEmptyTitle": "No agents yet",
+  "myAgentsEmptyMessage": "Agents you save or deploy from the Studio show up here.",
+  "myAgentsEmptyAction": "Create your first agent",
+  "agentAbout": "About",
+  "agentSkills": "Skills",
+  "agentOnChainIdentity": "On-chain identity",
+  "agentId": "Agent id",
+  "agentDemoNotOnChain": "Demo agent, not on chain",
+  "agentPaymentWallet": "Payment wallet",
+  "agentViewOnExplorer": "View on explorer",
+  "agentPrice": "Price",
+  "hireAgent": "Hire {name}",
+  "@hireAgent": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "hireNotFoundTitle": "Hire not found",
+  "hireCouldNotLoad": "Could not load this hire",
+  "agentCouldNotLoad": "Could not load this agent",
+  "pricePerTask": "/ task",
+  "agentUntitled": "Untitled agent",
+  "agentUnspecifiedModel": "Unspecified",
+  "agentNotFoundTitle": "Agent not found",
+  "agentNotFoundMessage": "No agent with this id is registered. It may have been removed, or the link is wrong.",
+  "agentBackToMarketplace": "Back to Marketplace",
+  "agentChecking": "Checking the agent on the server…",
+  "agentHireDisabled": "Hire is disabled until the agent loads.",
+  "agentStaleTitle": "Showing the last known data",
+  "agentStaleMessage": "The puls3 server did not respond, so this agent could not be confirmed.",
+  "agentPaidOnStellar": "Paid in USDC on Stellar. Settles in about 5 seconds.",
+  "agentHire": "Hire",
+  "agentLoading": "Loading agent",
+  "marketLoadingAgents": "Loading agents",
+  "agentPricePerTask": "Price / task",
+  "agentRating": "Rating",
+  "agentOnChainId": "On-chain id",
+  "agentDemo": "Demo",
+  "agentDetails": "Details",
+  "networkTestnet": "Testnet",
+  "skillOnChainAnalytics": "On-chain analytics",
+  "skillMonitoring": "Monitoring",
+  "skillSummaries": "Summaries",
+  "skillPayments": "Payments",
+  "skillAnchors": "Anchors",
+  "skillCompliance": "Compliance",
+  "skillSmartContracts": "Smart contracts",
+  "skillSecurity": "Security",
+  "skillRust": "Rust",
+  "skillDocumentParsing": "Document parsing",
+  "skillAccounting": "Accounting",
+  "skillTrading": "Trading",
+  "skillCopywriting": "Copywriting",
+  "skillMarketing": "Marketing",
+  "skillCustomerSupport": "Customer support",
+  "skillTriage": "Triage",
+  "skillDataCleaning": "Data cleaning",
+  "skillResearch": "Research",
+  "demoDescAgt001": "Monitors Stellar accounts and summarizes balance changes, payments and trustline updates in plain language.",
+  "demoDescAgt002": "Plans cross-border payouts, compares anchor routes and prepares USDC transfers for review.",
+  "demoDescAgt003": "Reviews Soroban smart contracts for common pitfalls and explains findings with suggested fixes.",
+  "demoDescAgt004": "Reads invoices, extracts line items and drafts matching USDC payment requests.",
+  "demoDescAgt005": "Tracks SDEX order books and liquidity pools and delivers a daily market brief.",
+  "demoDescAgt006": "Writes landing pages, release notes and social threads in your brand voice.",
+  "demoDescAgt007": "Answers wallet support tickets, triages bugs and escalates with full context.",
+  "demoDescAgt008": "Cleans CSV exports, joins datasets and returns tidy tables with charts.",
+  "studioSectionIdentity": "Identity",
+  "studioAgentName": "Agent name",
+  "studioAgentNameHint": "For example, Brief Bot",
+  "studioCharacters": "{count} characters",
+  "@studioCharacters": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "studioDescription": "Description",
+  "studioDescriptionHint": "What the agent does, in one or two sentences",
+  "studioModel": "Model",
+  "studioModelOwnProvider": "Runs on your own provider account",
+  "studioModelFreeTier": "Free tier on your own Workers AI account",
+  "studioModelOwnKey": "Uses your own {provider} key",
+  "@studioModelOwnKey": {
+    "placeholders": {
+      "provider": {"type": "String"}
+    }
+  },
+  "studioModelFree": "{label} · free",
+  "@studioModelFree": {
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "studioSectionBehavior": "Behavior",
+  "studioSystemPrompt": "System prompt",
+  "studioSystemPromptHint": "The instructions the agent follows on every hire",
+  "studioAddSkill": "Add a skill",
+  "studioAddSkillHint": "Type and press Enter",
+  "studioAddSkillTooltip": "Add skill",
+  "studioSectionIo": "Input and output",
+  "studioInputMax": "Longest input (characters)",
+  "studioInputMaxHint": "For example, 6000",
+  "studioInputHelper": "Plain text from the person who hires the agent",
+  "studioAnswerFormat": "Answer format",
+  "studioPlainText": "Plain text",
+  "studioMarkdown": "Markdown",
+  "studioOutputMax": "Longest answer",
+  "studioSectionPricing": "Pricing",
+  "studioPricePerTask": "Price per task",
+  "studioReady": "Ready to deploy",
+  "studioFieldsToComplete": "{count, plural, =1{1 field to complete} other{{count} fields to complete}}",
+  "@studioFieldsToComplete": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "studioWhatIsMissing": "What is missing?",
+  "studioConnectDraftOwner": "Connect the wallet that owns this draft to open it.",
+  "studioUnsavedRevision": "Unsaved changes · revision {revision}",
+  "@studioUnsavedRevision": {
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+  "studioSavedRevision": "Saved · revision {revision}",
+  "@studioSavedRevision": {
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+  "studioSavedRevisionDemo": "Saved · revision {revision} (demo)",
+  "@studioSavedRevisionDemo": {
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+  "studioReload": "Reload",
+  "studioKeepMine": "Keep mine",
+  "studioNotSaved": "Not saved: {message}",
+  "@studioNotSaved": {
+    "placeholders": {
+      "message": {"type": "String"}
+    }
+  },
+  "studioServerNoAnswer": "Not saved: the server did not respond. Your text stays.",
+  "studioVersionBanner": "Editing creates version {next}. Hirers keep version {current} until you deploy.",
+  "@studioVersionBanner": {
+    "placeholders": {
+      "next": {"type": "int"},
+      "current": {"type": "int"}
+    }
+  },
+  "studioErrWholeNumber": "Enter a whole number of characters.",
+  "studioErrPriceFormat": "Enter an amount like 0.50.",
+  "studioErrSkillLetters": "Use letters or numbers in each skill name.",
+  "studioErrSkillTooLong": "A skill name is too long.",
+  "studioErrNameMissing": "Give your agent a name.",
+  "studioErrNameTooShort": "The name is too short.",
+  "studioErrNameTooLong": "The name is too long.",
+  "studioErrNameCheck": "Check the name.",
+  "studioErrDescMissing": "Say what the agent does.",
+  "studioErrDescTooShort": "The description is too short.",
+  "studioErrDescTooLong": "The description is too long.",
+  "studioErrDescCheck": "Check the description.",
+  "studioErrSkillsMissing": "Add at least one skill.",
+  "studioErrSkillsTooMany": "Too many skills: remove some.",
+  "studioErrSkillDuplicate": "Two skills have the same name.",
+  "studioErrSkillCheck": "Check the skill names.",
+  "studioErrModelMissing": "Choose a model.",
+  "studioErrModelFreeTier": "This model is not available on the free tier.",
+  "studioErrModelProvider": "This provider is not enabled yet.",
+  "studioErrPromptMissing": "Write the instructions the agent follows.",
+  "studioErrPromptTooShort": "The instructions are too short.",
+  "studioErrPromptTooLong": "The instructions are too long.",
+  "studioErrPromptCheck": "Check the instructions.",
+  "studioErrInputMissing": "Set the longest input the agent accepts.",
+  "studioErrInputTooLow": "The input limit must be at least 1 character.",
+  "studioErrInputTooHigh": "The input limit is above what agents accept.",
+  "studioErrInputCheck": "Check the input.",
+  "studioErrOutputMissing": "Set the longest answer the agent returns.",
+  "studioErrOutputTooLow": "The answer limit must be at least 1 character.",
+  "studioErrOutputTooHigh": "The answer limit is above what agents return.",
+  "studioErrOutputCheck": "Check the output.",
+  "studioErrPriceMissing": "Set a price.",
+  "studioErrPricePositive": "The price must be more than 0.",
+  "studioErrPriceCheck": "Check the price.",
+  "studioErrCannotSave": "This agent cannot be saved.",
+  "playgroundDemoLead": "Demo test runner: no model answers yet.",
+  "playgroundLiveLead": "Test runs are free and limited per day.",
+  "playgroundProviderToken": "Provider token",
+  "playgroundProviderTokenHint": "Stored for your test runs",
+  "playgroundAccountId": "Cloudflare account id",
+  "playgroundRunning": "Running… It stops at the runtime timeout.",
+  "playgroundFailed": "The test run failed",
+  "playgroundTryLater": "Try again in a moment.",
+  "playgroundQuota": "You used today's test runs.",
+  "playgroundSampleTask": "A sample task for your agent",
+  "playgroundTooLong": "This agent accepts up to {max} characters.",
+  "@playgroundTooLong": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "playgroundRun": "Run",
+  "playgroundRunningButton": "Running…",
+  "playgroundResultLabel": "Test run: not paid, nothing on chain",
+  "playgroundRunsLeft": "{count, plural, =1{1 run left today} other{{count} runs left today}}",
+  "@playgroundRunsLeft": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "commonClose": "Close",
+  "myAgentsDrafts": "Drafts",
+  "myAgentsDeployingOrFailed": "Deploying or failed",
+  "myAgentsLive": "Live",
+  "myAgentsDraftRevision": "Draft · revision {revision}",
+  "@myAgentsDraftRevision": {
+    "placeholders": {
+      "revision": {"type": "int"}
+    }
+  },
+  "myAgentsDeploying": "Deploying",
+  "myAgentsDeployFailed": "Deploy failed",
+  "myAgentsLiveVersion": "Live · version {version}",
+  "@myAgentsLiveVersion": {
+    "placeholders": {
+      "version": {"type": "int"}
+    }
+  },
+  "myAgentsContinue": "Continue editing",
+  "myAgentsResume": "Resume deploy",
+  "myAgentsResumeStep": "Resume deploy (step {step})",
+  "@myAgentsResumeStep": {
+    "placeholders": {
+      "step": {"type": "int"}
+    }
+  },
+  "myAgentsView": "View",
+  "myAgentsEdit": "Edit",
+  "myAgentsServerNoAnswer": "The server did not respond. Try again.",
+  "hireDemoOnly": "Demo only: signing here does not move funds. Escrow payments arrive once wallet sign-in is live on the server.",
+  "hireTaskLabel": "What should the agent do?",
+  "hireTaskHint": "Describe the task for this hire",
+  "hireAsset": "Asset",
+  "hireNetwork": "Network",
+  "hireDestination": "Destination",
+  "hireEscrow": "Escrow",
+  "hireNetworkFee": "Network fee",
+  "hireSigning": "Signing…",
+  "hireConfirmSign": "Confirm & sign",
+  "hireDemoSignature": "Demo signature only",
+  "hireDemoDone": "No payment was sent and no hire was created. Real escrow payments arrive once wallet sign-in is live on the server.",
+  "hireAgentLabel": "Agent",
+  "hirePaymentHeld": "Payment held by the escrow",
+  "hirePaymentConfirming": "Payment sent, confirming on Stellar…",
+  "hirePaymentHeldBody": "Your USDC is held by the escrow contract until you approve the result. The agent starts working.",
+  "hirePaymentConfirmingBody": "puls3 is confirming the transaction and checking that it matches this hire. You can follow it on StellarExpert.",
+  "hireTxHash": "Tx hash",
+  "hireViewHire": "View hire",
+  "hireViewExplorer": "View on StellarExpert",
+  "hirePaymentFailed": "Payment failed",
+  "hirePaymentIncomplete": "Payment could not be completed",
+  "hireEscrowProtection": "Escrow protection: your USDC stays in the escrow contract. The agent is paid only when you approve the result, and you get a refund if it never delivers.",
+  "studioDraftLoadError": "The draft could not be loaded. Try again.",
+  "playgroundUnavailable": "The test runner is unavailable.",
+  "playgroundQuotaReset": "You used today's test runs. They reset at {time}.",
+  "@playgroundQuotaReset": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "playgroundOutputCopied": "Output copied",
+  "marketSortAgents": "Sort agents",
+  "hireIdLabel": "Hire"
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/stellar_format.dart';
+import '../../../l10n/l10n.dart';
 import '../../../theme/puls3_theme.dart';
 import '../../atoms/content_width.dart';
 import '../../atoms/primary_button.dart';
@@ -34,14 +35,19 @@ class LandingNav extends StatelessWidget {
     required this.links,
     required this.onOpenApp,
     required this.compact,
+    this.trailing,
   });
 
   final List<LandingLink> links;
   final VoidCallback onOpenApp;
   final bool compact;
 
-  /// Below this width the links move into a menu.
-  static const double menuBelow = 1000;
+  /// Language switcher (or any extra action) before "Open app".
+  final Widget? trailing;
+
+  /// Below this width the links move into a menu. A bit above the old
+  /// 1000 so the language icon and "Open app" still fit.
+  static const double menuBelow = 1100;
 
   /// Below this width "Open app" leaves the bar (the menu has it).
   static const double openAppFrom = 400;
@@ -57,7 +63,7 @@ class LandingNav extends StatelessWidget {
         if (menu)
           PopupMenuButton<int>(
             key: const Key('landing-menu'),
-            tooltip: 'Menu',
+            tooltip: context.l10n.navMenu,
             icon: const Icon(Icons.menu_rounded),
             onSelected: (i) => links[i].onTap(),
             itemBuilder: (context) => [
@@ -92,11 +98,15 @@ class LandingNav extends StatelessWidget {
                 ],
               ),
             ),
+        if (trailing != null) ...[
+          const SizedBox(width: Puls3Spacing.xs),
+          trailing!,
+        ],
         if (width >= openAppFrom) ...[
           const SizedBox(width: Puls3Spacing.xs),
           PrimaryButton(
             key: const Key('landing-open-app'),
-            label: 'Open app',
+            label: context.l10n.navOpenApp,
             onPressed: onOpenApp,
           ),
         ],
@@ -301,15 +311,14 @@ class LandingFinalCta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Start with an agent.',
+            context.l10n.landingFinalCtaTitle,
             style: compact
                 ? Puls3Text.h3.copyWith(fontSize: 22)
                 : Puls3Text.h2Compact,
           ),
           const SizedBox(height: Puls3Spacing.xs),
           Text(
-            'Hire one on testnet, build your own in the Studio, or help '
-            'build puls3 in the open.',
+            context.l10n.landingFinalCtaLead,
             style: Puls3Text.bodyMuted,
           ),
           const SizedBox(height: Puls3Spacing.lg),
@@ -317,9 +326,12 @@ class LandingFinalCta extends StatelessWidget {
             spacing: Puls3Spacing.sm,
             runSpacing: Puls3Spacing.sm,
             children: [
-              PrimaryButton(label: 'Explore agents', onPressed: onExplore),
               PrimaryButton(
-                label: 'Build an agent',
+                label: context.l10n.landingExploreAgents,
+                onPressed: onExplore,
+              ),
+              PrimaryButton(
+                label: context.l10n.landingBuildAgent,
                 variant: PrimaryButtonVariant.outline,
                 onPressed: onBuild,
               ),

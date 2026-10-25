@@ -35,7 +35,7 @@ void main() {
     expect(find.text('Chain Atlas'), findsOneWidget);
     expect(find.text('On-chain analytics'), findsWidgets);
     expect(find.text('Ledger Scout'), findsNothing);
-    expect(find.text('1 AGENTS LIVE'), findsOneWidget);
+    expect(find.text('1 AGENT LIVE'), findsOneWidget);
   });
 
   testWidgets('a failing server shows the demo catalog, labelled, and Retry '

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/stellar_explorer.dart';
 import '../../domain/stellar_format.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/address_badge.dart';
 import '../atoms/price_tag.dart';
@@ -86,14 +87,16 @@ class HirePaymentView extends StatelessWidget {
     return AnimatedSwitcher(
       duration: Puls3Durations.medium,
       child: switch (phase) {
-        HirePhase.confirmed => isDemo ? _buildDemoDone() : _buildConfirmed(),
-        HirePhase.error => _buildError(),
-        _ => _buildSummary(),
+        HirePhase.confirmed =>
+          isDemo ? _buildDemoDone(context) : _buildConfirmed(context),
+        HirePhase.error => _buildError(context),
+        _ => _buildSummary(context),
       },
     );
   }
 
-  Widget _buildSummary() {
+  Widget _buildSummary(BuildContext context) {
+    final l10n = context.l10n;
     final signing = phase == HirePhase.signing;
     final input = inputController;
     final progress = progressLabel;
@@ -102,12 +105,11 @@ class HirePaymentView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Hire $agentName', style: Puls3Text.h3),
+        Text(l10n.hireAgent(agentName), style: Puls3Text.h3),
         const SizedBox(height: Puls3Spacing.xs),
         if (isDemo)
           Text(
-            'Demo only: signing here does not move funds. Escrow payments '
-            'arrive once wallet sign-in is live on the server.',
+            l10n.hireDemoOnly,
             style: Puls3Text.bodyMuted,
           ),
         if (resumeNote != null) ...[
@@ -151,9 +153,9 @@ class HirePaymentView extends StatelessWidget {
             minLines: 2,
             maxLines: 4,
             style: Puls3Text.body,
-            decoration: const InputDecoration(
-              labelText: 'What should the agent do?',
-              hintText: 'Describe the task for this hire',
+            decoration: InputDecoration(
+              labelText: l10n.hireTaskLabel,
+              hintText: l10n.hireTaskHint,
             ),
           ),
           const SizedBox(height: Puls3Spacing.md),
@@ -168,22 +170,22 @@ class HirePaymentView extends StatelessWidget {
           child: Column(
             children: [
               KeyValueRow(
-                label: 'Price',
+                label: l10n.agentPrice,
                 value: '',
                 valueWidget: PriceTag(
                   stroops: priceUsdcStroops,
-                  suffix: null,
+                  perTask: false,
                 ),
               ),
-              const KeyValueRow(label: 'Asset', value: 'USDC'),
-              const KeyValueRow(label: 'Network', value: 'Stellar Testnet'),
+              KeyValueRow(label: l10n.hireAsset, value: 'USDC'),
+              KeyValueRow(label: l10n.hireNetwork, value: 'Stellar Testnet'),
               KeyValueRow(
-                label: 'Destination',
+                label: l10n.hireDestination,
                 value: '',
                 valueWidget: AddressBadge(address: destinationAddress),
               ),
               KeyValueRow(
-                label: 'Escrow',
+                label: l10n.hireEscrow,
                 value: '',
                 valueWidget: AddressBadge(
                   icon: Icons.shield_outlined,
@@ -191,8 +193,8 @@ class HirePaymentView extends StatelessWidget {
                       escrowContractAddress ?? defaultEscrowContractAddress,
                 ),
               ),
-              const KeyValueRow(
-                label: 'Network fee',
+              KeyValueRow(
+                label: l10n.hireNetworkFee,
                 value: '< 0.00001 XLM',
                 mono: true,
               ),
@@ -205,7 +207,7 @@ class HirePaymentView extends StatelessWidget {
           builder: (context, _) {
             final ready = input == null || input.text.trim().isNotEmpty;
             return PrimaryButton(
-              label: signing ? 'Signing…' : 'Confirm & sign',
+              label: signing ? l10n.hireSigning : l10n.hireConfirmSign,
               icon: Icons.lock_outline_rounded,
               isLoading: signing,
               expand: true,
@@ -228,7 +230,8 @@ class HirePaymentView extends StatelessWidget {
 
   /// Demo result: never claims a payment, never links to the explorer or
   /// to a hire.
-  Widget _buildDemoDone() {
+  Widget _buildDemoDone(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       key: const ValueKey('confirmed-demo'),
       mainAxisSize: MainAxisSize.min,
@@ -238,20 +241,19 @@ class HirePaymentView extends StatelessWidget {
           children: [
             const Icon(Icons.info_outline, color: Puls3Colors.accent, size: 28),
             const SizedBox(width: Puls3Spacing.sm),
-            Text('Demo signature only', style: Puls3Text.h3),
+            Text(l10n.hireDemoSignature, style: Puls3Text.h3),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),
         Text(
-          'No payment was sent and no hire was created. Real escrow '
-          'payments arrive once wallet sign-in is live on the server.',
+          l10n.hireDemoDone,
           style: Puls3Text.bodyMuted,
         ),
         const SizedBox(height: Puls3Spacing.md),
-        KeyValueRow(label: 'Agent', value: agentName),
+        KeyValueRow(label: l10n.hireAgentLabel, value: agentName),
         const SizedBox(height: Puls3Spacing.lg),
         PrimaryButton(
-          label: 'Back to Marketplace',
+          label: l10n.agentBackToMarketplace,
           icon: Icons.storefront_outlined,
           expand: true,
           onPressed: onBackToMarketplace,
@@ -260,7 +262,8 @@ class HirePaymentView extends StatelessWidget {
     );
   }
 
-  Widget _buildConfirmed() {
+  Widget _buildConfirmed(BuildContext context) {
+    final l10n = context.l10n;
     final hash = transactionHash;
     final hireId = this.hireId;
     return Column(
@@ -283,8 +286,8 @@ class HirePaymentView extends StatelessWidget {
             Expanded(
               child: Text(
                 paymentConfirmed
-                    ? 'Payment held by the escrow'
-                    : 'Payment sent, confirming on Stellar…',
+                    ? l10n.hirePaymentHeld
+                    : l10n.hirePaymentConfirming,
                 style: Puls3Text.h3,
               ),
             ),
@@ -293,25 +296,24 @@ class HirePaymentView extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.sm),
         Text(
           paymentConfirmed
-              ? 'Your USDC is held by the escrow contract until you approve '
-                    'the result. The agent starts working.'
-              : 'puls3 is confirming the transaction and checking that it '
-                    'matches this hire. You can follow it on StellarExpert.',
+              ? l10n.hirePaymentHeldBody
+              : l10n.hirePaymentConfirmingBody,
           style: Puls3Text.bodyMuted,
         ),
         const SizedBox(height: Puls3Spacing.md),
-        KeyValueRow(label: 'Agent', value: agentName),
-        if (hireId != null) KeyValueRow(label: 'Hire', value: '#$hireId'),
+        KeyValueRow(label: l10n.hireAgentLabel, value: agentName),
+        if (hireId != null)
+          KeyValueRow(label: l10n.hireIdLabel, value: '#$hireId'),
         if (hash != null && hash.isNotEmpty)
           KeyValueRow(
-            label: 'Tx hash',
+            label: l10n.hireTxHash,
             value: shortenAddress(hash, head: 8, tail: 8),
             mono: true,
           ),
         const SizedBox(height: Puls3Spacing.md),
         if (onViewHire != null) ...[
           PrimaryButton(
-            label: 'View hire',
+            label: l10n.hireViewHire,
             icon: Icons.track_changes_rounded,
             expand: true,
             onPressed: onViewHire,
@@ -320,7 +322,7 @@ class HirePaymentView extends StatelessWidget {
         ],
         if (hash != null && hash.isNotEmpty && onOpenExplorer != null) ...[
           PrimaryButton(
-            label: 'View on StellarExpert',
+            label: l10n.hireViewExplorer,
             icon: Icons.open_in_new_rounded,
             variant: PrimaryButtonVariant.outline,
             expand: true,
@@ -329,7 +331,7 @@ class HirePaymentView extends StatelessWidget {
           const SizedBox(height: Puls3Spacing.sm),
         ],
         PrimaryButton(
-          label: 'Back to Marketplace',
+          label: l10n.agentBackToMarketplace,
           icon: Icons.storefront_outlined,
           variant: onViewHire == null
               ? PrimaryButtonVariant.filled
@@ -341,8 +343,9 @@ class HirePaymentView extends StatelessWidget {
     );
   }
 
-  Widget _buildError() {
-    final message = errorMessage ?? 'Payment could not be completed';
+  Widget _buildError(BuildContext context) {
+    final l10n = context.l10n;
+    final message = errorMessage ?? l10n.hirePaymentIncomplete;
     return Column(
       key: const ValueKey('error'),
       mainAxisSize: MainAxisSize.min,
@@ -356,14 +359,14 @@ class HirePaymentView extends StatelessWidget {
               size: 28,
             ),
             const SizedBox(width: Puls3Spacing.sm),
-            Text('Payment failed', style: Puls3Text.h3),
+            Text(l10n.hirePaymentFailed, style: Puls3Text.h3),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),
         Text(message, style: Puls3Text.bodyMuted),
         const SizedBox(height: Puls3Spacing.xl),
         PrimaryButton(
-          label: 'Try again',
+          label: l10n.commonTryAgain,
           icon: Icons.refresh,
           expand: true,
           onPressed: onRetry ?? onConfirm,
@@ -371,7 +374,7 @@ class HirePaymentView extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.sm),
         TextButton(
           onPressed: onBackToMarketplace,
-          child: const Text('Back to Marketplace'),
+          child: Text(l10n.agentBackToMarketplace),
         ),
       ],
     );
@@ -403,9 +406,7 @@ class _EscrowGuarantee extends StatelessWidget {
           const SizedBox(width: Puls3Spacing.sm),
           Expanded(
             child: Text(
-              'Escrow protection: your USDC stays in the escrow contract. '
-              'The agent is paid only when you approve the result, and you '
-              'get a refund if it never delivers.',
+              context.l10n.hireEscrowProtection,
               style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
             ),
           ),

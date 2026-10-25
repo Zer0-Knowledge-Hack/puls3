@@ -4,6 +4,7 @@ import 'package:puls3_domain/puls3_domain.dart'
     show AgentManifestDraft, OutputType;
 
 import '../domain/usdc.dart';
+import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
 import '../studio/studio_form_check.dart';
 import '../studio/studio_gateway.dart';
@@ -156,11 +157,12 @@ class _StudioScreenState extends State<StudioScreen> {
   /// Loads a saved draft into the form (F8 "Continue editing", F10 "Edit").
   Future<void> _open(int draftId) async {
     if (!mounted) return;
+    final l10n = context.l10n;
     final owner = _owner;
     if (owner == null) {
       setState(() {
         _loadingDraft = false;
-        _saveError = 'Connect the wallet that owns this draft to open it.';
+        _saveError = l10n.studioConnectDraftOwner;
       });
       return;
     }
@@ -189,7 +191,7 @@ class _StudioScreenState extends State<StudioScreen> {
       if (!mounted) return;
       setState(() {
         _loadingDraft = false;
-        _saveError = 'The draft could not be loaded. Try again.';
+        _saveError = l10n.studioDraftLoadError;
       });
     }
   }
@@ -229,6 +231,8 @@ class _StudioScreenState extends State<StudioScreen> {
       owner = _owner;
       if (owner == null) return null;
     }
+    if (!mounted) return null;
+    final l10n = context.l10n;
     setState(() {
       _saving = true;
       _saveError = null;
@@ -260,13 +264,13 @@ class _StudioScreenState extends State<StudioScreen> {
     } on StudioInvalidDraft catch (e) {
       error = e.message;
       for (final problem in e.problems) {
-        final (field, message) = describeManifestProblem(problem);
+        final (field, message) = describeManifestProblem(problem, l10n);
         problems.putIfAbsent(field, () => message);
       }
     } on StudioGatewayException catch (e) {
-      error = 'Not saved: ${e.message}';
+      error = l10n.studioNotSaved(e.message);
     } catch (_) {
-      error = 'Not saved: the server did not answer. Your text stays.';
+      error = l10n.studioServerNoAnswer;
     }
     if (!mounted) return null;
     setState(() {
@@ -347,7 +351,7 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   Widget _buildBody(BuildContext context) {
-    final check = checkStudioForm(_values);
+    final check = checkStudioForm(_values, l10n: context.l10n);
     // A draft needs at least a name to be listed in My agents.
     final saveable = _name.text.trim().isEmpty ? null : check.draft;
     final deployable = check.manifest != null ? saveable : null;
@@ -392,14 +396,16 @@ class _StudioScreenState extends State<StudioScreen> {
     final preview = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionLabel('Marketplace preview'),
+        SectionLabel(context.l10n.studioPreview),
         const SizedBox(height: Puls3Spacing.sm),
         // The same card the Marketplace shows (#26). A new agent has no
         // reviews: RatingBadge hides a 0.0 rating.
         AgentCard(
           key: const Key('studio-preview-card'),
-          name: name.isEmpty ? 'Your agent' : name,
-          topSkill: _skills.isEmpty ? 'Generalist' : _skills.first,
+          name: name.isEmpty ? context.l10n.studioYourAgent : name,
+          topSkill: _skills.isEmpty
+              ? context.l10n.studioGeneralist
+              : localizedSkillName(context.l10n, _skills.first),
           priceUsdcStroops: parseUsdcToStroops(_price.text) ?? 0,
           rating: 0.0,
           description: description.isEmpty ? null : description,
@@ -413,14 +419,13 @@ class _StudioScreenState extends State<StudioScreen> {
         ),
         const SizedBox(height: Puls3Spacing.md),
         Text(
-          'On deploy, puls3 creates a Stellar wallet for this agent and '
-          'registers its identity on Soroban.',
+          context.l10n.studioDeployHint,
           style: Puls3Text.bodyMuted,
         ),
         const SizedBox(height: Puls3Spacing.lg),
         PrimaryButton(
           key: const Key('studio-deploy'),
-          label: 'Deploy to Stellar',
+          label: context.l10n.studioDeploy,
           icon: Icons.rocket_launch_outlined,
           expand: true,
           onPressed: deployable == null || busy
@@ -433,7 +438,9 @@ class _StudioScreenState extends State<StudioScreen> {
             Expanded(
               child: PrimaryButton(
                 key: const Key('studio-save'),
-                label: _saving ? 'Saving…' : 'Save draft',
+                label: _saving
+                    ? context.l10n.studioSaving
+                    : context.l10n.studioSaveDraft,
                 icon: Icons.save_outlined,
                 variant: PrimaryButtonVariant.outline,
                 isLoading: _saving,
@@ -447,7 +454,7 @@ class _StudioScreenState extends State<StudioScreen> {
             Expanded(
               child: PrimaryButton(
                 key: const Key('studio-test-run'),
-                label: 'Test run',
+                label: context.l10n.studioTestRun,
                 icon: Icons.play_arrow_rounded,
                 variant: PrimaryButtonVariant.outline,
                 expand: true,
@@ -478,7 +485,7 @@ class _StudioScreenState extends State<StudioScreen> {
             key: const Key('studio-my-agents'),
             onPressed: () => context.go('/studio/agents'),
             icon: const Icon(Icons.list_alt_rounded, size: 18),
-            label: const Text('My agents'),
+            label: Text(context.l10n.studioMyAgents),
           ),
         ),
         if (wide && playground != null && owner != null) ...[
@@ -500,7 +507,7 @@ class _StudioScreenState extends State<StudioScreen> {
       children: [
         const SizedBox(height: Puls3Spacing.xl),
         Text(
-          'Agent Studio',
+          context.l10n.studioTitle,
           style:
               MediaQuery.sizeOf(context).width <
                   Puls3Breakpoints.compactHeadline
@@ -509,7 +516,7 @@ class _StudioScreenState extends State<StudioScreen> {
         ),
         const SizedBox(height: Puls3Spacing.xs),
         Text(
-          'Design an agent, give it a price, deploy it with its own wallet.',
+          context.l10n.studioLead,
           style: Puls3Text.lead,
         ),
         if (_loadingDraft) ...[
@@ -559,8 +566,7 @@ class _VersionBanner extends StatelessWidget {
         border: Border.all(color: Puls3Colors.lavender),
       ),
       child: Text(
-        'Editing creates version ${version + 1}. Hirers keep version '
-        '$version until you deploy.',
+        context.l10n.studioVersionBanner(version + 1, version),
         style: Puls3Text.body,
       ),
     );
@@ -610,12 +616,12 @@ class _SaveStatus extends StatelessWidget {
                 TextButton(
                   key: const Key('studio-conflict-reload'),
                   onPressed: onReload,
-                  child: const Text('Reload'),
+                  child: Text(context.l10n.studioReload),
                 ),
                 TextButton(
                   key: const Key('studio-conflict-keep'),
                   onPressed: onKeepMine,
-                  child: const Text('Keep mine'),
+                  child: Text(context.l10n.studioKeepMine),
                 ),
               ],
             ),
@@ -627,13 +633,13 @@ class _SaveStatus extends StatelessWidget {
     if (saving) {
       text = null;
     } else if (revision == null) {
-      text = walletConnected
-          ? null
-          : 'Connect your wallet to save drafts and test runs.';
+      text = walletConnected ? null : context.l10n.studioConnectToSave;
     } else if (unsaved) {
-      text = 'Unsaved changes · revision $revision';
+      text = context.l10n.studioUnsavedRevision(revision);
     } else {
-      text = 'Saved · revision $revision${isDemo ? ' (demo)' : ''}';
+      text = isDemo
+          ? context.l10n.studioSavedRevisionDemo(revision)
+          : context.l10n.studioSavedRevision(revision);
     }
     if (text == null) return const SizedBox.shrink();
     return Text(
@@ -683,10 +689,8 @@ class _ReadyPanel extends StatelessWidget {
               children: [
                 Text(
                   ready
-                      ? 'Ready to deploy'
-                      : remaining == 1
-                      ? '1 field to complete'
-                      : '$remaining fields to complete',
+                      ? context.l10n.studioReady
+                      : context.l10n.studioFieldsToComplete(remaining),
                   style: Puls3Text.body,
                 ),
                 // Under the text, so it fits on the narrowest phones.
@@ -697,7 +701,7 @@ class _ReadyPanel extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(0, 36),
                     ),
-                    child: const Text('What is missing?'),
+                    child: Text(context.l10n.studioWhatIsMissing),
                   ),
               ],
             ),

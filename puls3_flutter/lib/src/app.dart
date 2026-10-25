@@ -8,6 +8,10 @@ import 'hire/create_hire_flow_store.dart';
 import 'hire/fake_hire_gateway.dart';
 import 'hire/hire_flow_store.dart';
 import 'hire/hire_gateway.dart';
+import 'l10n/create_locale_store.dart';
+import 'l10n/l10n.dart';
+import 'l10n/locale_controller.dart';
+import 'l10n/locale_store.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
 import 'screens/brand_screen.dart';
@@ -83,6 +87,8 @@ class Puls3App extends StatefulWidget {
     this.studioGateway,
     this.hireGateway,
     this.hireFlowStore,
+    this.localeStore,
+    this.locale,
     this.healthCheck,
     this.initialLocation = '/',
   });
@@ -109,6 +115,13 @@ class Puls3App extends StatefulWidget {
 
   /// Where unfinished hires are kept: the browser's storage by default.
   final HireFlowStore? hireFlowStore;
+
+  /// Where the language tag is kept: the browser's storage by default.
+  final LocaleStore? localeStore;
+
+  /// Forces a locale in tests. Production resolves from the store, then
+  /// the device, then English.
+  final Locale? locale;
   final Future<String>? healthCheck;
   final String initialLocation;
 
@@ -132,6 +145,11 @@ class _Puls3AppState extends State<Puls3App> {
   late final HireGateway _hireGateway = widget.hireGateway ?? FakeHireGateway();
   late final HireFlowStore _hireFlowStore =
       widget.hireFlowStore ?? createHireFlowStore();
+  late final LocaleController _locale = LocaleController(
+    store: widget.localeStore ?? createLocaleStore(),
+    deviceLocale: WidgetsBinding.instance.platformDispatcher.locale,
+    initial: widget.locale,
+  );
 
   @override
   void initState() {
@@ -147,6 +165,7 @@ class _Puls3AppState extends State<Puls3App> {
     _router.dispose();
     _catalog.dispose();
     _wallet.dispose();
+    _locale.dispose();
     super.dispose();
   }
 
@@ -155,33 +174,40 @@ class _Puls3AppState extends State<Puls3App> {
     // Phones get the compact type scale; set before the theme is built.
     Puls3Text.compact =
         MediaQuery.sizeOf(context).width < Puls3Breakpoints.compact;
-    return AppScope(
-      catalog: _catalog,
-      wallet: _wallet,
-      deployGateway: _deployGateway,
-      studioGateway: _studioGateway,
-      hireGateway: _hireGateway,
-      hireFlowStore: _hireFlowStore,
-      child: MaterialApp.router(
-        title: 'puls3: the agent hub on Stellar',
-        debugShowCheckedModeBanner: false,
-        theme: Puls3Theme.dark(),
-        routerConfig: _router,
-        builder: (context, child) => Column(
-          children: [
-            if (widget.healthCheck != null)
-              // The public brand page does not depend on the backend.
-              ListenableBuilder(
-                listenable: _router.routeInformationProvider,
-                builder: (context, _) =>
-                    _hidesBackendStatus(
-                      _router.routeInformationProvider.value.uri.path,
-                    )
-                    ? const SizedBox.shrink()
-                    : _BackendStatus(healthCheck: widget.healthCheck!),
-              ),
-            Expanded(child: child ?? const SizedBox.shrink()),
-          ],
+    return ListenableBuilder(
+      listenable: _locale,
+      builder: (context, _) => AppScope(
+        catalog: _catalog,
+        wallet: _wallet,
+        deployGateway: _deployGateway,
+        studioGateway: _studioGateway,
+        hireGateway: _hireGateway,
+        hireFlowStore: _hireFlowStore,
+        locale: _locale,
+        child: MaterialApp.router(
+          onGenerateTitle: (context) => context.l10n.appTitle,
+          debugShowCheckedModeBanner: false,
+          theme: Puls3Theme.dark(),
+          locale: _locale.locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          routerConfig: _router,
+          builder: (context, child) => Column(
+            children: [
+              if (widget.healthCheck != null)
+                // The public brand page does not depend on the backend.
+                ListenableBuilder(
+                  listenable: _router.routeInformationProvider,
+                  builder: (context, _) =>
+                      _hidesBackendStatus(
+                        _router.routeInformationProvider.value.uri.path,
+                      )
+                      ? const SizedBox.shrink()
+                      : _BackendStatus(healthCheck: widget.healthCheck!),
+                ),
+              Expanded(child: child ?? const SizedBox.shrink()),
+            ],
+          ),
         ),
       ),
     );
@@ -201,10 +227,11 @@ class _BackendStatus extends StatelessWidget {
     return FutureBuilder<String>(
       future: healthCheck,
       builder: (context, snapshot) {
+        final l10n = context.l10n;
         final label = switch (snapshot.connectionState) {
-          ConnectionState.waiting => 'Connecting to backend…',
-          _ when snapshot.hasError => 'Backend unavailable',
-          _ => 'Backend v${snapshot.data}',
+          ConnectionState.waiting => l10n.backendConnecting,
+          _ when snapshot.hasError => l10n.backendUnavailable,
+          _ => l10n.backendVersion(snapshot.data ?? ''),
         };
         return Semantics(
           liveRegion: true,

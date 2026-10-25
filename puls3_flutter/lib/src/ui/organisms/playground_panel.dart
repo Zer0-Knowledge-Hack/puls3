@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/primary_button.dart';
 import '../atoms/section_label.dart';
@@ -93,11 +94,11 @@ class PlaygroundPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: SectionLabel('Test run')),
+              Expanded(child: SectionLabel(context.l10n.studioTestRun)),
               if (onClose != null)
                 IconButton(
                   key: const Key('playground-close'),
-                  tooltip: 'Close',
+                  tooltip: context.l10n.commonClose,
                   onPressed: onClose,
                   icon: const Icon(Icons.close_rounded, size: 20),
                 ),
@@ -106,8 +107,8 @@ class PlaygroundPanel extends StatelessWidget {
           const SizedBox(height: Puls3Spacing.xs),
           Text(
             isDemo
-                ? 'Demo test runner: no model answers yet.'
-                : 'Test runs are free and limited per day.',
+                ? context.l10n.playgroundDemoLead
+                : context.l10n.playgroundLiveLead,
             style: Puls3Text.bodyMuted,
           ),
           const SizedBox(height: Puls3Spacing.sm),
@@ -119,9 +120,9 @@ class PlaygroundPanel extends StatelessWidget {
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(
-                labelText: 'Provider token',
-                hintText: 'Stored for your test runs',
+              decoration: InputDecoration(
+                labelText: context.l10n.playgroundProviderToken,
+                hintText: context.l10n.playgroundProviderTokenHint,
               ),
             ),
             const SizedBox(height: Puls3Spacing.sm),
@@ -133,8 +134,8 @@ class PlaygroundPanel extends StatelessWidget {
               enabled: !running,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(
-                labelText: 'Cloudflare account id',
+              decoration: InputDecoration(
+                labelText: context.l10n.playgroundAccountId,
               ),
             ),
             const SizedBox(height: Puls3Spacing.sm),
@@ -167,7 +168,7 @@ class PlaygroundPanel extends StatelessWidget {
           if (running) ...[
             const SizedBox(height: Puls3Spacing.sm),
             Text(
-              'Running… It stops at the runtime timeout.',
+              context.l10n.playgroundRunning,
               key: const Key('playground-running'),
               style: Puls3Text.bodyMuted,
             ),
@@ -176,15 +177,15 @@ class PlaygroundPanel extends StatelessWidget {
             const SizedBox(height: Puls3Spacing.md),
             ErrorBanner(
               key: const Key('playground-error'),
-              title: 'The test run failed',
-              message: errorMessage ?? 'Try again in a moment.',
+              title: context.l10n.playgroundFailed,
+              message: errorMessage ?? context.l10n.playgroundTryLater,
               onRetry: onRetry,
             ),
           ],
           if (status == PlaygroundStatus.quotaExceeded) ...[
             const SizedBox(height: Puls3Spacing.md),
             Text(
-              errorMessage ?? 'You used today\'s test runs.',
+              errorMessage ?? context.l10n.playgroundQuota,
               key: const Key('playground-quota'),
               style: Puls3Text.body.copyWith(color: Puls3Colors.accent),
             ),
@@ -202,7 +203,7 @@ class PlaygroundPanel extends StatelessWidget {
             const SizedBox(height: Puls3Spacing.md),
             PrimaryButton(
               key: const Key('playground-deploy'),
-              label: 'Deploy to Stellar',
+              label: context.l10n.studioDeploy,
               icon: Icons.rocket_launch_outlined,
               variant: PrimaryButtonVariant.outline,
               expand: true,
@@ -247,17 +248,19 @@ class _InputAndRun extends StatelessWidget {
           minLines: 3,
           maxLines: 8,
           decoration: InputDecoration(
-            hintText: 'A sample task for your agent',
+            hintText: context.l10n.playgroundSampleTask,
             counterText: '$length / $maxChars',
             errorText: tooLong
-                ? 'This agent accepts up to $maxChars characters.'
+                ? context.l10n.playgroundTooLong(maxChars)
                 : null,
           ),
         ),
         const SizedBox(height: Puls3Spacing.sm),
         PrimaryButton(
           key: const Key('playground-run'),
-          label: running ? 'Running…' : 'Run',
+          label: running
+              ? context.l10n.playgroundRunningButton
+              : context.l10n.playgroundRun,
           icon: Icons.play_arrow_rounded,
           isLoading: running,
           expand: true,
@@ -302,7 +305,7 @@ class TestRunResultCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Test run: not paid, nothing on chain',
+                  context.l10n.playgroundResultLabel,
                   style: Puls3Text.caption.copyWith(
                     color: Puls3Colors.success,
                   ),
@@ -313,7 +316,7 @@ class TestRunResultCard extends StatelessWidget {
                   key: const Key('playground-copy'),
                   onPressed: onCopy,
                   icon: const Icon(Icons.copy_rounded, size: 16),
-                  label: const Text('Copy'),
+                  label: Text(context.l10n.commonCopy),
                 ),
             ],
           ),
@@ -325,7 +328,7 @@ class TestRunResultCard extends StatelessWidget {
           if (runs != null) ...[
             const SizedBox(height: Puls3Spacing.sm),
             Text(
-              runs == 1 ? '1 run left today' : '$runs runs left today',
+              context.l10n.playgroundRunsLeft(runs),
               style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
             ),
           ],

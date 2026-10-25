@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/agent_filter.dart';
+import '../l10n/l10n.dart';
 import '../state/agent_catalog.dart';
 import '../state/app_scope.dart';
 import '../theme/breakpoints.dart';
@@ -200,12 +201,15 @@ class _MarketScreenState extends State<MarketScreen> {
           spacing: Puls3Spacing.lg,
           runSpacing: Puls3Spacing.xs,
           children: [
-            Text('Marketplace', style: title),
+            Text(context.l10n.marketTitle, style: title),
             // Doto stat accent (brand guide page 11).
             if (catalog.status == CatalogStatus.ready)
-              Text('${catalog.agents.length} AGENTS LIVE', style: stat)
+              Text(
+                context.l10n.marketAgentsLive(catalog.agents.length),
+                style: stat,
+              )
             else if (catalog.status == CatalogStatus.demo)
-              Text('DEMO CATALOG', style: stat),
+              Text(context.l10n.marketDemoCatalog, style: stat),
           ],
         ),
         const SizedBox(height: Puls3Spacing.xxs),
@@ -213,7 +217,7 @@ class _MarketScreenState extends State<MarketScreen> {
           children: [
             Expanded(
               child: Text(
-                'Find an agent, hire it, pay it in USDC on Stellar.',
+                context.l10n.marketLead,
                 style: compact
                     ? Puls3Text.bodyMuted.copyWith(fontSize: 14)
                     : Puls3Text.lead,
@@ -224,7 +228,7 @@ class _MarketScreenState extends State<MarketScreen> {
               key: const Key('market-create-agent'),
               onPressed: () => context.go('/studio'),
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Create agent'),
+              label: Text(context.l10n.marketCreateAgent),
             ),
           ],
         ),
@@ -238,12 +242,12 @@ class _MarketScreenState extends State<MarketScreen> {
     style: Puls3Text.body,
     textInputAction: TextInputAction.search,
     decoration: InputDecoration(
-      hintText: 'Search agents, skills or models',
+      hintText: context.l10n.marketSearchHint,
       prefixIcon: const Icon(Icons.search_rounded),
       suffixIcon: _search.text.isEmpty
           ? null
           : IconButton(
-              tooltip: 'Clear search',
+              tooltip: context.l10n.marketClearSearch,
               icon: const Icon(Icons.close_rounded),
               onPressed: _search.clear,
             ),
@@ -256,13 +260,13 @@ class _MarketScreenState extends State<MarketScreen> {
     runSpacing: Puls3Spacing.xs,
     children: [
       SkillChip(
-        label: 'All',
+        label: context.l10n.commonAll,
         selected: _selectedSkills.isEmpty,
         onTap: () => setState(_selectedSkills.clear),
       ),
       for (final skill in catalog.allSkills)
         SkillChip(
-          label: skill,
+          label: localizedSkillName(context.l10n, skill),
           selected: _selectedSkills.contains(skill),
           onTap: () => _toggleSkill(skill),
         ),
@@ -279,10 +283,8 @@ class _MarketScreenState extends State<MarketScreen> {
       CatalogStatus.error => [
         ErrorBanner(
           key: const ValueKey('market-error'),
-          title: 'Could not load the agents',
-          message:
-              'The puls3 server did not answer. Check your connection '
-              'and try again.',
+          title: context.l10n.marketCouldNotLoad,
+          message: context.l10n.marketCouldNotLoadMessage,
           retrying: catalog.isLoading,
           onRetry: retry,
         ),
@@ -291,10 +293,8 @@ class _MarketScreenState extends State<MarketScreen> {
         if (catalog.status == CatalogStatus.demo) ...[
           ErrorBanner(
             key: const ValueKey('market-demo'),
-            title: 'Showing the demo catalog',
-            message:
-                'The puls3 server is unreachable, so these agents are '
-                'not read from the chain.',
+            title: context.l10n.marketDemoTitle,
+            message: context.l10n.marketDemoMessage,
             retrying: catalog.isLoading,
             onRetry: retry,
           ),
@@ -304,11 +304,9 @@ class _MarketScreenState extends State<MarketScreen> {
           EmptyState(
             key: const ValueKey('market-empty'),
             icon: Icons.hub_outlined,
-            title: 'No agents yet',
-            message:
-                'Agents registered on-chain appear here. Be the first '
-                'to publish one.',
-            actionLabel: 'Create an agent',
+            title: context.l10n.marketEmptyTitle,
+            message: context.l10n.marketEmptyMessage,
+            actionLabel: context.l10n.marketEmptyAction,
             onAction: () => context.go('/studio'),
           )
         else ...[
@@ -316,7 +314,10 @@ class _MarketScreenState extends State<MarketScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'SHOWING $visible OF ${catalog.agents.length}',
+                  context.l10n.marketShowingCount(
+                    visible,
+                    catalog.agents.length,
+                  ),
                   style: Puls3Text.eyebrow,
                 ),
               ),
@@ -332,9 +333,9 @@ class _MarketScreenState extends State<MarketScreen> {
             EmptyState(
               key: const ValueKey('market-no-match'),
               icon: Icons.search_off_rounded,
-              title: 'No matching agents',
-              message: 'Try another search or fewer filters.',
-              actionLabel: 'Clear filters',
+              title: context.l10n.marketNoMatchTitle,
+              message: context.l10n.marketNoMatchMessage,
+              actionLabel: context.l10n.marketClearFilters,
               onAction: _clearFilters,
             ),
         ],
@@ -359,7 +360,9 @@ class _FiltersButton extends StatelessWidget {
       textColor: Puls3Colors.onAccent,
       child: IconButton.outlined(
         key: const Key('market-filters-button'),
-        tooltip: active == 0 ? 'Filters' : 'Filters ($active active)',
+        tooltip: active == 0
+            ? context.l10n.marketFilters
+            : context.l10n.marketFiltersActive(active),
         onPressed: onPressed,
         style: IconButton.styleFrom(
           minimumSize: const Size(48, 48),
@@ -383,12 +386,15 @@ class _SortMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<AgentSort>(
       key: const Key('market-sort-menu'),
-      tooltip: 'Sort agents',
+      tooltip: context.l10n.marketSortAgents,
       initialValue: sort,
       onSelected: onSort,
       itemBuilder: (context) => [
         for (final option in AgentSort.values)
-          PopupMenuItem(value: option, child: Text(option.label)),
+          PopupMenuItem(
+            value: option,
+            child: Text(option.l10nLabel(context.l10n)),
+          ),
       ],
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: Puls3Spacing.xxs),
@@ -397,7 +403,7 @@ class _SortMenu extends StatelessWidget {
           children: [
             const Icon(Icons.sort_rounded, size: 18, color: Puls3Colors.muted),
             const SizedBox(width: Puls3Spacing.xxs),
-            Text(sort.label, style: Puls3Text.caption),
+            Text(sort.l10nLabel(context.l10n), style: Puls3Text.caption),
           ],
         ),
       ),

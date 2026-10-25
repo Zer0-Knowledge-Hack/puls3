@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:puls3_domain/puls3_domain.dart' show ModelPolicy, OutputType;
 
+import '../l10n/l10n.dart';
 import '../studio/studio_gateway.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
@@ -48,6 +49,7 @@ class _PlaygroundState extends State<Playground> {
   }
 
   Future<void> _run() async {
+    final l10n = context.l10n;
     setState(() {
       _status = PlaygroundStatus.running;
       _error = null;
@@ -56,7 +58,7 @@ class _PlaygroundState extends State<Playground> {
       if (!widget.gateway.isDemo) {
         final provider = widget.draft.manifest.model?.provider;
         if (provider == null) {
-          throw const StudioUnavailable('The test runner is unavailable.');
+          throw StudioUnavailable(l10n.playgroundUnavailable);
         }
         await widget.gateway.saveProviderCredential(
           provider: provider,
@@ -81,14 +83,14 @@ class _PlaygroundState extends State<Playground> {
       if (!mounted) return;
       setState(() {
         _status = PlaygroundStatus.quotaExceeded;
-        _error = _quotaMessage(e.resetsAt);
+        _error = _quotaMessage(l10n, e.resetsAt);
       });
     } on StudioGatewayException catch (e) {
       if (!mounted) return;
       setState(() {
         _status = PlaygroundStatus.failed;
         _error = switch (e) {
-          StudioUnavailable() => 'The test runner is unavailable.',
+          StudioUnavailable() => l10n.playgroundUnavailable,
           _ => e.message,
         };
       });
@@ -96,28 +98,29 @@ class _PlaygroundState extends State<Playground> {
       if (!mounted) return;
       setState(() {
         _status = PlaygroundStatus.failed;
-        _error = 'The test runner is unavailable.';
+        _error = l10n.playgroundUnavailable;
       });
     }
   }
 
-  String _quotaMessage(DateTime? resetsAt) {
-    if (resetsAt == null) return 'You used today\'s test runs.';
+  String _quotaMessage(AppLocalizations l10n, DateTime? resetsAt) {
+    if (resetsAt == null) return l10n.playgroundQuota;
     final local = resetsAt.toLocal();
     final time =
         '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
-    return 'You used today\'s test runs. They reset at $time.';
+    return l10n.playgroundQuotaReset(time);
   }
 
   Future<void> _copy() async {
     final output = _result?.output;
     if (output == null) return;
+    final copied = context.l10n.playgroundOutputCopied;
     await Clipboard.setData(ClipboardData(text: output));
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(
       context,
-    )?.showSnackBar(const SnackBar(content: Text('Output copied')));
+    )?.showSnackBar(SnackBar(content: Text(copied)));
   }
 
   @override

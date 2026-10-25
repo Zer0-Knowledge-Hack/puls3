@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/l10n/generated/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
+import 'package:puls3_flutter/src/l10n/locale_controller.dart';
+import 'package:puls3_flutter/src/l10n/locale_store.dart';
 import 'package:puls3_flutter/src/hire/wallet_session.dart';
 import 'package:puls3_flutter/src/screens/hire_detail_screen.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
@@ -151,8 +154,15 @@ Future<void> _pumpDetail(
       studioGateway: FakeStudioGateway(),
       hireGateway: gateway,
       hireFlowStore: MemoryHireFlowStore(),
+      locale: LocaleController(
+        store: MemoryLocaleStore(),
+        initial: const Locale('en'),
+      ),
       child: MaterialApp.router(
         theme: Puls3Theme.dark(),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
       ),
     ),

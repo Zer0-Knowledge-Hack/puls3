@@ -137,7 +137,8 @@ void main() {
     await tester.tap(find.byKey(const Key('my-agents-view-3')));
     await advance(tester, const Duration(milliseconds: 400));
 
-    expect(find.text('Monitors Stellar accounts.'), findsWidgets);
+    expect(find.text('Ledger Scout'), findsWidgets);
+    expect(find.textContaining('Monitors Stellar accounts'), findsWidgets);
   });
 
   testWidgets('Continue editing opens the draft in the Studio', (

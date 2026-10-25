@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
 import '../state/wallet_controller.dart';
 import '../studio/studio_gateway.dart';
@@ -70,6 +71,7 @@ class _MyAgentsScreenState extends State<MyAgentsScreen> {
 
   Future<void> _fetch(String owner) async {
     final gateway = AppScope.of(context).studioGateway;
+    final serverNoAnswer = context.l10n.myAgentsServerNoAnswer;
     List<StudioDraft>? drafts;
     String? error;
     try {
@@ -77,7 +79,7 @@ class _MyAgentsScreenState extends State<MyAgentsScreen> {
     } on StudioGatewayException catch (e) {
       error = e.message;
     } catch (_) {
-      error = 'The server did not answer. Try again.';
+      error = serverNoAnswer;
     }
     if (!mounted || owner != _owner) return;
     setState(() {
@@ -110,14 +112,13 @@ class _MyAgentsScreenState extends State<MyAgentsScreen> {
               children: [
                 const SizedBox(height: Puls3Spacing.xl),
                 ScreenHeader(
-                  title: 'My agents',
+                  title: context.l10n.myAgentsTitle,
                   subtitle: gateway.isDemo
-                      ? 'Your drafts and deployed agents. Demo: kept in '
-                            'this browser tab only.'
-                      : 'Your drafts and deployed agents.',
+                      ? context.l10n.myAgentsSubtitleDemo
+                      : context.l10n.myAgentsSubtitle,
                   trailing: PrimaryButton(
                     key: const Key('my-agents-new'),
-                    label: 'New agent',
+                    label: context.l10n.myAgentsNew,
                     icon: Icons.add_rounded,
                     variant: PrimaryButtonVariant.outline,
                     onPressed: () => context.go('/studio'),
@@ -128,9 +129,9 @@ class _MyAgentsScreenState extends State<MyAgentsScreen> {
                   EmptyState(
                     key: const Key('my-agents-no-wallet'),
                     icon: Icons.account_balance_wallet_outlined,
-                    title: 'Connect your wallet',
-                    message: 'Your drafts and agents belong to your wallet.',
-                    actionLabel: 'Connect wallet',
+                    title: context.l10n.myAgentsConnectTitle,
+                    message: context.l10n.myAgentsConnectMessage,
+                    actionLabel: context.l10n.walletConnect,
                     onAction: () => showWalletSheet(context),
                   )
                 else

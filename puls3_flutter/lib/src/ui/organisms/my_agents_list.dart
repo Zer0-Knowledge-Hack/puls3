@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../studio/studio_gateway.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/price_tag.dart';
@@ -45,7 +46,7 @@ class MyAgentsList extends StatelessWidget {
     if (error != null) {
       return ErrorBanner(
         key: const Key('my-agents-error'),
-        title: 'Could not load your agents',
+        title: context.l10n.myAgentsLoadError,
         message: error,
         onRetry: onRetry,
         retrying: loading,
@@ -56,22 +57,23 @@ class MyAgentsList extends StatelessWidget {
       return EmptyState(
         key: const Key('my-agents-empty'),
         icon: Icons.smart_toy_outlined,
-        title: 'No agents yet',
-        message: 'Agents you save or deploy from the Studio show up here.',
-        actionLabel: 'Create your first agent',
+        title: context.l10n.myAgentsEmptyTitle,
+        message: context.l10n.myAgentsEmptyMessage,
+        actionLabel: context.l10n.myAgentsEmptyAction,
         onAction: onNewAgent,
       );
     }
+    final l10n = context.l10n;
     final groups = [
       (
-        'Drafts',
+        l10n.myAgentsDrafts,
         [
           for (final d in drafts)
             if (d.deployState == DraftDeployState.draft) d,
         ],
       ),
       (
-        'Deploying or failed',
+        l10n.myAgentsDeployingOrFailed,
         [
           for (final d in drafts)
             if (d.deployState == DraftDeployState.deploying ||
@@ -80,7 +82,7 @@ class MyAgentsList extends StatelessWidget {
         ],
       ),
       (
-        'Live',
+        l10n.myAgentsLive,
         [
           for (final d in drafts)
             if (d.deployState == DraftDeployState.live) d,
@@ -133,34 +135,37 @@ class AgentVersionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final price = draft.manifest.price;
     final (label, color) = switch (draft.deployState) {
       DraftDeployState.draft => (
-        'Draft · revision ${draft.revision}',
+        l10n.myAgentsDraftRevision(draft.revision),
         Puls3Colors.muted,
       ),
-      DraftDeployState.deploying => ('Deploying', Puls3Colors.lavender),
-      DraftDeployState.failed => ('Deploy failed', Puls3Colors.accent),
+      DraftDeployState.deploying => (l10n.myAgentsDeploying, Puls3Colors.lavender),
+      DraftDeployState.failed => (l10n.myAgentsDeployFailed, Puls3Colors.accent),
       DraftDeployState.live => (
-        'Live · version ${draft.liveVersion ?? 1}',
+        l10n.myAgentsLiveVersion(draft.liveVersion ?? 1),
         Puls3Colors.success,
       ),
     };
     final step = draft.retryFromStep;
     final actions = switch (draft.deployState) {
       DraftDeployState.draft => [
-        _action('Continue editing', onContinue, 'continue'),
+        _action(l10n.myAgentsContinue, onContinue, 'continue'),
       ],
       DraftDeployState.deploying || DraftDeployState.failed => [
         _action(
-          step == null ? 'Resume deploy' : 'Resume deploy (step $step)',
+          step == null
+              ? l10n.myAgentsResume
+              : l10n.myAgentsResumeStep(step),
           onResume,
           'resume',
         ),
       ],
       DraftDeployState.live => [
-        if (onView != null) _action('View', onView!, 'view'),
-        _action('Edit', onEdit, 'edit'),
+        if (onView != null) _action(l10n.myAgentsView, onView!, 'view'),
+        _action(l10n.myAgentsEdit, onEdit, 'edit'),
       ],
     };
     return Container(
@@ -183,7 +188,12 @@ class AgentVersionRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(draft.name, style: Puls3Text.title),
+                Text(
+                  draft.name == 'Untitled agent'
+                      ? l10n.agentUntitled
+                      : draft.name,
+                  style: Puls3Text.title,
+                ),
                 const SizedBox(height: 2),
                 Wrap(
                   spacing: Puls3Spacing.sm,
@@ -221,7 +231,10 @@ class _Skeleton extends StatelessWidget {
       key: const Key('my-agents-loading'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final title in ['Drafts', 'Live']) ...[
+        for (final title in [
+          context.l10n.myAgentsDrafts,
+          context.l10n.myAgentsLive,
+        ]) ...[
           SectionLabel(title),
           const SizedBox(height: Puls3Spacing.sm),
           for (var i = 0; i < 2; i++) ...[

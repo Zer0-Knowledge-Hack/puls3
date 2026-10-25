@@ -1,5 +1,8 @@
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_flutter/l10n/generated/app_localizations.dart';
+import 'package:puls3_flutter/l10n/generated/app_localizations_en.dart';
 
+import '../domain/skill_display_name.dart';
 import '../domain/usdc.dart';
 import 'studio_models.dart';
 
@@ -68,7 +71,9 @@ class StudioFormCheck {
 StudioFormCheck checkStudioForm(
   StudioFormValues values, {
   ModelPolicy? policy,
+  AppLocalizations? l10n,
 }) {
+  final copy = l10n ?? AppLocalizationsEn();
   final errors = <StudioField, String>{};
   void error(StudioField field, String message) =>
       errors.putIfAbsent(field, () => message);
@@ -77,7 +82,7 @@ StudioFormCheck checkStudioForm(
     final text = raw.trim();
     if (text.isEmpty) return null;
     final value = int.tryParse(text);
-    if (value == null) error(field, 'Enter a whole number of characters.');
+    if (value == null) error(field, copy.studioErrWholeNumber);
     return value;
   }
 
@@ -85,7 +90,7 @@ StudioFormCheck checkStudioForm(
   if (values.price.trim().isNotEmpty) {
     final stroops = parseUsdcToStroops(values.price);
     if (stroops == null) {
-      error(StudioField.price, 'Enter an amount like 0.50.');
+      error(StudioField.price, copy.studioErrPriceFormat);
     } else {
       price = UsdcAmount.stroops(stroops);
     }
@@ -99,9 +104,8 @@ StudioFormCheck checkStudioForm(
     ];
   } on InvalidSkill catch (e) {
     error(StudioField.skills, switch (e.problem) {
-      SkillProblem.idNotKebabCase =>
-        'Use letters or numbers in each skill name.',
-      SkillProblem.nameLength => 'A skill name is too long.',
+      SkillProblem.idNotKebabCase => copy.studioErrSkillLetters,
+      SkillProblem.nameLength => copy.studioErrSkillTooLong,
     });
   }
 
@@ -138,7 +142,7 @@ StudioFormCheck checkStudioForm(
   }
 
   for (final problem in problems) {
-    final (field, message) = describeManifestProblem(problem);
+    final (field, message) = describeManifestProblem(problem, copy);
     error(field, message);
   }
   return StudioFormCheck(
@@ -174,129 +178,140 @@ StudioFormValues studioFormValuesFor(AgentManifestDraft draft) {
 
 /// The kebab-case skill id for a display [name], for example
 /// "On-chain analytics" → `on-chain-analytics`.
-String skillIdFor(String name) => name
-    .trim()
-    .toLowerCase()
-    .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-    .replaceAll(RegExp(r'^-+|-+$'), '');
+String skillIdFor(String name) => canonicalSkillId(name);
 
 /// The field a domain [problem] belongs to, and how to say it.
 (StudioField, String) describeManifestProblem(
-  ManifestProblem problem,
-) => switch (problem) {
-  ManifestProblem.nameMissing => (StudioField.name, 'Give your agent a name.'),
-  ManifestProblem.nameTooShort => (StudioField.name, 'The name is too short.'),
-  ManifestProblem.nameTooLong => (StudioField.name, 'The name is too long.'),
-  ManifestProblem.nameMalformed => (StudioField.name, 'Check the name.'),
-  ManifestProblem.descriptionMissing => (
-    StudioField.description,
-    'Say what the agent does.',
-  ),
-  ManifestProblem.descriptionTooShort => (
-    StudioField.description,
-    'The description is too short.',
-  ),
-  ManifestProblem.descriptionTooLong => (
-    StudioField.description,
-    'The description is too long.',
-  ),
-  ManifestProblem.descriptionMalformed => (
-    StudioField.description,
-    'Check the description.',
-  ),
-  ManifestProblem.skillsMissing => (
-    StudioField.skills,
-    'Add at least one skill.',
-  ),
-  ManifestProblem.skillsTooMany => (
-    StudioField.skills,
-    'Too many skills: remove some.',
-  ),
-  ManifestProblem.skillIdDuplicate => (
-    StudioField.skills,
-    'Two skills have the same name.',
-  ),
-  ManifestProblem.skillIdNotKebabCase ||
-  ManifestProblem.skillNameLength ||
-  ManifestProblem.skillsMalformed => (
-    StudioField.skills,
-    'Check the skill names.',
-  ),
-  ManifestProblem.modelMissing => (StudioField.model, 'Choose a model.'),
-  ManifestProblem.modelNotAllowed => (
-    StudioField.model,
-    'This model is not available on the free tier.',
-  ),
-  ManifestProblem.modelProviderNotEnabled => (
-    StudioField.model,
-    'This provider is not enabled yet.',
-  ),
-  ManifestProblem.modelMalformed => (StudioField.model, 'Choose a model.'),
-  ManifestProblem.systemPromptMissing => (
-    StudioField.systemPrompt,
-    'Write the instructions the agent follows.',
-  ),
-  ManifestProblem.systemPromptTooShort => (
-    StudioField.systemPrompt,
-    'The instructions are too short.',
-  ),
-  ManifestProblem.systemPromptTooLong => (
-    StudioField.systemPrompt,
-    'The instructions are too long.',
-  ),
-  ManifestProblem.systemPromptMalformed => (
-    StudioField.systemPrompt,
-    'Check the instructions.',
-  ),
-  ManifestProblem.inputMissing => (
-    StudioField.input,
-    'Set the longest input the agent accepts.',
-  ),
-  ManifestProblem.inputMaxCharsTooLow => (
-    StudioField.input,
-    'The input limit must be at least 1 character.',
-  ),
-  ManifestProblem.inputMaxCharsTooHigh => (
-    StudioField.input,
-    'The input limit is above what agents accept.',
-  ),
-  ManifestProblem.inputMalformed || ManifestProblem.inputTypeUnsupported => (
-    StudioField.input,
-    'Check the input.',
-  ),
-  ManifestProblem.outputMissing => (
-    StudioField.output,
-    'Set the longest answer the agent returns.',
-  ),
-  ManifestProblem.outputMaxCharsTooLow => (
-    StudioField.output,
-    'The answer limit must be at least 1 character.',
-  ),
-  ManifestProblem.outputMaxCharsTooHigh => (
-    StudioField.output,
-    'The answer limit is above what agents return.',
-  ),
-  ManifestProblem.outputMalformed || ManifestProblem.outputTypeUnsupported => (
-    StudioField.output,
-    'Check the output.',
-  ),
-  ManifestProblem.priceMissing => (StudioField.price, 'Set a price.'),
-  ManifestProblem.priceNotPositive => (
-    StudioField.price,
-    'The price must be more than 0.',
-  ),
-  ManifestProblem.priceMalformed || ManifestProblem.priceAssetUnsupported => (
-    StudioField.price,
-    'Check the price.',
-  ),
-  // Wire-only problems: the Studio never builds these documents.
-  ManifestProblem.notAnObject ||
-  ManifestProblem.unknownKey ||
-  ManifestProblem.toolsNotSupported ||
-  ManifestProblem.versionInDraft ||
-  ManifestProblem.schemaUnsupported ||
-  ManifestProblem.versionInvalid => (
-    StudioField.name,
-    'This agent cannot be saved.',
-  ),
-};
+  ManifestProblem problem, [
+  AppLocalizations? l10n,
+]) {
+  final copy = l10n ?? AppLocalizationsEn();
+  return switch (problem) {
+    ManifestProblem.nameMissing => (StudioField.name, copy.studioErrNameMissing),
+    ManifestProblem.nameTooShort => (
+      StudioField.name,
+      copy.studioErrNameTooShort,
+    ),
+    ManifestProblem.nameTooLong => (StudioField.name, copy.studioErrNameTooLong),
+    ManifestProblem.nameMalformed => (StudioField.name, copy.studioErrNameCheck),
+    ManifestProblem.descriptionMissing => (
+      StudioField.description,
+      copy.studioErrDescMissing,
+    ),
+    ManifestProblem.descriptionTooShort => (
+      StudioField.description,
+      copy.studioErrDescTooShort,
+    ),
+    ManifestProblem.descriptionTooLong => (
+      StudioField.description,
+      copy.studioErrDescTooLong,
+    ),
+    ManifestProblem.descriptionMalformed => (
+      StudioField.description,
+      copy.studioErrDescCheck,
+    ),
+    ManifestProblem.skillsMissing => (
+      StudioField.skills,
+      copy.studioErrSkillsMissing,
+    ),
+    ManifestProblem.skillsTooMany => (
+      StudioField.skills,
+      copy.studioErrSkillsTooMany,
+    ),
+    ManifestProblem.skillIdDuplicate => (
+      StudioField.skills,
+      copy.studioErrSkillDuplicate,
+    ),
+    ManifestProblem.skillIdNotKebabCase ||
+    ManifestProblem.skillNameLength ||
+    ManifestProblem.skillsMalformed => (
+      StudioField.skills,
+      copy.studioErrSkillCheck,
+    ),
+    ManifestProblem.modelMissing => (
+      StudioField.model,
+      copy.studioErrModelMissing,
+    ),
+    ManifestProblem.modelNotAllowed => (
+      StudioField.model,
+      copy.studioErrModelFreeTier,
+    ),
+    ManifestProblem.modelProviderNotEnabled => (
+      StudioField.model,
+      copy.studioErrModelProvider,
+    ),
+    ManifestProblem.modelMalformed => (
+      StudioField.model,
+      copy.studioErrModelMissing,
+    ),
+    ManifestProblem.systemPromptMissing => (
+      StudioField.systemPrompt,
+      copy.studioErrPromptMissing,
+    ),
+    ManifestProblem.systemPromptTooShort => (
+      StudioField.systemPrompt,
+      copy.studioErrPromptTooShort,
+    ),
+    ManifestProblem.systemPromptTooLong => (
+      StudioField.systemPrompt,
+      copy.studioErrPromptTooLong,
+    ),
+    ManifestProblem.systemPromptMalformed => (
+      StudioField.systemPrompt,
+      copy.studioErrPromptCheck,
+    ),
+    ManifestProblem.inputMissing => (
+      StudioField.input,
+      copy.studioErrInputMissing,
+    ),
+    ManifestProblem.inputMaxCharsTooLow => (
+      StudioField.input,
+      copy.studioErrInputTooLow,
+    ),
+    ManifestProblem.inputMaxCharsTooHigh => (
+      StudioField.input,
+      copy.studioErrInputTooHigh,
+    ),
+    ManifestProblem.inputMalformed || ManifestProblem.inputTypeUnsupported => (
+      StudioField.input,
+      copy.studioErrInputCheck,
+    ),
+    ManifestProblem.outputMissing => (
+      StudioField.output,
+      copy.studioErrOutputMissing,
+    ),
+    ManifestProblem.outputMaxCharsTooLow => (
+      StudioField.output,
+      copy.studioErrOutputTooLow,
+    ),
+    ManifestProblem.outputMaxCharsTooHigh => (
+      StudioField.output,
+      copy.studioErrOutputTooHigh,
+    ),
+    ManifestProblem.outputMalformed || ManifestProblem.outputTypeUnsupported => (
+      StudioField.output,
+      copy.studioErrOutputCheck,
+    ),
+    ManifestProblem.priceMissing => (
+      StudioField.price,
+      copy.studioErrPriceMissing,
+    ),
+    ManifestProblem.priceNotPositive => (
+      StudioField.price,
+      copy.studioErrPricePositive,
+    ),
+    ManifestProblem.priceMalformed || ManifestProblem.priceAssetUnsupported => (
+      StudioField.price,
+      copy.studioErrPriceCheck,
+    ),
+    ManifestProblem.notAnObject ||
+    ManifestProblem.unknownKey ||
+    ManifestProblem.toolsNotSupported ||
+    ManifestProblem.versionInDraft ||
+    ManifestProblem.schemaUnsupported ||
+    ManifestProblem.versionInvalid => (
+      StudioField.name,
+      copy.studioErrCannotSave,
+    ),
+  };
+}

@@ -6,8 +6,10 @@ import '../domain/agent.dart';
 import '../domain/landing_content.dart';
 import '../domain/project_links.dart';
 import '../domain/stellar_explorer.dart';
+import '../l10n/l10n.dart';
 import '../state/agent_catalog.dart';
 import '../state/app_scope.dart';
+import '../ui/molecules/language_menu.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/content_width.dart';
@@ -159,22 +161,27 @@ class LandingScreen extends StatelessWidget {
                       LandingNav(
                         compact: compact,
                         onOpenApp: () => go('/market'),
+                        trailing: LanguageMenu(
+                          locale: AppScope.of(context).locale.locale,
+                          onSelected: AppScope.of(context).locale.setLocale,
+                          iconOnly: true,
+                        ),
                         links: [
                           LandingLink(
-                            label: 'Marketplace',
+                            label: context.l10n.navMarketplace,
                             onTap: () => go('/market'),
                           ),
                           LandingLink(
-                            label: 'Agent Studio',
+                            label: context.l10n.studioTitle,
                             onTap: () => go('/studio'),
                           ),
                           LandingLink(
-                            label: 'Docs',
+                            label: context.l10n.navDocs,
                             external: true,
                             onTap: () => _open(documentationUrl),
                           ),
                           LandingLink(
-                            label: 'GitHub',
+                            label: context.l10n.navGitHub,
                             external: true,
                             onTap: () => _open(repositoryUrl),
                           ),
@@ -396,13 +403,22 @@ class LandingScreen extends StatelessWidget {
             ),
             LandingFooter(
               product: [
-                LandingLink(label: 'Marketplace', onTap: () => go('/market')),
-                LandingLink(label: 'Agent Studio', onTap: () => go('/studio')),
                 LandingLink(
-                  label: 'My agents',
+                  label: context.l10n.navMarketplace,
+                  onTap: () => go('/market'),
+                ),
+                LandingLink(
+                  label: context.l10n.studioTitle,
+                  onTap: () => go('/studio'),
+                ),
+                LandingLink(
+                  label: context.l10n.studioMyAgents,
                   onTap: () => go('/studio/agents'),
                 ),
-                LandingLink(label: 'Brand', onTap: () => go('/brand')),
+                LandingLink(
+                  label: context.l10n.footerBrand,
+                  onTap: () => go('/brand'),
+                ),
               ],
               project: [
                 LandingLink(
@@ -455,8 +471,8 @@ class _Hero extends StatelessWidget {
     final copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel(
-          'The agent hub on Stellar',
+        SectionLabel(
+          context.l10n.landingKicker,
           color: Puls3Colors.accent,
         ),
         const SizedBox(height: Puls3Spacing.sm),
@@ -465,7 +481,7 @@ class _Hero extends StatelessWidget {
           child: Semantics(
             header: true,
             child: Text(
-              'Build. Discover. Pay.\nAI agents on Stellar.',
+              context.l10n.landingHeadline,
               style: compact
                   ? Puls3Text.h2Compact.copyWith(fontSize: 26, height: 1.15)
                   : Puls3Text.h1.copyWith(fontSize: 52),
@@ -476,9 +492,7 @@ class _Hero extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: Text(
-            'Create AI agents with their own on-chain identity and wallet, '
-            'find the right one in a single Marketplace, and pay it per task '
-            'in USDC, held in escrow until the work is done.',
+            context.l10n.landingLead,
             style: compact
                 ? Puls3Text.bodyMuted.copyWith(fontSize: 15, height: 1.5)
                 : Puls3Text.lead,
@@ -492,12 +506,12 @@ class _Hero extends StatelessWidget {
           children: [
             PrimaryButton(
               key: const Key('landing-explore'),
-              label: 'Explore agents',
+              label: context.l10n.landingExploreAgents,
               onPressed: onExplore,
             ),
             PrimaryButton(
               key: const Key('landing-build'),
-              label: 'Build an agent',
+              label: context.l10n.landingBuildAgent,
               variant: PrimaryButtonVariant.outline,
               onPressed: onBuild,
             ),
@@ -505,7 +519,7 @@ class _Hero extends StatelessWidget {
               key: const Key('landing-docs'),
               onPressed: onDocs,
               icon: const Icon(Icons.menu_book_outlined, size: 18),
-              label: const Text('View documentation'),
+              label: Text(context.l10n.landingViewDocs),
             ),
           ],
         ),
@@ -527,7 +541,7 @@ class _Hero extends StatelessWidget {
                   const SizedBox(width: Puls3Spacing.xs),
                   Flexible(
                     child: Text(
-                      'Live in the Marketplace',
+                      context.l10n.landingLiveInMarketplace,
                       style: Puls3Text.caption,
                     ),
                   ),
@@ -538,7 +552,11 @@ class _Hero extends StatelessWidget {
                 key: const Key('landing-hero-agent'),
                 name: agent.name,
                 model: agent.model,
-                description: agent.description,
+                description: localizedAgentDescription(
+                  context.l10n,
+                  agent.id,
+                  agent.description,
+                ),
                 skills: agent.skills,
                 priceUsdcStroops: agent.priceUsdcStroops,
                 rating: agent.rating,
@@ -555,7 +573,7 @@ class _Hero extends StatelessWidget {
                   padding: EdgeInsets.zero,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('See the first hire paid into escrow'),
+                label: Text(context.l10n.landingSeeFirstHire),
               ),
             ],
           );
@@ -610,14 +628,17 @@ class _FeaturedAgents extends StatelessWidget {
         children: [for (var i = 0; i < 3; i++) const AgentCardSkeleton()],
       ),
       CatalogStatus.error => ErrorBanner(
-        title: 'Could not load the agents',
-        message: 'The puls3 server did not answer.',
+        title: context.l10n.marketCouldNotLoad,
+        message: context.l10n.marketCouldNotLoadMessage,
         retrying: catalog.isLoading,
         onRetry: catalog.retry,
       ),
       CatalogStatus.demo || CatalogStatus.ready =>
         catalog.agents.isEmpty
-            ? Text('No agents are published yet.', style: Puls3Text.bodyMuted)
+            ? Text(
+                context.l10n.marketEmptyTitle,
+                style: Puls3Text.bodyMuted,
+              )
             : LandingGrid(
                 children: [
                   for (final agent in catalog.agents.take(6))
@@ -625,7 +646,11 @@ class _FeaturedAgents extends StatelessWidget {
                       key: ValueKey('landing-agent-${agent.id}'),
                       name: agent.name,
                       model: agent.model,
-                      description: agent.description,
+                      description: localizedAgentDescription(
+                        context.l10n,
+                        agent.id,
+                        agent.description,
+                      ),
                       skills: agent.skills,
                       priceUsdcStroops: agent.priceUsdcStroops,
                       rating: agent.rating,
@@ -641,8 +666,7 @@ class _FeaturedAgents extends StatelessWidget {
       children: [
         if (catalog.status == CatalogStatus.demo) ...[
           Text(
-            'Demo catalog: the server is unreachable, so these agents are '
-            'not read from the chain.',
+            context.l10n.marketDemoMessage,
             style: Puls3Text.caption.copyWith(color: Puls3Colors.accent),
           ),
           const SizedBox(height: Puls3Spacing.sm),
@@ -766,32 +790,32 @@ class _LinkButton extends StatelessWidget {
 class _WhyStellar extends StatelessWidget {
   const _WhyStellar();
 
-  static const _points = [
-    FeaturePoint(
-      stat: '~5s',
-      title: '~5s settlement',
-      body: 'Payments to agents finalize in seconds, not days.',
-    ),
-    FeaturePoint(
-      stat: '<\$0.01',
-      title: 'Fees of a fraction of a cent',
-      body: 'Micro-payments per task stay worth it.',
-    ),
-    FeaturePoint(
-      stat: 'USDC',
-      title: 'Native USDC',
-      body: 'Price and pay agents in a stable, dollar-backed asset.',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final l10n = context.l10n;
+    final points = [
+      FeaturePoint(
+        stat: '~5s',
+        title: l10n.landingSettleTitle,
+        body: l10n.landingSettleBody,
+      ),
+      FeaturePoint(
+        stat: '<\$0.01',
+        title: l10n.landingFeesTitle,
+        body: l10n.landingFeesBody,
+      ),
+      FeaturePoint(
+        stat: 'USDC',
+        title: l10n.landingUsdcTitle,
+        body: l10n.landingUsdcBody,
+      ),
+    ];
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel('Why Stellar'),
-        SizedBox(height: Puls3Spacing.sm),
-        LandingGrid(children: _points),
+        SectionLabel(l10n.landingWhyStellar),
+        const SizedBox(height: Puls3Spacing.sm),
+        LandingGrid(children: points),
       ],
     );
   }

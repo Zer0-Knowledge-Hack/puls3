@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/usdc.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/agent_avatar.dart';
 
@@ -121,7 +122,7 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                     runSpacing: Puls3Spacing.xxs,
                     children: [
                       for (final skill in widget.skills.take(3))
-                        _Tag(label: skill),
+                        _Tag(label: localizedSkillName(context.l10n, skill)),
                     ],
                   ),
                 ],
@@ -137,14 +138,14 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
               child: Row(
                 children: [
                   _Figure(
-                    label: 'Price / task',
+                    label: context.l10n.agentPricePerTask,
                     value: '${formatUsdc(widget.priceUsdcStroops)} USDC',
                     accent: true,
                   ),
-                  _Figure(label: 'Rating', value: rating),
+                  _Figure(label: context.l10n.agentRating, value: rating),
                   _Figure(
-                    label: 'On-chain id',
-                    value: id == null ? 'Demo' : '#$id',
+                    label: context.l10n.agentOnChainId,
+                    value: id == null ? context.l10n.agentDemo : '#$id',
                   ),
                 ],
               ),
@@ -162,7 +163,7 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                         side: const BorderSide(color: Puls3Colors.hairline),
                         minimumSize: const Size(0, 40),
                       ),
-                      child: const Text('Details'),
+                      child: Text(context.l10n.agentDetails),
                     ),
                   ),
                   const SizedBox(width: Puls3Spacing.xs),
@@ -174,7 +175,7 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                         foregroundColor: Puls3Colors.onAccent,
                         minimumSize: const Size(0, 40),
                       ),
-                      child: const Text('Hire'),
+                      child: Text(context.l10n.agentHire),
                     ),
                   ),
                 ],
@@ -204,7 +205,7 @@ class _NetworkBadge extends StatelessWidget {
           const Icon(Icons.circle, size: 6, color: Puls3Colors.success),
           const SizedBox(width: 4),
           Text(
-            'Testnet',
+            context.l10n.networkTestnet,
             style: Puls3Text.caption.copyWith(
               color: Puls3Colors.success,
               fontSize: 11,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:puls3_domain/puls3_domain.dart' show OutputType;
 
+import '../../l10n/l10n.dart';
 import '../../studio/studio_form_check.dart';
 import '../../studio/studio_models.dart';
 import '../../theme/puls3_theme.dart';
@@ -52,11 +53,11 @@ class AgentForm extends StatelessWidget {
   /// The problem to show under each field.
   final Map<StudioField, String> errors;
 
-  static String _count(TextEditingController c) =>
-      '${c.text.runes.length} characters';
-
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    String count(TextEditingController c) =>
+        l10n.studioCharacters(c.text.runes.length);
     const gap = SizedBox(height: Puls3Spacing.md);
     final remainingSuggestions = suggestedSkills
         .where((s) => !skills.contains(s))
@@ -66,16 +67,16 @@ class AgentForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionLabel('Identity'),
+        SectionLabel(l10n.studioSectionIdentity),
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           key: const Key('agent-name-field'),
           controller: nameController,
           style: Puls3Text.body,
           decoration: InputDecoration(
-            labelText: 'Agent name',
-            hintText: 'For example, Brief Bot',
-            helperText: _count(nameController),
+            labelText: l10n.studioAgentName,
+            hintText: l10n.studioAgentNameHint,
+            helperText: count(nameController),
             errorText: errors[StudioField.name],
           ),
         ),
@@ -87,9 +88,9 @@ class AgentForm extends StatelessWidget {
           minLines: 2,
           maxLines: 3,
           decoration: InputDecoration(
-            labelText: 'Description',
-            hintText: 'What the agent does, in one or two sentences',
-            helperText: _count(descriptionController),
+            labelText: l10n.studioDescription,
+            hintText: l10n.studioDescriptionHint,
+            helperText: count(descriptionController),
             errorText: errors[StudioField.description],
           ),
         ),
@@ -101,12 +102,12 @@ class AgentForm extends StatelessWidget {
           dropdownColor: Puls3Colors.surface,
           style: Puls3Text.body,
           decoration: InputDecoration(
-            labelText: 'Model',
+            labelText: l10n.studioModel,
             helperText: selectedModel == null
-                ? 'Runs on your own provider account'
+                ? l10n.studioModelOwnProvider
                 : selectedModel!.isFree
-                ? 'Free tier on your own Workers AI account'
-                : 'Uses your own ${selectedModel!.provider} key',
+                ? l10n.studioModelFreeTier
+                : l10n.studioModelOwnKey(selectedModel!.provider),
             errorText: errors[StudioField.model],
           ),
           items: [
@@ -114,7 +115,9 @@ class AgentForm extends StatelessWidget {
               DropdownMenuItem(
                 value: model,
                 child: Text(
-                  model.isFree ? '${model.label} · free' : model.label,
+                  model.isFree
+                      ? l10n.studioModelFree(model.label)
+                      : model.label,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -124,7 +127,7 @@ class AgentForm extends StatelessWidget {
           },
         ),
         const SizedBox(height: Puls3Spacing.lg),
-        const SectionLabel('Behavior'),
+        SectionLabel(l10n.studioSectionBehavior),
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           key: const Key('agent-prompt-field'),
@@ -133,10 +136,10 @@ class AgentForm extends StatelessWidget {
           minLines: 4,
           maxLines: 8,
           decoration: InputDecoration(
-            labelText: 'System prompt',
-            hintText: 'The instructions the agent follows on every hire',
+            labelText: l10n.studioSystemPrompt,
+            hintText: l10n.studioSystemPromptHint,
             alignLabelWithHint: true,
-            helperText: _count(promptController),
+            helperText: count(promptController),
             errorText: errors[StudioField.systemPrompt],
           ),
         ),
@@ -146,11 +149,11 @@ class AgentForm extends StatelessWidget {
           controller: skillController,
           style: Puls3Text.body,
           decoration: InputDecoration(
-            labelText: 'Add a skill',
-            hintText: 'Type and press Enter',
+            labelText: l10n.studioAddSkill,
+            hintText: l10n.studioAddSkillHint,
             errorText: skillsError,
             suffixIcon: IconButton(
-              tooltip: 'Add skill',
+              tooltip: l10n.studioAddSkillTooltip,
               icon: const Icon(Icons.add_rounded),
               onPressed: () => onAddSkill(skillController.text),
             ),
@@ -164,16 +167,19 @@ class AgentForm extends StatelessWidget {
           children: [
             for (final skill in skills)
               SkillChip(
-                label: skill,
+                label: localizedSkillName(l10n, skill),
                 selected: true,
                 onDelete: () => onRemoveSkill(skill),
               ),
             for (final skill in remainingSuggestions)
-              SkillChip(label: '+ $skill', onTap: () => onAddSkill(skill)),
+              SkillChip(
+                label: '+ ${localizedSkillName(l10n, skill)}',
+                onTap: () => onAddSkill(skill),
+              ),
           ],
         ),
         const SizedBox(height: Puls3Spacing.lg),
-        const SectionLabel('Input and output'),
+        SectionLabel(l10n.studioSectionIo),
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           key: const Key('agent-input-max-field'),
@@ -181,9 +187,9 @@ class AgentForm extends StatelessWidget {
           style: Puls3Text.data,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: 'Longest input (characters)',
-            hintText: 'For example, 6000',
-            helperText: 'Plain text from the person who hires the agent',
+            labelText: l10n.studioInputMax,
+            hintText: l10n.studioInputMaxHint,
+            helperText: l10n.studioInputHelper,
             errorText: errors[StudioField.input],
           ),
         ),
@@ -196,15 +202,15 @@ class AgentForm extends StatelessWidget {
               isExpanded: true,
               dropdownColor: Puls3Colors.surface,
               style: Puls3Text.body,
-              decoration: const InputDecoration(labelText: 'Answer format'),
-              items: const [
+              decoration: InputDecoration(labelText: l10n.studioAnswerFormat),
+              items: [
                 DropdownMenuItem(
                   value: OutputType.text,
-                  child: Text('Plain text'),
+                  child: Text(l10n.studioPlainText),
                 ),
                 DropdownMenuItem(
                   value: OutputType.markdown,
-                  child: Text('Markdown'),
+                  child: Text(l10n.studioMarkdown),
                 ),
               ],
               onChanged: (value) {
@@ -217,7 +223,7 @@ class AgentForm extends StatelessWidget {
               style: Puls3Text.data,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Longest answer',
+                labelText: l10n.studioOutputMax,
                 hintText: '2000',
                 errorText: errors[StudioField.output],
                 errorMaxLines: 3,
@@ -241,7 +247,7 @@ class AgentForm extends StatelessWidget {
           },
         ),
         const SizedBox(height: Puls3Spacing.lg),
-        const SectionLabel('Pricing'),
+        SectionLabel(l10n.studioSectionPricing),
         const SizedBox(height: Puls3Spacing.sm),
         TextField(
           key: const Key('agent-price-field'),
@@ -249,7 +255,7 @@ class AgentForm extends StatelessWidget {
           style: Puls3Text.data,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: 'Price per task',
+            labelText: l10n.studioPricePerTask,
             hintText: '0.50',
             suffixText: 'USDC',
             suffixStyle: Puls3Text.data,

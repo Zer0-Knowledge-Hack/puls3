@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/stellar_format.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 
 /// "Connect wallet" chip that shows the shortened address once connected.
@@ -21,11 +22,12 @@ class WalletChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connected = address != null;
+    final l10n = context.l10n;
     final label = connected
         ? shortenAddress(address!)
         : isConnecting
-        ? 'Connecting…'
-        : (compact ? 'Connect' : 'Connect wallet');
+        ? l10n.walletConnecting
+        : (compact ? l10n.walletConnectShort : l10n.walletConnect);
 
     return Material(
       color: connected ? Puls3Colors.surface : Puls3Colors.accent,

@@ -39,7 +39,7 @@ Future<void> pumpCard(WidgetTester tester, Size size, double rating) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    MaterialApp(
+    localizedTestApp(
       home: Scaffold(
         body: AgentCard(
           name: 'Card Agent',

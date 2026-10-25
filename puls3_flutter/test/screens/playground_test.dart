@@ -6,6 +6,7 @@ import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/ui/atoms/primary_button.dart';
 
+import '../helpers.dart';
 import '../studio/studio_fixtures.dart';
 
 /// S11 states (F9) with the demo gateway: empty, over the limit, running,
@@ -23,8 +24,7 @@ void main() {
       seed: [(testOwner, draft)],
     );
     await tester.pumpWidget(
-      MaterialApp(
-        theme: Puls3Theme.dark(),
+      localizedTestApp(
         home: Scaffold(
           body: SingleChildScrollView(
             child: Playground(draft: draft, gateway: studio, owner: testOwner),
@@ -144,8 +144,7 @@ void main() {
     Puls3Fonts.useGoogleFonts = false;
     final studio = _LiveGateway(seed: [(testOwner, savedDraft(1))]);
     await tester.pumpWidget(
-      MaterialApp(
-        theme: Puls3Theme.dark(),
+      localizedTestApp(
         home: Scaffold(
           body: SingleChildScrollView(
             child: Playground(

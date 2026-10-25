@@ -19,6 +19,14 @@ const _knownSkillNames = {
   'data-cleaning': 'Data cleaning',
 };
 
+/// Kebab-case id for a skill display name or id, e.g. "On-chain analytics"
+/// → `on-chain-analytics`.
+String canonicalSkillId(String raw) => raw
+    .trim()
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+    .replaceAll(RegExp(r'^-+|-+$'), '');
+
 /// Turns a kebab-case skill id into a readable label.
 ///
 /// Known ids use the table above. Unknown ids replace hyphens with spaces and

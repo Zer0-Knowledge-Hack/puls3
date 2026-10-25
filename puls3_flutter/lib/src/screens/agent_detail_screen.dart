@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/agent.dart';
 import '../domain/stellar_explorer.dart';
+import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/content_width.dart';
@@ -102,11 +103,9 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
       _DetailStatus.notFound => EmptyState(
         key: const ValueKey('detail-not-found'),
         icon: Icons.person_search_outlined,
-        title: 'Agent not found',
-        message:
-            'No agent with this id is registered. It may have been '
-            'removed, or the link is wrong.',
-        actionLabel: 'Back to Marketplace',
+        title: context.l10n.agentNotFoundTitle,
+        message: context.l10n.agentNotFoundMessage,
+        actionLabel: context.l10n.agentBackToMarketplace,
         onAction: _back,
       ),
       _DetailStatus.loading when agent == null => AgentDetailSkeleton(
@@ -119,10 +118,8 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
         children: [
           const SizedBox(height: Puls3Spacing.xl),
           ErrorBanner(
-            title: 'Could not load this agent',
-            message:
-                'The puls3 server did not answer. Check your '
-                'connection and try again.',
+            title: context.l10n.agentCouldNotLoad,
+            message: context.l10n.marketCouldNotLoadMessage,
             onRetry: () => unawaited(_load()),
           ),
           const SizedBox(height: Puls3Spacing.md),
@@ -131,7 +128,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
             child: TextButton.icon(
               onPressed: _back,
               icon: const Icon(Icons.arrow_back_rounded, size: 18),
-              label: const Text('Marketplace'),
+              label: Text(context.l10n.navMarketplace),
             ),
           ),
           const SizedBox(height: Puls3Spacing.xxl),
@@ -159,8 +156,8 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
           ? () => showHireSheet(context, agent)
           : null,
       hireNote: switch (status) {
-        _DetailStatus.loading => 'Checking the agent on the server…',
-        _DetailStatus.error => 'Hire is disabled until the agent loads.',
+        _DetailStatus.loading => context.l10n.agentChecking,
+        _DetailStatus.error => context.l10n.agentHireDisabled,
         _ => null,
       },
       onOpenExplorer: () => unawaited(
@@ -171,10 +168,8 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
       banner: status == _DetailStatus.error
           ? ErrorBanner(
               key: const ValueKey('detail-stale'),
-              title: 'Showing the last known data',
-              message:
-                  'The puls3 server did not answer, so this agent '
-                  'could not be confirmed.',
+              title: context.l10n.agentStaleTitle,
+              message: context.l10n.agentStaleMessage,
               onRetry: () => unawaited(_load()),
             )
           : null,

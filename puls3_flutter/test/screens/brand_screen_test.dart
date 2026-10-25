@@ -42,8 +42,7 @@ Future<BrandHarness> pumpBrand(
     ),
   );
   await tester.pumpWidget(
-    MaterialApp(
-      theme: Puls3Theme.dark(),
+    localizedTestApp(
       home: BrandScreen(
         onOpenFile: harness.opened.add,
         loadSvg: (path) async => '<svg data-path="$path"/>',

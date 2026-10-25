@@ -132,7 +132,7 @@ class HireDetailView extends StatelessWidget {
                 value: '',
                 valueWidget: PriceTag(
                   stroops: hire.priceUsdcStroops,
-                  suffix: null,
+                  perTask: false,
                 ),
               ),
               const KeyValueRow(label: 'Network', value: 'Stellar Testnet'),
