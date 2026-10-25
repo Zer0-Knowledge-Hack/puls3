@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/agent.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/breakpoints.dart';
 import '../../theme/puls3_theme.dart';
 import '../molecules/agent_card.dart';
@@ -21,11 +22,15 @@ class AgentGrid extends StatelessWidget {
           AgentCard(
             key: ValueKey(agent.id),
             name: agent.name,
-            topSkill: agent.topSkill,
+            topSkill: localizedSkillName(context.l10n, agent.topSkill),
             priceUsdcStroops: agent.priceUsdcStroops,
             rating: agent.rating,
-            description: agent.description,
-            model: agent.model,
+            description: localizedAgentDescription(
+              context.l10n,
+              agent.id,
+              agent.description,
+            ),
+            model: localizedModelName(context.l10n, agent.model),
             onTap: () => onSelect(agent),
           ),
       ],
@@ -42,7 +47,7 @@ class AgentGridSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Loading agents',
+      label: context.l10n.marketLoadingAgents,
       child: _ResponsiveWrap(
         children: List.generate(count, (_) => const AgentCardSkeleton()),
       ),

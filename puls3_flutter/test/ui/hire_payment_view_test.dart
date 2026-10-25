@@ -4,6 +4,8 @@ import 'package:puls3_flutter/src/domain/stellar_explorer.dart';
 import 'package:puls3_flutter/src/ui/atoms/address_badge.dart';
 import 'package:puls3_flutter/src/ui/organisms/hire_payment_view.dart';
 
+import '../helpers.dart';
+
 Widget buildView({
   required HirePhase phase,
   String agentName = 'Ledger Scout',
@@ -16,7 +18,7 @@ Widget buildView({
   VoidCallback? onBackToMarketplace,
   VoidCallback? onRetry,
 }) {
-  return MaterialApp(
+  return localizedTestApp(
     home: Scaffold(
       body: HirePaymentView(
         phase: phase,
@@ -114,7 +116,7 @@ void main() {
 
     testWidgets('signing shows which wallet step is running', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        localizedTestApp(
           home: Scaffold(
             body: SingleChildScrollView(
               child: HirePaymentView(
@@ -142,7 +144,7 @@ void main() {
     ) async {
       var opened = 0;
       await tester.pumpWidget(
-        MaterialApp(
+        localizedTestApp(
           home: Scaffold(
             body: SingleChildScrollView(
               child: HirePaymentView(
@@ -172,7 +174,7 @@ void main() {
     testWidgets('only a confirmed payment says the escrow holds it', (
       tester,
     ) async {
-      Widget view({required bool confirmed}) => MaterialApp(
+      Widget view({required bool confirmed}) => localizedTestApp(
         home: Scaffold(
           body: SingleChildScrollView(
             child: HirePaymentView(

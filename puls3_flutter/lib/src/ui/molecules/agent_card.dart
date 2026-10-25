@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/breakpoints.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/agent_avatar.dart';
@@ -81,7 +82,7 @@ class _AgentCardState extends State<AgentCard> {
                           children: [
                             Text(
                               widget.name.isEmpty
-                                  ? 'Untitled agent'
+                                  ? context.l10n.agentUntitled
                                   : widget.name,
                               style: Puls3Text.title,
                               maxLines: 1,
@@ -125,7 +126,7 @@ class _AgentCardState extends State<AgentCard> {
                       const SizedBox(width: Puls3Spacing.sm),
                       PriceTag(
                         stroops: widget.priceUsdcStroops,
-                        suffix: null,
+                        perTask: false,
                       ),
                     ],
                   ),

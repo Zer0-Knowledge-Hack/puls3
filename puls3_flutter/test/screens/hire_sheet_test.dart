@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:puls3_flutter/l10n/generated/app_localizations.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
@@ -8,6 +9,8 @@ import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/hire/fake_hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
 import 'package:puls3_flutter/src/hire/hire_gateway.dart';
+import 'package:puls3_flutter/src/l10n/locale_controller.dart';
+import 'package:puls3_flutter/src/l10n/locale_store.dart';
 import 'package:puls3_flutter/src/screens/hire_sheet.dart';
 import 'package:puls3_flutter/src/hire/wallet_session.dart';
 import 'package:puls3_flutter/src/state/agent_catalog.dart';
@@ -15,6 +18,8 @@ import 'package:puls3_flutter/src/state/app_scope.dart';
 import 'package:puls3_flutter/src/state/wallet_controller.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/wallet/wallet_port.dart';
+
+import '../helpers.dart';
 
 class TestWallet implements WalletPort {
   TestWallet({this.initialAddress});
@@ -294,7 +299,7 @@ Future<void> pumpSheet(
   Puls3Fonts.useGoogleFonts = false;
   opened.clear();
   await tester.pumpWidget(
-    MaterialApp(
+    localizedTestApp(
       theme: Puls3Theme.dark(),
       home: AppScope(
         catalog: AgentCatalog(InMemoryAgentRepository([agent])),
@@ -303,6 +308,10 @@ Future<void> pumpSheet(
         studioGateway: FakeStudioGateway(),
         hireGateway: gateway ?? FakeHireGateway(delay: Duration.zero),
         hireFlowStore: store ?? MemoryHireFlowStore(),
+        locale: LocaleController(
+          store: MemoryLocaleStore(),
+          initial: const Locale('en'),
+        ),
         child: Scaffold(
           body: HireSheet(
             agent: agent,
@@ -416,8 +425,15 @@ void main() {
           studioGateway: FakeStudioGateway(),
           hireGateway: ScriptedHireGateway(),
           hireFlowStore: MemoryHireFlowStore(),
+          locale: LocaleController(
+            store: MemoryLocaleStore(),
+            initial: const Locale('en'),
+          ),
           child: MaterialApp.router(
             theme: Puls3Theme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             routerConfig: router,
           ),
         ),

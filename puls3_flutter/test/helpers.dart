@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/l10n/generated/app_localizations.dart';
 import 'package:puls3_flutter/src/app.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
+import 'package:puls3_flutter/src/l10n/locale_store.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
+
+/// A [MaterialApp] with gen-l10n, for tests that pump a screen without
+/// going through [Puls3App].
+Widget localizedTestApp({required Widget home, ThemeData? theme}) {
+  return MaterialApp(
+    theme: theme ?? Puls3Theme.dark(),
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: home,
+  );
+}
 
 const testAgents = [
   Agent(
@@ -42,6 +56,8 @@ Future<void> pumpApp(
   AgentRepository? demoRepository,
   MockWallet? wallet,
   StudioGateway? studioGateway,
+  LocaleStore? localeStore,
+  Locale? locale = const Locale('en'),
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = size;
@@ -50,12 +66,15 @@ Future<void> pumpApp(
 
   await tester.pumpWidget(
     Puls3App(
+      key: ValueKey('$location-${locale?.toLanguageTag()}-$size'),
       repository: repository,
       demoRepository: demoRepository,
       wallet: wallet ?? MockWallet(),
       studioGateway: studioGateway,
       initialLocation: location,
       healthCheck: healthCheck,
+      localeStore: localeStore,
+      locale: locale,
     ),
   );
   // Let the catalog load. The pulse animation repeats forever, so

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_filter.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/primary_button.dart';
 import '../atoms/section_label.dart';
@@ -44,16 +45,18 @@ class MarketFilters extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Filters', style: Puls3Text.title)),
+            Expanded(
+              child: Text(context.l10n.marketFilters, style: Puls3Text.title),
+            ),
             TextButton(
               key: const Key('market-filters-reset'),
               onPressed: active == 0 ? null : onReset,
-              child: const Text('Reset'),
+              child: Text(context.l10n.marketReset),
             ),
           ],
         ),
         const SizedBox(height: Puls3Spacing.sm),
-        const SectionLabel('Sort by'),
+        SectionLabel(context.l10n.marketSortBy),
         const SizedBox(height: Puls3Spacing.xs),
         Wrap(
           spacing: Puls3Spacing.xs,
@@ -62,14 +65,14 @@ class MarketFilters extends StatelessWidget {
             for (final option in AgentSort.values)
               SkillChip(
                 key: Key('market-sort-${option.name}'),
-                label: option.label,
+                label: option.l10nLabel(context.l10n),
                 selected: option == sort,
                 onTap: () => onSort(option),
               ),
           ],
         ),
         const SizedBox(height: Puls3Spacing.md),
-        const SectionLabel('Skills'),
+        SectionLabel(context.l10n.marketSkills),
         const SizedBox(height: Puls3Spacing.xs),
         Wrap(
           spacing: Puls3Spacing.xs,
@@ -77,7 +80,7 @@ class MarketFilters extends StatelessWidget {
           children: [
             for (final skill in skills)
               SkillChip(
-                label: skill,
+                label: localizedSkillName(context.l10n, skill),
                 selected: selectedSkills.contains(skill),
                 onTap: () => onToggleSkill(skill),
               ),
@@ -86,7 +89,7 @@ class MarketFilters extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.lg),
         PrimaryButton(
           key: const Key('market-filters-apply'),
-          label: resultCount == 1 ? 'Show 1 agent' : 'Show $resultCount agents',
+          label: context.l10n.marketShowAgents(resultCount),
           expand: true,
           onPressed: onApply,
         ),
@@ -122,17 +125,21 @@ class ActiveFilters extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (sort != AgentSort.featured)
-          SkillChip(label: sort.label, selected: true, onDelete: onResetSort),
+          SkillChip(
+            label: sort.l10nLabel(context.l10n),
+            selected: true,
+            onDelete: onResetSort,
+          ),
         for (final skill in selectedSkills)
           SkillChip(
-            label: skill,
+            label: localizedSkillName(context.l10n, skill),
             selected: true,
             onDelete: () => onRemoveSkill(skill),
           ),
         TextButton(
           key: const Key('market-clear-all'),
           onPressed: onClearAll,
-          child: const Text('Clear all'),
+          child: Text(context.l10n.marketClearAll),
         ),
       ],
     );

@@ -314,7 +314,7 @@ void main() {
       Puls3Fonts.useGoogleFonts = false;
       var opened = 0;
       await tester.pumpWidget(
-        MaterialApp(
+        localizedTestApp(
           theme: Puls3Theme.dark(),
           home: Scaffold(
             body: SingleChildScrollView(

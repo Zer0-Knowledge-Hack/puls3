@@ -30,6 +30,7 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
     required this.walletAddress,
     required this.isWalletConnecting,
     required this.onConnectWallet,
+    this.beforeWallet,
   });
 
   final List<TopBarLink> links;
@@ -38,6 +39,9 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   final String? walletAddress;
   final bool isWalletConnecting;
   final VoidCallback onConnectWallet;
+
+  /// Language switcher (or any extra action) before the wallet chip.
+  final Widget? beforeWallet;
 
   static const double height = Puls3Spacing.topBarHeight;
   static const double logoMarkHeight = 28;
@@ -72,6 +76,10 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 onTap: () => onNavigate(link.path),
               ),
             const Spacer(),
+            if (beforeWallet != null) ...[
+              beforeWallet!,
+              SizedBox(width: compact ? Puls3Spacing.xs : Puls3Spacing.sm),
+            ],
             Flexible(
               child: WalletChip(
                 address: walletAddress,

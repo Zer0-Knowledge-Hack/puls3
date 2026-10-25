@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/agent.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/breakpoints.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/address_badge.dart';
@@ -72,7 +73,10 @@ class AgentDetailView extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       RatingBadge(rating: agent.rating),
-                      Text(agent.model, style: Puls3Text.bodyMuted),
+                      Text(
+                        localizedModelName(context.l10n, agent.model),
+                        style: Puls3Text.bodyMuted,
+                      ),
                     ],
                   ),
                 ],
@@ -81,28 +85,38 @@ class AgentDetailView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: Puls3Spacing.xl),
-        const SectionLabel('About'),
+        SectionLabel(context.l10n.agentAbout),
         const SizedBox(height: Puls3Spacing.sm),
-        Text(agent.description, style: Puls3Text.lead),
+        Text(
+          localizedAgentDescription(
+            context.l10n,
+            agent.id,
+            agent.description,
+          ),
+          style: Puls3Text.lead,
+        ),
         const SizedBox(height: Puls3Spacing.xl),
-        const SectionLabel('Skills'),
+        SectionLabel(context.l10n.agentSkills),
         const SizedBox(height: Puls3Spacing.sm),
         Wrap(
           spacing: Puls3Spacing.xs,
           runSpacing: Puls3Spacing.xs,
-          children: [for (final s in agent.skills) SkillChip(label: s)],
+          children: [
+            for (final s in agent.skills)
+              SkillChip(label: localizedSkillName(context.l10n, s)),
+          ],
         ),
         const SizedBox(height: Puls3Spacing.xl),
-        const SectionLabel('On-chain identity'),
+        SectionLabel(context.l10n.agentOnChainIdentity),
         const SizedBox(height: Puls3Spacing.xs),
         KeyValueRow(
-          label: 'Agent id',
+          label: context.l10n.agentId,
           value: registryId == null
-              ? 'Demo agent, not on chain'
+              ? context.l10n.agentDemoNotOnChain
               : '#$registryId',
         ),
         KeyValueRow(
-          label: 'Payment wallet',
+          label: context.l10n.agentPaymentWallet,
           value: agent.stellarAddress,
           valueWidget: AddressBadge(address: agent.stellarAddress),
         ),
@@ -111,7 +125,7 @@ class AgentDetailView extends StatelessWidget {
           key: const ValueKey('detail-explorer'),
           onPressed: onOpenExplorer,
           icon: const Icon(Icons.open_in_new_rounded, size: 16),
-          label: const Text('View on explorer'),
+          label: Text(context.l10n.agentViewOnExplorer),
           style: TextButton.styleFrom(foregroundColor: Puls3Colors.lavender),
         ),
       ],
@@ -127,17 +141,17 @@ class AgentDetailView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionLabel('Price'),
+          SectionLabel(context.l10n.agentPrice),
           const SizedBox(height: Puls3Spacing.sm),
           PriceTag(stroops: agent.priceUsdcStroops, large: true),
           const SizedBox(height: Puls3Spacing.xs),
           Text(
-            'Paid in USDC on Stellar. Settles in about 5 seconds.',
+            context.l10n.agentPaidOnStellar,
             style: Puls3Text.bodyMuted,
           ),
           const SizedBox(height: Puls3Spacing.lg),
           PrimaryButton(
-            label: 'Hire',
+            label: context.l10n.agentHire,
             icon: Icons.handshake_outlined,
             expand: true,
             onPressed: onHire,
@@ -191,7 +205,7 @@ class AgentDetailSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Loading agent',
+      label: context.l10n.agentLoading,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -239,7 +253,7 @@ class _BackLink extends StatelessWidget {
       child: TextButton.icon(
         onPressed: onBack,
         icon: const Icon(Icons.arrow_back_rounded, size: 18),
-        label: const Text('Marketplace'),
+        label: Text(context.l10n.navMarketplace),
         style: TextButton.styleFrom(foregroundColor: Puls3Colors.muted),
       ),
     );

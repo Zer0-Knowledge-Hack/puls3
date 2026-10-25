@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../deploy/deploy_gateway.dart';
 import '../hire/hire_flow_store.dart';
 import '../hire/hire_gateway.dart';
+import '../l10n/locale_controller.dart';
 import '../studio/studio_gateway.dart';
 import 'agent_catalog.dart';
 import 'wallet_controller.dart';
@@ -18,6 +19,7 @@ class AppScope extends InheritedWidget {
     required this.studioGateway,
     required this.hireGateway,
     required this.hireFlowStore,
+    required this.locale,
     required super.child,
   });
 
@@ -32,6 +34,9 @@ class AppScope extends InheritedWidget {
   /// Unfinished hires, so a closed sheet or a reload resumes them.
   final HireFlowStore hireFlowStore;
 
+  /// Active UI language. Changing it rebuilds [MaterialApp].
+  final LocaleController locale;
+
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
     assert(scope != null, 'AppScope not found in the widget tree.');
@@ -45,5 +50,6 @@ class AppScope extends InheritedWidget {
       deployGateway != oldWidget.deployGateway ||
       studioGateway != oldWidget.studioGateway ||
       hireGateway != oldWidget.hireGateway ||
-      hireFlowStore != oldWidget.hireFlowStore;
+      hireFlowStore != oldWidget.hireFlowStore ||
+      locale != oldWidget.locale;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/usdc.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 
 /// Displays a USDC amount. Takes integer stroops; formatting is display-only.
@@ -8,12 +9,14 @@ class PriceTag extends StatelessWidget {
   const PriceTag({
     super.key,
     required this.stroops,
-    this.suffix = '/ task',
+    this.perTask = true,
     this.large = false,
   });
 
   final int stroops;
-  final String? suffix;
+
+  /// Appends the localized "/ task" suffix.
+  final bool perTask;
   final bool large;
 
   @override
@@ -30,9 +33,9 @@ class PriceTag extends StatelessWidget {
             ),
           ),
           TextSpan(text: ' USDC', style: amountStyle),
-          if (suffix != null)
+          if (perTask)
             TextSpan(
-              text: ' $suffix',
+              text: ' ${context.l10n.pricePerTask}',
               style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
             ),
         ],

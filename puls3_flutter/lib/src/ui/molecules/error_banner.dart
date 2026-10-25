@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 
 /// A recoverable error with a Retry action (docs/blueprints/flows.md: "error
@@ -71,7 +72,7 @@ class ErrorBanner extends StatelessWidget {
               TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Retry'),
+                label: Text(context.l10n.commonRetry),
                 style: TextButton.styleFrom(
                   foregroundColor: Puls3Colors.accent,
                 ),
