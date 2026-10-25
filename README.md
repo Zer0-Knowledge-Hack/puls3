@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://puls3-4lw.pages.dev/"><strong>Live demo →</strong></a>
+  <a href="https://puls3.org/"><strong>Live demo →</strong></a>
 </p>
 
 > **Wallet warning (expected).** Freighter may show a **Blockaid** warning when connecting to `puls3-4lw.pages.dev` — a **domain-reputation false positive** on the shared Cloudflare Pages domain, raised before any signature. Connecting only shares your public address; every transaction is shown in Freighter before you sign, and the source is public in this repository.
