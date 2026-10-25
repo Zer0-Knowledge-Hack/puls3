@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
 import 'package:puls3_server/src/agent/registry_reader.dart';
+import 'package:puls3_server/src/chain/chain_log.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:test/test.dart';
@@ -324,6 +325,79 @@ void main() {
       final stale = await service.list();
 
       expect(stale.map((a) => a.id), ['agt-001', 'agt-002']);
+    });
+  });
+
+  group('outage logging', () {
+    late List<(ChainLogLevel, String)> logged;
+
+    AgentCatalogService loggedOver(_FakeRegistry registry) =>
+        AgentCatalogService(
+          registry,
+          now: clock.call,
+          log: (level, message) => logged.add((level, message)),
+        );
+
+    setUp(() => logged = []);
+
+    test('logs the exception type and message before throwing', () async {
+      final registry = _FakeRegistry({0: _metadata(1)})
+        ..failure = const LedgerUnavailable(
+          'totalAgents timed out after 0:00:08.000000',
+        );
+
+      await expectLater(loggedOver(registry).list(), _throwsUnavailable);
+
+      expect(logged, hasLength(1));
+      expect(logged.single.$1, ChainLogLevel.warning);
+      expect(logged.single.$2, contains('LedgerUnavailable'));
+      expect(
+        logged.single.$2,
+        contains('totalAgents timed out after 0:00:08.000000'),
+      );
+      expect(logged.single.$2, contains('No cached catalog'));
+    });
+
+    test('logs it too when the stale catalog is served', () async {
+      final registry = _FakeRegistry({0: _metadata(1)});
+      final service = loggedOver(registry);
+      await service.list();
+
+      registry.failure = const LedgerUnavailable(
+        'simulateTransaction answered HTTP 504',
+      );
+      clock.advance(const Duration(minutes: 5));
+      final stale = await service.list();
+
+      expect(stale.single.id, 'agt-001');
+      expect(logged, hasLength(1));
+      expect(
+        logged.single.$2,
+        contains('simulateTransaction answered HTTP 504'),
+      );
+      expect(logged.single.$2, contains('Serving the stale catalog'));
+    });
+
+    test('logs once per failed rebuild, not once per caller', () async {
+      final registry = _FakeRegistry({0: _metadata(1)})
+        ..failure = const LedgerUnavailable('down')
+        ..totalGate = Completer<void>();
+      final service = loggedOver(registry);
+
+      final calls = [service.list(), service.list(), service.list()]
+          .map((call) => call.then<Object?>((_) => null, onError: (_) => null))
+          .toList();
+      await Future<void>.delayed(Duration.zero);
+      registry.totalGate!.complete();
+      await Future.wait(calls);
+
+      expect(logged, hasLength(1));
+    });
+
+    test('a successful rebuild logs nothing', () async {
+      await loggedOver(_FakeRegistry({0: _metadata(1)})).list();
+
+      expect(logged, isEmpty);
     });
   });
 

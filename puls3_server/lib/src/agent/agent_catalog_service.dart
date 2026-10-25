@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../chain/chain_log.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
 import 'agent_summary_reader.dart';
@@ -26,14 +27,17 @@ final class AgentCatalogService implements CatalogReader {
     DateTime Function()? now,
     Duration ttl = _catalogTtl,
     int concurrency = _readConcurrency,
+    ChainLog log = ignoreChainLog,
   }) : _now = now ?? DateTime.now,
        _ttl = ttl,
-       _concurrency = concurrency;
+       _concurrency = concurrency,
+       _log = log;
 
   final RegistryReader _registry;
   final DateTime Function() _now;
   final Duration _ttl;
   final int _concurrency;
+  final ChainLog _log;
 
   List<AgentSummary>? _cached;
   DateTime? _builtAt;
@@ -67,8 +71,15 @@ final class AgentCatalogService implements CatalogReader {
       _cached = built;
       _builtAt = _now();
       return built;
-    } on LedgerException {
+    } on LedgerException catch (e) {
+      // The cause (client timeout, HTTP 504, JSON-RPC -32001, ...) is only in
+      // the exception, so log it before it is swallowed.
       final stale = _cached;
+      _log(
+        ChainLogLevel.warning,
+        'Agent catalog rebuild failed (${e.runtimeType}): ${e.message}. '
+        '${stale != null ? 'Serving the stale catalog.' : 'No cached catalog.'}',
+      );
       if (stale != null) return stale;
       throw AgentCatalogUnavailable(
         message: 'The agent catalog cannot be read from the chain right now.',

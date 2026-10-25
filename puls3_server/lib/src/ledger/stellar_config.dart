@@ -14,6 +14,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 /// | `PULS3_STELLAR_ESCROW` | [escrow] |
 /// | `PULS3_STELLAR_REPUTATION_REGISTRY` | [reputationRegistry] |
 /// | `PULS3_STELLAR_SIMULATION_SOURCE` | [simulationSource] |
+/// | `PULS3_STELLAR_RPC_TIMEOUT_SECONDS` | [rpcTimeout] |
 final class StellarConfig {
   const StellarConfig({
     required this.rpcUrl,
@@ -23,12 +24,15 @@ final class StellarConfig {
     required this.escrow,
     required this.simulationSource,
     this.reputationRegistry,
+    this.rpcTimeout = defaultRpcTimeout,
   });
 
   /// Builds the configuration from [env] (normally `Platform.environment`).
   ///
   /// An unset or empty variable keeps its [testnet] value. A set variable
-  /// overrides it. An invalid address throws [InvalidStellarAddress].
+  /// overrides it. An invalid address throws [InvalidStellarAddress]. A
+  /// timeout that is not a positive whole number of seconds throws
+  /// [ArgumentError].
   factory StellarConfig.fromEnvironment(Map<String, String> env) {
     String? read(String name) {
       final value = env[name];
@@ -38,6 +42,21 @@ final class StellarConfig {
     StellarAddress address(String name, StellarAddress fallback) {
       final value = read(name);
       return value == null ? fallback : StellarAddress.parse(value);
+    }
+
+    Duration timeout() {
+      const name = 'PULS3_STELLAR_RPC_TIMEOUT_SECONDS';
+      final value = read(name);
+      if (value == null) return defaultRpcTimeout;
+      final seconds = int.tryParse(value);
+      if (seconds == null || seconds < 1) {
+        throw ArgumentError.value(
+          value,
+          name,
+          'must be a positive whole number of seconds',
+        );
+      }
+      return Duration(seconds: seconds);
     }
 
     final rpcUrl = read('PULS3_STELLAR_RPC_URL');
@@ -59,8 +78,12 @@ final class StellarConfig {
         final value? => StellarAddress.parse(value),
         null => testnet.reputationRegistry,
       },
+      rpcTimeout: timeout(),
     );
   }
+
+  /// How long one Soroban RPC call may take before the chain counts as down.
+  static const defaultRpcTimeout = Duration(seconds: 8);
 
   /// Public testnet values. A drift test keeps the contract ids equal to
   /// `contracts/deployments/testnet.json`.
@@ -102,6 +125,10 @@ final class StellarConfig {
   /// An existing account used only as the source of unsigned simulations.
   final StellarAddress simulationSource;
 
+  /// The client timeout of every Soroban RPC call (one request, not a whole
+  /// catalog build). Not capped: other providers may use other limits.
+  final Duration rpcTimeout;
+
   @override
   bool operator ==(Object other) =>
       other is StellarConfig &&
@@ -111,7 +138,8 @@ final class StellarConfig {
       other.identityRegistry == identityRegistry &&
       other.escrow == escrow &&
       other.simulationSource == simulationSource &&
-      other.reputationRegistry == reputationRegistry;
+      other.reputationRegistry == reputationRegistry &&
+      other.rpcTimeout == rpcTimeout;
 
   @override
   int get hashCode => Object.hash(
@@ -122,5 +150,6 @@ final class StellarConfig {
     escrow,
     simulationSource,
     reputationRegistry,
+    rpcTimeout,
   );
 }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:serverpod/serverpod.dart';
 
 import '../agent/agent_catalog_service.dart';
+import '../agent/agent_catalog_wiring.dart' show catalogConsoleLog;
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
 import '../feedback/feedback_service.dart';
@@ -23,9 +24,6 @@ import 'hire_relay_config.dart';
 import 'hire_service.dart';
 import 'serverpod_escrow_preparation_store.dart';
 import 'serverpod_hire_repository.dart';
-
-/// How long one Soroban RPC call may take before the chain counts as down.
-const _rpcTimeout = Duration(seconds: 8);
 
 /// The services one `HireEndpoint` request works with.
 final class HireServices {
@@ -78,13 +76,13 @@ final class HireWiring {
     final rpc = SorobanRpcClient(
       httpClient: httpClient ?? http.Client(),
       url: stellar.rpcUrl,
-      timeout: _rpcTimeout,
+      timeout: stellar.rpcTimeout,
     );
     final ledger = SorobanLedger(rpc, stellar);
     return HireWiring._(
       stellar: stellar,
       ledger: ledger,
-      catalog: AgentCatalogService(ledger),
+      catalog: AgentCatalogService(ledger, log: catalogConsoleLog),
       codec: StellarEnvelopeCodec.forPassphrase(stellar.networkPassphrase),
       accounts: RpcChainAccounts(rpc),
       sender: SorobanSubmissionLedger(rpc, escrow: stellar.escrow),

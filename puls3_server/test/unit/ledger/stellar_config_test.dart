@@ -88,6 +88,41 @@ void main() {
       expect(configured, isNot(StellarConfig.testnet));
     });
 
+    group('rpc timeout', () {
+      const name = 'PULS3_STELLAR_RPC_TIMEOUT_SECONDS';
+
+      test('unset or empty keeps the 8 s default', () {
+        expect(
+          StellarConfig.fromEnvironment(const {}).rpcTimeout,
+          const Duration(seconds: 8),
+        );
+        expect(
+          StellarConfig.fromEnvironment(const {name: ''}).rpcTimeout,
+          const Duration(seconds: 8),
+        );
+        expect(StellarConfig.testnet.rpcTimeout, const Duration(seconds: 8));
+      });
+
+      test('a positive whole number of seconds is used', () {
+        final config = StellarConfig.fromEnvironment(const {name: '20'});
+
+        expect(config.rpcTimeout, const Duration(seconds: 20));
+        expect(config, isNot(StellarConfig.testnet));
+        expect(config.hashCode, isNot(StellarConfig.testnet.hashCode));
+      });
+
+      for (final bad in ['abc', '1.5', '0', '-3', ' ']) {
+        test('"$bad" throws an ArgumentError naming the variable', () {
+          expect(
+            () => StellarConfig.fromEnvironment({name: bad}),
+            throwsA(
+              isA<ArgumentError>().having((e) => e.name, 'name', name),
+            ),
+          );
+        });
+      }
+    });
+
     test('an invalid address throws', () {
       expect(
         () => StellarConfig.fromEnvironment(const {

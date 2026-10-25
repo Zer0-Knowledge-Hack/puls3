@@ -290,3 +290,20 @@ repository-admin access. They cannot be proven by local commands alone.
 | `set it in puls3_server/.env` when running Docker | Run `./scripts/setup-local-secrets.sh` first. |
 | Port 8080 already in use | Another process uses it (maybe a static server). Stop it, or serve the web build on another port. |
 | The web app shows an old version | Hard reload with `Ctrl+Shift+R`: Flutter caches the app in a service worker. |
+| `AgentCatalogUnavailable`, or the catalog looks empty or stale | Read the server log line `[agent-catalog] warning: Agent catalog rebuild failed ...` and see [7.1](#71-soroban-rpc-timeout). |
+
+### 7.1 Soroban RPC timeout
+
+Every Soroban RPC call has a client timeout of 8 s, set with `PULS3_STELLAR_RPC_TIMEOUT_SECONDS` (a positive whole number of seconds; anything else stops the server at startup). It applies to each request, not to a whole catalog build, which on a cold start makes dozens of `simulateTransaction` calls. If one fails, the build is abandoned.
+
+The cause is in the log line, which carries the exception type and message:
+
+| Log message | Meaning | Fix |
+| --- | --- | --- |
+| `<method> timed out after <timeout>` | The client timeout was hit. | Raise the setting. 20 s is a good first try: above the documented 15 s simulation limit, below the 25 s request limit, and the value the Studio deploy already uses. |
+| `<method> answered HTTP 504` | The server hit its request limit (`MAX_REQUEST_EXECUTION_DURATION`, 25 s by default). | Raising the client timeout will not help. Use another RPC provider. |
+| `<method> answered JSON-RPC error -32001: ...` | The server hit its simulation limit (`MAX_SIMULATE_TRANSACTION_EXECUTION_DURATION`, 15 s by default). | Same: use another RPC provider. |
+
+The 15 s and 25 s values are the `stellar-rpc` defaults from the [admin guide](https://developers.stellar.org/docs/data/apis/rpc/admin-guide/configuring). Providers can set their own, so the setting is not capped.
+
+A larger value has a cost: while the chain is down, each request that triggers a rebuild waits until the call fails (up to the configured value) before it gets the stale catalog, so users wait longer during an outage.
