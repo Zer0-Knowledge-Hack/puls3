@@ -215,6 +215,46 @@ PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
+### Submit and complete proof on testnet (#208)
+
+`tool/e2e_submit_testnet.dart` continues past funding: the agent runtime
+signs escrow `submit` with the custodied provider key, then the consumer
+signs `complete` unchanged. It prints both transaction hashes with Stellar
+Expert links. Seed demo agents that still pay the escrow admin (`GAFUY…`)
+are skipped; the hire must be of a Studio-deployed agent whose wallet is in
+`agent_wallet`. Rebinding the seed catalog is #209.
+
+Default Serverpod mode is `test` (`postgres_test`, same as the relay proof).
+A Studio deploy against the local development server writes `agent_wallet`
+and the manifest to development Postgres (`localhost:8090`), so that agent
+is invisible in test mode. Stop `dart bin/main.dart` and set
+`PULS3_E2E_SERVERPOD_MODE=development` to use those rows.
+
+The same consumer secret and relay fee keys as the relay proof. Also:
+
+- `PULS3_AGENT_WALLET_SECRET_KEY` (custody cipher; see `docs/infra/secrets.md`)
+- Workers AI (`PULS3_WORKERS_AI_ACCOUNT_ID` + `workersAiApiToken`) or Anthropic,
+  so the run can finish
+- `PULS3_E2E_AGENT_ID` optional; otherwise the cheapest custodied agent
+- `PULS3_E2E_SERVERPOD_MODE` optional (`test` or `development`)
+
+```bash
+# Stop dart bin/main.dart first so ports 8080–8082 are free.
+docker start puls3_server-postgres-1 puls3_server-redis-1
+cd puls3_server
+set -a; . ../.env; set +a
+PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" \
+PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_PLATFORM_FEE_BPS=0 \
+PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+PULS3_E2E_SERVERPOD_MODE=development \
+dart run tool/e2e_submit_testnet.dart
+```
+
+Paste the printed `submit` and `complete` hashes on PR #213.
+
 ### Feedback proof on testnet (#179)
 
 `tool/e2e_feedback_testnet.dart` continues the funded hire of the relay proof:
