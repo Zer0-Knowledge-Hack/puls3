@@ -16,8 +16,12 @@ typedef CreateHireCall =
       String requestId,
     );
 
-/// `client.hire.prepareCreateJob` or `client.hire.prepareFund`.
+/// `client.hire.prepareCreateJob`, `prepareFund` or `prepareComplete`.
 typedef PrepareEscrowCall = Future<PreparedTransaction> Function(int hireId);
+
+/// `client.hire.prepareReject`.
+typedef PrepareRejectCall =
+    Future<PreparedTransaction> Function(int hireId, String reason);
 
 /// `client.hire.submitEscrowCall`.
 typedef SubmitEscrowCall =
@@ -41,6 +45,8 @@ class ServerHireGateway implements HireGateway {
     required this._createHire,
     required this._prepareCreateJob,
     required this._prepareFund,
+    required this._prepareComplete,
+    required this._prepareReject,
     required this._submitEscrowCall,
     required this._getHire,
     this._session,
@@ -53,6 +59,8 @@ class ServerHireGateway implements HireGateway {
   final CreateHireCall _createHire;
   final PrepareEscrowCall _prepareCreateJob;
   final PrepareEscrowCall _prepareFund;
+  final PrepareEscrowCall _prepareComplete;
+  final PrepareRejectCall _prepareReject;
   final SubmitEscrowCall _submitEscrowCall;
   final GetHireCall _getHire;
 
@@ -144,6 +152,14 @@ class ServerHireGateway implements HireGateway {
   }
 
   @override
+  Future<EscrowPreparation> prepareComplete(int hireId) async =>
+      _preparation(await _call(() => _prepareComplete(hireId)));
+
+  @override
+  Future<EscrowPreparation> prepareReject(int hireId, String reason) async =>
+      _preparation(await _call(() => _prepareReject(hireId, reason)));
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,
@@ -180,6 +196,11 @@ class ServerHireGateway implements HireGateway {
     // also carries the payment link when the hire has no payment yet.
     final latest = detail.escrowSubmission;
     final fund = latest != null && latest.purpose == 'fund' ? latest : null;
+    final decision =
+        latest != null &&
+            (latest.purpose == 'complete' || latest.purpose == 'reject')
+        ? latest
+        : null;
     final paymentTransaction = hire.paymentTransaction ?? fund?.transaction;
     return HireProgress(
       hireId: hire.id,
@@ -195,6 +216,9 @@ class ServerHireGateway implements HireGateway {
       paymentExplorerUrl:
           detail.paymentExplorerUrl ??
           (fund?.transaction == paymentTransaction ? fund?.explorerUrl : null),
+      approvalDeadline: detail.approvalDeadline,
+      decisionTransaction: decision?.transaction,
+      decisionExplorerUrl: decision?.explorerUrl,
     );
   }
 

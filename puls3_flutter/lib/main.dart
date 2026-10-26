@@ -49,6 +49,8 @@ HireGateway? _createHireGateway(Client client, String configJson) =>
         createHire: client.hire.createHire,
         prepareCreateJob: client.hire.prepareCreateJob,
         prepareFund: client.hire.prepareFund,
+        prepareComplete: client.hire.prepareComplete,
+        prepareReject: client.hire.prepareReject,
         submitEscrowCall: client.hire.submitEscrowCall,
         getHire: client.hire.getHire,
         session: _walletSession(client, configJson),
