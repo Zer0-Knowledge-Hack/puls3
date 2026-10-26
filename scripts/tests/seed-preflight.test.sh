@@ -184,9 +184,10 @@ if grep -q '^set_agent_wallet --caller GCALLER --agent-id 8 --new-wallet GCALLER
 case "$LAST_OUT" in *"wallet: agent 1 bound to GCALLER"*"$(printf '%064x' 255)"*) ok "bind logs agent id and tx hash" ;; *) bad "bind logs agent id and tx hash" "$LAST_OUT" ;; esac
 
 STUB_WALLET=GSOMEONEELSE expect_exit "different wallet exits 0" 0 run_seed GCALLER ""
-if [ "$(wallet_calls)" -eq 8 ]; then ok "different wallet is rebound for all 8 agents"; else bad "different wallet is rebound" "$(wallet_calls) calls"; fi
+if [ "$(wallet_calls)" -eq 0 ]; then ok "different wallet is left alone"; else bad "different wallet is left alone" "$(wallet_calls) calls"; fi
+case "$LAST_OUT" in *"left alone"*) ok "different wallet is reported as left alone" ;; *) bad "different wallet is reported as left alone" "$LAST_OUT" ;; esac
 
-AGENT_WALLET_ACCOUNT=other-wallet expect_exit "separate target wallet exits 0" 0 run_seed GCALLER ""
+STUB_WALLET=null AGENT_WALLET_ACCOUNT=other-wallet expect_exit "separate target wallet exits 0" 0 run_seed GCALLER ""
 if [ "$(wallet_calls)" -eq 8 ] && grep -q -- '--new-wallet GOTHERWALLET' "$WORK/calls"; then ok "AGENT_WALLET_ACCOUNT selects the target wallet"; else bad "AGENT_WALLET_ACCOUNT target" "$(wallet_calls) calls"; fi
 
 STUB_UNSEEDED="puls3://demo/agt-008" expect_exit "newly registered agent exits 0" 0 run_seed GCALLER ""
