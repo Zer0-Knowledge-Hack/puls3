@@ -417,7 +417,7 @@ abstract class AppLocalizations {
   /// No description provided for @landingHireHint.
   ///
   /// In en, this message translates to:
-  /// **'This button runs the hire. Press it and watch the USDC lock.'**
+  /// **'Press Hire. Watch USDC lock, the agent work, deliver, and only then get paid.'**
   String get landingHireHint;
 
   /// No description provided for @landingHireTask.
@@ -435,13 +435,13 @@ abstract class AppLocalizations {
   /// No description provided for @landingHireSigning.
   ///
   /// In en, this message translates to:
-  /// **'In your wallet'**
+  /// **'You hire'**
   String get landingHireSigning;
 
   /// No description provided for @landingHireLocking.
   ///
   /// In en, this message translates to:
-  /// **'Locked in escrow'**
+  /// **'USDC locks'**
   String get landingHireLocking;
 
   /// No description provided for @landingHireWorking.
@@ -449,6 +449,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Agent at work'**
   String get landingHireWorking;
+
+  /// No description provided for @landingHireDelivering.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent delivers'**
+  String get landingHireDelivering;
 
   /// No description provided for @landingHireReview.
   ///
@@ -465,31 +471,37 @@ abstract class AppLocalizations {
   /// No description provided for @landingHireWalletBody.
   ///
   /// In en, this message translates to:
-  /// **'Your wallet holds {amount} USDC.'**
+  /// **'You open the job. {amount} USDC is still in your wallet — the agent is not paid yet.'**
   String landingHireWalletBody(String amount);
 
   /// No description provided for @landingHireLockBody.
   ///
   /// In en, this message translates to:
-  /// **'That USDC goes into a vault: escrow, a contract. It cannot leave on its own.'**
+  /// **'The money enters a vault: the escrow contract. It cannot leave on its own.'**
   String get landingHireLockBody;
 
   /// No description provided for @landingHireWorkBody.
   ///
   /// In en, this message translates to:
-  /// **'The agent is notified and starts the work. The money stays locked.'**
+  /// **'The agent is notified and starts. The vault stays locked the whole time.'**
   String get landingHireWorkBody;
+
+  /// No description provided for @landingHireDeliverBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The work comes to you. The money still cannot leave the vault.'**
+  String get landingHireDeliverBody;
 
   /// No description provided for @landingHireReviewBody.
   ///
   /// In en, this message translates to:
-  /// **'The agent finishes. You get notified and review the work.'**
+  /// **'You inspect the work. Nothing is paid until you accept.'**
   String get landingHireReviewBody;
 
   /// No description provided for @landingHireReleaseBody.
   ///
   /// In en, this message translates to:
-  /// **'You accept: the vault pays the agent and releases the work. No accept, no payout — and no free work.'**
+  /// **'The vault pays the agent and releases the work. No accept, no payout — and no free work.'**
   String get landingHireReleaseBody;
 
   /// No description provided for @landingHireReplay.
@@ -497,6 +509,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Replay'**
   String get landingHireReplay;
+
+  /// No description provided for @landingHireStepHire.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire'**
+  String get landingHireStepHire;
+
+  /// No description provided for @landingHireStepLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get landingHireStepLock;
+
+  /// No description provided for @landingHireStepWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get landingHireStepWork;
+
+  /// No description provided for @landingHireStepDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver'**
+  String get landingHireStepDeliver;
+
+  /// No description provided for @landingHireStepReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get landingHireStepReview;
+
+  /// No description provided for @landingHireStepPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get landingHireStepPay;
+
+  /// No description provided for @landingHireYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get landingHireYou;
+
+  /// No description provided for @landingHireLegendUsdc.
+  ///
+  /// In en, this message translates to:
+  /// **'USDC'**
+  String get landingHireLegendUsdc;
+
+  /// No description provided for @landingHireLegendWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get landingHireLegendWork;
 
   /// No description provided for @landingComing.
   ///

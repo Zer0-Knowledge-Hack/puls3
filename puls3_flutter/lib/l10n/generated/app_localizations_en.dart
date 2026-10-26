@@ -177,7 +177,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get landingHireHint =>
-      'This button runs the hire. Press it and watch the USDC lock.';
+      'Press Hire. Watch USDC lock, the agent work, deliver, and only then get paid.';
 
   @override
   String get landingHireTask =>
@@ -187,13 +187,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get landingHireCta => 'Hire';
 
   @override
-  String get landingHireSigning => 'In your wallet';
+  String get landingHireSigning => 'You hire';
 
   @override
-  String get landingHireLocking => 'Locked in escrow';
+  String get landingHireLocking => 'USDC locks';
 
   @override
   String get landingHireWorking => 'Agent at work';
+
+  @override
+  String get landingHireDelivering => 'Agent delivers';
 
   @override
   String get landingHireReview => 'You review';
@@ -203,27 +206,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String landingHireWalletBody(String amount) {
-    return 'Your wallet holds $amount USDC.';
+    return 'You open the job. $amount USDC is still in your wallet — the agent is not paid yet.';
   }
 
   @override
   String get landingHireLockBody =>
-      'That USDC goes into a vault: escrow, a contract. It cannot leave on its own.';
+      'The money enters a vault: the escrow contract. It cannot leave on its own.';
 
   @override
   String get landingHireWorkBody =>
-      'The agent is notified and starts the work. The money stays locked.';
+      'The agent is notified and starts. The vault stays locked the whole time.';
+
+  @override
+  String get landingHireDeliverBody =>
+      'The work comes to you. The money still cannot leave the vault.';
 
   @override
   String get landingHireReviewBody =>
-      'The agent finishes. You get notified and review the work.';
+      'You inspect the work. Nothing is paid until you accept.';
 
   @override
   String get landingHireReleaseBody =>
-      'You accept: the vault pays the agent and releases the work. No accept, no payout — and no free work.';
+      'The vault pays the agent and releases the work. No accept, no payout — and no free work.';
 
   @override
   String get landingHireReplay => 'Replay';
+
+  @override
+  String get landingHireStepHire => 'Hire';
+
+  @override
+  String get landingHireStepLock => 'Lock';
+
+  @override
+  String get landingHireStepWork => 'Work';
+
+  @override
+  String get landingHireStepDeliver => 'Deliver';
+
+  @override
+  String get landingHireStepReview => 'Review';
+
+  @override
+  String get landingHireStepPay => 'Pay';
+
+  @override
+  String get landingHireYou => 'You';
+
+  @override
+  String get landingHireLegendUsdc => 'USDC';
+
+  @override
+  String get landingHireLegendWork => 'Work';
 
   @override
   String get landingComing => 'Coming';

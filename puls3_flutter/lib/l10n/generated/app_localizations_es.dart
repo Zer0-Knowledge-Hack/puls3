@@ -180,7 +180,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get landingHireHint =>
-      'Este botón corre el hire. Presiónalo y vas a ver el USDC quedar en escrow.';
+      'Presiona Contratar. Vas a ver el USDC cerrarse, al agente trabajar, entregar y cobrar solo al final.';
 
   @override
   String get landingHireTask =>
@@ -190,13 +190,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get landingHireCta => 'Contratar';
 
   @override
-  String get landingHireSigning => 'En tu wallet';
+  String get landingHireSigning => 'Tú contratas';
 
   @override
-  String get landingHireLocking => 'Cerrado en escrow';
+  String get landingHireLocking => 'El USDC se cierra';
 
   @override
   String get landingHireWorking => 'El agente trabaja';
+
+  @override
+  String get landingHireDelivering => 'El agente entrega';
 
   @override
   String get landingHireReview => 'Tú revisas';
@@ -206,27 +209,58 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String landingHireWalletBody(String amount) {
-    return 'Tu wallet tiene $amount USDC.';
+    return 'Abres el trabajo. $amount USDC sigue en tu wallet: el agente aún no cobra.';
   }
 
   @override
   String get landingHireLockBody =>
-      'Ese USDC entra a un baúl: el escrow, un contrato. No puede salir de ahí como si nada.';
+      'El dinero entra a un baúl: el contrato de escrow. No puede salir como si nada.';
 
   @override
   String get landingHireWorkBody =>
-      'Se notifica al agente para que haga el trabajo. El dinero queda en el baúl.';
+      'Se notifica al agente y empieza. El baúl sigue cerrado todo el tiempo.';
+
+  @override
+  String get landingHireDeliverBody =>
+      'El trabajo llega a ti. El dinero sigue sin poder salir del baúl.';
 
   @override
   String get landingHireReviewBody =>
-      'El agente termina. Te avisamos y tú revisas el trabajo.';
+      'Revisas el trabajo. No se paga nada hasta que aceptas.';
 
   @override
   String get landingHireReleaseBody =>
-      'Si aceptas, el baúl paga al agente y libera el trabajo. Sin aceptar, no hay pago ni trabajo gratis.';
+      'El baúl paga al agente y libera el trabajo. Sin aceptar, no hay pago ni trabajo gratis.';
 
   @override
   String get landingHireReplay => 'Repetir';
+
+  @override
+  String get landingHireStepHire => 'Contratar';
+
+  @override
+  String get landingHireStepLock => 'Cerrar';
+
+  @override
+  String get landingHireStepWork => 'Trabaja';
+
+  @override
+  String get landingHireStepDeliver => 'Entrega';
+
+  @override
+  String get landingHireStepReview => 'Revisas';
+
+  @override
+  String get landingHireStepPay => 'Paga';
+
+  @override
+  String get landingHireYou => 'Tú';
+
+  @override
+  String get landingHireLegendUsdc => 'USDC';
+
+  @override
+  String get landingHireLegendWork => 'Trabajo';
 
   @override
   String get landingComing => 'En camino';

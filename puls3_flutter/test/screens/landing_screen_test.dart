@@ -24,9 +24,15 @@ void main() {
     expect(find.text('Build an agent'), findsWidgets);
     expect(find.text('Press Hire'), findsOneWidget);
     expect(
-      find.text('This button runs the hire. Press it and watch the USDC lock.'),
+      find.text(
+        'Press Hire. Watch USDC lock, the agent work, deliver, and only then get paid.',
+      ),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('landing-hire-scene')), findsOneWidget);
+    for (var i = 1; i <= 6; i++) {
+      expect(find.byKey(Key('landing-hire-step-$i')), findsOneWidget);
+    }
     expect(find.text('You already use AI. Can it get paid?'), findsOneWidget);
     expect(find.text('See the first hire paid into escrow'), findsOneWidget);
     expect(find.text('Coming'), findsOneWidget);
@@ -117,23 +123,29 @@ void main() {
     expect(find.byKey(const Key('landing-build')), findsOneWidget);
   });
 
-  testWidgets('Hire walks wallet, lock, work, review, then release', (
+  testWidgets('Hire walks lock, work, deliver, review, then pay', (
     tester,
   ) async {
     await pumpApp(tester);
     await tester.tap(find.byKey(const Key('landing-hire-run')));
     await tester.pump();
 
-    await advance(tester, const Duration(milliseconds: 900));
+    await advance(tester, const Duration(milliseconds: 400));
+    expect(find.textContaining('the agent is not paid yet'), findsOneWidget);
+
+    await advance(tester, const Duration(milliseconds: 4600));
     expect(find.textContaining('cannot leave on its own'), findsOneWidget);
 
-    await advance(tester, const Duration(milliseconds: 1800));
-    expect(find.textContaining('money stays locked'), findsOneWidget);
+    await advance(tester, const Duration(milliseconds: 4500));
+    expect(find.textContaining('vault stays locked the whole time'), findsOneWidget);
 
-    await advance(tester, const Duration(milliseconds: 1300));
-    expect(find.textContaining('You get notified'), findsOneWidget);
+    await advance(tester, const Duration(milliseconds: 4500));
+    expect(find.textContaining('work comes to you'), findsOneWidget);
 
-    await advance(tester, const Duration(milliseconds: 2500));
+    await advance(tester, const Duration(milliseconds: 4500));
+    expect(find.textContaining('Nothing is paid until you accept'), findsOneWidget);
+
+    await advance(tester, const Duration(milliseconds: 9000));
     expect(find.textContaining('No accept, no payout'), findsOneWidget);
     expect(find.text('Replay'), findsOneWidget);
   });

@@ -179,7 +179,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get landingHireHint =>
-      'Este botão roda o hire. Toque e veja o USDC travar no escrow.';
+      'Toque em Contratar. Veja o USDC travar, o agente trabalhar, entregar e só então receber.';
 
   @override
   String get landingHireTask =>
@@ -189,13 +189,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get landingHireCta => 'Contratar';
 
   @override
-  String get landingHireSigning => 'Na sua carteira';
+  String get landingHireSigning => 'Você contrata';
 
   @override
-  String get landingHireLocking => 'Trancado no escrow';
+  String get landingHireLocking => 'O USDC trava';
 
   @override
   String get landingHireWorking => 'O agente trabalha';
+
+  @override
+  String get landingHireDelivering => 'O agente entrega';
 
   @override
   String get landingHireReview => 'Você revisa';
@@ -205,27 +208,58 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String landingHireWalletBody(String amount) {
-    return 'Sua carteira tem $amount USDC.';
+    return 'Você abre o trabalho. $amount USDC ainda está na carteira — o agente ainda não recebe.';
   }
 
   @override
   String get landingHireLockBody =>
-      'Esse USDC entra num cofre: o escrow, um contrato. Não sai de lá sozinho.';
+      'O dinheiro entra num cofre: o contrato de escrow. Não sai de lá sozinho.';
 
   @override
   String get landingHireWorkBody =>
-      'O agente é avisado para fazer o trabalho. O dinheiro fica no cofre.';
+      'O agente é avisado e começa. O cofre fica trancado o tempo todo.';
+
+  @override
+  String get landingHireDeliverBody =>
+      'O trabalho chega até você. O dinheiro ainda não pode sair do cofre.';
 
   @override
   String get landingHireReviewBody =>
-      'O agente termina. Você é avisado e revisa o trabalho.';
+      'Você revisa o trabalho. Nada é pago até você aceitar.';
 
   @override
   String get landingHireReleaseBody =>
-      'Se você aceita, o cofre paga o agente e libera o trabalho. Sem aceitar, não há pagamento nem trabalho de graça.';
+      'O cofre paga o agente e libera o trabalho. Sem aceitar, não há pagamento nem trabalho de graça.';
 
   @override
   String get landingHireReplay => 'Repetir';
+
+  @override
+  String get landingHireStepHire => 'Contratar';
+
+  @override
+  String get landingHireStepLock => 'Travar';
+
+  @override
+  String get landingHireStepWork => 'Trabalha';
+
+  @override
+  String get landingHireStepDeliver => 'Entrega';
+
+  @override
+  String get landingHireStepReview => 'Revisa';
+
+  @override
+  String get landingHireStepPay => 'Paga';
+
+  @override
+  String get landingHireYou => 'Você';
+
+  @override
+  String get landingHireLegendUsdc => 'USDC';
+
+  @override
+  String get landingHireLegendWork => 'Trabalho';
 
   @override
   String get landingComing => 'A caminho';
@@ -1353,7 +1387,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get landingHireHint =>
-      'Este botão roda o hire. Toque e veja o USDC travar no escrow.';
+      'Toque em Contratar. Veja o USDC travar, o agente trabalhar, entregar e só então receber.';
 
   @override
   String get landingHireTask =>
@@ -1363,13 +1397,16 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get landingHireCta => 'Contratar';
 
   @override
-  String get landingHireSigning => 'Na sua carteira';
+  String get landingHireSigning => 'Você contrata';
 
   @override
-  String get landingHireLocking => 'Trancado no escrow';
+  String get landingHireLocking => 'O USDC trava';
 
   @override
   String get landingHireWorking => 'O agente trabalha';
+
+  @override
+  String get landingHireDelivering => 'O agente entrega';
 
   @override
   String get landingHireReview => 'Você revisa';
@@ -1379,27 +1416,58 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String landingHireWalletBody(String amount) {
-    return 'Sua carteira tem $amount USDC.';
+    return 'Você abre o trabalho. $amount USDC ainda está na carteira — o agente ainda não recebe.';
   }
 
   @override
   String get landingHireLockBody =>
-      'Esse USDC entra num cofre: o escrow, um contrato. Não sai de lá sozinho.';
+      'O dinheiro entra num cofre: o contrato de escrow. Não sai de lá sozinho.';
 
   @override
   String get landingHireWorkBody =>
-      'O agente é avisado para fazer o trabalho. O dinheiro fica no cofre.';
+      'O agente é avisado e começa. O cofre fica trancado o tempo todo.';
+
+  @override
+  String get landingHireDeliverBody =>
+      'O trabalho chega até você. O dinheiro ainda não pode sair do cofre.';
 
   @override
   String get landingHireReviewBody =>
-      'O agente termina. Você é avisado e revisa o trabalho.';
+      'Você revisa o trabalho. Nada é pago até você aceitar.';
 
   @override
   String get landingHireReleaseBody =>
-      'Se você aceita, o cofre paga o agente e libera o trabalho. Sem aceitar, não há pagamento nem trabalho de graça.';
+      'O cofre paga o agente e libera o trabalho. Sem aceitar, não há pagamento nem trabalho de graça.';
 
   @override
   String get landingHireReplay => 'Repetir';
+
+  @override
+  String get landingHireStepHire => 'Contratar';
+
+  @override
+  String get landingHireStepLock => 'Travar';
+
+  @override
+  String get landingHireStepWork => 'Trabalha';
+
+  @override
+  String get landingHireStepDeliver => 'Entrega';
+
+  @override
+  String get landingHireStepReview => 'Revisa';
+
+  @override
+  String get landingHireStepPay => 'Paga';
+
+  @override
+  String get landingHireYou => 'Você';
+
+  @override
+  String get landingHireLegendUsdc => 'USDC';
+
+  @override
+  String get landingHireLegendWork => 'Trabalho';
 
   @override
   String get landingComing => 'A caminho';
@@ -2528,7 +2596,7 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get landingHireHint =>
-      'Este botão corre o hire. Toque e veja o USDC ficar no escrow.';
+      'Toque em Contratar. Veja o USDC trancar, o agente trabalhar, entregar e só depois receber.';
 
   @override
   String get landingHireTask =>
@@ -2538,13 +2606,16 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   String get landingHireCta => 'Contratar';
 
   @override
-  String get landingHireSigning => 'Na sua carteira';
+  String get landingHireSigning => 'Contrata';
 
   @override
-  String get landingHireLocking => 'Trancado no escrow';
+  String get landingHireLocking => 'O USDC tranca';
 
   @override
   String get landingHireWorking => 'O agente trabalha';
+
+  @override
+  String get landingHireDelivering => 'O agente entrega';
 
   @override
   String get landingHireReview => 'Revisa';
@@ -2554,27 +2625,58 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String landingHireWalletBody(String amount) {
-    return 'A sua carteira tem $amount USDC.';
+    return 'Abre o trabalho. $amount USDC ainda está na carteira — o agente ainda não recebe.';
   }
 
   @override
   String get landingHireLockBody =>
-      'Esse USDC entra num cofre: o escrow, um contrato. Não sai de lá por si.';
+      'O dinheiro entra num cofre: o contrato de escrow. Não sai de lá por si.';
 
   @override
   String get landingHireWorkBody =>
-      'O agente é avisado para fazer o trabalho. O dinheiro fica no cofre.';
+      'O agente é avisado e começa. O cofre fica trancado o tempo todo.';
+
+  @override
+  String get landingHireDeliverBody =>
+      'O trabalho chega até si. O dinheiro ainda não pode sair do cofre.';
 
   @override
   String get landingHireReviewBody =>
-      'O agente termina. É avisado e revê o trabalho.';
+      'Revê o trabalho. Nada é pago até aceitar.';
 
   @override
   String get landingHireReleaseBody =>
-      'Se aceitar, o cofre paga o agente e liberta o trabalho. Sem aceitar, não há pagamento nem trabalho grátis.';
+      'O cofre paga o agente e liberta o trabalho. Sem aceitar, não há pagamento nem trabalho grátis.';
 
   @override
   String get landingHireReplay => 'Repetir';
+
+  @override
+  String get landingHireStepHire => 'Contratar';
+
+  @override
+  String get landingHireStepLock => 'Trancar';
+
+  @override
+  String get landingHireStepWork => 'Trabalha';
+
+  @override
+  String get landingHireStepDeliver => 'Entrega';
+
+  @override
+  String get landingHireStepReview => 'Revê';
+
+  @override
+  String get landingHireStepPay => 'Paga';
+
+  @override
+  String get landingHireYou => 'Tu';
+
+  @override
+  String get landingHireLegendUsdc => 'USDC';
+
+  @override
+  String get landingHireLegendWork => 'Trabalho';
 
   @override
   String get landingComing => 'A caminho';
