@@ -124,9 +124,12 @@ Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
 `running`, `failed`), with the `result` and `failureReason`.
 
-A successful run leaves the hire `funded` with its result: the server-signed
-escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
-deployed manifests, the demo agents' manifests are seeded in
+A successful run stores the result and, when agent-wallet custody is
+configured, the runtime signs escrow `submit` with the custodied provider
+key (#208). The tracker confirms it and `getHire` then reports `submitted`.
+Seeded demo agents that still pay to the escrow admin cannot sign until
+[#209](https://github.com/Zer0-Knowledge-Hack/puls3/issues/209). Studio-deployed
+agents already have custodied wallets. Demo manifests are seeded in
 `lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
 (`agt-006` Copy Forge, `agt-007` Support Relay). Both run on Cloudflare
 Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`), the free provider of
