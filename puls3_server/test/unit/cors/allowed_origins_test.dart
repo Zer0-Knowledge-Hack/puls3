@@ -5,6 +5,7 @@ import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
 const _app = 'https://puls3-4lw.pages.dev';
+const _site = 'https://puls3.org';
 const _development = 'development';
 const _production = 'production';
 
@@ -44,6 +45,17 @@ void main() {
 
       expect(origins.allows('http://localhost:8082'), isTrue);
       expect(origins.allows('http://localhost:54321'), isFalse);
+    });
+
+    test('allows the official site and the Pages origin together', () {
+      final origins = _origins(const {
+        'PULS3_ALLOWED_ORIGINS': '$_site,$_app',
+      });
+
+      expect(origins.configured, [_site, _app]);
+      expect(origins.allows(_site), isTrue);
+      expect(origins.allows(_app), isTrue);
+      expect(origins.allows('https://www.puls3.org'), isFalse);
     });
 
     test('reads a comma-separated list and normalizes each origin', () {

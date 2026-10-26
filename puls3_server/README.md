@@ -367,7 +367,7 @@ letters, digits, `-` and `.` stops the server at startup.
 
 Browsers may call the API server only from an origin listed in
 `PULS3_ALLOWED_ORIGINS` (comma-separated, for example
-`https://puls3-4lw.pages.dev`). In the `development` run mode, loopback origins
+`https://puls3.org,https://puls3-4lw.pages.dev`). In the `development` run mode, loopback origins
 (`localhost`, `127.0.0.1` or `[::1]`, any port) are allowed as well; in
 `production`, `staging` and `test` they are not. A request from any other
 origin, or with several `Origin` headers, gets `403` before an endpoint runs.
@@ -491,7 +491,7 @@ per project.
 
    ```bash
    scloud variable set SERVERPOD_APPLY_MIGRATIONS true
-   scloud variable set PULS3_ALLOWED_ORIGINS https://puls3-4lw.pages.dev
+   scloud variable set PULS3_ALLOWED_ORIGINS https://puls3.org,https://puls3-4lw.pages.dev
    ```
 
    - `SERVERPOD_APPLY_MIGRATIONS=true` makes Serverpod apply pending migrations
@@ -559,6 +559,8 @@ per project.
 
    ```bash
    curl -s -X POST -d '{}' <api>/health/check
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \
+     -H 'Origin: https://puls3.org' <api>/health/check             # 200
    curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \
      -H 'Origin: https://puls3-4lw.pages.dev' <api>/health/check   # 200
    curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{}' \

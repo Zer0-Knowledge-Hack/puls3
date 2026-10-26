@@ -14,7 +14,7 @@
   <a href="https://puls3.org/"><strong>Live demo →</strong></a>
 </p>
 
-> **Wallet warning (expected).** Freighter may show a **Blockaid** warning when connecting to `puls3-4lw.pages.dev` — a **domain-reputation false positive** on the shared Cloudflare Pages domain, raised before any signature. Connecting only shares your public address; every transaction is shown in Freighter before you sign, and the source is public in this repository.
+> **Wallet warning (expected).** Freighter may show a **Blockaid** warning when connecting to the Cloudflare Pages hostname `puls3-4lw.pages.dev` — a **domain-reputation false positive** on the shared `pages.dev` domain, raised before any signature. The official site is [puls3.org](https://puls3.org/). Connecting only shares your public address; every transaction is shown in Freighter before you sign, and the source is public in this repository.
 
 ---
 
@@ -60,7 +60,7 @@ flowchart LR
 
 puls3 is in **early development**. What exists today:
 
-- ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/)**
+- ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3.org](https://puls3.org/)**
 - ✅ The puls3 brand identity ([brand guide](docs/brand/README.md))
 - ✅ The Agent Identity Registry contract on Soroban, deployed on testnet with 8 current demo agents ([evidence](#on-chain-evidence-testnet))
 - ✅ The Agent Escrow contract on Soroban, deployed on testnet, with a completed escrow job in Circle testnet USDC ([evidence](#on-chain-evidence-testnet))
@@ -255,7 +255,7 @@ Per rules §8.1, this project existed prior to the Stellar Odyssey event. The co
 | Part | Where | Public URL |
 | --- | --- | --- |
 | Server (Serverpod) | Serverpod Cloud | [puls3-hub-on-stellar.api.serverpod.space](https://puls3-hub-on-stellar.api.serverpod.space/) |
-| Web app (Flutter) | Cloudflare Pages | [puls3-4lw.pages.dev](https://puls3-4lw.pages.dev/) |
+| Web app (Flutter) | Cloudflare Pages | [puls3.org](https://puls3.org/) ([Pages hostname](https://puls3-4lw.pages.dev/)) |
 
 Server deploy and redeploy, step by step: [`puls3_server/README.md`](puls3_server/README.md#deploy-to-serverpod-cloud). Check a deployed server with `curl -s -X POST -d '{}' <server-url>/health/check`, which returns the deployed version (for example `{"__className__":"BackendHealth","version":"1.0.0+4df3ba4"}`). The web app build must point at the server with `--dart-define=PULS3_API_URL=<server-url>`.
 

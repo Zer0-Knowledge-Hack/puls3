@@ -184,6 +184,7 @@ void main() {
     expect(row.state, 'active');
     final document = jsonEncode(registrationDocument(rig.validated));
     expect(document.contains(rig.validated.systemPrompt), isFalse);
+    expect(document, contains('https://puls3.org'));
     final source = StudioRunManifestSource(
       lookup: (agentId, version) async {
         final found = await rig.versions.find(agentId, version);

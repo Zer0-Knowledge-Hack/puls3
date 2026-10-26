@@ -17,7 +17,7 @@ final class AllowedOrigins {
 
   /// Reads `PULS3_ALLOWED_ORIGINS` from [env] (normally
   /// `Platform.environment`): a comma-separated list of origins such as
-  /// `https://puls3-4lw.pages.dev`. Empty entries are skipped and a trailing
+  /// `https://puls3.org`. Empty entries are skipped and a trailing
   /// slash is ignored. An entry that is not a bare `http(s)://host[:port]`
   /// origin throws an [ArgumentError]. [runMode] is the Serverpod run mode.
   factory AllowedOrigins.fromEnvironment(

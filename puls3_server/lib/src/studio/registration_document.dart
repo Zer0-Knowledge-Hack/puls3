@@ -6,7 +6,7 @@ Map<String, Object?> registrationDocument(AgentManifest manifest) => {
   'name': manifest.name,
   'description': manifest.description,
   'services': const [
-    {'name': 'puls3', 'endpoint': 'https://puls3-4lw.pages.dev'},
+    {'name': 'puls3', 'endpoint': 'https://puls3.org'},
   ],
   'x402Support': false,
   'active': true,
