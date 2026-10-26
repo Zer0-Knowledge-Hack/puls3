@@ -174,7 +174,7 @@ The `hire_payment` table MUST have unique indexes on `hireId`, `transactionHash`
 
 ### Requirement: Hire status derives settlement from confirmed submissions
 
-Hire status reads MUST report `completed` when the hire has a `confirmed` `release` submission and `expired` when it has a `confirmed` `claim_refund` submission, taking precedence over `funded`. A hire without either keeps its current derived status. `submitted` and `rejected` MUST remain unpersisted (#97 remainder). See `escrow-settlement-tracking`.
+Hire status reads MUST derive the escrow state of a funded hire from its confirmed submissions, with no status column: `complete` or `release` → `completed`, `reject` → `rejected`, `claim_refund` → `expired`, `submit` (with none of those) → `submitted`. A hire without those keeps `funded`. See `escrow-settlement-tracking`.
 
 #### Scenario: Completed from confirmed release
 
@@ -196,7 +196,7 @@ Hire status reads MUST report `completed` when the hire has a `confirmed` `relea
 
 ### Requirement: Hire state changes only through the domain
 
-The effect and the repository MUST change a hire's status only through the domain state machine (`Hire.fund`). The server MUST NOT write a status directly. The only exception is the read-time derivation of `completed` and `expired` from confirmed `release` and `claim_refund` submissions, which writes no status.
+The effect and the repository MUST change a hire's status only through the domain state machine (`Hire.fund`, `Hire.submit`, `Hire.complete`, `Hire.reject`, `Hire.expire`). The server MUST NOT write a status directly. Read-time derivation of `submitted`, `completed`, `rejected` and `expired` from confirmed submissions writes no status.
 (Previously: no exception for derived settlement status.)
 
 #### Scenario: No direct status write
@@ -250,12 +250,12 @@ Every `HireEndpoint` method (`createHire`, `prepareCreateJob`, `prepareFund`, `p
 - WHEN each hire method is called
 - THEN each calls `requireLogin` exactly once before touching a store or the chain
 
-### Requirement: Settlement by complete and reject awaits #97
+### Requirement: Settlement by submit, complete and reject
 
-A hire MUST NOT move to `completed` or `rejected` as a result of this change. `complete` and `reject` relays record their `ChainSubmission` and leave it `submitted`; the corresponding hire effects are specified and delivered by #97.
+A confirmed `submit` MUST make a funded hire `submitted`. A confirmed evaluator `complete` or permissionless `release` MUST make it `completed`. A confirmed `reject` MUST make it `rejected` (`rejectedFrom` is `submitted` when a `submit` was also confirmed, otherwise `funded`).
 
-#### Scenario: Status unchanged after complete or reject relay
+#### Scenario: Status after complete or reject confirmation
 
 - GIVEN a funded hire and a relayed `complete` or `reject` submission
-- WHEN the tracker polls it
-- THEN the hire status is unchanged and the submission stays `submitted`
+- WHEN the tracker confirms it
+- THEN the hire status is `completed` or `rejected`

@@ -93,11 +93,10 @@ that hire raises `OutcomeUnknown` until the record is resolved by hand. An
 expired `fund` is first reconciled through the escrow job: `Funded` or later
 pays the hire, `Open` is `PreparationExpired`.
 
-`complete`, `reject` and `registerFull` are confirmed when the transaction
-succeeds but change nothing else (#97). Until then the hire status does not
-move, so the app may offer `prepareComplete` again and the contract rejects it
-as `TransactionFailed`. Recording the job id after `createJob` is a no-op until
-the hire lifecycle lands (#96).
+`submit`, `complete`, `reject`, `release`, `claimRefund` and `registerFull`
+are confirmed when the transaction succeeds. Hire status is then derived from
+those records (#208): `submitted`, `completed`, `rejected` or `expired`. The
+tracker does not write a status column. `setAgentWallet` stays untracked.
 
 | Variable | Default | Meaning |
 |---|---|---|

@@ -3,27 +3,32 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import '../chain/chain_submission_store.dart';
 import '../chain/submission_values.dart';
 import '../generated/protocol.dart';
+import '../ledger/escrow_job.dart';
 import '../ledger/ledger_errors.dart';
 import '../runtime/hire_run_store.dart';
 import 'hire_lifecycle_store.dart';
 
 /// Reads one hire for its consumer: `HireEndpoint.getHire` (api.md, F5-5,
-/// F6-2, F6-3). It has no side effects, so polling it is safe.
+/// F6-2, F6-3). It never writes, so polling it is safe. Reading the escrow
+/// job for `approvalDeadline` is a chain read, not a submission.
 final class HireQueryService {
   HireQueryService({
     required HireLifecycleStore hires,
     required HireRunStore runs,
     required ChainSubmissionStore submissions,
     required Future<AgentSummary?> Function(int registryId) agents,
+    EscrowJobReader? jobs,
   }) : _hires = hires,
        _runs = runs,
        _submissions = submissions,
-       _agents = agents;
+       _agents = agents,
+       _jobs = jobs;
 
   final HireLifecycleStore _hires;
   final HireRunStore _runs;
   final ChainSubmissionStore _submissions;
   final Future<AgentSummary?> Function(int registryId) _agents;
+  final EscrowJobReader? _jobs;
 
   /// The hire [hireId] as [wallet], its consumer, sees it: escrow status,
   /// run progress and result, job expiry and the latest escrow submission.
@@ -68,9 +73,31 @@ final class HireQueryService {
               hire.expiredAt * 1000,
               isUtc: true,
             ),
+      approvalDeadline: await _approvalDeadline(hire.status, jobId),
       escrowSubmission: escrow?.toProtocol(),
       feedbackSubmission: feedback?.toProtocol(),
     );
+  }
+
+  /// The job's approval window, once the agent has submitted. A chain read
+  /// that fails leaves the deadline unset so the hire stays readable.
+  Future<DateTime?> _approvalDeadline(HireStatus? status, int? jobId) async {
+    final jobs = _jobs;
+    if (jobs == null ||
+        jobId == null ||
+        (status != HireStatus.submitted && status != HireStatus.completed)) {
+      return null;
+    }
+    try {
+      final job = await jobs.escrowJob(jobId);
+      if (job == null || job.approvalDeadline <= 0) return null;
+      return DateTime.fromMillisecondsSinceEpoch(
+        job.approvalDeadline * 1000,
+        isUtc: true,
+      );
+    } on LedgerException {
+      return null;
+    }
   }
 
   static StoredSubmission? _latest(Iterable<StoredSubmission> submissions) =>
