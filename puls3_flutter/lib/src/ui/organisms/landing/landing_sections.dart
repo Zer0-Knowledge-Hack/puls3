@@ -154,8 +154,8 @@ class LandingSectionHeading extends StatelessWidget {
             child: Text(
               lead,
               style: compact
-                  ? Puls3Text.bodyMuted.copyWith(fontSize: 14, height: 1.5)
-                  : Puls3Text.lead,
+                  ? Puls3Text.body.copyWith(fontSize: 14, height: 1.5)
+                  : Puls3Text.lead.copyWith(color: Puls3Colors.text),
             ),
           ),
         ],
@@ -250,7 +250,7 @@ class OnChainFacts extends StatelessWidget {
                             Text(
                               facts[i].detail,
                               style: Puls3Text.caption.copyWith(
-                                color: Puls3Colors.muted,
+                                color: Puls3Colors.text,
                               ),
                             ),
                           ],
@@ -263,11 +263,11 @@ class OnChainFacts extends StatelessWidget {
                       ),
                       const SizedBox(width: Puls3Spacing.xxs),
                       Tooltip(
-                        message: 'Open on StellarExpert',
-                        child: const Icon(
+                        message: context.l10n.landingOpenExplorer,
+                        child: Icon(
                           Icons.open_in_new_rounded,
                           size: 16,
-                          color: Puls3Colors.muted,
+                          color: Puls3Colors.text.withValues(alpha: 0.82),
                         ),
                       ),
                     ],
@@ -288,63 +288,51 @@ class LandingFinalCta extends StatelessWidget {
     super.key,
     required this.onExplore,
     required this.onBuild,
-    required this.onContribute,
     required this.compact,
   });
 
   final VoidCallback onExplore;
   final VoidCallback onBuild;
-  final VoidCallback onContribute;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(compact ? Puls3Spacing.lg : Puls3Spacing.xxl),
-      decoration: BoxDecoration(
-        color: Puls3Colors.surface,
-        borderRadius: Puls3Radius.lgAll,
-        border: Border.all(color: Puls3Colors.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            context.l10n.landingFinalCtaTitle,
-            style: compact
-                ? Puls3Text.h3.copyWith(fontSize: 22)
-                : Puls3Text.h2Compact,
-          ),
-          const SizedBox(height: Puls3Spacing.xs),
-          Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.landingFinalCtaTitle,
+          style: compact
+              ? Puls3Text.h1.copyWith(fontSize: 28, height: 1.15)
+              : Puls3Text.h2,
+        ),
+        const SizedBox(height: Puls3Spacing.sm),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Text(
             context.l10n.landingFinalCtaLead,
-            style: Puls3Text.bodyMuted,
+            style: Puls3Text.body.copyWith(fontSize: 18, height: 1.45),
           ),
-          const SizedBox(height: Puls3Spacing.lg),
-          Wrap(
-            spacing: Puls3Spacing.sm,
-            runSpacing: Puls3Spacing.sm,
-            children: [
-              PrimaryButton(
-                label: context.l10n.landingExploreAgents,
-                onPressed: onExplore,
-              ),
-              PrimaryButton(
-                label: context.l10n.landingBuildAgent,
-                variant: PrimaryButtonVariant.outline,
-                onPressed: onBuild,
-              ),
-              TextButton.icon(
-                key: const Key('landing-contribute'),
-                onPressed: onContribute,
-                icon: const Icon(Icons.north_east_rounded, size: 16),
-                label: const Text('Contribute on GitHub'),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: Puls3Spacing.lg),
+        Wrap(
+          spacing: Puls3Spacing.sm,
+          runSpacing: Puls3Spacing.sm,
+          children: [
+            PrimaryButton(
+              key: const Key('landing-explore'),
+              label: context.l10n.landingExploreAgents,
+              onPressed: onExplore,
+            ),
+            PrimaryButton(
+              key: const Key('landing-build'),
+              label: context.l10n.landingBuildAgent,
+              variant: PrimaryButtonVariant.outline,
+              onPressed: onBuild,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

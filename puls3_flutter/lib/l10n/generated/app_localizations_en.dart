@@ -33,6 +33,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navMarketplace => 'Marketplace';
 
   @override
+  String get navHome => 'Home';
+
+  @override
   String get navOpenApp => 'Open app';
 
   @override
@@ -48,11 +51,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get landingKicker => 'The agent hub on Stellar';
 
   @override
-  String get landingHeadline => 'Build. Discover. Pay.\nAI agents on Stellar.';
+  String get landingHeadline => 'Your AI works. It still can\'t get paid.';
 
   @override
-  String get landingLead =>
-      'Create AI agents with on-chain identity and wallet, find the right one in a single Marketplace, and pay per task in USDC, held in escrow until the work is done.';
+  String get landingLead => 'USDC stays in escrow until the work is done.';
 
   @override
   String get landingOpenStudio => 'Open Studio';
@@ -76,14 +78,165 @@ class AppLocalizationsEn extends AppLocalizations {
   String get landingSeeFirstHire => 'See the first hire paid into escrow';
 
   @override
-  String get landingFinalCtaTitle => 'Start with an agent.';
+  String get landingFinalCtaTitle => 'You already use AI. Can it get paid?';
 
   @override
   String get landingFinalCtaLead =>
-      'Hire one on testnet, build your own in the Studio, or help build puls3 in the open.';
+      'It writes and ships. It cannot receive USDC for a task. puls3 is that missing piece.';
+
+  @override
+  String get landingWhyEyebrow => 'Why puls3';
+
+  @override
+  String get landingWhyTitle =>
+      'AI agents can work. Getting them paid is the hard part.';
+
+  @override
+  String get landingProblem1Title => 'Building an agent that earns is slow';
+
+  @override
+  String get landingProblem1Body =>
+      'Studio turns a name, a prompt, a model and a price into a checked definition. Deploying it with its own wallet and on-chain id is coming.';
+
+  @override
+  String get landingProblem2Title => 'Finding an agent you can trust is hard';
+
+  @override
+  String get landingProblem2Body =>
+      'One Marketplace read from an on-chain registry: search by skill, compare prices and check who the agent is.';
+
+  @override
+  String get landingProblem3Title => 'Paying per task does not fit cards';
+
+  @override
+  String get landingProblem3Body =>
+      'Pay per task in USDC on Stellar, held in escrow until the result is approved, settled in seconds with sub-cent fees.';
+
+  @override
+  String get landingHowEyebrow => 'How it works';
+
+  @override
+  String get landingHowTitle => 'Two steps to hire. Studio is coming.';
+
+  @override
+  String get landingStep1Title => 'Discover and hire';
+
+  @override
+  String get landingStep1Body =>
+      'One Marketplace, read from the registry. Compare skills and prices, then describe the task.';
+
+  @override
+  String get landingStep2Title => 'Pay into escrow';
+
+  @override
+  String get landingStep2Body =>
+      'Your wallet funds the job in USDC. The contract holds the payment until the work is done.';
+
+  @override
+  String get landingStep3Title => 'Create an agent';
+
+  @override
+  String get landingStep3Body =>
+      'Name it, set a price and describe what it does. Studio checks the definition as you type. On-chain deploy is coming.';
+
+  @override
+  String get landingBentoEscrowTitle => 'Payment does not go to the agent';
+
+  @override
+  String get landingBentoEscrowBody =>
+      'Your wallet signs. The escrow contract holds the USDC until the work is approved or rejected.';
+
+  @override
+  String get landingBentoWallet => 'Wallet';
+
+  @override
+  String get landingBentoEscrow => 'Escrow';
+
+  @override
+  String get landingBentoAgent => 'Agent';
+
+  @override
+  String get landingBentoStudioTitle => 'Studio';
+
+  @override
+  String get landingBentoStudioBody =>
+      'Define an agent with identity and a price. On-chain deploy is coming.';
+
+  @override
+  String get landingBentoIdentityTitle => 'On-chain identity';
+
+  @override
+  String get landingBentoIdentityBody =>
+      'Every Marketplace agent has a registry id. You can see who it is before you pay.';
+
+  @override
+  String get landingDemoLive => 'Live demo';
+
+  @override
+  String get landingHireTry => 'Press Hire';
+
+  @override
+  String get landingHireHint =>
+      'This button runs the hire. Press it and watch the USDC lock.';
+
+  @override
+  String get landingHireTask =>
+      'Check this Stellar account for incoming payments.';
+
+  @override
+  String get landingHireCta => 'Hire';
+
+  @override
+  String get landingHireSigning => 'In your wallet';
+
+  @override
+  String get landingHireLocking => 'Locked in escrow';
+
+  @override
+  String get landingHireWorking => 'Agent at work';
+
+  @override
+  String get landingHireReview => 'You review';
+
+  @override
+  String get landingHireDone => 'You accept — paid';
+
+  @override
+  String landingHireWalletBody(String amount) {
+    return 'Your wallet holds $amount USDC.';
+  }
+
+  @override
+  String get landingHireLockBody =>
+      'That USDC goes into a vault: escrow, a contract. It cannot leave on its own.';
+
+  @override
+  String get landingHireWorkBody =>
+      'The agent is notified and starts the work. The money stays locked.';
+
+  @override
+  String get landingHireReviewBody =>
+      'The agent finishes. You get notified and review the work.';
+
+  @override
+  String get landingHireReleaseBody =>
+      'You accept: the vault pays the agent and releases the work. No accept, no payout — and no free work.';
+
+  @override
+  String get landingHireReplay => 'Replay';
+
+  @override
+  String get landingComing => 'Coming';
+
+  @override
+  String get landingOpenExplorer => 'Open on StellarExpert';
 
   @override
   String get landingWhyStellar => 'Why Stellar';
+
+  @override
+  String get landingWhyStellarTitle =>
+      'Micropayments that settle while the agent works.';
 
   @override
   String get landingSettleTitle => '~5s settlement';
@@ -110,6 +263,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get footerBrand => 'Brand';
+
+  @override
+  String get footerProduct => 'Product';
+
+  @override
+  String get footerResources => 'Resources';
+
+  @override
+  String get footerIssues => 'Issues';
+
+  @override
+  String get footerTestnet => 'Runs on Stellar Testnet. Test USDC only.';
+
+  @override
+  String get footerBuiltOn => 'Built on';
 
   @override
   String get commonRetry => 'Retry';

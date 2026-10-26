@@ -91,7 +91,7 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                             Text(
                               widget.model,
                               style: Puls3Text.caption.copyWith(
-                                color: Puls3Colors.muted,
+                                color: Puls3Colors.text.withValues(alpha: 0.82),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -108,7 +108,7 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                     height: 42,
                     child: Text(
                       widget.description,
-                      style: Puls3Text.bodyMuted.copyWith(
+                      style: Puls3Text.body.copyWith(
                         fontSize: 14,
                         height: 1.5,
                       ),
@@ -160,7 +160,9 @@ class _AgentShowcaseCardState extends State<AgentShowcaseCard> {
                       onPressed: widget.onDetails,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Puls3Colors.text,
-                        side: const BorderSide(color: Puls3Colors.hairline),
+                        side: BorderSide(
+                          color: Puls3Colors.text.withValues(alpha: 0.45),
+                        ),
                         minimumSize: const Size(0, 40),
                       ),
                       child: Text(context.l10n.agentDetails),
@@ -256,7 +258,7 @@ class _Figure extends StatelessWidget {
           Text(
             label,
             style: Puls3Text.caption.copyWith(
-              color: Puls3Colors.muted,
+              color: Puls3Colors.text.withValues(alpha: 0.82),
               fontSize: 11,
             ),
           ),

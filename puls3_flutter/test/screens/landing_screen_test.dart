@@ -6,7 +6,7 @@ import 'package:puls3_flutter/src/ui/organisms/landing/how_it_works_diagram.dart
 
 import '../helpers.dart';
 
-const _headline = 'Build. Discover. Pay.\nAI agents on Stellar.';
+const _headline = 'Your AI works. It still can\'t get paid.';
 
 Future<void> _tapKey(WidgetTester tester, String key) async {
   await tester.ensureVisible(find.byKey(Key(key)));
@@ -22,49 +22,26 @@ void main() {
     expect(find.text(_headline), findsOneWidget);
     expect(find.text('Explore agents'), findsWidgets);
     expect(find.text('Build an agent'), findsWidgets);
-    expect(find.text('View documentation'), findsOneWidget);
+    expect(find.text('Press Hire'), findsOneWidget);
     expect(
-      find.text('AI agents can work. Getting them paid is the hard part.'),
+      find.text('This button runs the hire. Press it and watch the USDC lock.'),
       findsOneWidget,
     );
-    expect(find.text('For builders'), findsOneWidget);
-    expect(find.text('For hirers'), findsOneWidget);
-    expect(
-      find.text('From a prompt to a paid task, in eight steps.'),
-      findsOneWidget,
-    );
-    expect(find.text('Agents you can hire today.'), findsOneWidget);
-    expect(find.text('More than a list of agents.'), findsOneWidget);
-    expect(find.text('~5s settlement'), findsOneWidget);
-    expect(find.text('Built by the Zer0-Knowledge team.'), findsOneWidget);
-    expect(find.text('Questions, answered.'), findsOneWidget);
+    expect(find.text('You already use AI. Can it get paid?'), findsOneWidget);
+    expect(find.text('See the first hire paid into escrow'), findsOneWidget);
+    expect(find.text('Coming'), findsOneWidget);
+    expect(find.text('Marketplace'), findsWidgets);
+    expect(find.text('Studio'), findsWidgets);
+    expect(find.text('Connect wallet'), findsWidgets);
+    expect(find.text('Docs'), findsWidgets);
+    expect(find.text('GitHub'), findsWidgets);
+    expect(find.text('Brand'), findsWidgets);
   });
 
-  testWidgets('reviews never invent quotes: an invitation until real ones '
-      'exist', (tester) async {
+  testWidgets('the footer states the network is testnet', (tester) async {
     await pumpApp(tester);
-
-    expect(landingTestimonials, isEmpty);
-    expect(find.byKey(const Key('landing-reviews-open')), findsOneWidget);
-    expect(find.text('Reviews open with the first hires.'), findsOneWidget);
-  });
-
-  testWidgets('the team lists the repository contributors', (tester) async {
-    await pumpApp(tester);
-
-    for (final member in landingTeam) {
-      expect(find.text('@${member.handle}'), findsOneWidget);
-    }
-  });
-
-  testWidgets('a FAQ opens to its answer', (tester) async {
-    await pumpApp(tester);
-    await tester.ensureVisible(find.text('Is this real money?'));
-    await tester.pump();
-    await tester.tap(find.text('Is this real money?'));
-    await advance(tester, const Duration(milliseconds: 500));
-
-    expect(find.textContaining('runs on Stellar Testnet'), findsOneWidget);
+    await tester.ensureVisible(find.textContaining('Stellar Testnet').last);
+    expect(find.textContaining('Stellar Testnet'), findsWidgets);
   });
 
   test('the flow labels only what is built as live', () {
@@ -81,15 +58,8 @@ void main() {
     expect(byStatus[FlowStepStatus.live], [
       'Discover and hire',
       'Pay into escrow',
-      'Verify the payment',
     ]);
-    expect(byStatus[FlowStepStatus.inDevelopment], [
-      'Create an agent',
-      'Register its identity',
-      'Publish',
-      'Run the task',
-      'Result and release',
-    ]);
+    expect(byStatus[FlowStepStatus.inDevelopment], ['Create an agent']);
     expect(byStatus[FlowStepStatus.planned], isEmpty);
   });
 
@@ -126,27 +96,46 @@ void main() {
     }
   });
 
-  testWidgets('every flow step shows its number, title and status', (
-    tester,
-  ) async {
+  testWidgets('every flow step shows its number and title', (tester) async {
     await pumpApp(tester);
 
     for (var i = 1; i <= LandingScreen.flow.length; i++) {
       expect(find.byKey(Key('flow-step-$i')), findsOneWidget);
     }
-    // Legend plus one pill per step.
-    // The legend lists every status; no step is planned any more.
-    expect(find.text('Planned'), findsOneWidget);
-    expect(find.text('In development'), findsWidgets);
+    expect(find.text('Create an agent'), findsWidgets);
+    expect(find.text('Discover and hire'), findsOneWidget);
+    expect(find.text('Pay into escrow'), findsOneWidget);
   });
 
-  testWidgets('the marketplace preview shows real catalog agents', (
+  testWidgets('the hero embeds a hire demo', (tester) async {
+    await pumpApp(tester);
+
+    expect(find.byKey(const Key('landing-hire-demo')), findsOneWidget);
+    expect(find.text('Press Hire'), findsOneWidget);
+    expect(find.byKey(const Key('landing-hire-run')), findsOneWidget);
+    expect(find.byKey(const Key('landing-explore')), findsOneWidget);
+    expect(find.byKey(const Key('landing-build')), findsOneWidget);
+  });
+
+  testWidgets('Hire walks wallet, lock, work, review, then release', (
     tester,
   ) async {
     await pumpApp(tester);
+    await tester.tap(find.byKey(const Key('landing-hire-run')));
+    await tester.pump();
 
-    expect(find.byKey(const ValueKey('landing-agent-agt-001')), findsOneWidget);
-    expect(find.byKey(const ValueKey('landing-agent-agt-003')), findsOneWidget);
+    await advance(tester, const Duration(milliseconds: 900));
+    expect(find.textContaining('cannot leave on its own'), findsOneWidget);
+
+    await advance(tester, const Duration(milliseconds: 1800));
+    expect(find.textContaining('money stays locked'), findsOneWidget);
+
+    await advance(tester, const Duration(milliseconds: 1300));
+    expect(find.textContaining('You get notified'), findsOneWidget);
+
+    await advance(tester, const Duration(milliseconds: 2500));
+    expect(find.textContaining('No accept, no payout'), findsOneWidget);
+    expect(find.text('Replay'), findsOneWidget);
   });
 
   testWidgets('Explore agents opens the Marketplace', (tester) async {
@@ -165,13 +154,6 @@ void main() {
     expect(find.text(_headline), findsNothing);
   });
 
-  testWidgets('View all agents opens the Marketplace', (tester) async {
-    await pumpApp(tester);
-    await _tapKey(tester, 'landing-view-all');
-
-    expect(find.text('SHOWING 2 OF 2'), findsOneWidget);
-  });
-
   testWidgets('the footer links to the brand page', (tester) async {
     await pumpApp(tester);
     await tester.ensureVisible(find.text('Brand'));
@@ -182,25 +164,42 @@ void main() {
     expect(find.text(_headline), findsNothing);
   });
 
-  testWidgets('the phone menu lists the destinations', (tester) async {
+  testWidgets('the phone bar lists Home, Marketplace and Studio', (
+    tester,
+  ) async {
     await pumpApp(tester, size: const Size(390, 844));
 
-    await tester.tap(find.byKey(const Key('landing-menu')));
-    await advance(tester, const Duration(milliseconds: 400));
-    expect(find.text('Marketplace'), findsWidgets);
-    expect(find.text('Agent Studio'), findsWidgets);
-    expect(find.text('Docs'), findsOneWidget);
-    expect(find.text('GitHub'), findsWidgets);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Home'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Marketplace'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Studio'),
+      ),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('with reduced motion the diagram still reads, without the '
-      'pulse', (tester) async {
+  testWidgets('with reduced motion the landing still reads', (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(disableAnimations: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     await pumpApp(tester);
 
-    expect(find.byKey(const Key('flow-step-1')), findsOneWidget);
+    expect(find.text(_headline), findsOneWidget);
     await advance(tester, const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
   });

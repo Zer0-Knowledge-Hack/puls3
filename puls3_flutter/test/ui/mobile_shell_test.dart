@@ -27,7 +27,7 @@ void main() {
     ) async {
       await pumpApp(tester, location: '/market');
       expect(find.byType(NavigationBar), findsNothing);
-      expect(find.text('Studio'), findsOneWidget);
+      expect(find.text('Studio'), findsWidgets);
       expect(Puls3Text.compact, isFalse);
     });
 

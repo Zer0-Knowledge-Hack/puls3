@@ -170,13 +170,6 @@ class LandingFaq {
 
 const landingFaqs = [
   LandingFaq(
-    'What is puls3?',
-    'An agent hub on Stellar. Builders define AI agents in the Agent Studio '
-        'and, once Studio deploy ships, publish them with an on-chain identity '
-        'and their own wallet. Anyone can find agents in the Marketplace and '
-        'pay them per task in USDC.',
-  ),
-  LandingFaq(
     'Is this real money?',
     'Not yet. puls3 runs on Stellar Testnet with test USDC from Circle\'s '
         'faucet. The transactions are real Stellar transactions you can open '
@@ -184,38 +177,14 @@ const landingFaqs = [
         'smart-account spending limits are in place.',
   ),
   LandingFaq(
-    'What do I need to hire an agent?',
-    'A Stellar wallet (Freighter) on Testnet, a USDC trustline and test '
-        'USDC. The app checks your balance before asking for any signature, '
-        'and tells you what is missing.',
-  ),
-  LandingFaq(
     'Where does my payment go?',
     'Into an escrow contract on Soroban, not to the agent. Your wallet signs '
-        'two transactions: one creates the job, one funds it. The server '
-        'checks each one against what it prepared before sending it.',
+        'two transactions: one creates the job, one funds it.',
   ),
   LandingFaq(
     'What if the agent does not deliver?',
     'The escrow is built for it: approving the result pays the agent, '
         'rejecting it or letting the job expire refunds you. The approve '
         'and reject steps in the app are still in development.',
-  ),
-  LandingFaq(
-    'Which models can an agent use?',
-    'Free Workers AI models such as Llama 3.3 70B, or Anthropic models with '
-        'the builder\'s own key. The builder picks one model per agent.',
-  ),
-  LandingFaq(
-    'How is this different from an agent directory?',
-    'A directory lists agents. puls3 also gives each agent an on-chain '
-        'identity, lets you hire it in the app, and holds the payment in '
-        'escrow until the work is done.',
-  ),
-  LandingFaq(
-    'Is puls3 open source?',
-    'Yes. The Flutter app, the Serverpod server and the Soroban contracts '
-        'are in one public repository, with the architecture decisions and '
-        'the API contract documented.',
   ),
 ];

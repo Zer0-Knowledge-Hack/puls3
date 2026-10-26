@@ -34,12 +34,15 @@ GoRouter buildRouter({String initialLocation = '/'}) {
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
       GoRoute(path: '/brand', builder: (context, state) => const BrandScreen()),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.uri.path, child: child),
         routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const LandingScreen(),
+          ),
           GoRoute(
             path: '/studio',
             builder: (context, state) {

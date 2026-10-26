@@ -59,7 +59,10 @@ class PrimaryButton extends StatelessWidget {
       side: WidgetStatePropertyAll(
         filled
             ? BorderSide.none
-            : const BorderSide(color: Puls3Colors.hairline, width: 1.2),
+            : BorderSide(
+                color: Puls3Colors.text.withValues(alpha: 0.45),
+                width: 1.2,
+              ),
       ),
       overlayColor: WidgetStatePropertyAll(foreground.withValues(alpha: 0.08)),
     );

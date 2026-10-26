@@ -6,7 +6,7 @@ import 'package:puls3_flutter/src/ui/molecules/agent_card.dart';
 import '../helpers.dart';
 
 /// The Marketplace on a phone: search, a Filters sheet for skills and sort
-/// order, removable active filters, and Create agent.
+/// order, and removable active filters.
 void main() {
   const phone = Size(390, 844);
 
@@ -104,9 +104,14 @@ void main() {
     expect(find.byKey(const Key('market-active-filters')), findsNothing);
   });
 
-  testWidgets('Create agent opens the Studio', (tester) async {
+  testWidgets('Studio in the phone bar opens the Studio', (tester) async {
     await pumpApp(tester, location: '/market', size: phone);
-    await tester.tap(find.byKey(const Key('market-create-agent')));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Studio'),
+      ),
+    );
     await advance(tester, const Duration(milliseconds: 500));
 
     expect(find.text('Agent Studio'), findsOneWidget);

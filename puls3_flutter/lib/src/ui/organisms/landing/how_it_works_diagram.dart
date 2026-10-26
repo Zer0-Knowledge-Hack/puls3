@@ -38,9 +38,17 @@ class FlowStep {
 /// vertical timeline. With reduced motion the pulse stays off; the diagram
 /// reads the same without it. Purely presentational.
 class HowItWorksDiagram extends StatefulWidget {
-  const HowItWorksDiagram({super.key, required this.steps});
+  const HowItWorksDiagram({
+    super.key,
+    required this.steps,
+    this.showStatus = false,
+  });
 
   final List<FlowStep> steps;
+
+  /// When true, each node shows live / in development / planned. The
+  /// landing story hides that; the data still carries the status.
+  final bool showStatus;
 
   /// From this width the diagram uses the two-row layout.
   static const double wideFrom = 900;
@@ -106,11 +114,31 @@ class _HowItWorksDiagramState extends State<HowItWorksDiagram>
     number: i + 1,
     step: widget.steps[i],
     highlighted: i == active,
+    showStatus: widget.showStatus,
   );
 
-  /// Two rows of four; the second row runs right to left.
+  /// A single row when there are few steps; otherwise two rows, the
+  /// second running right to left.
   Widget _wide(int active, double t) {
     final steps = widget.steps;
+    if (steps.length <= 4) {
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < steps.length; i++) ...[
+              if (i > 0)
+                _Connector(
+                  axis: Axis.horizontal,
+                  reversed: false,
+                  pulse: _pulseAt(i - 1, active, t),
+                ),
+              Expanded(child: _node(i, active)),
+            ],
+          ],
+        ),
+      );
+    }
     final perRow = (steps.length / 2).ceil();
     final first = [for (var i = 0; i < perRow; i++) i];
     final second = [for (var i = steps.length - 1; i >= perRow; i--) i];
@@ -197,17 +225,20 @@ class _StepNode extends StatelessWidget {
     required this.number,
     required this.step,
     required this.highlighted,
+    required this.showStatus,
   });
 
   final int number;
   final FlowStep step;
   final bool highlighted;
+  final bool showStatus;
 
   @override
   Widget build(BuildContext context) {
     final status = step.status;
+    final accent = showStatus ? status.color : Puls3Colors.accent;
     return Semantics(
-      label: 'Step $number: ${step.title}. ${status.label}. ${step.body}',
+      label: 'Step $number: ${step.title}. ${step.body}',
       excludeSemantics: true,
       child: AnimatedContainer(
         key: Key('flow-step-$number'),
@@ -217,7 +248,7 @@ class _StepNode extends StatelessWidget {
           color: Puls3Colors.surface,
           borderRadius: Puls3Radius.mdAll,
           border: Border.all(
-            color: highlighted ? status.color : Puls3Colors.hairline,
+            color: highlighted ? accent : Puls3Colors.hairline,
           ),
         ),
         child: Column(
@@ -232,26 +263,27 @@ class _StepNode extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: status.color),
+                    border: Border.all(color: accent),
                   ),
                   child: Text(
                     '$number',
-                    style: Puls3Text.caption.copyWith(color: status.color),
+                    style: Puls3Text.caption.copyWith(color: accent),
                   ),
                 ),
                 const SizedBox(width: Puls3Spacing.xs),
                 Icon(step.icon, size: 18, color: Puls3Colors.muted),
-                const SizedBox(width: Puls3Spacing.xs),
-                // Shrinks instead of overflowing on narrow nodes.
-                Flexible(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: _StatusPill(status: status),
+                if (showStatus) ...[
+                  const SizedBox(width: Puls3Spacing.xs),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: _StatusPill(status: status),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: Puls3Spacing.sm),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 
 /// "Built on Stellar" lockup, text only for now.
@@ -24,12 +25,15 @@ class BuiltOnStellar extends StatelessWidget {
         TextSpan(
           children: [
             TextSpan(
-              text: 'Built on ',
-              style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
+              text: '${context.l10n.footerBuiltOn} ',
+              style: Puls3Text.caption.copyWith(color: Puls3Colors.text),
             ),
             TextSpan(
               text: 'Stellar',
-              style: Puls3Text.caption.copyWith(fontWeight: FontWeight.w800),
+              style: Puls3Text.caption.copyWith(
+                color: Puls3Colors.text,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),

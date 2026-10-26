@@ -10,7 +10,7 @@ void main() {
     await pumpApp(tester, localeStore: store);
 
     expect(
-      find.text('Build. Discover. Pay.\nAI agents on Stellar.'),
+      find.text('Your AI works. It still can\'t get paid.'),
       findsOneWidget,
     );
 
@@ -19,21 +19,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Español').last);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(
-      find.text('Crea. Descubre. Paga.\nAgentes de IA en Stellar.'),
+      find.text('Tu IA trabaja. Todavía no cobra.'),
       findsOneWidget,
     );
+    expect(find.text('Ya usas IA. ¿Puede cobrar?'), findsOneWidget);
+    expect(find.text('Press Hire'), findsNothing);
+    expect(find.text('Presiona Contratar'), findsOneWidget);
     expect(store.read(), 'es');
   });
 
   testWidgets('pt-BR and pt-PT are distinct catalogs', (tester) async {
     await pumpApp(tester, locale: const Locale('pt', 'BR'));
-    expect(find.textContaining('ser concluído'), findsOneWidget);
+    expect(find.textContaining('ser concluído'), findsWidgets);
+    expect(find.textContaining('estar concluído'), findsNothing);
 
     await pumpApp(tester, locale: const Locale('pt', 'PT'));
-    expect(find.textContaining('estar concluído'), findsOneWidget);
+    expect(find.textContaining('estar concluído'), findsWidgets);
     expect(find.textContaining('ser concluído'), findsNothing);
   });
 
@@ -44,7 +48,7 @@ void main() {
       locale: null,
     );
     expect(
-      find.text('Crea. Descubre. Paga.\nAgentes de IA en Stellar.'),
+      find.text('Tu IA trabaja. Todavía no cobra.'),
       findsOneWidget,
     );
   });

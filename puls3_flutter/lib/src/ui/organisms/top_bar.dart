@@ -19,8 +19,8 @@ class TopBarLink {
   final String path;
 }
 
-/// App bar for every non-landing screen (brand guide page 14): 56 px tall,
-/// solid-3 lockup with C01-small at 28 px, text links, wallet action.
+/// Shared 56 px bar (brand guide page 14): lockup, Marketplace / Studio
+/// links, language and wallet. The logo goes home.
 class TopBar extends StatelessWidget implements PreferredSizeWidget {
   const TopBar({
     super.key,
@@ -71,7 +71,9 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
               _NavLink(
                 label: link.label,
                 icon: link.icon,
-                selected: currentPath.startsWith(link.path),
+                selected: link.path == '/'
+                    ? currentPath == '/'
+                    : currentPath.startsWith(link.path),
                 compact: compact,
                 onTap: () => onNavigate(link.path),
               ),

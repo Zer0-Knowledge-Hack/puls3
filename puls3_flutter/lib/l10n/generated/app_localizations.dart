@@ -150,6 +150,12 @@ abstract class AppLocalizations {
   /// **'Marketplace'**
   String get navMarketplace;
 
+  /// No description provided for @navHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get navHome;
+
   /// No description provided for @navOpenApp.
   ///
   /// In en, this message translates to:
@@ -183,13 +189,13 @@ abstract class AppLocalizations {
   /// No description provided for @landingHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Build. Discover. Pay.\nAI agents on Stellar.'**
+  /// **'Your AI works. It still can\'t get paid.'**
   String get landingHeadline;
 
   /// No description provided for @landingLead.
   ///
   /// In en, this message translates to:
-  /// **'Create AI agents with on-chain identity and wallet, find the right one in a single Marketplace, and pay per task in USDC, held in escrow until the work is done.'**
+  /// **'USDC stays in escrow until the work is done.'**
   String get landingLead;
 
   /// No description provided for @landingOpenStudio.
@@ -237,20 +243,284 @@ abstract class AppLocalizations {
   /// No description provided for @landingFinalCtaTitle.
   ///
   /// In en, this message translates to:
-  /// **'Start with an agent.'**
+  /// **'You already use AI. Can it get paid?'**
   String get landingFinalCtaTitle;
 
   /// No description provided for @landingFinalCtaLead.
   ///
   /// In en, this message translates to:
-  /// **'Hire one on testnet, build your own in the Studio, or help build puls3 in the open.'**
+  /// **'It writes and ships. It cannot receive USDC for a task. puls3 is that missing piece.'**
   String get landingFinalCtaLead;
+
+  /// No description provided for @landingWhyEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Why puls3'**
+  String get landingWhyEyebrow;
+
+  /// No description provided for @landingWhyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI agents can work. Getting them paid is the hard part.'**
+  String get landingWhyTitle;
+
+  /// No description provided for @landingProblem1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Building an agent that earns is slow'**
+  String get landingProblem1Title;
+
+  /// No description provided for @landingProblem1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio turns a name, a prompt, a model and a price into a checked definition. Deploying it with its own wallet and on-chain id is coming.'**
+  String get landingProblem1Body;
+
+  /// No description provided for @landingProblem2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding an agent you can trust is hard'**
+  String get landingProblem2Title;
+
+  /// No description provided for @landingProblem2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'One Marketplace read from an on-chain registry: search by skill, compare prices and check who the agent is.'**
+  String get landingProblem2Body;
+
+  /// No description provided for @landingProblem3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Paying per task does not fit cards'**
+  String get landingProblem3Title;
+
+  /// No description provided for @landingProblem3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay per task in USDC on Stellar, held in escrow until the result is approved, settled in seconds with sub-cent fees.'**
+  String get landingProblem3Body;
+
+  /// No description provided for @landingHowEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get landingHowEyebrow;
+
+  /// No description provided for @landingHowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two steps to hire. Studio is coming.'**
+  String get landingHowTitle;
+
+  /// No description provided for @landingStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover and hire'**
+  String get landingStep1Title;
+
+  /// No description provided for @landingStep1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'One Marketplace, read from the registry. Compare skills and prices, then describe the task.'**
+  String get landingStep1Body;
+
+  /// No description provided for @landingStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay into escrow'**
+  String get landingStep2Title;
+
+  /// No description provided for @landingStep2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet funds the job in USDC. The contract holds the payment until the work is done.'**
+  String get landingStep2Body;
+
+  /// No description provided for @landingStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an agent'**
+  String get landingStep3Title;
+
+  /// No description provided for @landingStep3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Name it, set a price and describe what it does. Studio checks the definition as you type. On-chain deploy is coming.'**
+  String get landingStep3Body;
+
+  /// No description provided for @landingBentoEscrowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment does not go to the agent'**
+  String get landingBentoEscrowTitle;
+
+  /// No description provided for @landingBentoEscrowBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet signs. The escrow contract holds the USDC until the work is approved or rejected.'**
+  String get landingBentoEscrowBody;
+
+  /// No description provided for @landingBentoWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get landingBentoWallet;
+
+  /// No description provided for @landingBentoEscrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Escrow'**
+  String get landingBentoEscrow;
+
+  /// No description provided for @landingBentoAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get landingBentoAgent;
+
+  /// No description provided for @landingBentoStudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio'**
+  String get landingBentoStudioTitle;
+
+  /// No description provided for @landingBentoStudioBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Define an agent with identity and a price. On-chain deploy is coming.'**
+  String get landingBentoStudioBody;
+
+  /// No description provided for @landingBentoIdentityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On-chain identity'**
+  String get landingBentoIdentityTitle;
+
+  /// No description provided for @landingBentoIdentityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every Marketplace agent has a registry id. You can see who it is before you pay.'**
+  String get landingBentoIdentityBody;
+
+  /// No description provided for @landingDemoLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live demo'**
+  String get landingDemoLive;
+
+  /// No description provided for @landingHireTry.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Hire'**
+  String get landingHireTry;
+
+  /// No description provided for @landingHireHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This button runs the hire. Press it and watch the USDC lock.'**
+  String get landingHireHint;
+
+  /// No description provided for @landingHireTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Check this Stellar account for incoming payments.'**
+  String get landingHireTask;
+
+  /// No description provided for @landingHireCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire'**
+  String get landingHireCta;
+
+  /// No description provided for @landingHireSigning.
+  ///
+  /// In en, this message translates to:
+  /// **'In your wallet'**
+  String get landingHireSigning;
+
+  /// No description provided for @landingHireLocking.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked in escrow'**
+  String get landingHireLocking;
+
+  /// No description provided for @landingHireWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent at work'**
+  String get landingHireWorking;
+
+  /// No description provided for @landingHireReview.
+  ///
+  /// In en, this message translates to:
+  /// **'You review'**
+  String get landingHireReview;
+
+  /// No description provided for @landingHireDone.
+  ///
+  /// In en, this message translates to:
+  /// **'You accept — paid'**
+  String get landingHireDone;
+
+  /// No description provided for @landingHireWalletBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet holds {amount} USDC.'**
+  String landingHireWalletBody(String amount);
+
+  /// No description provided for @landingHireLockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'That USDC goes into a vault: escrow, a contract. It cannot leave on its own.'**
+  String get landingHireLockBody;
+
+  /// No description provided for @landingHireWorkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent is notified and starts the work. The money stays locked.'**
+  String get landingHireWorkBody;
+
+  /// No description provided for @landingHireReviewBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent finishes. You get notified and review the work.'**
+  String get landingHireReviewBody;
+
+  /// No description provided for @landingHireReleaseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You accept: the vault pays the agent and releases the work. No accept, no payout — and no free work.'**
+  String get landingHireReleaseBody;
+
+  /// No description provided for @landingHireReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay'**
+  String get landingHireReplay;
+
+  /// No description provided for @landingComing.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming'**
+  String get landingComing;
+
+  /// No description provided for @landingOpenExplorer.
+  ///
+  /// In en, this message translates to:
+  /// **'Open on StellarExpert'**
+  String get landingOpenExplorer;
 
   /// No description provided for @landingWhyStellar.
   ///
   /// In en, this message translates to:
   /// **'Why Stellar'**
   String get landingWhyStellar;
+
+  /// No description provided for @landingWhyStellarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Micropayments that settle while the agent works.'**
+  String get landingWhyStellarTitle;
 
   /// No description provided for @landingSettleTitle.
   ///
@@ -299,6 +569,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Brand'**
   String get footerBrand;
+
+  /// No description provided for @footerProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get footerProduct;
+
+  /// No description provided for @footerResources.
+  ///
+  /// In en, this message translates to:
+  /// **'Resources'**
+  String get footerResources;
+
+  /// No description provided for @footerIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Issues'**
+  String get footerIssues;
+
+  /// No description provided for @footerTestnet.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs on Stellar Testnet. Test USDC only.'**
+  String get footerTestnet;
+
+  /// No description provided for @footerBuiltOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Built on'**
+  String get footerBuiltOn;
 
   /// No description provided for @commonRetry.
   ///

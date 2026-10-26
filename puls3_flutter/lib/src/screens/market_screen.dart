@@ -180,58 +180,30 @@ class _MarketScreenState extends State<MarketScreen> {
     );
   }
 
-  /// Title with the live count, the tagline and Create agent. Phones get a
-  /// compact title, as in an app header.
+  /// Catalog title and live count. Studio lives in the shared chrome.
   Widget _header(AgentCatalog catalog, bool compact) {
-    final width = MediaQuery.sizeOf(context).width;
     final title = compact
-        ? Puls3Text.h3.copyWith(fontSize: 22, fontWeight: FontWeight.w600)
-        : width < Puls3Breakpoints.compactHeadline
-        ? Puls3Text.h2Compact
-        : Puls3Text.h1;
+        ? Puls3Text.h3.copyWith(fontSize: 20, fontWeight: FontWeight.w600)
+        : Puls3Text.h2Compact;
     final stat = compact
         ? Puls3Text.accentMd.copyWith(fontSize: 14)
         : Puls3Text.accentMd;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.end,
-          spacing: Puls3Spacing.lg,
-          runSpacing: Puls3Spacing.xs,
-          children: [
-            Text(context.l10n.marketTitle, style: title),
-            // Doto stat accent (brand guide page 11).
-            if (catalog.status == CatalogStatus.ready)
-              Text(
-                context.l10n.marketAgentsLive(catalog.agents.length),
-                style: stat,
-              )
-            else if (catalog.status == CatalogStatus.demo)
-              Text(context.l10n.marketDemoCatalog, style: stat),
-          ],
+        Expanded(
+          child: Semantics(
+            header: true,
+            child: Text(context.l10n.marketTitle, style: title),
+          ),
         ),
-        const SizedBox(height: Puls3Spacing.xxs),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                context.l10n.marketLead,
-                style: compact
-                    ? Puls3Text.bodyMuted.copyWith(fontSize: 14)
-                    : Puls3Text.lead,
-              ),
-            ),
-            const SizedBox(width: Puls3Spacing.xs),
-            TextButton.icon(
-              key: const Key('market-create-agent'),
-              onPressed: () => context.go('/studio'),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(context.l10n.marketCreateAgent),
-            ),
-          ],
-        ),
+        if (catalog.status == CatalogStatus.ready)
+          Text(
+            context.l10n.marketAgentsLive(catalog.agents.length),
+            style: stat,
+          )
+        else if (catalog.status == CatalogStatus.demo)
+          Text(context.l10n.marketDemoCatalog, style: stat),
       ],
     );
   }
