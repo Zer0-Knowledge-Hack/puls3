@@ -89,7 +89,6 @@ class Puls3App extends StatefulWidget {
     this.hireFlowStore,
     this.localeStore,
     this.locale,
-    this.healthCheck,
     this.initialLocation = '/',
   });
 
@@ -122,7 +121,6 @@ class Puls3App extends StatefulWidget {
   /// Forces a locale in tests. Production resolves from the store, then
   /// the device, then English.
   final Locale? locale;
-  final Future<String>? healthCheck;
   final String initialLocation;
 
   @override
@@ -150,15 +148,6 @@ class _Puls3AppState extends State<Puls3App> {
     deviceLocale: WidgetsBinding.instance.platformDispatcher.locale,
     initial: widget.locale,
   );
-
-  @override
-  void initState() {
-    super.initState();
-    // The banner reports a failed health check, but routes that hide it
-    // (/brand) leave the future unwatched; mark the error as handled so it
-    // is not reported as uncaught. The banner still receives it.
-    widget.healthCheck?.ignore();
-  }
 
   @override
   void dispose() {
@@ -192,68 +181,8 @@ class _Puls3AppState extends State<Puls3App> {
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           routerConfig: _router,
-          builder: (context, child) => Column(
-            children: [
-              if (widget.healthCheck != null)
-                // The public brand page does not depend on the backend.
-                ListenableBuilder(
-                  listenable: _router.routeInformationProvider,
-                  builder: (context, _) =>
-                      _hidesBackendStatus(
-                        _router.routeInformationProvider.value.uri.path,
-                      )
-                      ? const SizedBox.shrink()
-                      : _BackendStatus(healthCheck: widget.healthCheck!),
-                ),
-              Expanded(child: child ?? const SizedBox.shrink()),
-            ],
-          ),
         ),
       ),
-    );
-  }
-}
-
-/// Routes that hide the backend status banner.
-bool _hidesBackendStatus(String path) => path == '/brand';
-
-class _BackendStatus extends StatelessWidget {
-  const _BackendStatus({required this.healthCheck});
-
-  final Future<String> healthCheck;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String>(
-      future: healthCheck,
-      builder: (context, snapshot) {
-        final l10n = context.l10n;
-        final label = switch (snapshot.connectionState) {
-          ConnectionState.waiting => l10n.backendConnecting,
-          _ when snapshot.hasError => l10n.backendUnavailable,
-          _ => l10n.backendVersion(snapshot.data ?? ''),
-        };
-        return Semantics(
-          liveRegion: true,
-          child: ColoredBox(
-            color: Puls3Colors.surface,
-            child: SizedBox(
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Puls3Spacing.md,
-                  vertical: Puls3Spacing.xs,
-                ),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: Puls3Text.caption.copyWith(color: Puls3Colors.muted),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

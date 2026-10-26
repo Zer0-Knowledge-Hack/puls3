@@ -146,7 +146,6 @@ Future<void> main() async {
       hireGateway: _createHireGateway(client, configJson),
       studioGateway: _createStudioGateway(client, wallet, configJson),
       deployGateway: _createDeployGateway(client, wallet, configJson),
-      healthCheck: client.health.check().then((health) => health.version),
     ),
   );
 }

@@ -402,24 +402,6 @@ abstract class AppLocalizations {
   /// **'Install {walletName}'**
   String walletInstall(String walletName);
 
-  /// No description provided for @backendConnecting.
-  ///
-  /// In en, this message translates to:
-  /// **'Connecting to backend…'**
-  String get backendConnecting;
-
-  /// No description provided for @backendUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Backend unavailable'**
-  String get backendUnavailable;
-
-  /// No description provided for @backendVersion.
-  ///
-  /// In en, this message translates to:
-  /// **'Backend v{version}'**
-  String backendVersion(String version);
-
   /// No description provided for @marketTitle.
   ///
   /// In en, this message translates to:

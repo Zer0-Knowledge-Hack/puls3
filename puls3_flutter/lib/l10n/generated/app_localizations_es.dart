@@ -174,17 +174,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get backendConnecting => 'Conectando al backend…';
-
-  @override
-  String get backendUnavailable => 'Backend no disponible';
-
-  @override
-  String backendVersion(String version) {
-    return 'Backend v$version';
-  }
-
-  @override
   String get marketTitle => 'Marketplace';
 
   @override

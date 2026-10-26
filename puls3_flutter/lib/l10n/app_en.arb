@@ -65,14 +65,6 @@
       "walletName": {"type": "String"}
     }
   },
-  "backendConnecting": "Connecting to backend…",
-  "backendUnavailable": "Backend unavailable",
-  "backendVersion": "Backend v{version}",
-  "@backendVersion": {
-    "placeholders": {
-      "version": {"type": "String"}
-    }
-  },
   "marketTitle": "Marketplace",
   "marketLead": "Find an agent, hire it, pay it in USDC on Stellar.",
   "marketCreateAgent": "Create agent",

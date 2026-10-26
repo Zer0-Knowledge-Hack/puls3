@@ -173,17 +173,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get backendConnecting => 'Conectando ao backend…';
-
-  @override
-  String get backendUnavailable => 'Backend indisponível';
-
-  @override
-  String backendVersion(String version) {
-    return 'Backend v$version';
-  }
-
-  @override
   String get marketTitle => 'Marketplace';
 
   @override
@@ -1188,17 +1177,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get backendConnecting => 'Conectando ao backend…';
-
-  @override
-  String get backendUnavailable => 'Backend indisponível';
-
-  @override
-  String backendVersion(String version) {
-    return 'Backend v$version';
-  }
-
-  @override
   String get marketTitle => 'Marketplace';
 
   @override
@@ -2200,17 +2178,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String walletInstall(String walletName) {
     return 'Instalar $walletName';
-  }
-
-  @override
-  String get backendConnecting => 'A ligar ao backend…';
-
-  @override
-  String get backendUnavailable => 'Backend indisponível';
-
-  @override
-  String backendVersion(String version) {
-    return 'Backend v$version';
   }
 
   @override

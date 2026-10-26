@@ -51,7 +51,6 @@ Future<void> pumpApp(
   WidgetTester tester, {
   String location = '/',
   Size size = const Size(1440, 1000),
-  Future<String>? healthCheck,
   AgentRepository repository = const InMemoryAgentRepository(testAgents),
   AgentRepository? demoRepository,
   MockWallet? wallet,
@@ -72,7 +71,6 @@ Future<void> pumpApp(
       wallet: wallet ?? MockWallet(),
       studioGateway: studioGateway,
       initialLocation: location,
-      healthCheck: healthCheck,
       localeStore: localeStore,
       locale: locale,
     ),
