@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/stellar_format.dart';
 import '../../hire/hire_gateway.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 import '../atoms/price_tag.dart';
 import '../atoms/primary_button.dart';
@@ -12,7 +13,7 @@ import '../molecules/screen_header.dart';
 
 /// S06 hire detail (flow F6): the hire's status, the agent run, the result
 /// and the payment link. Presentational: the container polls the hire and
-/// passes it with the callbacks.
+/// passes it with the callbacks. It never calls the client.
 class HireDetailView extends StatelessWidget {
   const HireDetailView({
     super.key,
@@ -20,6 +21,16 @@ class HireDetailView extends StatelessWidget {
     required this.onBackToMarketplace,
     this.onOpenPayment,
     this.onCopyResult,
+    this.onOpenDecision,
+    this.onApprove,
+    this.onReject,
+    this.rejectReasonController,
+    this.showApprove = false,
+    this.showReject = false,
+    this.deadlinePassed = false,
+    this.approving = false,
+    this.rejecting = false,
+    this.isDemo = false,
     this.banner,
   });
 
@@ -31,6 +42,21 @@ class HireDetailView extends StatelessWidget {
 
   /// Copies the result.
   final VoidCallback? onCopyResult;
+
+  /// Opens the `complete` or `reject` transaction on StellarExpert.
+  final VoidCallback? onOpenDecision;
+
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final TextEditingController? rejectReasonController;
+  final bool showApprove;
+  final bool showReject;
+  final bool deadlinePassed;
+  final bool approving;
+  final bool rejecting;
+  final bool isDemo;
+
+  bool get _acting => approving || rejecting;
 
   /// Shown above the steps, for example when a refresh failed.
   final Widget? banner;
@@ -155,9 +181,87 @@ class HireDetailView extends StatelessWidget {
             onPressed: onOpenPayment,
           ),
         ],
+        ..._decision(context),
         const SizedBox(height: Puls3Spacing.xxl),
       ],
     );
+  }
+
+  List<Widget> _decision(BuildContext context) {
+    final l10n = context.l10n;
+    final deadline = hire.approvalDeadline;
+    final decision = hire.decisionTransaction;
+    return [
+      if (isDemo && (showApprove || showReject)) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        Text(
+          l10n.hireDemoDecision,
+          key: const ValueKey('hire-detail-demo'),
+          style: Puls3Text.bodyMuted,
+        ),
+      ],
+      if (showApprove && deadline != null) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        Text(
+          l10n.hireApprovalDeadline(deadline.toUtc().toIso8601String()),
+          key: const ValueKey('hire-detail-deadline'),
+          style: Puls3Text.bodyMuted,
+        ),
+      ],
+      if (deadlinePassed) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        Text(
+          l10n.hireDeadlinePassed,
+          key: const ValueKey('hire-detail-deadline-passed'),
+          style: Puls3Text.bodyMuted,
+        ),
+      ],
+      if (showReject) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        TextField(
+          key: const ValueKey('hire-detail-reject-reason'),
+          enabled: !_acting,
+          controller: rejectReasonController,
+          decoration: InputDecoration(hintText: l10n.hireRejectReasonHint),
+          minLines: 1,
+          maxLines: 3,
+        ),
+      ],
+      if (showApprove) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        PrimaryButton(
+          key: const ValueKey('hire-detail-approve'),
+          label: approving ? l10n.hireApproving : l10n.hireApprove,
+          icon: Icons.check_rounded,
+          expand: true,
+          isLoading: approving,
+          onPressed: _acting ? null : onApprove,
+        ),
+      ],
+      if (showReject) ...[
+        const SizedBox(height: Puls3Spacing.sm),
+        PrimaryButton(
+          key: const ValueKey('hire-detail-reject'),
+          label: rejecting ? l10n.hireRejecting : l10n.hireRejectRefund,
+          icon: Icons.undo_rounded,
+          variant: PrimaryButtonVariant.outline,
+          expand: true,
+          isLoading: rejecting,
+          onPressed: _acting ? null : onReject,
+        ),
+      ],
+      if (decision != null && onOpenDecision != null) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        PrimaryButton(
+          key: const ValueKey('hire-detail-decision'),
+          label: l10n.hireViewDecisionExplorer,
+          icon: Icons.open_in_new_rounded,
+          variant: PrimaryButtonVariant.outline,
+          expand: true,
+          onPressed: onOpenDecision,
+        ),
+      ],
+    ];
   }
 
   /// The status as #10 names it, with the run while the hire is funded.
