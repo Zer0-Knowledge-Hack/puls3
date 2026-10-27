@@ -61,9 +61,9 @@ Access roles: **each developer** (own machine only), **maintainers** (GitHub rep
 
 | Secret | Purpose | Where it is stored | Who has access | How to rotate |
 |---|---|---|---|---|
-| Deployer / registry owner key (`STELLAR_ACCOUNT` identity, testnet `GBY33…TJ4R`) | Deploys contracts, owns the Identity Registry and the seeded demo agents | Stellar CLI config on the deployer's machine. `.env` holds only the identity **name** | Deployer | Generate a new identity and redeploy with `scripts/deploy-testnet.sh`, then re-seed. The registry has no owner transfer. Update `contracts/deployments/testnet.json` and `.env.example` |
-| Escrow admin key (testnet `GAFUY…IFKY`) | Admin of the Agent Escrow (allow-list tokens, `set_admin`, `set_treasury`). Also the demo agent wallet | Stellar CLI config on the deployer's machine | Deployer | `set_admin` to a new identity's address, or `scripts/deploy-escrow-testnet.sh --redeploy` |
-| Agent wallet key (`AGENT_WALLET_ACCOUNT` identity) | Provider wallet bound with `set_agent_wallet` for the demo agents | Stellar CLI config. Defaults to the deployer identity | Deployer | New identity, then re-run `scripts/seed-demo-agents.sh` (it re-binds the wallet) |
+| Deployer / registry owner key (`STELLAR_ACCOUNT` identity, testnet `GBY33…TJ4R`) | Deploys contracts and owns the Identity Registry. It does **not** own the seeded demo agents | Stellar CLI config on the deployer's machine. `.env` holds only the identity **name** | Deployer | Generate a new identity and redeploy with `scripts/deploy-testnet.sh`, then re-seed. The registry has no owner transfer. Update `contracts/deployments/testnet.json` and `.env.example` |
+| Escrow admin key (testnet `GAFUY…IFKY`) | Admin of the Agent Escrow (allow-list tokens, `set_admin`, `set_treasury`). Seed demo agents still pay here until the custodied rebind in `puls3_server/tool/rebind_demo_wallets.dart` (#209) | Stellar CLI config on the deployer's machine. **Never** a server password | Deployer | `set_admin` to a new identity's address, or `scripts/deploy-escrow-testnet.sh --redeploy` |
+| Agent wallet key (`AGENT_WALLET_ACCOUNT` identity) | Fallback for a **missing** seed-agent wallet in `scripts/seed-demo-agents.sh` | Stellar CLI config. Defaults to the owner identity. A custodied G-address is left alone on re-seed | Deployer | Do not re-run seed to force this identity; use the rebind tool |
 | Test client key (`CLIENT_ACCOUNT` identity) | Client and evaluator in `deploy-escrow-testnet.sh --test-job / --direct-payment` | Stellar CLI config | Whoever runs the evidence jobs | Generate a new identity and fund it. Nothing on chain points to it |
 | Test USDC issuer key (`TEST_USDC_ISSUER_ACCOUNT` identity, default `puls3-test-usdc-issuer`) | Issues the scripted test asset `PUSDC` in `fund-testnet-accounts.sh` | Stellar CLI config. Created on first use | Whoever runs the funding script | Remove the identity (`stellar keys rm`). The next run creates a new issuer, so a new asset and SAC |
 | Per-agent wallet keys, server-custodied ([ADR-0003](../adr/0003-payment-rail-and-custody.md) §4) | One G-account per agent: trustline, earnings sweep | Custody (keypair + encrypted storage) is in `puls3_server/lib/src/agent/`; funding and registration are the next part of #18. Secrets are encrypted at rest with `PULS3_AGENT_WALLET_SECRET_KEY` (base64 of 32 bytes) — `.env` locally, the platform secret on Serverpod Cloud. **Back this key up: losing it makes every custodied account unrecoverable** | Server process only | Add a new key version to the keyring and re-encrypt; a leaked wallet key is replaced by a new wallet and `set_agent_wallet` |
@@ -108,3 +108,37 @@ gitleaks git --config=.gitleaks.toml .
 3. Open an issue (`area: infra`) that says what leaked and when. Never paste the secret in the issue.
 
 Out of scope here: mainnet keys, HSM/KMS custody, automated rotation.
+
+## Rebind demo agents (#209)
+
+Seed demo agents (ids 7–14, `puls3://demo/agt-001` … `agt-008`) still pay the
+escrow admin until this run. Their **agent owner** is that same identity
+(`GAFUY…IFKY`), not the registry deployer (`GBY33…TJ4R`). `set_agent_wallet`
+needs the agent owner; using the deployer secret fails.
+
+The owner secret stays in the Stellar CLI on the deployer's machine; it is
+never a server password. Custodied keys live in `agent_wallet`, encrypted with
+`PULS3_AGENT_WALLET_SECRET_KEY`.
+
+`scripts/seed-demo-agents.sh` leaves a non-target G-address alone, so a
+re-seed does not undo the rebind. New missing wallets still bind to
+`AGENT_WALLET_ACCOUNT`.
+
+```bash
+# Stop dart bin/main.dart first so ports 8080–8082 are free.
+# The hire runtime that should sign `submit` must see these rows: for
+# puls3.org that is Serverpod Cloud, not local Postgres.
+docker start puls3_server-postgres-1 puls3_server-redis-1
+cd puls3_server
+set -a; . ../.env; set +a
+PULS3_REBIND_OWNER_SECRET="$(stellar keys secret <gafuy-identity>)" \
+PULS3_REBIND_OWNER_ADDRESS=GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_E2E_SERVERPOD_MODE=development \
+dart run tool/rebind_demo_wallets.dart
+```
+
+Paste each printed G-address and `set_agent_wallet` hash into this file and
+`contracts/deployments/testnet.json` after a successful run. Do not commit
+secrets.
