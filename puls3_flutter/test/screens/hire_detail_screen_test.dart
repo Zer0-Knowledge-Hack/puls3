@@ -25,6 +25,10 @@ const _poll = Duration(seconds: 1);
 const _fundHash =
     'fa11ce0000000000000000000000000000000000000000000000000000000001';
 
+final _now = DateTime.utc(2026, 10, 26, 12);
+const _decisionHash =
+    'dec1510000000000000000000000000000000000000000000000000000000001';
+
 HireProgress _hire({
   String? status = 'funded',
   String? runtimeStatus,
@@ -33,6 +37,9 @@ HireProgress _hire({
   String? rejectedFrom,
   String? paymentTransaction = _fundHash,
   String? paymentExplorerUrl,
+  DateTime? approvalDeadline,
+  String? decisionTransaction,
+  String? decisionExplorerUrl,
 }) => HireProgress(
   hireId: 3,
   agentName: 'Support Relay',
@@ -45,19 +52,25 @@ HireProgress _hire({
   rejectedFrom: rejectedFrom,
   paymentTransaction: paymentTransaction,
   paymentExplorerUrl: paymentExplorerUrl,
+  approvalDeadline: approvalDeadline,
+  decisionTransaction: decisionTransaction,
+  decisionExplorerUrl: decisionExplorerUrl,
 );
 
 /// Answers `getHire` from a script: each read takes the next answer, and
 /// the last one repeats. An answer is a [HireProgress] or an exception.
 class _ProgressGateway implements HireGateway {
-  _ProgressGateway(this.answers);
+  _ProgressGateway(this.answers, {this.isDemo = false, this.failSubmit});
 
   final List<Object> answers;
   final reads = <(int, String)>[];
   final signIns = <String>[];
+  final prepared = <(String, String)>[];
+  final submitted = <(int, String, String)>[];
+  HireGatewayException? failSubmit;
 
   @override
-  bool get isDemo => false;
+  final bool isDemo;
 
   @override
   Future<HireProgress> getHire(int hireId, String consumer) async {
@@ -101,11 +114,45 @@ class _ProgressGateway implements HireGateway {
       throw UnimplementedError();
 
   @override
+  Future<EscrowPreparation> prepareComplete(int hireId) async {
+    prepared.add(('complete', ''));
+    return EscrowPreparation(
+      preparationId: 'prep-complete',
+      purpose: 'complete',
+      unsignedTransaction: 'AAAA-complete',
+    );
+  }
+
+  @override
+  Future<EscrowPreparation> prepareReject(int hireId, String reason) async {
+    prepared.add(('reject', reason));
+    return EscrowPreparation(
+      preparationId: 'prep-reject',
+      purpose: 'reject',
+      unsignedTransaction: 'AAAA-reject',
+    );
+  }
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,
     String signedTransaction,
-  ) => throw UnimplementedError();
+  ) async {
+    final failure = failSubmit;
+    if (failure != null) {
+      failSubmit = null;
+      throw failure;
+    }
+    submitted.add((hireId, preparation.purpose, signedTransaction));
+    return EscrowSubmission(
+      transactionHash:
+          'dec1510000000000000000000000000000000000000000000000000000000001',
+      state: 'submitted',
+      explorerUrl:
+          'https://stellar.expert/explorer/testnet/tx/dec1510000000000000000000000000000000000000000000000000000000001',
+    );
+  }
 }
 
 final _opened = <Uri>[];
@@ -116,6 +163,7 @@ Future<void> _pumpDetail(
   required HireGateway gateway,
   WalletPort? wallet,
   String id = '3',
+  DateTime Function()? now,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = const Size(1200, 2400);
@@ -134,6 +182,7 @@ Future<void> _pumpDetail(
             pollInterval: _poll,
             openUrl: (url) async => _opened.add(url),
             copyText: (text) async => _copied.add(text),
+            now: now ?? () => _now,
           ),
         ),
       ),
@@ -211,10 +260,13 @@ void main() {
     await tester.pump();
     expect(gateway.reads, hasLength(4));
     expect(_status('Funded · Run failed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('hire-detail-reject')), findsOneWidget);
 
-    // A failed run is final: no more reads.
-    await tester.pump(_poll * 5);
-    expect(gateway.reads, hasLength(4));
+    // A failed run keeps polling until the client rejects.
+    await tester.pump(_poll);
+    await tester.pump();
+    expect(gateway.reads, hasLength(5));
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('Copy copies the result; the payment opens on StellarExpert', (
@@ -438,5 +490,194 @@ void main() {
     await pumpApp(tester, location: '/hires/3');
     // The default wallet is not connected yet.
     expect(find.text('Connect your wallet'), findsOneWidget);
+  });
+
+  testWidgets('submitted hire: Approve signs complete and shows Completed', (
+    tester,
+  ) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final gateway = _ProgressGateway([
+      _hire(
+        status: 'submitted',
+        result: 'Ticket 42 answered.',
+        approvalDeadline: _now.add(const Duration(hours: 1)),
+      ),
+      _hire(
+        status: 'completed',
+        result: 'Ticket 42 answered.',
+        decisionTransaction: _decisionHash,
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    expect(_status('Submitted'), findsOneWidget);
+    expect(find.byKey(const ValueKey('hire-detail-approve')), findsOneWidget);
+    expect(find.byKey(const ValueKey('hire-detail-reject')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-approve')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(wallet.signed, ['AAAA-complete']);
+    expect(gateway.prepared, [('complete', '')]);
+    expect(gateway.submitted.single.$2, 'complete');
+    expect(gateway.submitted.single.$3, 'signed:AAAA-complete');
+    expect(_status('Completed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('hire-detail-approve')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-decision')));
+    await tester.pump();
+    expect(_opened.single.toString(), endsWith('/tx/$_decisionHash'));
+  });
+
+  testWidgets('Reject and refund on submitted shows Rejected with the tx', (
+    tester,
+  ) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final gateway = _ProgressGateway([
+      _hire(
+        status: 'submitted',
+        result: 'Ticket 42 answered.',
+        approvalDeadline: _now.add(const Duration(hours: 1)),
+      ),
+      _hire(
+        status: 'rejected',
+        rejectedFrom: 'submitted',
+        result: 'Ticket 42 answered.',
+        decisionTransaction: _decisionHash,
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('hire-detail-reject-reason')),
+      'Not what I asked',
+    );
+    await tester.tap(find.byKey(const ValueKey('hire-detail-reject')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(gateway.prepared, [('reject', 'Not what I asked')]);
+    expect(wallet.signed, ['AAAA-reject']);
+    expect(_status('Rejected'), findsOneWidget);
+    expect(
+      find.text('This hire was rejected. The escrow returned the USDC to you.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a failed run offers Reject and refund', (tester) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final gateway = _ProgressGateway([
+      _hire(runtimeStatus: 'failed', failureReason: 'The model timed out.'),
+      _hire(
+        status: 'rejected',
+        rejectedFrom: 'funded',
+        failureReason: 'The model timed out.',
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    expect(find.byKey(const ValueKey('hire-detail-approve')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('hire-detail-reject')));
+    await tester.pump();
+    await tester.pump();
+    expect(gateway.prepared, [('reject', '')]);
+    expect(_status('Rejected'), findsOneWidget);
+  });
+
+  testWidgets('after the approval deadline Reject is hidden', (tester) async {
+    await _pumpDetail(
+      tester,
+      gateway: _ProgressGateway([
+        _hire(
+          status: 'submitted',
+          result: 'done',
+          approvalDeadline: _now.subtract(const Duration(minutes: 1)),
+        ),
+      ]),
+    );
+    expect(find.byKey(const ValueKey('hire-detail-approve')), findsNothing);
+    expect(find.byKey(const ValueKey('hire-detail-reject')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('hire-detail-deadline-passed')),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a declined wallet signature stays on the hire', (tester) async {
+    final wallet = TestWallet(initialAddress: _consumer)
+      ..failNextSignature = const WalletSignatureRejected();
+    final gateway = _ProgressGateway([
+      _hire(
+        status: 'submitted',
+        result: 'done',
+        approvalDeadline: _now.add(const Duration(hours: 1)),
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-approve')));
+    await tester.pump();
+    expect(
+      find.text(
+        'You cancelled the signature in your wallet. Nothing was sent.',
+      ),
+      findsOneWidget,
+    );
+    expect(_status('Submitted'), findsOneWidget);
+    expect(gateway.submitted, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a relay error keeps the hire and can be retried', (
+    tester,
+  ) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final gateway = _ProgressGateway(
+      [
+        _hire(
+          status: 'submitted',
+          result: 'done',
+          approvalDeadline: _now.add(const Duration(hours: 1)),
+        ),
+      ],
+      failSubmit: const HireBackendUnavailable(
+        'Stellar Testnet could not be reached.',
+      ),
+    );
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-approve')));
+    await tester.pump();
+    expect(find.text('Stellar Testnet could not be reached.'), findsOneWidget);
+    expect(_status('Submitted'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a demo hire labels the flow and has no explorer link', (
+    tester,
+  ) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final gateway = _ProgressGateway([
+      _hire(
+        status: 'submitted',
+        result: 'Demo result. No funds moved.',
+        approvalDeadline: _now.add(const Duration(hours: 1)),
+      ),
+      _hire(
+        status: 'completed',
+        result: 'Demo result. No funds moved.',
+      ),
+    ], isDemo: true);
+    await _pumpDetail(tester, gateway: gateway, wallet: wallet);
+
+    expect(find.byKey(const ValueKey('hire-detail-demo')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('hire-detail-approve')));
+    await tester.pump();
+    await tester.pump();
+    expect(_status('Completed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('hire-detail-decision')), findsNothing);
   });
 }
