@@ -4,7 +4,7 @@
 
 A hire is one task a consumer asks an agent to do. It is an ERC-8183 job in the puls3 escrow: the consumer is the client and the evaluator, and the agent wallet is the provider. This page defines, once, which states a hire goes through and what moves it between them, so the app, the server and the agent runtime cannot disagree (for example, an agent working on a task nobody funded).
 
-**The lifecycle mirrors the escrow job 1:1.** Every hire state is an ERC-8183 job state with the same name, so the server can derive a hire's state from the job. Off-chain facts (runtime progress, the state a hire was rejected from, feedback) are data on the hire, not states.
+**The lifecycle mirrors the escrow job 1:1.** Every hire state is an ERC-8183 job state with the same name, so the server can derive a hire's state from the job. Off-chain facts (runtime progress, the state a hire was rejected from, feedback) are data on the hire, not states. After `funded`, the server derives `submitted`, `completed`, `rejected` and `expired` from confirmed chain submissions (#208); it does not write a status column.
 
 Every transition is a method on `Hire` that returns a **new** `Hire` and leaves the original unchanged, or throws a typed `DomainError`. There is no I/O: the server applies a transition once the matching escrow transaction is final (the tracker, [API contract](../architecture/api.md)); the domain decides whether it is allowed. Time rules (`expired_at`, the approval window) are enforced by the escrow, not by the domain.
 

@@ -4,7 +4,7 @@
 
 The server prepares every client-signed escrow call, the wallet signs it unchanged, and `HireEndpoint.submitEscrowCall` verifies and relays it (Decision A, `docs/architecture/api.md`, "Server relay submission"). The server never custodies or signs for the consumer. `api.md` is authoritative for error codes and `details` payloads.
 
-> Scope: `createHire` first preparation, `prepareCreateJob`, `prepareFund`, `prepareComplete`, `prepareReject` and `submitEscrowCall`. Tracker effects for `complete` and `reject` belong to #97. Real wallet sessions belong to #25; until then the session wallet comes from the injectable `SessionWallet` seam.
+> Scope: `createHire` first preparation, `prepareCreateJob`, `prepareFund`, `prepareComplete`, `prepareReject` and `submitEscrowCall`. Hire status after a confirmed `submit`, `complete` or `reject` is derived on read (#208). Real wallet sessions belong to #25; until then the session wallet comes from the injectable `SessionWallet` seam.
 
 ## ADDED Requirements
 
@@ -310,20 +310,19 @@ While a hire has a `submitted` escrow record, every `prepare...` method MUST rai
 - GIVEN a hire whose state does not allow the requested purpose
 - WHEN the prepare method is called
 - THEN it fails with `InvalidHireTransition`
-### Requirement: Settlement of complete and reject depends on #97
+### Requirement: Settlement of submit, complete and reject
 
-`prepareComplete`, `prepareReject` and their submissions MUST work through the relay. The tracker effects that move a hire to `completed` or `rejected` still belong to #97. Until then a chain-SUCCESS `complete`, `reject` or `registerFull` submission MUST become `confirmed` and MUST NOT change the hire. Because the hire status does not change, the app MAY be offered `prepareComplete` again; the contract then rejects it as `TransactionFailed`. This caveat MUST be documented in the README tracker paragraph and in the tracker doc comment.
-(Previously: the submission remained `submitted` and blocked later prepares with `SubmissionInProgress`.)
+`prepareComplete` and `prepareReject` MUST work through the relay. A chain-SUCCESS `submit`, `complete`, `reject` or `registerFull` submission MUST become `confirmed`. Hire status is then derived from those records: `prepareComplete` is offered only while the hire is `submitted`.
 
-#### Scenario: Complete confirms without hire change
+#### Scenario: Complete confirms and completes the hire
 
-- GIVEN a relayed `complete` or `reject` submission whose transaction is SUCCESS
+- GIVEN a relayed `complete` submission whose transaction is SUCCESS
 - WHEN the tracker runs
-- THEN the submission is `confirmed` and the hire status is unchanged
+- THEN the submission is `confirmed` and the hire status is `completed`
 
 #### Scenario: Prepare after a confirmed settlement
 
-- GIVEN a confirmed `complete` submission and a hire whose status is unchanged
+- GIVEN a confirmed `complete` submission
 - WHEN `prepareComplete` is called
-- THEN it is not rejected with `SubmissionInProgress`
+- THEN it fails with `InvalidHireTransition`
 

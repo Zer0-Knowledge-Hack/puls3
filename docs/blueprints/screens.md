@@ -124,7 +124,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ### S06-hire-detail
 
-**Purpose:** follow a hire, read the result and decide. **Flows:** F6, F7. **Partly built** (`hire_detail_screen.dart`, #28): status, run progress, result with **Copy** and the `fund` link, polled until final. **Approve** and **Reject and refund** wait for the server-signed `submit` (#97); **Rate** waits for #14 and #21.
+**Purpose:** follow a hire, read the result and decide. **Flows:** F6, F7. **Partly built** (`hire_detail_screen.dart`, #28): status, run progress, result with **Copy** and the `fund` link, polled until final. **Approve** and **Reject and refund** wait for the app issue (#210) now that the server derives `submitted`/`completed`/`rejected` (#208); **Rate** waits for #211.
 
 **Data:** `Hire.id`, the agent's `Agent.name`, `Hire.status`, `Hire.runtimeStatus`, `Hire.failureReason`, `Hire.price` (held in escrow), the result, the approval deadline, `Payment.transaction` (the `fund` link), and the refund transaction after a reject or expiry. A rated hire shows `Feedback.score`.
 

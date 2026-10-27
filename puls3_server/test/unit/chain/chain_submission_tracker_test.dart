@@ -982,8 +982,8 @@ void main() {
     });
   });
 
-  test('SUCCESS of complete, reject and registerFull confirms without an '
-      'effect or a job event', () async {
+  test('SUCCESS of complete, reject and registerFull confirms without a '
+      'job event or an effect hook', () async {
     final complete = await submit(SubmissionPurpose.complete);
     final reject = await submit(SubmissionPurpose.reject);
     final registerFull = await submit(SubmissionPurpose.registerFull);
@@ -1019,15 +1019,19 @@ void main() {
     );
   });
 
-  test('SUCCESS of release confirms without a job event', () async {
+  test('SUCCESS of submit, release and claim_refund confirms without a '
+      'job event', () async {
+    final agentSubmit = await submit(SubmissionPurpose.submit);
     final release = await submit(SubmissionPurpose.release);
     final refund = await submit(SubmissionPurpose.claimRefund);
+    ledger.lookups[agentSubmit.transactionHash] = _success();
     ledger.lookups[release.transactionHash] = _success();
     ledger.lookups[refund.transactionHash] = _success();
 
     final summary = await tracker.pass(store);
 
-    expect(summary.confirmed, 2);
+    expect(summary.confirmed, 3);
+    await expectState(agentSubmit, SubmissionState.confirmed);
     await expectState(release, SubmissionState.confirmed);
     await expectState(refund, SubmissionState.confirmed);
   });
@@ -1045,17 +1049,17 @@ void main() {
   test('purposes with their own outcome codes are not tracked yet and are '
       'logged once', () async {
     final wallet = await submit(SubmissionPurpose.setAgentWallet);
-    final release = await submit(SubmissionPurpose.submit);
+    final other = await submit(SubmissionPurpose.setAgentWallet);
     ledger.closeTime = _validUntil.add(const Duration(minutes: 1));
 
     await tracker.pass(store);
     await tracker.pass(store);
 
     await expectState(wallet, SubmissionState.submitted);
-    await expectState(release, SubmissionState.submitted);
+    await expectState(other, SubmissionState.submitted);
     expect(ledger.resent, isEmpty);
     expect(ledger.lookedUp, isEmpty);
-    for (final s in [wallet, release]) {
+    for (final s in [wallet, other]) {
       expect(
         logged.where((m) => m.contains('submission ${s.id}')),
         hasLength(1),
@@ -1115,7 +1119,7 @@ void main() {
     test('is called for every record left submitted, at the pass '
         'time', () async {
       final flaky = _FlakyStore(store, failTransitions: false);
-      final untracked = await submit(SubmissionPurpose.submit);
+      final untracked = await submit(SubmissionPurpose.setAgentWallet);
       final wallet = await submit(SubmissionPurpose.setAgentWallet);
       final resent = await submit(SubmissionPurpose.fund);
       final waiting = await submit(SubmissionPurpose.fund);
@@ -1184,7 +1188,7 @@ void main() {
     test('a recordCheck that throws is counted and the pass goes on', () async {
       final flaky = _FlakyStore(store, failTransitions: false)
         ..failChecks = true;
-      final first = await submit(SubmissionPurpose.submit);
+      final first = await submit(SubmissionPurpose.setAgentWallet);
       final second = await submit(SubmissionPurpose.fund);
       ledger.lookups[second.transactionHash] = _success(
         jobFunded: [_jobFunded],

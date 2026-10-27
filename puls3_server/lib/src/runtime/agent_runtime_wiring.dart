@@ -3,12 +3,23 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:serverpod/serverpod.dart';
 
+import '../agent/aes_gcm_secret_cipher.dart';
+import '../agent/agent_wallet_custody.dart';
+import '../agent/serverpod_agent_wallet_store.dart';
+import '../agent/stellar_agent_wallet_custody.dart';
+import '../agent/wallet_custody_config.dart';
+import '../chain/agent_submit_sender.dart';
 import '../chain/chain_log.dart';
+import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/tracker_loop.dart';
+import '../generated/protocol.dart' show HireConfigurationMissing;
+import '../hire/chain_accounts.dart';
+import '../hire/hire_relay_config.dart';
 import '../hire/serverpod_hire_repository.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
+import '../ledger/stellar_envelope_codec.dart';
 import '../studio/builder_task_runner.dart';
 import '../studio/serverpod_studio_agent_version_store.dart';
 import '../studio/studio_endpoint.dart';
@@ -22,6 +33,7 @@ import 'provider_router.dart';
 import 'run_manifest.dart';
 import 'runtime_config.dart';
 import 'runtime_task.dart';
+import 'serverpod_due_submit_source.dart';
 import 'serverpod_hire_run_store.dart';
 import 'studio_run_manifest_source.dart';
 
@@ -146,14 +158,12 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
   final router = ProviderRouter(runtimes);
 
   final stellar = StellarConfig.fromEnvironment(env);
-  final registry = SorobanLedger(
-    SorobanRpcClient(
-      httpClient: httpClient,
-      url: stellar.rpcUrl,
-      timeout: stellar.rpcTimeout,
-    ),
-    stellar,
+  final rpc = SorobanRpcClient(
+    httpClient: httpClient,
+    url: stellar.rpcUrl,
+    timeout: stellar.rpcTimeout,
   );
+  final registry = SorobanLedger(rpc, stellar);
   final agentRunner = AgentRunner(
     runtime: router,
     timeout: config.timeout,
@@ -190,6 +200,7 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     batchSize: _batchSize,
   );
   final backfill = MissedRunBackfill(log: log);
+  final submit = _submitWiringOrNull(env, rpc, stellar, log);
   final loop = TrackerLoop(
     interval: loopConfig.interval,
     passTimeout: config.timeout * _batchSize + const Duration(minutes: 1),
@@ -206,6 +217,12 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
           hires: ServerpodHireRepository(session),
         );
         if (summary.total > 0) log(ChainLogLevel.info, 'Pass: $summary');
+        if (submit != null) {
+          final sent = await submit.pass(session);
+          if (sent > 0) {
+            log(ChainLogLevel.info, 'Submit pass sent $sent envelope(s)');
+          }
+        }
       } finally {
         await session.close();
       }
@@ -216,9 +233,91 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     ChainLogLevel.info,
     'Agent runtime started, every ${loopConfig.interval.inSeconds}s, '
     'providers ${router.providers.join(', ')}, '
-    'timeout ${config.timeout.inSeconds}s',
+    'timeout ${config.timeout.inSeconds}s'
+    '${submit == null ? '; submit off' : ''}',
   );
   return loop;
+}
+
+/// Custodied `submit` after a successful run, or null when the cipher or
+/// hire relay fees are missing so the runtime can still call the model.
+_SubmitWiring? _submitWiringOrNull(
+  Map<String, String> env,
+  SorobanRpcClient rpc,
+  StellarConfig stellar,
+  ChainLog log,
+) {
+  try {
+    final custody = WalletCustodyConfig.fromEnvironment(env);
+    final fees = HireRelayConfig(env);
+    return _SubmitWiring(
+      cipher: AesGcmSecretCipher(
+        keys: {custody.keyVersion: custody.secretKey},
+        writeKeyVersion: custody.keyVersion,
+      ),
+      codec: StellarEnvelopeCodec.forPassphrase(stellar.networkPassphrase),
+      rpc: rpc,
+      stellar: stellar,
+      inclusionFee: fees.inclusionFeeStroops,
+      validitySeconds: fees.preparationValiditySeconds,
+      log: log,
+    );
+  } on AgentWalletCustodyUnavailable catch (e) {
+    log(ChainLogLevel.info, 'Agent submit is off: $e');
+  } on HireConfigurationMissing catch (e) {
+    log(
+      ChainLogLevel.info,
+      'Agent submit is off: ${e.setting} is not set',
+    );
+  } on ArgumentError catch (e) {
+    log(ChainLogLevel.warning, 'Agent submit is off: ${e.message}');
+  }
+  return null;
+}
+
+final class _SubmitWiring {
+  _SubmitWiring({
+    required this.cipher,
+    required this.codec,
+    required this.rpc,
+    required this.stellar,
+    required this.inclusionFee,
+    required this.validitySeconds,
+    required this.log,
+  });
+
+  final AesGcmSecretCipher cipher;
+  final StellarEnvelopeCodec codec;
+  final SorobanRpcClient rpc;
+  final StellarConfig stellar;
+  final int inclusionFee;
+  final int validitySeconds;
+  final ChainLog log;
+
+  Future<int> pass(Session session) async {
+    final signer = CustodiedEnvelopeSigner(
+      wallets: ServerpodAgentWalletStore(session),
+      cipher: cipher,
+      codec: codec,
+    );
+    final sender = AgentSubmitSender(
+      submissions: ServerpodChainSubmissionStore(session),
+      accounts: RpcChainAccounts(rpc),
+      codec: codec,
+      sign: signer.sign,
+      send: rpc.sendTransaction,
+      escrow: stellar.escrow,
+      inclusionFee: inclusionFee,
+      validitySeconds: validitySeconds,
+      now: DateTime.now,
+      log: log,
+    );
+    final due = await ServerpodDueSubmitSource(session).list();
+    for (final item in due) {
+      await sender.send(item);
+    }
+    return due.length;
+  }
 }
 
 /// Runs a Studio agent on the builder's credential. A missing credential
