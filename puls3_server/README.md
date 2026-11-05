@@ -160,7 +160,7 @@ model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `172800`. |
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
@@ -211,7 +211,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
@@ -248,7 +248,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
 PULS3_E2E_SERVERPOD_MODE=development \
 dart run tool/e2e_submit_testnet.dart
 ```
@@ -556,7 +556,7 @@ per project.
    scloud variable set PULS3_INDEXER_ENABLED true
    scloud variable set PULS3_RUNTIME_ENABLED true
    scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
-   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 86400
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 172800
    scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
    scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
    scloud variable set PULS3_PLATFORM_FEE_BPS 0
