@@ -51,6 +51,22 @@ abstract interface class HireGateway {
   /// be empty.
   Future<EscrowPreparation> prepareReject(int hireId, String reason);
 
+  /// The unsigned `give_feedback` of a completed hire (F7), with [score]
+  /// (1 to 5) and an optional [comment].
+  Future<EscrowPreparation> prepareFeedback(
+    int hireId,
+    int score,
+    String comment,
+  );
+
+  /// Relays the wallet-signed `give_feedback` of [preparation] and returns
+  /// its submission. [getHire] reports it as the hire's feedback.
+  Future<EscrowSubmission> submitFeedback(
+    int hireId,
+    EscrowPreparation preparation,
+    String signedTransaction,
+  );
+
   /// Relays the wallet-signed envelope of [preparation] and returns its
   /// submission.
   Future<EscrowSubmission> submit(
@@ -116,6 +132,9 @@ class HireProgress {
     this.approvalDeadline,
     this.decisionTransaction,
     this.decisionExplorerUrl,
+    this.feedbackTransaction,
+    this.feedbackState,
+    this.feedbackExplorerUrl,
   });
 
   final int hireId;
@@ -158,6 +177,17 @@ class HireProgress {
   /// StellarExpert link of [decisionTransaction], when the server built one.
   final String? decisionExplorerUrl;
 
+  /// Lowercase hex hash of the hire's `give_feedback` (`feedbackReference`):
+  /// set once it is relayed, and cleared when it failed.
+  final String? feedbackTransaction;
+
+  /// `submitted`, `confirmed` or `failed`: the state of the hire's latest
+  /// `give_feedback`, if any.
+  final String? feedbackState;
+
+  /// StellarExpert link of [feedbackTransaction], when the server built one.
+  final String? feedbackExplorerUrl;
+
   HireStage get stage => switch (status) {
     'funded' when runtimeStatus == 'failed' => HireStage.runFailed,
     // A succeeded run stays `running` until its `submit` lands (api.md,
@@ -187,6 +217,16 @@ class HireProgress {
   bool showApproveAt(DateTime now) =>
       stage == HireStage.submitted && approvalWindowOpen(now);
 
+  /// F7 Rate: completed, and no rating relayed yet. A failed rating can be
+  /// sent again.
+  bool get canRate =>
+      stage == HireStage.completed && feedbackTransaction == null;
+
+  /// A rating was relayed and the chain has not confirmed it yet, so the
+  /// hire is still worth polling.
+  bool get feedbackPending =>
+      feedbackTransaction != null && feedbackState == 'submitted';
+
   /// F6 Reject: a failed run, or submitted before the deadline.
   bool showRejectAt(DateTime now) {
     if (stage == HireStage.runFailed) return true;
@@ -215,7 +255,7 @@ class EscrowPreparation {
 
   final String preparationId;
 
-  /// `createJob` or `fund`.
+  /// `createJob`, `fund`, `complete`, `reject` or `giveFeedback`.
   final String purpose;
 
   /// Base64 unsigned transaction envelope.
@@ -320,6 +360,18 @@ final class HirePaymentAlreadySubmitted extends HireGatewayException {
 /// The hire is closed (`rejected` or `expired`): it takes no payment.
 final class HireClosed extends HireGatewayException {
   const HireClosed() : super('This hire is closed. Start a new hire.');
+}
+
+/// The hire already has a rating (`HireAlreadyRated`): each hire is rated
+/// once.
+final class HireAlreadyRated extends HireGatewayException {
+  const HireAlreadyRated() : super('You already rated this hire.');
+}
+
+/// The connected wallet is not the one that hired (`HireNotOwned` on a
+/// rating). Only the hire's client can rate it.
+final class HireWrongWallet extends HireGatewayException {
+  const HireWrongWallet() : super('Rate with the wallet that hired.');
 }
 
 /// No hire with this id belongs to the connected wallet.

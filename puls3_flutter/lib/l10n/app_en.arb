@@ -489,5 +489,37 @@
   "hireDemoDecision": "Demo only: signing here does not move funds.",
   "hireApproving": "Approving…",
   "hireRejecting": "Rejecting…",
-  "hireDecisionFailed": "The decision could not be sent. Try again."
+  "hireDecisionFailed": "The decision could not be sent. Try again.",
+  "rateHire": "Rate this hire",
+  "rateTitle": "Rate {agent}",
+  "@rateTitle": {
+    "placeholders": {
+      "agent": {"type": "String"}
+    }
+  },
+  "rateClose": "Close",
+  "rateScore": "Score",
+  "rateStars": "{score} of 5 stars",
+  "@rateStars": {
+    "placeholders": {
+      "score": {"type": "int"}
+    }
+  },
+  "rateCommentHint": "Optional comment",
+  "rateCommentTooLong": "Keep the comment to {max} characters.",
+  "@rateCommentTooLong": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "rateSend": "Send rating",
+  "rateSending": "Sending…",
+  "rateDemo": "Demo only: signing here sends no rating.",
+  "rateNotSent": "Rating not sent: you cancelled the signature in your wallet.",
+  "rateWrongWallet": "Rate with the wallet that hired.",
+  "rateAlreadyRated": "You already rated this hire.",
+  "rateSection": "Your rating",
+  "rateConfirming": "Rating sent. Waiting for Stellar to confirm it.",
+  "rateSaved": "Rating saved",
+  "rateViewExplorer": "View rating on StellarExpert"
 }

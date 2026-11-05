@@ -309,6 +309,15 @@ final class Payment {
       hireId == hire.id && payee == agentWallet && amount == hire.price;
 }
 
+/// The lowest [Feedback.score].
+const feedbackMinScore = 1;
+
+/// The highest [Feedback.score].
+const feedbackMaxScore = 5;
+
+/// The longest [Feedback.comment], in characters.
+const feedbackCommentMaxLength = 500;
+
 /// The score and optional comment a consumer leaves about a paid hire.
 final class Feedback {
   Feedback({
@@ -318,10 +327,10 @@ final class Feedback {
     required this.score,
     this.comment = '',
   }) {
-    if (score < 1 || score > 5) {
+    if (score < feedbackMinScore || score > feedbackMaxScore) {
       throw const InvalidFeedback(FeedbackProblem.scoreOutOfRange);
     }
-    if (comment.length > 500) {
+    if (comment.length > feedbackCommentMaxLength) {
       throw const InvalidFeedback(FeedbackProblem.commentTooLong);
     }
   }

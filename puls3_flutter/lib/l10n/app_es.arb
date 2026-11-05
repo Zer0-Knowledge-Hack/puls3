@@ -367,5 +367,22 @@
   "hireDemoDecision": "Solo demostración: firmar aquí no mueve fondos.",
   "hireApproving": "Aprobando…",
   "hireRejecting": "Rechazando…",
-  "hireDecisionFailed": "No se pudo enviar la decisión. Inténtalo de nuevo."
+  "hireDecisionFailed": "No se pudo enviar la decisión. Inténtalo de nuevo.",
+  "rateHire": "Calificar esta contratación",
+  "rateTitle": "Calificar a {agent}",
+  "rateClose": "Cerrar",
+  "rateScore": "Puntaje",
+  "rateStars": "{score} de 5 estrellas",
+  "rateCommentHint": "Comentario (opcional)",
+  "rateCommentTooLong": "El comentario puede tener hasta {max} caracteres.",
+  "rateSend": "Enviar calificación",
+  "rateSending": "Enviando…",
+  "rateDemo": "Solo demostración: firmar aquí no envía ninguna calificación.",
+  "rateNotSent": "Calificación no enviada: cancelaste la firma en tu wallet.",
+  "rateWrongWallet": "Califica con la wallet que contrató.",
+  "rateAlreadyRated": "Ya calificaste esta contratación.",
+  "rateSection": "Tu calificación",
+  "rateConfirming": "Calificación enviada. Esperando la confirmación de Stellar.",
+  "rateSaved": "Calificación guardada",
+  "rateViewExplorer": "Ver la calificación en StellarExpert"
 }

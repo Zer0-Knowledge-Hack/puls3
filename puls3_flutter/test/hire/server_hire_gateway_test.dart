@@ -28,8 +28,14 @@ PreparedTransaction _prepared(
   expiresAt: DateTime(2030),
 );
 
-HireDetail _detail(String state, {String? errorCode}) => HireDetail(
-  hire: _hire(3),
+HireDetail _detail(
+  String state, {
+  String? errorCode,
+  String? feedbackReference,
+  ChainSubmission? feedbackSubmission,
+}) => HireDetail(
+  hire: _hire(3).copyWith(feedbackReference: feedbackReference),
+  feedbackSubmission: feedbackSubmission,
   agent: AgentSummary(
     id: 'agt-003',
     registryId: 9,
@@ -50,6 +56,19 @@ HireDetail _detail(String state, {String? errorCode}) => HireDetail(
   ),
 );
 
+const _feedbackHash =
+    'fee0000000000000000000000000000000000000000000000000000000000001';
+
+ChainSubmission _feedback(String state, {String? errorCode}) => ChainSubmission(
+  preparationId: 'prep-giveFeedback',
+  purpose: 'giveFeedback',
+  transaction: _feedbackHash,
+  state: state,
+  errorCode: errorCode,
+  explorerUrl: 'https://stellar.expert/explorer/testnet/tx/$_feedbackHash',
+  updatedAt: DateTime(2030),
+);
+
 ServerHireGateway _gateway({
   CreateHireCall? createHire,
   PrepareEscrowCall? prepareCreateJob,
@@ -58,6 +77,8 @@ ServerHireGateway _gateway({
   PrepareRejectCall? prepareReject,
   SubmitEscrowCall? submit,
   GetHireCall? getHire,
+  PrepareFeedbackCall? prepareFeedback,
+  SubmitFeedbackCall? submitFeedback,
   ReadWalletFunds? readFunds,
   Duration confirmationTimeout = const Duration(seconds: 1),
 }) => ServerHireGateway(
@@ -74,11 +95,133 @@ ServerHireGateway _gateway({
   prepareReject: prepareReject ?? (_, _) async => _prepared('reject'),
   submitEscrowCall: submit ?? (_, _, _) async => _detail('submitted'),
   getHire: getHire ?? (_, _) async => _detail('confirmed'),
+  prepareFeedback:
+      prepareFeedback ?? (_, _, _) async => _prepared('giveFeedback'),
+  submitFeedback:
+      submitFeedback ??
+      (_, _, _) async => _detail(
+        'confirmed',
+        feedbackReference: _feedbackHash,
+        feedbackSubmission: _feedback('submitted'),
+      ),
   pollInterval: const Duration(milliseconds: 5),
   confirmationTimeout: confirmationTimeout,
 );
 
 void main() {
+  group('ServerHireGateway feedback (F7)', () {
+    test('prepareFeedback passes the score and comment through', () async {
+      final calls = <List<Object>>[];
+      final gateway = _gateway(
+        prepareFeedback: (hireId, score, comment) async {
+          calls.add([hireId, score, comment]);
+          return _prepared('giveFeedback');
+        },
+      );
+      final preparation = await gateway.prepareFeedback(3, 5, 'Fast');
+      expect(calls.single, [3, 5, 'Fast']);
+      expect(preparation.purpose, 'giveFeedback');
+      expect(preparation.unsignedTransaction, 'AAAA-unsigned');
+    });
+
+    test('submitFeedback relays the signed envelope unchanged', () async {
+      final calls = <List<Object>>[];
+      final gateway = _gateway(
+        submitFeedback: (hireId, preparationId, signed) async {
+          calls.add([hireId, preparationId, signed]);
+          return _detail(
+            'confirmed',
+            feedbackReference: _feedbackHash,
+            feedbackSubmission: _feedback('submitted'),
+          );
+        },
+      );
+      final submission = await gateway.submitFeedback(
+        3,
+        await gateway.prepareFeedback(3, 4, ''),
+        'AAAA-signed',
+      );
+      expect(calls.single, [3, 'prep-giveFeedback', 'AAAA-signed']);
+      expect(submission.transactionHash, _feedbackHash);
+      expect(submission.state, 'submitted');
+      expect(submission.explorerUrl, endsWith('/tx/$_feedbackHash'));
+    });
+
+    test('a failed rating is an error, not a sent one', () async {
+      final gateway = _gateway(
+        submitFeedback: (_, _, _) async => _detail(
+          'confirmed',
+          feedbackSubmission: _feedback(
+            'failed',
+            errorCode: 'TransactionFailed',
+          ),
+        ),
+      );
+      await expectLater(
+        gateway.submitFeedback(
+          3,
+          await gateway.prepareFeedback(3, 4, ''),
+          'AAAA-signed',
+        ),
+        throwsA(isA<HireSubmissionFailed>()),
+      );
+    });
+
+    test('maps the rating rules to their errors', () async {
+      Future<void> expectCode(String code, Matcher matcher) => expectLater(
+        _gateway(
+          prepareFeedback: (_, _, _) async =>
+              throw Puls3ApiException(code: code),
+        ).prepareFeedback(3, 5, ''),
+        throwsA(matcher),
+        reason: code,
+      );
+      await expectCode('HireAlreadyRated', isA<HireAlreadyRated>());
+      await expectCode('HireNotOwned', isA<HireWrongWallet>());
+      await expectCode('HireNotFound', isA<HireNotFound>());
+      await expectCode('HireNotCompleted', isA<HireRejected>());
+      await expectCode('FeedbackFromAgentOwner', isA<HireRejected>());
+      await expectCode('InvalidFeedback', isA<HireRejected>());
+      await expectCode('NotAuthenticated', isA<HireNotSignedIn>());
+    });
+
+    test('HireNotOwned outside a rating stays "not found"', () async {
+      await expectLater(
+        _gateway(
+          getHire: (_, _) async =>
+              throw Puls3ApiException(code: 'HireNotOwned'),
+        ).getHire(3, _consumer),
+        throwsA(isA<HireNotFound>()),
+      );
+    });
+
+    test('getHire reports the rating and its state', () async {
+      final rated = await _gateway(
+        getHire: (_, _) async => _detail(
+          'confirmed',
+          feedbackReference: _feedbackHash,
+          feedbackSubmission: _feedback('submitted'),
+        ),
+      ).getHire(3, _consumer);
+      expect(rated.feedbackTransaction, _feedbackHash);
+      expect(rated.feedbackState, 'submitted');
+      expect(rated.feedbackExplorerUrl, endsWith('/tx/$_feedbackHash'));
+      expect(rated.feedbackPending, isTrue);
+
+      // A failed rating clears the reference: the hire can be rated again.
+      final failed = await _gateway(
+        getHire: (_, _) async => _detail(
+          'confirmed',
+          feedbackSubmission: _feedback('failed'),
+        ),
+      ).getHire(3, _consumer);
+      expect(failed.feedbackTransaction, isNull);
+      expect(failed.feedbackState, 'failed');
+      expect(failed.feedbackExplorerUrl, isNull);
+      expect(failed.feedbackPending, isFalse);
+    });
+  });
+
   group('ServerHireGateway', () {
     test(
       'createHire passes the request through and returns the create_job',
@@ -323,6 +466,8 @@ void main() {
         prepareReject: (_, _) async => _prepared('reject'),
         submitEscrowCall: (_, _, _) async => _detail('submitted'),
         getHire: (_, _) async => _detail('confirmed'),
+        prepareFeedback: (_, _, _) async => _prepared('giveFeedback'),
+        submitFeedback: (_, _, _) async => _detail('confirmed'),
         callTimeout: const Duration(milliseconds: 20),
       );
       await expectLater(

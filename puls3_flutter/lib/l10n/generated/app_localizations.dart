@@ -2279,6 +2279,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The decision could not be sent. Try again.'**
   String get hireDecisionFailed;
+
+  /// No description provided for @rateHire.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate this hire'**
+  String get rateHire;
+
+  /// No description provided for @rateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate {agent}'**
+  String rateTitle(String agent);
+
+  /// No description provided for @rateClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get rateClose;
+
+  /// No description provided for @rateScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Score'**
+  String get rateScore;
+
+  /// No description provided for @rateStars.
+  ///
+  /// In en, this message translates to:
+  /// **'{score} of 5 stars'**
+  String rateStars(int score);
+
+  /// No description provided for @rateCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional comment'**
+  String get rateCommentHint;
+
+  /// No description provided for @rateCommentTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the comment to {max} characters.'**
+  String rateCommentTooLong(int max);
+
+  /// No description provided for @rateSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send rating'**
+  String get rateSend;
+
+  /// No description provided for @rateSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get rateSending;
+
+  /// No description provided for @rateDemo.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo only: signing here sends no rating.'**
+  String get rateDemo;
+
+  /// No description provided for @rateNotSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating not sent: you cancelled the signature in your wallet.'**
+  String get rateNotSent;
+
+  /// No description provided for @rateWrongWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate with the wallet that hired.'**
+  String get rateWrongWallet;
+
+  /// No description provided for @rateAlreadyRated.
+  ///
+  /// In en, this message translates to:
+  /// **'You already rated this hire.'**
+  String get rateAlreadyRated;
+
+  /// No description provided for @rateSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating'**
+  String get rateSection;
+
+  /// No description provided for @rateConfirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating sent. Waiting for Stellar to confirm it.'**
+  String get rateConfirming;
+
+  /// No description provided for @rateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating saved'**
+  String get rateSaved;
+
+  /// No description provided for @rateViewExplorer.
+  ///
+  /// In en, this message translates to:
+  /// **'View rating on StellarExpert'**
+  String get rateViewExplorer;
 }
 
 class _AppLocalizationsDelegate

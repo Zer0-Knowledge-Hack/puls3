@@ -1234,4 +1234,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hireDecisionFailed => 'The decision could not be sent. Try again.';
+
+  @override
+  String get rateHire => 'Rate this hire';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Rate $agent';
+  }
+
+  @override
+  String get rateClose => 'Close';
+
+  @override
+  String get rateScore => 'Score';
+
+  @override
+  String rateStars(int score) {
+    return '$score of 5 stars';
+  }
+
+  @override
+  String get rateCommentHint => 'Optional comment';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'Keep the comment to $max characters.';
+  }
+
+  @override
+  String get rateSend => 'Send rating';
+
+  @override
+  String get rateSending => 'Sending…';
+
+  @override
+  String get rateDemo => 'Demo only: signing here sends no rating.';
+
+  @override
+  String get rateNotSent =>
+      'Rating not sent: you cancelled the signature in your wallet.';
+
+  @override
+  String get rateWrongWallet => 'Rate with the wallet that hired.';
+
+  @override
+  String get rateAlreadyRated => 'You already rated this hire.';
+
+  @override
+  String get rateSection => 'Your rating';
+
+  @override
+  String get rateConfirming =>
+      'Rating sent. Waiting for Stellar to confirm it.';
+
+  @override
+  String get rateSaved => 'Rating saved';
+
+  @override
+  String get rateViewExplorer => 'View rating on StellarExpert';
 }

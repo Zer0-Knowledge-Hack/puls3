@@ -31,10 +31,23 @@ typedef SubmitEscrowCall =
       String signedTransactionXdr,
     );
 
+/// `client.feedback.prepareFeedback`.
+typedef PrepareFeedbackCall =
+    Future<PreparedTransaction> Function(int hireId, int score, String comment);
+
+/// `client.feedback.submitFeedback`.
+typedef SubmitFeedbackCall =
+    Future<HireDetail> Function(
+      int hireId,
+      String preparationId,
+      String signedTransactionXdr,
+    );
+
 /// `client.hire.getHire`.
 typedef GetHireCall = Future<HireDetail> Function(int hireId, String consumer);
 
-/// [HireGateway] over `HireEndpoint` (api.md, F5-3 to F5-5, F6).
+/// [HireGateway] over `HireEndpoint` (api.md, F5-3 to F5-5, F6) and
+/// `FeedbackEndpoint` (F7).
 ///
 /// [prepareFund] waits for the `create_job` confirmation by asking again
 /// while the server answers that the job is still being created
@@ -49,6 +62,8 @@ class ServerHireGateway implements HireGateway {
     required this._prepareReject,
     required this._submitEscrowCall,
     required this._getHire,
+    required this._prepareFeedback,
+    required this._submitFeedback,
     this._session,
     this._readFunds,
     this.callTimeout = const Duration(seconds: 30),
@@ -63,6 +78,8 @@ class ServerHireGateway implements HireGateway {
   final PrepareRejectCall _prepareReject;
   final SubmitEscrowCall _submitEscrowCall;
   final GetHireCall _getHire;
+  final PrepareFeedbackCall _prepareFeedback;
+  final SubmitFeedbackCall _submitFeedback;
 
   /// The wallet session (#136). Without it, the server is called with no
   /// session and answers `NotAuthenticated`.
@@ -160,6 +177,48 @@ class ServerHireGateway implements HireGateway {
       _preparation(await _call(() => _prepareReject(hireId, reason)));
 
   @override
+  Future<EscrowPreparation> prepareFeedback(
+    int hireId,
+    int score,
+    String comment,
+  ) async => _preparation(
+    await _call(
+      () => _prepareFeedback(hireId, score, comment),
+      feedback: true,
+    ),
+  );
+
+  @override
+  Future<EscrowSubmission> submitFeedback(
+    int hireId,
+    EscrowPreparation preparation,
+    String signedTransaction,
+  ) async {
+    final detail = await _call(
+      () => _submitFeedback(
+        hireId,
+        preparation.preparationId,
+        signedTransaction,
+      ),
+      feedback: true,
+    );
+    final submission = detail.feedbackSubmission;
+    if (submission == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the rating.',
+      );
+    }
+    if (submission.state == 'failed') {
+      throw _outcome(submission.errorCode);
+    }
+    return EscrowSubmission(
+      transactionHash: submission.transaction,
+      state: submission.state,
+      explorerUrl: submission.explorerUrl,
+    );
+  }
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,
@@ -202,6 +261,7 @@ class ServerHireGateway implements HireGateway {
         ? latest
         : null;
     final paymentTransaction = hire.paymentTransaction ?? fund?.transaction;
+    final feedback = detail.feedbackSubmission;
     return HireProgress(
       hireId: hire.id,
       agentName: detail.agent.name,
@@ -219,6 +279,11 @@ class ServerHireGateway implements HireGateway {
       approvalDeadline: detail.approvalDeadline,
       decisionTransaction: decision?.transaction,
       decisionExplorerUrl: decision?.explorerUrl,
+      feedbackTransaction: hire.feedbackReference,
+      feedbackState: feedback?.state,
+      feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
+          ? feedback?.explorerUrl
+          : null,
     );
   }
 
@@ -235,11 +300,15 @@ class ServerHireGateway implements HireGateway {
   }
 
   /// Runs one server call and maps its failure to a [HireGatewayException].
-  Future<T> _call<T>(Future<T> Function() call, {bool fund = false}) async {
+  Future<T> _call<T>(
+    Future<T> Function() call, {
+    bool fund = false,
+    bool feedback = false,
+  }) async {
     try {
       return await call().timeout(callTimeout);
     } on Puls3ApiException catch (e) {
-      throw _map(e, fund: fund);
+      throw _map(e, fund: fund, feedback: feedback);
     } on TimeoutException {
       throw const HireBackendUnavailable('The puls3 server did not answer.');
     } on ServerpodClientException {
@@ -248,7 +317,11 @@ class ServerHireGateway implements HireGateway {
   }
 
   /// api.md, "Typed error transport" and the `HireEndpoint` rows.
-  static Exception _map(Puls3ApiException e, {required bool fund}) {
+  static Exception _map(
+    Puls3ApiException e, {
+    required bool fund,
+    required bool feedback,
+  }) {
     final reason = e.details?['reason'];
     return switch (e.code) {
       'AuthenticationUnavailable' ||
@@ -261,6 +334,18 @@ class ServerHireGateway implements HireGateway {
       'InvalidWalletSignature' => const HireSignInFailed(),
       'ChallengeRateLimited' => const HireBackendUnavailable(
         'Too many sign-in attempts. Wait a minute, then try again.',
+      ),
+      // F7: the rating's own rules (FeedbackEndpoint, api.md).
+      'HireNotOwned' when feedback => const HireWrongWallet(),
+      'HireAlreadyRated' => const HireAlreadyRated(),
+      'HireNotCompleted' => const HireRejected(
+        'Only a completed hire can be rated.',
+      ),
+      'FeedbackFromAgentOwner' => const HireRejected(
+        'The owner of this agent cannot rate it.',
+      ),
+      'InvalidFeedback' => const HireRejected(
+        'Pick a score from 1 to 5 and keep the comment to 500 characters.',
       ),
       'InvalidHireId' ||
       'HireNotFound' ||

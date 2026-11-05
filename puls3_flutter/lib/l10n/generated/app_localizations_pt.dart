@@ -1249,6 +1249,66 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint => 'Comentário (opcional)';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Só demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: você cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Você já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'Sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. Aguardando a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação salva';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2496,6 +2556,66 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint => 'Comentário (opcional)';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Só demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: você cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Você já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'Sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. Aguardando a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação salva';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -3746,4 +3866,64 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint => 'Comentário (opcional)';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'A enviar…';
+
+  @override
+  String get rateDemo =>
+      'Apenas demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'A sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. A aguardar a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação guardada';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
 }

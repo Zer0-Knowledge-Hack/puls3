@@ -1256,4 +1256,64 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get hireDecisionFailed =>
       'No se pudo enviar la decisión. Inténtalo de nuevo.';
+
+  @override
+  String get rateHire => 'Calificar esta contratación';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Calificar a $agent';
+  }
+
+  @override
+  String get rateClose => 'Cerrar';
+
+  @override
+  String get rateScore => 'Puntaje';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrellas';
+  }
+
+  @override
+  String get rateCommentHint => 'Comentario (opcional)';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'El comentario puede tener hasta $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar calificación';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Solo demostración: firmar aquí no envía ninguna calificación.';
+
+  @override
+  String get rateNotSent =>
+      'Calificación no enviada: cancelaste la firma en tu wallet.';
+
+  @override
+  String get rateWrongWallet => 'Califica con la wallet que contrató.';
+
+  @override
+  String get rateAlreadyRated => 'Ya calificaste esta contratación.';
+
+  @override
+  String get rateSection => 'Tu calificación';
+
+  @override
+  String get rateConfirming =>
+      'Calificación enviada. Esperando la confirmación de Stellar.';
+
+  @override
+  String get rateSaved => 'Calificación guardada';
+
+  @override
+  String get rateViewExplorer => 'Ver la calificación en StellarExpert';
 }
