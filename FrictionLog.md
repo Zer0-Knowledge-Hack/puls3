@@ -11,15 +11,16 @@ puls3 is an AI agent hub on Stellar. Builders create agents in a Studio and
 deploy them; consumers hire them and pay in USDC.
 
 - **Identity and reputation:** each agent is an on-chain identity in a
-  Soroban registry that follows ERC-8004. Consumers rate completed hires in a
-  reputation registry.
+  Soroban registry that follows ERC-8004. A reputation registry holds the
+  consumers' ratings. The app's rating screen is in review (PR #217).
 - **Payment:** each hire is a job in a Soroban escrow that follows ERC-8183.
   The consumer funds it in USDC, the agent submits its result, and the
-  consumer approves or rejects. If nothing happens before the deadline, the
-  escrow refunds.
+  consumer approves or rejects. Deadlines move the money on their own: a
+  refund if no result arrives in time, a release to the agent if the
+  approval window passes.
 - **Server:** Serverpod (Dart) with PostgreSQL. It runs the agents with
-  hosted LLMs, holds custodied agent wallets, and signs the agent's escrow
-  `submit`.
+  hosted LLMs and holds custodied agent wallets. Signing the agent's escrow
+  `submit` with that wallet is in review (PR #213).
 - **App:** Flutter Web with Freighter.
 
 ## Stellar tools we used, and how
@@ -46,7 +47,7 @@ deploy them; consumers hire them and pay in USDC.
 
 - **What happened:**
   - On 2026-09-30 SDF testnet ran protocol 29. Simulating a native SAC `transfer` there returned **only `ADDRESS_V2`** credentials (CAP-71). The JS SDK says `useUpgradedAuth=false` is a no-op from protocol 28, so we could not ask for the legacy format.
-  - `ADDRESS_V2` is signed over a different preimage, `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`. The Freighter guide only documented the legacy one.
+  - `ADDRESS_V2` is signed over a different preimage, `ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`. The Freighter guide documented the legacy one.
   - On 2026-11-05 testnet ran protocol 30, and a USDC SAC `transfer` simulation returned legacy `ADDRESS` (type 1) again.
 - **Cost:** about 1–2 days in the Flutter wallet spike (#70), plus some hours later.
 - **Fix:**
@@ -62,7 +63,7 @@ deploy them; consumers hire them and pay in USDC.
     - its `SorobanCredentialsType` stops at `address`;
     - its `EnvelopeType` stops at 9;
     - it has no `HashIdPreimage` for Soroban authorization.
-- **Cost:** about half a day to choose an approach (ADR-0001), and about 380 lines of hand-written XDR in the x402 spike.
+- **Cost:** it shaped the server design (ADR-0001: plain HTTP RPC instead of an SDK), and it took about 380 lines of hand-written XDR in the x402 spike.
 - **Fix:**
   - On the server we call RPC over plain HTTP and use `stellar_dart` for keys and envelopes.
   - We wrote the `ADDRESS_V2` entry and its signing payload by hand.
@@ -72,7 +73,7 @@ deploy them; consumers hire them and pay in USDC.
 
 - **What happened:**
   - The x402 packages are TypeScript only.
-  - The quickstart does not document the facilitator endpoints or the exact `PAYMENT-SIGNATURE` payload. To find it we read the `@x402/stellar` source. It is a base64 JSON with `accepted` echoed back, and an unsigned envelope whose source is the all-zero account, re-simulated after signing.
+  - We did not find the facilitator endpoints or the exact `PAYMENT-SIGNATURE` payload in the x402 quickstart. To find the payload we read the `@x402/stellar` source. It is a base64 JSON with `accepted` echoed back, and an unsigned envelope whose source is the all-zero account, re-simulated after signing.
 - **Cost:** about 1–2 hours of reading source in spike #164. The Dart client then worked on the first live run.
 - **Fix:**
   - We mirrored `ExactStellarScheme` in Dart.
@@ -93,7 +94,7 @@ deploy them; consumers hire them and pay in USDC.
 
 ### 5. Testnet USDC is hard to get from scripts
 
-- **What happened:** Circle's faucet is a web page with a captcha, so tests and seeding cannot use it.
+- **What happened:** Circle's faucet is a web form, so tests and seeding scripts cannot use it.
 - **Cost:** a few hours over the project.
 - **Fix:**
   - Early proofs used a throwaway asset with its own SAC.
@@ -105,16 +106,16 @@ deploy them; consumers hire them and pay in USDC.
 - **What happened:**
   - Our escrow rejects `submit` with `SubmitTooLate` unless `now + approval_window < expired_at`. The testnet escrow's `approval_window` is 86400 s.
   - Our docs set the hire's job duration to 86400 s too, so every agent `submit` would fail in simulation.
-  - This was our configuration bug, not a Stellar bug. Still, a simulation failure from a contract error came back to the server as a generic simulation error. We found the cause by reading the contract and querying `approval_window` with the CLI.
+  - This was our configuration bug, not a Stellar bug. RPC does return the contract error (`Error(Contract, #106)`) in the simulation's diagnostic events. But it is a number inside a string, and our server logged it as a generic chain error. We found the cause by reading the contract and querying `approval_window` with the CLI.
 - **Cost:** about 1 hour once we looked for it. Nobody had noticed it in review before.
 - **Fix:**
   - The job duration is now 172800 s, and the docs state the rule.
-- **Would have helped:** clearer contract error codes in simulation results through the SDKs, mapped to the contract's error enum.
+- **Would have helped:** a structured contract error (contract id plus code) in the `simulateTransaction` response, so clients can map it to the contract's error enum without parsing diagnostic event strings.
 
 ### 7. State archival and TTL
 
 - **What happened:** new persistent entries (the registry's URI index, the escrow's claimable balances) needed explicit TTL extension. Otherwise they could be archived.
-- **Cost:** two fixes, on 2026-09-25 and 2026-10-06 (#105), each a few hours with tests.
+- **Cost:** two fixes, on 2026-09-25 and 2026-10-06 (#105). Each was a small change plus tests.
 - **Fix:** we extend the TTL where each entry is written.
 - **Would have helped:** a checklist in the contract docs: "every new persistent key needs a TTL plan".
 
@@ -136,7 +137,7 @@ deploy them; consumers hire them and pay in USDC.
 
 ## What worked well
 
-- **Soroban contracts and tests in Rust:** the SDK, the test environment and the error enums were reliable. The three contracts went from design to testnet in about two weeks.
+- **Soroban contracts and tests in Rust:** the SDK, the test environment and the error enums were reliable. The three contracts went from scaffold (2026-09-23) to testnet in about three weeks: identity on 2026-09-25, escrow on 2026-10-05, reputation on 2026-10-13.
 - **Stellar CLI:**
   - deploy, invoke and read worked well, including `--send no` for read-only calls;
   - `keys generate --fund` and the classic operations (trustlines, path payments) made testnet setup fast.
@@ -145,7 +146,7 @@ deploy them; consumers hire them and pay in USDC.
   - `simulateTransaction` caught auth and balance problems before we signed anything.
 - **SAC:** one `transfer` interface for classic USDC and test assets, so changing the asset was a config change.
 - **Freighter:** `signTransaction`, `signAuthEntry` and the SEP-10 challenge all worked from Flutter Web once the preimage was right.
-- **Fees and settlement:** low fees and fast ledgers (about 5 s). An x402 payment settled in one ledger, with the facilitator paying the fee.
+- **Fees and settlement:** low fees and fast ledgers (about 5 s). In x402 the facilitator paid the fee, so the paying account needed USDC but no XLM for fees.
 
 ## What would have made Stellar development easier
 
@@ -156,5 +157,5 @@ deploy them; consumers hire them and pay in USDC.
    - a wallet example for each type.
 3. An x402-on-Stellar protocol page: the payload format, the facilitator API, and how to handle a lost response after settlement.
 4. A scriptable testnet USDC faucet.
-5. Contract error codes surfaced clearly in simulation results across SDKs.
+5. Structured contract errors in `simulateTransaction` results.
 6. A shared ERC-8004 indexer for agent discovery that any compatible registry can join.
