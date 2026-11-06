@@ -80,7 +80,7 @@ final class RunPassSummary {
 /// conditional writes ([HireRunStore]), so two runners never run one hire.
 ///
 /// A successful run stores the result; the hire stays `funded` until the
-/// server-signed escrow `submit` (#97) makes it `submitted`.
+/// server-signed escrow `submit` (#208) is confirmed.
 final class HireRunner {
   /// [staleAfter] must exceed the runtime timeout: a run still `running`
   /// after it is failed as [runInterrupted].

@@ -229,7 +229,7 @@ void main() {
         expect(await repo.preparedExpiry(HireId(999999999)), isNull);
       });
 
-      group('settlement derived from confirmed release and claim_refund', () {
+      group('settlement derived from confirmed escrow submissions', () {
         var serial = 0;
 
         Future<Hire> funded(ServerpodHireRepository repo) async {
@@ -284,6 +284,86 @@ void main() {
           expect((await repo.findHire(hire.id.value))!.status, status);
           expect((await repo.findById(hire.id))!.status, status);
         }
+
+        test('a confirmed submit is submitted', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.submit,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.submitted);
+        });
+
+        test('a confirmed complete completes the hire', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.submit,
+            SubmissionState.confirmed,
+          );
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.complete,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.completed);
+        });
+
+        test('a confirmed reject from funded is rejected', () async {
+          final session = sessionBuilder.build();
+          final repo = ServerpodHireRepository(session);
+          final hire = await funded(repo);
+          await relay(
+            session,
+            hire,
+            SubmissionPurpose.reject,
+            SubmissionState.confirmed,
+          );
+
+          await expectBoth(repo, hire, HireStatus.rejected);
+          expect(
+            (await repo.findById(hire.id))!.rejectedFrom,
+            HireStatus.funded,
+          );
+        });
+
+        test(
+          'a confirmed reject after submit records rejectedFrom submitted',
+          () async {
+            final session = sessionBuilder.build();
+            final repo = ServerpodHireRepository(session);
+            final hire = await funded(repo);
+            await relay(
+              session,
+              hire,
+              SubmissionPurpose.submit,
+              SubmissionState.confirmed,
+            );
+            await relay(
+              session,
+              hire,
+              SubmissionPurpose.reject,
+              SubmissionState.confirmed,
+            );
+
+            await expectBoth(repo, hire, HireStatus.rejected);
+            expect(
+              (await repo.findById(hire.id))!.rejectedFrom,
+              HireStatus.submitted,
+            );
+          },
+        );
 
         test('a confirmed release completes the hire', () async {
           final session = sessionBuilder.build();

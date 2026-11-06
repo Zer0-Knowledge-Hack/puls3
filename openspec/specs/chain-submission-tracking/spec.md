@@ -116,33 +116,39 @@ When a transaction result carries several valid `job_created` or `job_funded` ev
 - WHEN the tracker processes the SUCCESS
 - THEN the record fails with `JobMismatch`
 
-### Requirement: complete, reject and registerFull confirm without domain effect
+### Requirement: submit, complete, reject and registerFull confirm on SUCCESS
 
-On chain SUCCESS, `complete`, `reject` and `registerFull` records MUST become `confirmed` and MUST NOT change the hire or any other domain state. The tracker doc comment and the README tracker paragraph MUST document the caveat that the hire status does not change until #97, so the app may offer `prepareComplete` again and the contract then rejects it as `TransactionFailed`. `setAgentWallet` and `submit` records MUST remain untracked by this requirement.
+On chain SUCCESS, `submit`, `complete`, `reject`, `release`, `claimRefund` and `registerFull` records MUST become `confirmed`. Hire status is derived from the confirmed hire purposes (#208); the tracker MUST NOT write a hire status column. `registerFull` has no hire effect. `setAgentWallet` records MUST remain untracked.
+
+#### Scenario: submit succeeds
+
+- GIVEN a `submitted` `submit` record whose transaction is SUCCESS
+- WHEN the tracker runs
+- THEN the record becomes `confirmed` and a funded hire reads as `submitted`
 
 #### Scenario: complete succeeds
 
 - GIVEN a `submitted` `complete` record whose transaction is SUCCESS
 - WHEN the tracker runs
-- THEN the record becomes `confirmed` and the hire status is unchanged
+- THEN the record becomes `confirmed` and the hire reads as `completed`
 
 #### Scenario: reject succeeds
 
 - GIVEN a `submitted` `reject` record whose transaction is SUCCESS
 - WHEN the tracker runs
-- THEN the record becomes `confirmed` and the hire status is unchanged
+- THEN the record becomes `confirmed` and the hire reads as `rejected`
 
 #### Scenario: registerFull succeeds
 
 - GIVEN a `submitted` `registerFull` record whose transaction is SUCCESS
 - WHEN the tracker runs
-- THEN the record becomes `confirmed` with no domain effect
+- THEN the record becomes `confirmed` with no hire effect
 
-#### Scenario: No longer blocks later prepares
+#### Scenario: Prepare after a confirmed complete
 
 - GIVEN a confirmed `complete` record
-- WHEN a prepare method is called for the hire
-- THEN it is not rejected with `SubmissionInProgress`
+- WHEN `prepareComplete` is called for the hire
+- THEN it fails with `InvalidHireTransition`
 
 #### Scenario: Failed settlement transaction
 
@@ -150,11 +156,11 @@ On chain SUCCESS, `complete`, `reject` and `registerFull` records MUST become `c
 - WHEN the tracker runs
 - THEN the record fails with `TransactionFailed`
 
-#### Scenario: setAgentWallet and submit unchanged
+#### Scenario: setAgentWallet unchanged
 
-- GIVEN a `setAgentWallet` or `submit` record
+- GIVEN a `setAgentWallet` record
 - WHEN the tracker runs
-- THEN this change does not alter their handling
+- THEN it stays `submitted` (untracked)
 
 ### Requirement: SUCCESS without a parsable event is retried three passes
 
