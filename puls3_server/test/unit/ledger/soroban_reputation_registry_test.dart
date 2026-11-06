@@ -133,6 +133,78 @@ void main() {
         ]);
       });
 
+      test(
+        'an agent with no feedback reads one empty page and no records',
+        () async {
+          final chain = FakeReputationChain();
+
+          final read = await chain.adapter.readRecords(AgentId(7));
+
+          expect(read.records, isEmpty);
+          expect(read.clientPages, 1);
+          expect(await chain.adapter.feedbacksOf(AgentId(7)), isEmpty);
+        },
+      );
+
+      test('pagination reads every client page and drops no record', () async {
+        final chain = FakeReputationChain();
+        final clients = [
+          for (var i = 0; i < reputationPageSize + 1; i++) testAccount(i),
+        ];
+        for (final client in clients) {
+          chain.add(7, client, _stored(4));
+        }
+
+        final read = await chain.adapter.readRecords(AgentId(7));
+
+        // A full page, a page of one, and the empty page that ends the list.
+        expect(read.clientPages, 3);
+        expect(read.records, hasLength(reputationPageSize + 1));
+        expect(read.records.map((r) => r.client).toSet(), clients.toSet());
+        expect(countedFeedback(read.records), hasLength(clients.length));
+      });
+
+      test(
+        'equal scores from one client are separate records, all counted',
+        () async {
+          // The registry keys a record by (client, index): two 5s from Alice
+          // are two feedbacks, not a duplicate to drop.
+          final chain = FakeReputationChain()
+            ..add(7, _alice, _stored(5))
+            ..add(7, _alice, _stored(5));
+
+          final records = await chain.adapter.recordsOf(AgentId(7));
+          final feedback = await chain.adapter.feedbacksOf(AgentId(7));
+
+          expect(records.map((r) => r.index), [1, 2]);
+          expect(feedback.map((f) => f.score), [5, 5]);
+        },
+      );
+
+      test(
+        'a failure in the middle of a read throws, never a partial list',
+        () async {
+          final chain = FakeReputationChain()
+            ..add(7, _alice, _stored(5))
+            ..add(7, _alice, _stored(1))
+            ..add(7, _bob, _stored(1));
+          // The clients pages and Alice's last index answer; the next read fails.
+          chain.failAfterRequests = 3;
+
+          await expectLater(
+            chain.adapter.recordsOf(AgentId(7)),
+            throwsA(isA<LedgerUnavailable>()),
+          );
+          chain
+            ..requests.clear()
+            ..failAfterRequests = 3;
+          await expectLater(
+            chain.adapter.feedbacksOf(AgentId(7)),
+            throwsA(isA<LedgerUnavailable>()),
+          );
+        },
+      );
+
       test('feedbacksOf is exactly countedFeedback of recordsOf', () async {
         final records = await mixedChain().adapter.recordsOf(AgentId(7));
         final feedback = await mixedChain().adapter.feedbacksOf(AgentId(7));

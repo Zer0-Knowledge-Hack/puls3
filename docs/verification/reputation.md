@@ -18,11 +18,11 @@ backend could tell.
 | Where | Change |
 |---|---|
 | `puls3_domain/lib/src/feedback_record.dart` | `FeedbackRecord` (a record as the registry stores it), `FeedbackExclusion` with the only four reasons a record does not count, `exclusionOf()` and `countedFeedback()`. Public, pure Dart, shared by the server and the tool |
-| `puls3_server/lib/src/ledger/soroban_reputation_registry.dart` | `recordsOf()` returns every record the registry lists, raw. `feedbacksOf()` is now exactly `countedFeedback(recordsOf())`: the adapter has no filter of its own |
-| `puls3_server/tool/verify_reputation.dart` | Recomputes a rating from the raw records and compares it with the rating the server serves |
+| `puls3_server/lib/src/ledger/soroban_reputation_registry.dart` | `recordsOf()` returns every record the registry lists, raw; `readRecords()` adds how many client pages were read. `feedbacksOf()` is now exactly `countedFeedback(recordsOf())`: the adapter has no filter of its own |
+| `scripts/verify_reputation.dart` | Recomputes a rating from the raw records and compares it with the rating the server serves. Runs from the repository root (pub workspace) |
 | `puls3_domain/test/feedback_record_test.dart` | Each exclusion reason; every record without one reaches the formula, in order; nothing is dropped without a public reason |
-| `puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` | `recordsOf()` returns every listed record (including revoked, unreadable and off-scale ones); `feedbacksOf()` equals `countedFeedback(recordsOf())` |
-| `docs/domain/reputation.md` | "Which on-chain feedback counts" and "How to verify a rating" |
+| `puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` | `recordsOf()` returns every listed record (including revoked, unreadable and off-scale ones); `feedbacksOf()` equals `countedFeedback(recordsOf())`; every client page is read; equal scores from one client all count; an empty agent; a failure in the middle of a read throws instead of returning part of the records |
+| `docs/domain/reputation.md` | New section "Verifying Agent Reputation" |
 
 The four reasons a record does not count:
 
@@ -42,15 +42,16 @@ The four reasons a record does not count:
 
 ## Run it
 
+From the repository root:
+
 ```bash
-cd puls3_server
-dart run tool/verify_reputation.dart <registryId>                 # deployed server
-dart run tool/verify_reputation.dart <registryId> --api http://localhost:8080
+dart run scripts/verify_reputation.dart <registryId>                              # deployed server
+dart run scripts/verify_reputation.dart <registryId> --api http://localhost:8080  # local server
 ```
 
 `<registryId>` is the agent's id in the Identity Registry (the catalog's
 `registryId`, for example `7` for Ledger Scout). Exit code: `0` match, `1`
-mismatch, `2` a read failed.
+mismatch, `2` a read failed or the arguments are wrong.
 
 ## Evidence (testnet, 2026-11-06)
 
@@ -60,6 +61,7 @@ deployed server `https://puls3-hub-on-stellar.api.serverpod.space`.
 Agent 7, one feedback on chain:
 
 ```
+pages    : 2 page(s) of get_clients_paginated (50 clients per page)
 records  : 1 listed, 1 counted
   GABK…HF5H #1  value=5 decimals=0 revoked=false  counts
 
@@ -68,9 +70,10 @@ served    : rating 4.17, paidHireCount 1
 MATCH: the served rating is the formula over every counted on-chain record.
 ```
 
-Agent 13, no feedback (the prior, 4.00):
+Agent 9, no feedback (the prior, 4.00):
 
 ```
+pages    : 1 page(s) of get_clients_paginated (50 clients per page)
 records  : 0 listed, 0 counted
 
 recomputed: rating 4.00, 0 counted feedback

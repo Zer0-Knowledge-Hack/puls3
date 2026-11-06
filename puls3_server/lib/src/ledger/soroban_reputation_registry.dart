@@ -51,9 +51,17 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   /// that do not count. What an auditor reads on chain (#202).
   ///
   /// A registry read failure is a [LedgerException], never an empty list.
-  Future<List<FeedbackRecord>> recordsOf(AgentId agent) async {
+  Future<List<FeedbackRecord>> recordsOf(AgentId agent) async =>
+      (await readRecords(agent)).records;
+
+  /// [recordsOf] plus how many `get_clients_paginated` pages were read,
+  /// the empty page that ends the list included, for the verification tool.
+  Future<({List<FeedbackRecord> records, int clientPages})> readRecords(
+    AgentId agent,
+  ) async {
+    final (:clients, :pages) = await _clientsOf(agent);
     final records = <FeedbackRecord>[];
-    for (final client in await _clientsOf(agent)) {
+    for (final client in clients) {
       final last = readU64(
         await _read('get_last_index', [
           ScArg.u32(agent.value),
@@ -64,7 +72,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
         records.add(await _recordAt(agent, client, index));
       }
     }
-    return records;
+    return (records: records, clientPages: pages);
   }
 
   /// The server never signs: the consumer's wallet signs `give_feedback`,
@@ -77,10 +85,14 @@ final class SorobanReputationRegistry implements ReputationRegistry {
       );
 
   /// Every client that gave [agent] feedback, page by page until an empty one.
-  Future<List<StellarAddress>> _clientsOf(AgentId agent) async {
+  Future<({List<StellarAddress> clients, int pages})> _clientsOf(
+    AgentId agent,
+  ) async {
     final clients = <StellarAddress>[];
     var start = 0;
+    var pages = 0;
     while (true) {
+      pages++;
       final page = readVec(
         await _read('get_clients_paginated', [
           ScArg.u32(agent.value),
@@ -88,7 +100,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
           const ScArg.u32(reputationPageSize),
         ]),
       ).map(readAddress).toList();
-      if (page.isEmpty) return clients;
+      if (page.isEmpty) return (clients: clients, pages: pages);
       clients.addAll(page);
       start += reputationPageSize;
     }
