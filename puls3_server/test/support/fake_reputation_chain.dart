@@ -55,6 +55,10 @@ final class FakeReputationChain {
   /// When set, every request gets this HTTP status.
   int? failWithStatus;
 
+  /// When set, every request after the first [failAfterRequests] gets a
+  /// 503, as a node that drops in the middle of a read would.
+  int? failAfterRequests;
+
   /// When set, every simulation answers a `restorePreamble`.
   bool needsRestore = false;
 
@@ -84,6 +88,10 @@ final class FakeReputationChain {
     requests.add(body);
     final status = failWithStatus;
     if (status != null) return http.Response('', status);
+    final after = failAfterRequests;
+    if (after != null && requests.length > after) {
+      return http.Response('', 503);
+    }
     final params = body['params']! as Map<String, Object?>;
     final envelope = params['transaction']! as String;
     final Map<String, Object?> result;
