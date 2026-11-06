@@ -78,9 +78,10 @@ WalletSession _walletSession(Client client, String configJson) {
   );
 }
 
-/// Which Studio backend the app uses: `demo` (default, labelled, stores
-/// nothing) or `server` for `StudioEndpoint` (#35):
-/// `--dart-define=STUDIO=server`. Drafts need a wallet session (#136).
+/// Which Studio backend the app uses: `server` for `StudioEndpoint` (#35)
+/// (the default on the production Pages build) or `demo` (labelled, stores
+/// nothing): `--dart-define=STUDIO=server` or `--dart-define=STUDIO=demo`.
+/// Drafts need a wallet session (#136).
 const _studioKind = String.fromEnvironment('STUDIO', defaultValue: 'demo');
 
 StudioGateway? _createStudioGateway(

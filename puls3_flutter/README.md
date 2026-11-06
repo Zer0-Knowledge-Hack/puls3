@@ -42,6 +42,11 @@ Freighter is the default on the web. To use the mock wallet instead:
 
     flutter run -d chrome --dart-define=WALLET=mock
 
+The production web build sets `STUDIO=server` to run Agent Studio on the live
+server (`StudioEndpoint`, #35). To use the demo Studio gateway locally:
+
+    flutter run -d chrome --dart-define=STUDIO=demo
+
 ### Testing with Freighter
 
 1. Install the [Freighter](https://www.freighter.app/) extension in Chrome,

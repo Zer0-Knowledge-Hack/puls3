@@ -428,15 +428,17 @@ covered here); build it with `--dart-define=PULS3_API_URL=<api-url>` so it
 calls this server. In the Pages project, `scripts/cloudflare-pages-build.sh`
 reads `PULS3_API_URL`, `PULS3_HIRE` and `PULS3_STUDIO` from the environment; set
 `PULS3_HIRE=server` once this server has wallet sign-in configured, or hires
-stay the labelled demo. Set `PULS3_STUDIO=server` so Studio saves, test-runs
-and deploys through this server. Unset, Studio stays the labelled demo.
+stay the labelled demo. The production web build sets `PULS3_STUDIO=server`
+(compiling with `--dart-define=STUDIO=server`) so Studio saves, test-runs
+and deploys through this server; unset or `STUDIO=demo` keeps the labelled demo.
 
-With `PULS3_HIRE=server` the Pages build also needs the SEP-10 values the app
+With `PULS3_HIRE=server` or `PULS3_STUDIO=server` the Pages build also needs the SEP-10 values the app
 checks every sign-in challenge against before the wallet is prompted (#136),
 and fails without them. All three are public:
 
 | Pages variable | Value for this deployment |
 |---|---|
+| `PULS3_STUDIO` | `server` |
 | `PULS3_AUTH_SERVER_SIGNING_KEY` | the `G…` account of the `walletAuthSigningKey` password (today `GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG`) |
 | `PULS3_AUTH_HOME_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |
 | `PULS3_AUTH_WEB_AUTH_DOMAIN` | `puls3-hub-on-stellar.api.serverpod.space` |

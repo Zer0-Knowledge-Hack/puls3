@@ -141,6 +141,32 @@ void main() {
     expect(find.textContaining('Monitors Stellar accounts'), findsWidgets);
   });
 
+  testWidgets(
+    'reloading My agents shows the draft as live with its catalog id',
+    (tester) async {
+      await pumpMyAgents(
+        tester,
+        wallet: connected(),
+        drafts: [
+          savedDraft(
+            1,
+            name: 'Studio Agent One',
+            state: DraftDeployState.live,
+            liveVersion: 1,
+            agentId: 'studio-1',
+          ),
+        ],
+      );
+      await advance(tester, const Duration(milliseconds: 400));
+
+      expect(find.text('LIVE'), findsOneWidget);
+      expect(find.text('Studio Agent One'), findsOneWidget);
+      expect(find.text('Live · version 1'), findsOneWidget);
+      expect(find.byKey(const Key('my-agents-view-1')), findsOneWidget);
+      expect(find.byKey(const Key('my-agents-edit-1')), findsOneWidget);
+    },
+  );
+
   testWidgets('Continue editing opens the draft in the Studio', (
     tester,
   ) async {

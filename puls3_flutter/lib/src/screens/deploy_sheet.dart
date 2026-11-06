@@ -49,9 +49,12 @@ class DeploySheet extends StatelessWidget {
     onLive?.call(result);
     // A demo deploy created nothing: never list it as a real agent.
     if (result.isDemo) return;
+    final catalogId = draft.draftId != null
+        ? 'studio-${draft.draftId}'
+        : '${result.agentId}';
     AppScope.of(context).catalog.publish(
       Agent(
-        id: '${result.agentId}',
+        id: catalogId,
         name: draft.name,
         description: draft.description,
         skills: draft.skills,
@@ -86,8 +89,12 @@ class DeploySheet extends StatelessWidget {
             gateway: scope.deployGateway,
             wallet: scope.wallet,
             onLive: (result) => _publish(context, result),
-            onViewAgent: (result) =>
-                _close(context, goTo: '/agent/${result.agentId}'),
+            onViewAgent: (result) {
+              final catalogId = draft.draftId != null
+                  ? 'studio-${draft.draftId}'
+                  : '${result.agentId}';
+              _close(context, goTo: '/agent/$catalogId');
+            },
             onClose: () => _close(context),
           ),
         ),
