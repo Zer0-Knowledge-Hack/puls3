@@ -89,6 +89,43 @@ Consistent with ADR-0002 (#6) and ADR-0005 D5:
 - `isSelfRating(Feedback, {required StellarAddress owner})` and
   `rejectSelfRating(...)` — rule 3.
 
+## Which on-chain feedback counts
+
+The Reputation Registry (#14) accepts feedback from any address and in any
+scale. A record counts toward `R` unless one of these four rules applies, and
+no other rule exists (`exclusionOf` in `puls3_domain/lib/src/feedback_record.dart`):
+
+| Reason (`FeedbackExclusion`) | When |
+|---|---|
+| `unreadable` | The registry lists the record but `read_feedback` cannot load it |
+| `revoked` | Its submitter revoked it (`is_revoked`) |
+| `notWholeScore` | `value_decimals` is not 0 |
+| `outOfScale` | The value is outside 1 to 5 |
+
+`countedFeedback(records)` turns the records that count into the input of
+`reputationOf`. The server reads every record (`SorobanReputationRegistry.recordsOf`)
+and serves `reputationOf(countedFeedback(records))`, with no filter of its own:
+`puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` checks that
+every record either reaches the formula or has one of the reasons above (#202).
+
+## How to verify a rating
+
+Anyone can recompute an agent's rating from the chain and compare it with what
+the server serves. The tool reads the registry with simulated calls (no key, no
+signature) and calls the public catalog:
+
+```bash
+cd puls3_server
+dart run tool/verify_reputation.dart <registryId>                 # deployed server
+dart run tool/verify_reputation.dart <registryId> --api http://localhost:8080
+```
+
+It lists every record with `counts` or `excluded: <reason>`, then prints the
+recomputed rating and count next to the served ones and ends with `MATCH`
+(exit 0) or `MISMATCH` (exit 1). The server keeps a rating for 60 s, so right
+after a new feedback run it again after a minute. Step-by-step evidence:
+[`docs/verification/reputation.md`](../verification/reputation.md).
+
 ## Out of scope
 
 - The Reputation Registry contract (#14).

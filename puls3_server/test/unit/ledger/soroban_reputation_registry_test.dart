@@ -89,6 +89,66 @@ void main() {
       expect(feedback.map((f) => f.score), [2]);
     });
 
+    group('no filtering beyond the public rules (#202)', () {
+      FakeReputationChain mixedChain() => FakeReputationChain()
+        ..add(7, _alice, _stored(5)) // counts
+        ..add(7, _alice, _stored(4, revoked: true)) // revoked
+        ..add(7, _alice, _stored(3)) // counts
+        ..add(7, _alice, _stored(2)) // unreadable (missing below)
+        ..add(7, _bob, _stored(25, decimals: 1)) // 2.5, not a whole score
+        ..add(7, _bob, _stored(9)) // outside 1 to 5
+        ..add(
+          7,
+          _bob,
+          _stored(1, tag1: 'quality'),
+        ) // counts: tags are no filter
+        ..missing.add((7, _alice, 4));
+
+      test('recordsOf returns every record the registry lists', () async {
+        final chain = mixedChain();
+
+        final records = await chain.adapter.recordsOf(AgentId(7));
+
+        expect(records, hasLength(7));
+        expect(
+          records.map((r) => (r.client, r.index)),
+          [
+            (_alice, 1),
+            (_alice, 2),
+            (_alice, 3),
+            (_alice, 4),
+            (_bob, 1),
+            (_bob, 2),
+            (_bob, 3),
+          ],
+        );
+        expect(records.map(exclusionOf), [
+          null,
+          FeedbackExclusion.revoked,
+          null,
+          FeedbackExclusion.unreadable,
+          FeedbackExclusion.notWholeScore,
+          FeedbackExclusion.outOfScale,
+          null,
+        ]);
+      });
+
+      test('feedbacksOf is exactly countedFeedback of recordsOf', () async {
+        final records = await mixedChain().adapter.recordsOf(AgentId(7));
+        final feedback = await mixedChain().adapter.feedbacksOf(AgentId(7));
+
+        final expected = countedFeedback(records);
+        expect(feedback.map((f) => (f.client, f.score)), [
+          for (final f in expected) (f.client, f.score),
+        ]);
+        expect(feedback.map((f) => f.score), [5, 3, 1]);
+        // Every record either reaches the formula or has a public reason.
+        final excluded = records.where((r) => exclusionOf(r) != null).length;
+        expect(feedback.length + excluded, records.length);
+        expect(reputationOf(feedback), reputationOf(expected));
+      });
+    });
+
     test('archived registry state is unavailable, not empty', () async {
       final chain = FakeReputationChain()
         ..add(7, _alice, _stored(5))
