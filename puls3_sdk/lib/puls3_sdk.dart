@@ -2,7 +2,11 @@
 library;
 
 export 'package:puls3_client/puls3_client.dart'
-    show AgentCatalogUnavailable, AgentSummary, Puls3ApiException;
+    show
+        AgentCatalogUnavailable,
+        AgentSummary,
+        Puls3ApiException,
+        ServerpodClientException;
 
 export 'src/catalog.dart' show CatalogApi;
 export 'src/puls3_sdk.dart' show Puls3Sdk;

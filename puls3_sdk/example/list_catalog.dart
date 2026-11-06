@@ -28,6 +28,10 @@ Future<void> main() async {
   } on AgentCatalogUnavailable catch (e) {
     stderr.writeln('catalog unavailable: ${e.message}');
     exitCode = 1;
+  } on ServerpodClientException catch (e) {
+    // The server was not reached, timed out or answered with an HTTP error.
+    stderr.writeln('cannot reach $apiUrl: ${e.message}');
+    exitCode = 1;
   } finally {
     sdk.close();
   }

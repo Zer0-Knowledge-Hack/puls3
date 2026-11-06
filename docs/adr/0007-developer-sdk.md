@@ -45,6 +45,7 @@ The SDK adds no error vocabulary. A caller sees exactly what the server sends:
 - `Puls3ApiException` and its stable `code` (contract rule 7);
 - `AgentCatalogUnavailable` for a catalog outage (the documented exception to rule 7);
 - for a session the server rejects before the endpoint runs, the client's HTTP `401` or `403` exception, as rule 7 describes.
+- for a server that cannot be reached, times out or answers with another HTTP error, the generated client's `ServerpodClientException` (the SDK re-exports the type so callers can catch it).
 
 Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API URL, raise `ArgumentError` without a network call.
 
