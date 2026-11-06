@@ -4,7 +4,11 @@
 // Read-only: contract reads are simulations, the server call is the public
 // catalog. No key, no signature.
 //
-//   dart run tool/verify_reputation.dart <registryId> [--api <url>]
+//   dart run scripts/verify_reputation.dart <registryId> [--api <url>]
+//
+// Run it from the repository root: the repository is a pub workspace, so
+// the script resolves `puls3_domain` and `puls3_server` without its own
+// pubspec.
 //
 // It prints every record the registry lists, whether it counts and why not,
 // then the recomputed rating (domain `countedFeedback` + `reputationOf`, the
@@ -29,7 +33,7 @@ Future<void> main(List<String> args) async {
   final options = _parse(args);
   if (options == null) {
     print(
-      'usage: dart run tool/verify_reputation.dart <registryId> '
+      'usage: dart run scripts/verify_reputation.dart <registryId> '
       '[--api <url>]',
     );
     exit(2);
@@ -56,12 +60,16 @@ Future<void> main(List<String> args) async {
       registry: registryAddress,
     );
 
-    final records = await registry.recordsOf(agent);
+    final (:records, :clientPages) = await registry.readRecords(agent);
     final counted = countedFeedback(records);
     final recomputed = reputationOf(counted);
 
     print('registry : ${registryAddress.value}');
     print('agent    : ${agent.value}');
+    print(
+      'pages    : $clientPages page(s) of get_clients_paginated '
+      '($reputationPageSize clients per page)',
+    );
     print('records  : ${records.length} listed, ${counted.length} counted');
     for (final record in records) {
       final reason = exclusionOf(record);
