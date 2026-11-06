@@ -221,6 +221,14 @@ class ScriptedHireGateway implements HireGateway {
   }
 
   @override
+  Future<EscrowPreparation> prepareComplete(int hireId) async =>
+      _prep('complete');
+
+  @override
+  Future<EscrowPreparation> prepareReject(int hireId, String reason) async =>
+      _prep('reject');
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,

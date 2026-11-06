@@ -356,5 +356,16 @@
   "playgroundQuotaReset": "Já usou os testes de hoje. Reiniciam às {time}.",
   "playgroundOutputCopied": "Saída copiada",
   "marketSortAgents": "Ordenar agentes",
-  "hireIdLabel": "Contratação"
+  "hireIdLabel": "Contratação",
+  "hireApprove": "Aprovar",
+  "hireRejectRefund": "Rejeitar e reembolsar",
+  "hireRejectReasonHint": "Motivo (opcional)",
+  "hireApprovalDeadline": "Aprove ou rejeite antes de {time}.",
+  "hireDeadlinePassed": "A janela de aprovação fechou. O escrow vai pagar o agente.",
+  "hireDecisionCancelled": "Cancelou a assinatura na sua carteira. Nada foi enviado.",
+  "hireViewDecisionExplorer": "Ver a decisão no StellarExpert",
+  "hireDemoDecision": "Apenas demonstração: assinar aqui não move fundos.",
+  "hireApproving": "A aprovar…",
+  "hireRejecting": "A rejeitar…",
+  "hireDecisionFailed": "Não foi possível enviar a decisão. Tente de novo."
 }

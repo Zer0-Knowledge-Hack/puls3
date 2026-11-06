@@ -164,9 +164,13 @@ scripts/deploy-escrow-testnet.sh --redeploy <identity>      # force a new deploy
 The constructor values are fixed: `fee_bps` 0, `approval_window` 86400 s,
 `max_expiry` 2592000 s, no treasury. A re-run skips the deploy when the recorded
 escrow still answers. Results are merged into the `escrow` and `direct_payment`
-slots of `deployments/testnet.json`; the seed script also binds each agent wallet
-(`AGENT_WALLET_ACCOUNT`, default: the owner identity). Identities are Stellar CLI
-identity names; no secret is stored in the repository.
+slots of `deployments/testnet.json`. The seed script binds a **missing**
+registry wallet to `AGENT_WALLET_ACCOUNT` (default: the owner identity) and
+leaves any other G-address alone, so a custodied rebind (#209) survives a
+re-seed. Live seed agents (ids 7–14) are owned by the escrow-admin identity
+(`GAFUY…`), not the registry deployer (`GBY33…`); dual-auth rebind uses that
+owner (`puls3_server/tool/rebind_demo_wallets.dart`). Identities are Stellar
+CLI identity names; no secret is stored in the repository.
 
 **TTL.** Escrow state is persistent and has a TTL of about 60 days. Call
 `extend_ttl(job_id)` on the escrow contract before it lapses to keep a job

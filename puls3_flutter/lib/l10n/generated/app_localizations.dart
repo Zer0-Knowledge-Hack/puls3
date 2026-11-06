@@ -2213,6 +2213,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hire'**
   String get hireIdLabel;
+
+  /// No description provided for @hireApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get hireApprove;
+
+  /// No description provided for @hireRejectRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject and refund'**
+  String get hireRejectRefund;
+
+  /// No description provided for @hireRejectReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional reason'**
+  String get hireRejectReasonHint;
+
+  /// No description provided for @hireApprovalDeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve or reject before {time}.'**
+  String hireApprovalDeadline(String time);
+
+  /// No description provided for @hireDeadlinePassed.
+  ///
+  /// In en, this message translates to:
+  /// **'The approval window closed. The escrow will pay the agent.'**
+  String get hireDeadlinePassed;
+
+  /// No description provided for @hireDecisionCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'You cancelled the signature in your wallet. Nothing was sent.'**
+  String get hireDecisionCancelled;
+
+  /// No description provided for @hireViewDecisionExplorer.
+  ///
+  /// In en, this message translates to:
+  /// **'View decision on StellarExpert'**
+  String get hireViewDecisionExplorer;
+
+  /// No description provided for @hireDemoDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo only: signing here does not move funds.'**
+  String get hireDemoDecision;
+
+  /// No description provided for @hireApproving.
+  ///
+  /// In en, this message translates to:
+  /// **'Approving…'**
+  String get hireApproving;
+
+  /// No description provided for @hireRejecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejecting…'**
+  String get hireRejecting;
+
+  /// No description provided for @hireDecisionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The decision could not be sent. Try again.'**
+  String get hireDecisionFailed;
 }
 
 class _AppLocalizationsDelegate

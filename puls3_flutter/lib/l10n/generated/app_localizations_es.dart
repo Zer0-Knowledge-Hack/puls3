@@ -1217,4 +1217,43 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get hireIdLabel => 'Contratación';
+
+  @override
+  String get hireApprove => 'Aprobar';
+
+  @override
+  String get hireRejectRefund => 'Rechazar y reembolsar';
+
+  @override
+  String get hireRejectReasonHint => 'Motivo (opcional)';
+
+  @override
+  String hireApprovalDeadline(String time) {
+    return 'Aprueba o rechaza antes de $time.';
+  }
+
+  @override
+  String get hireDeadlinePassed =>
+      'Se cerró la ventana de aprobación. El escrow pagará al agente.';
+
+  @override
+  String get hireDecisionCancelled =>
+      'Cancelaste la firma en tu wallet. No se envió nada.';
+
+  @override
+  String get hireViewDecisionExplorer => 'Ver la decisión en StellarExpert';
+
+  @override
+  String get hireDemoDecision =>
+      'Solo demostración: firmar aquí no mueve fondos.';
+
+  @override
+  String get hireApproving => 'Aprobando…';
+
+  @override
+  String get hireRejecting => 'Rechazando…';
+
+  @override
+  String get hireDecisionFailed =>
+      'No se pudo enviar la decisión. Inténtalo de nuevo.';
 }

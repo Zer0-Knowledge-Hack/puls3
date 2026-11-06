@@ -1210,6 +1210,45 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hireIdLabel => 'Contratação';
+
+  @override
+  String get hireApprove => 'Aprovar';
+
+  @override
+  String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireRejectReasonHint => 'Motivo (opcional)';
+
+  @override
+  String hireApprovalDeadline(String time) {
+    return 'Aprove ou rejeite antes de $time.';
+  }
+
+  @override
+  String get hireDeadlinePassed =>
+      'A janela de aprovação fechou. O escrow vai pagar o agente.';
+
+  @override
+  String get hireDecisionCancelled =>
+      'Você cancelou a assinatura na sua carteira. Nada foi enviado.';
+
+  @override
+  String get hireViewDecisionExplorer => 'Ver a decisão no StellarExpert';
+
+  @override
+  String get hireDemoDecision =>
+      'Só demonstração: assinar aqui não move fundos.';
+
+  @override
+  String get hireApproving => 'Aprovando…';
+
+  @override
+  String get hireRejecting => 'Rejeitando…';
+
+  @override
+  String get hireDecisionFailed =>
+      'Não foi possível enviar a decisão. Tente de novo.';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2418,6 +2457,45 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get hireIdLabel => 'Contratação';
+
+  @override
+  String get hireApprove => 'Aprovar';
+
+  @override
+  String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireRejectReasonHint => 'Motivo (opcional)';
+
+  @override
+  String hireApprovalDeadline(String time) {
+    return 'Aprove ou rejeite antes de $time.';
+  }
+
+  @override
+  String get hireDeadlinePassed =>
+      'A janela de aprovação fechou. O escrow vai pagar o agente.';
+
+  @override
+  String get hireDecisionCancelled =>
+      'Você cancelou a assinatura na sua carteira. Nada foi enviado.';
+
+  @override
+  String get hireViewDecisionExplorer => 'Ver a decisão no StellarExpert';
+
+  @override
+  String get hireDemoDecision =>
+      'Só demonstração: assinar aqui não move fundos.';
+
+  @override
+  String get hireApproving => 'Aprovando…';
+
+  @override
+  String get hireRejecting => 'Rejeitando…';
+
+  @override
+  String get hireDecisionFailed =>
+      'Não foi possível enviar a decisão. Tente de novo.';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -3629,4 +3707,43 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get hireIdLabel => 'Contratação';
+
+  @override
+  String get hireApprove => 'Aprovar';
+
+  @override
+  String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireRejectReasonHint => 'Motivo (opcional)';
+
+  @override
+  String hireApprovalDeadline(String time) {
+    return 'Aprove ou rejeite antes de $time.';
+  }
+
+  @override
+  String get hireDeadlinePassed =>
+      'A janela de aprovação fechou. O escrow vai pagar o agente.';
+
+  @override
+  String get hireDecisionCancelled =>
+      'Cancelou a assinatura na sua carteira. Nada foi enviado.';
+
+  @override
+  String get hireViewDecisionExplorer => 'Ver a decisão no StellarExpert';
+
+  @override
+  String get hireDemoDecision =>
+      'Apenas demonstração: assinar aqui não move fundos.';
+
+  @override
+  String get hireApproving => 'A aprovar…';
+
+  @override
+  String get hireRejecting => 'A rejeitar…';
+
+  @override
+  String get hireDecisionFailed =>
+      'Não foi possível enviar a decisão. Tente de novo.';
 }

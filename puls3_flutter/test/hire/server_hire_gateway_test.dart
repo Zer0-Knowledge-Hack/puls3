@@ -54,6 +54,8 @@ ServerHireGateway _gateway({
   CreateHireCall? createHire,
   PrepareEscrowCall? prepareCreateJob,
   PrepareEscrowCall? prepareFund,
+  PrepareEscrowCall? prepareComplete,
+  PrepareRejectCall? prepareReject,
   SubmitEscrowCall? submit,
   GetHireCall? getHire,
   ReadWalletFunds? readFunds,
@@ -68,6 +70,8 @@ ServerHireGateway _gateway({
       ),
   prepareCreateJob: prepareCreateJob ?? (_) async => _prepared('createJob'),
   prepareFund: prepareFund ?? (_) async => _prepared('fund'),
+  prepareComplete: prepareComplete ?? (_) async => _prepared('complete'),
+  prepareReject: prepareReject ?? (_, _) async => _prepared('reject'),
   submitEscrowCall: submit ?? (_, _, _) async => _detail('submitted'),
   getHire: getHire ?? (_, _) async => _detail('confirmed'),
   pollInterval: const Duration(milliseconds: 5),
@@ -315,6 +319,8 @@ void main() {
         createHire: (_, _, _, _) => Completer<CreateHireResult>().future,
         prepareCreateJob: (_) async => _prepared('createJob'),
         prepareFund: (_) async => _prepared('fund'),
+        prepareComplete: (_) async => _prepared('complete'),
+        prepareReject: (_, _) async => _prepared('reject'),
         submitEscrowCall: (_, _, _) async => _detail('submitted'),
         getHire: (_, _) async => _detail('confirmed'),
         callTimeout: const Duration(milliseconds: 20),
@@ -446,6 +452,40 @@ void main() {
       expect(hire.stage, HireStage.awaitingPayment);
     });
 
+    test('maps the approval deadline and a complete/reject tx', () async {
+      final deadline = DateTime.utc(2026, 10, 27);
+      final hire = await _gateway(
+        getHire: (_, _) async => HireDetail(
+          hire: _hire(3).copyWith(status: 'submitted'),
+          agent: AgentSummary(
+            id: 'agt-007',
+            registryId: 13,
+            name: 'Support Relay',
+            description: 'Answers support tickets',
+            skills: ['support'],
+            priceUsdcStroops: 45000000,
+          ),
+          input: 'Answer this ticket',
+          result: 'done',
+          approvalDeadline: deadline,
+          escrowSubmission: submission('complete', 'c0a1e5ce'),
+        ),
+      ).getHire(3, _consumer);
+      expect(hire.approvalDeadline, deadline);
+      expect(hire.decisionTransaction, 'c0a1e5ce');
+      expect(hire.decisionExplorerUrl, contains('/tx/c0a1e5ce'));
+      expect(
+        hire.showApproveAt(deadline.subtract(const Duration(minutes: 1))),
+        isTrue,
+      );
+      expect(
+        hire.showRejectAt(deadline.subtract(const Duration(minutes: 1))),
+        isTrue,
+      );
+      expect(hire.showApproveAt(deadline), isFalse);
+      expect(hire.showRejectAt(deadline), isFalse);
+    });
+
     test('never links another submission as the payment', () async {
       final hire = await _gateway(
         getHire: (_, _) async => funded(
@@ -547,13 +587,41 @@ void main() {
       expect(
         HireStage.values.where((s) => s.isFinal),
         [
-          HireStage.runFailed,
           HireStage.completed,
           HireStage.rejected,
           HireStage.expired,
         ],
       );
     });
+
+    test(
+      'a failed run can still be rejected; submitted follows the window',
+      () {
+        final now = DateTime.utc(2026, 10, 26, 12);
+        expect(
+          progress(status: 'funded', runtimeStatus: 'failed').showRejectAt(now),
+          isTrue,
+        );
+        expect(
+          progress(
+            status: 'funded',
+            runtimeStatus: 'failed',
+          ).showApproveAt(now),
+          isFalse,
+        );
+        final open = HireProgress(
+          hireId: 3,
+          agentName: 'Support Relay',
+          priceUsdcStroops: 1,
+          input: 'x',
+          status: 'submitted',
+          approvalDeadline: now.add(const Duration(hours: 1)),
+        );
+        expect(open.showApproveAt(now), isTrue);
+        expect(open.showRejectAt(now), isTrue);
+        expect(open.showApproveAt(now.add(const Duration(hours: 2))), isFalse);
+      },
+    );
 
     test('a reject from open is a cancel', () {
       expect(

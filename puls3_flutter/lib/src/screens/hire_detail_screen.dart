@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../domain/stellar_explorer.dart';
 import '../hire/hire_flow_controller.dart' show walletErrorMessage;
 import '../hire/hire_gateway.dart';
+import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
 import '../state/wallet_controller.dart';
 import '../theme/puls3_theme.dart';
@@ -28,10 +29,9 @@ enum _Status { loading, ready, notFound, needsWallet, needsSignIn, error }
 
 /// `/hires/:id` (S06, flow F6): the container. It reads the hire with the
 /// connected wallet (`HireEndpoint.getHire`) and polls it every
-/// [pollInterval] until nothing changes without the client any more.
-///
-/// Approve and Reject are not offered yet: they need the agent's
-/// server-signed `submit` (#97), so a hire stops at "result ready".
+/// [pollInterval] until the hire is terminal. Approve and Reject sign
+/// `complete` / `reject` through [HireGateway]; the presentational view
+/// never calls the client.
 class HireDetailScreen extends StatefulWidget {
   const HireDetailScreen({
     super.key,
@@ -39,6 +39,7 @@ class HireDetailScreen extends StatefulWidget {
     this.openUrl = _launch,
     this.copyText = _copy,
     this.pollInterval = const Duration(seconds: 4),
+    this.now = DateTime.now,
   });
 
   /// The `:id` path parameter, unparsed.
@@ -46,6 +47,7 @@ class HireDetailScreen extends StatefulWidget {
   final Future<void> Function(Uri url) openUrl;
   final Future<void> Function(String text) copyText;
   final Duration pollInterval;
+  final DateTime Function() now;
 
   @override
   State<HireDetailScreen> createState() => _HireDetailScreenState();
@@ -58,9 +60,12 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   /// Why the last refresh or sign-in failed, until the next attempt.
   String? _error;
   bool _busy = false;
+  bool _approving = false;
+  bool _rejecting = false;
   Timer? _poll;
   WalletController? _wallet;
   String? _address;
+  final _reason = TextEditingController();
 
   /// Bumped per request, so a stale answer never overwrites a newer one.
   int _request = 0;
@@ -85,6 +90,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _reason.dispose();
     _wallet?.removeListener(_onWallet);
     super.dispose();
   }
@@ -199,6 +205,63 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
     unawaited(widget.openUrl(Uri.parse(url)));
   }
 
+  void _openDecision(HireProgress hire) {
+    final url =
+        hire.decisionExplorerUrl ??
+        stellarExpertTxUrl(hire.decisionTransaction!);
+    unawaited(widget.openUrl(Uri.parse(url)));
+  }
+
+  Future<void> _decide({required bool approve}) async {
+    if (_approving || _rejecting) return;
+    final hire = _hire;
+    final wallet = _wallet;
+    final address = wallet?.address;
+    if (hire == null || wallet == null || address == null) return;
+    _poll?.cancel();
+    setState(() {
+      if (approve) {
+        _approving = true;
+      } else {
+        _rejecting = true;
+      }
+      _error = null;
+    });
+    try {
+      final gateway = AppScope.of(context).hireGateway;
+      await gateway.ensureSignedIn(address, wallet.signChallenge);
+      final preparation = approve
+          ? await gateway.prepareComplete(hire.hireId)
+          : await gateway.prepareReject(hire.hireId, _reason.text.trim());
+      final signed = await wallet.signTransaction(
+        preparation.unsignedTransaction,
+      );
+      await gateway.submit(hire.hireId, preparation, signed);
+      if (!mounted) return;
+      setState(() {
+        _approving = false;
+        _rejecting = false;
+      });
+      await _load();
+    } on WalletException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _approving = false;
+        _rejecting = false;
+        _error = e is WalletSignatureRejected
+            ? context.l10n.hireDecisionCancelled
+            : walletErrorMessage(e);
+      });
+    } on HireGatewayException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _approving = false;
+        _rejecting = false;
+        _error = e.message;
+      });
+    }
+  }
+
   Future<void> _copyResult(String result) async {
     await widget.copyText(result);
     if (!mounted) return;
@@ -281,6 +344,20 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
         onCopyResult: hire.result == null
             ? null
             : () => unawaited(_copyResult(hire.result!)),
+        onOpenDecision: hire.decisionTransaction == null
+            ? null
+            : () => _openDecision(hire),
+        onApprove: () => unawaited(_decide(approve: true)),
+        onReject: () => unawaited(_decide(approve: false)),
+        rejectReasonController: _reason,
+        showApprove: hire.showApproveAt(widget.now()),
+        showReject: hire.showRejectAt(widget.now()),
+        deadlinePassed:
+            hire.stage == HireStage.submitted &&
+            !hire.approvalWindowOpen(widget.now()),
+        approving: _approving,
+        rejecting: _rejecting,
+        isDemo: AppScope.of(context).hireGateway.isDemo,
         banner: error == null
             ? null
             : ErrorBanner(

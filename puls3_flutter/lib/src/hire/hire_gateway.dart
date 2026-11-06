@@ -44,6 +44,13 @@ abstract interface class HireGateway {
   /// being confirmed, up to the gateway's own limit.
   Future<EscrowPreparation> prepareFund(int hireId);
 
+  /// The unsigned `complete` of a submitted hire (F6 Approve).
+  Future<EscrowPreparation> prepareComplete(int hireId);
+
+  /// The unsigned `reject` of [hireId] (F6 Reject and refund). [reason] may
+  /// be empty.
+  Future<EscrowPreparation> prepareReject(int hireId, String reason);
+
   /// Relays the wallet-signed envelope of [preparation] and returns its
   /// submission.
   Future<EscrowSubmission> submit(
@@ -85,8 +92,9 @@ enum HireStage {
   expired;
 
   /// Nothing changes any more without the client, so polling can stop.
+  /// A failed run is not final: the client can still reject and refund.
   bool get isFinal => switch (this) {
-    runFailed || completed || rejected || expired => true,
+    completed || rejected || expired => true,
     _ => false,
   };
 }
@@ -105,6 +113,9 @@ class HireProgress {
     this.result,
     this.paymentTransaction,
     this.paymentExplorerUrl,
+    this.approvalDeadline,
+    this.decisionTransaction,
+    this.decisionExplorerUrl,
   });
 
   final int hireId;
@@ -138,6 +149,15 @@ class HireProgress {
   /// StellarExpert link of [paymentTransaction], when the server built one.
   final String? paymentExplorerUrl;
 
+  /// The job's `approval_deadline`, set once the agent submitted.
+  final DateTime? approvalDeadline;
+
+  /// Lowercase hex hash of the confirmed `complete` or `reject` transaction.
+  final String? decisionTransaction;
+
+  /// StellarExpert link of [decisionTransaction], when the server built one.
+  final String? decisionExplorerUrl;
+
   HireStage get stage => switch (status) {
     'funded' when runtimeStatus == 'failed' => HireStage.runFailed,
     // A succeeded run stays `running` until its `submit` lands (api.md,
@@ -154,6 +174,24 @@ class HireProgress {
 
   /// A reject before any payment: the app calls it cancelled.
   bool get isCancelled => status == 'rejected' && rejectedFrom == 'open';
+
+  /// The approval window is still open. A missing deadline (not submitted
+  /// yet, or the server has not filled it) is treated as open.
+  bool approvalWindowOpen(DateTime now) {
+    final deadline = approvalDeadline;
+    if (deadline == null) return true;
+    return now.toUtc().isBefore(deadline.toUtc());
+  }
+
+  /// F6 Approve: submitted, and the window is still open.
+  bool showApproveAt(DateTime now) =>
+      stage == HireStage.submitted && approvalWindowOpen(now);
+
+  /// F6 Reject: a failed run, or submitted before the deadline.
+  bool showRejectAt(DateTime now) {
+    if (stage == HireStage.runFailed) return true;
+    return stage == HireStage.submitted && approvalWindowOpen(now);
+  }
 }
 
 /// A created hire and its first escrow call.

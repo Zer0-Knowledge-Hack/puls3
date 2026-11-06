@@ -473,5 +473,21 @@
   },
   "playgroundOutputCopied": "Output copied",
   "marketSortAgents": "Sort agents",
-  "hireIdLabel": "Hire"
+  "hireIdLabel": "Hire",
+  "hireApprove": "Approve",
+  "hireRejectRefund": "Reject and refund",
+  "hireRejectReasonHint": "Optional reason",
+  "hireApprovalDeadline": "Approve or reject before {time}.",
+  "@hireApprovalDeadline": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "hireDeadlinePassed": "The approval window closed. The escrow will pay the agent.",
+  "hireDecisionCancelled": "You cancelled the signature in your wallet. Nothing was sent.",
+  "hireViewDecisionExplorer": "View decision on StellarExpert",
+  "hireDemoDecision": "Demo only: signing here does not move funds.",
+  "hireApproving": "Approving…",
+  "hireRejecting": "Rejecting…",
+  "hireDecisionFailed": "The decision could not be sent. Try again."
 }

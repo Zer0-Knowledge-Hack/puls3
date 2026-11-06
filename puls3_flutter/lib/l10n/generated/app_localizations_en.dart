@@ -1197,4 +1197,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hireIdLabel => 'Hire';
+
+  @override
+  String get hireApprove => 'Approve';
+
+  @override
+  String get hireRejectRefund => 'Reject and refund';
+
+  @override
+  String get hireRejectReasonHint => 'Optional reason';
+
+  @override
+  String hireApprovalDeadline(String time) {
+    return 'Approve or reject before $time.';
+  }
+
+  @override
+  String get hireDeadlinePassed =>
+      'The approval window closed. The escrow will pay the agent.';
+
+  @override
+  String get hireDecisionCancelled =>
+      'You cancelled the signature in your wallet. Nothing was sent.';
+
+  @override
+  String get hireViewDecisionExplorer => 'View decision on StellarExpert';
+
+  @override
+  String get hireDemoDecision => 'Demo only: signing here does not move funds.';
+
+  @override
+  String get hireApproving => 'Approving…';
+
+  @override
+  String get hireRejecting => 'Rejecting…';
+
+  @override
+  String get hireDecisionFailed => 'The decision could not be sent. Try again.';
 }

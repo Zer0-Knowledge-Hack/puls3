@@ -14,12 +14,13 @@
 #   --sync-metadata  Repair registered agents whose on-chain metadata drifted from
 #                    the seed file (owner only). Without it, drift is only reported.
 #
-# Every agent's registry wallet is checked after registration or skip and bound with
-# set_agent_wallet when it is missing or different (escrow create_job requires
-# provider == registry wallet). The target wallet is the Stellar CLI identity named by
-# $AGENT_WALLET_ACCOUNT, defaulting to the owner identity. A separate wallet needs a
-# second signature on set_agent_wallet that is not confirmed for stellar-cli 28.0.0, so
-# the default keeps wallet == owner (one signer).
+# Every agent's registry wallet is checked after registration or skip. A missing
+# wallet is bound with set_agent_wallet to the Stellar CLI identity named by
+# $AGENT_WALLET_ACCOUNT (default: the owner identity). A wallet that is already
+# a different G-address is left alone: rebinding it to the owner only needs the
+# owner signature (new_wallet == caller) and would undo a custodied rebind
+# (#209). Dual-auth set_agent_wallet for a new custodied wallet is
+# puls3_server/tool/rebind_demo_wallets.dart, not this script.
 #
 # Env: SEED_FILE overrides the seed file (used by tests).
 #      AGENT_WALLET_ACCOUNT selects the wallet identity (default: the owner identity).
@@ -329,13 +330,17 @@ clean() { printf '%s' "$1" | tr -d '"[:space:]'; }
 # Prints the 64-hex transaction hash found in CLI log file $1, or nothing.
 tx_hash_of() { grep -oE '(tx/|[Tt]ransaction hash is )[0-9a-f]{64}' "$1" | head -n 1 | grep -oE '[0-9a-f]{64}' || true; }
 
-# Makes the registry wallet of agent $1 equal TARGET_WALLET: no call when already bound,
-# otherwise set_agent_wallet (owner only) and the transaction hash is logged.
+# Binds a missing registry wallet of agent $1 to TARGET_WALLET. A wallet that is
+# already TARGET is a no-op. A different G-address is left alone (#209).
 ensure_wallet() {
   local agent_id="$1" current hash
   current="$(clean "$(invoke get_agent_wallet --agent-id "$agent_id" || true)")"
   if [ "$current" = "$TARGET_WALLET" ]; then
     echo "wallet: agent $agent_id already bound to $TARGET_WALLET"
+    return 0
+  fi
+  if [ -n "$current" ] && [ "$current" != "null" ]; then
+    echo "wallet: agent $agent_id already bound to $current (left alone; target is $TARGET_WALLET)"
     return 0
   fi
   invoke set_agent_wallet --caller "$CALLER" --agent-id "$agent_id" --new-wallet "$TARGET_WALLET" >/dev/null 2>"$ERR_LOG" || {
