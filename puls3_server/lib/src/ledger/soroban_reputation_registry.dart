@@ -12,10 +12,6 @@ const reputationPageSize = 50;
 /// already revoked, for `revoke_feedback`; for a read, it cannot be loaded).
 const _feedbackNotFound = 2;
 
-/// The first and last score of a feedback, the scale of #11.
-const _lowestScore = 1;
-const _highestScore = 5;
-
 /// The [ReputationRegistry] over the Reputation Registry of #14
 /// (`contracts/contracts/reputation-registry`), read through simulated
 /// calls like the other registry readers: no signature, no submission.
@@ -24,11 +20,12 @@ const _highestScore = 5;
 /// `get_last_index` for how many feedbacks each one gave, and
 /// `read_feedback` for each record.
 ///
-/// What it returns is what `SorobanReputationCalls` writes: a feedback whose
-/// `value` is a whole score from 1 to 5 (`value_decimals` 0). Revoked
-/// records, records another writer left on the registry with another scale
-/// or decimals, and records the registry cannot load are not puls3 scores and
-/// are left out. Tags are not a filter: they carry no puls3 meaning.
+/// [recordsOf] returns every record the registry lists, raw. [feedbacksOf]
+/// is exactly `countedFeedback` of those records: the four public rules of
+/// the domain (`exclusionOf`: unreadable, revoked, not a whole score, outside
+/// 1 to 5) are the only reasons a record does not count, and this adapter
+/// adds none of its own (#202). Tags are not a filter: they carry no puls3
+/// meaning.
 ///
 /// The registry stores no hire and no comment, so the returned [Feedback] has
 /// no `hireId` (null: the `feedback_index` is the registry key, not a puls3
@@ -46,9 +43,25 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   /// A registry read failure is a [LedgerException]: the caller must not
   /// treat it as "no feedback".
   @override
-  Future<List<Feedback>> feedbacksOf(AgentId agent) async {
-    final feedback = <Feedback>[];
-    for (final client in await _clientsOf(agent)) {
+  Future<List<Feedback>> feedbacksOf(AgentId agent) async =>
+      countedFeedback(await recordsOf(agent));
+
+  /// Every feedback record the registry lists for [agent], raw and in
+  /// registry order (client by client, index by index), including the ones
+  /// that do not count. What an auditor reads on chain (#202).
+  ///
+  /// A registry read failure is a [LedgerException], never an empty list.
+  Future<List<FeedbackRecord>> recordsOf(AgentId agent) async =>
+      (await readRecords(agent)).records;
+
+  /// [recordsOf] plus how many `get_clients_paginated` pages were read,
+  /// the empty page that ends the list included, for the verification tool.
+  Future<({List<FeedbackRecord> records, int clientPages})> readRecords(
+    AgentId agent,
+  ) async {
+    final (:clients, :pages) = await _clientsOf(agent);
+    final records = <FeedbackRecord>[];
+    for (final client in clients) {
       final last = readU64(
         await _read('get_last_index', [
           ScArg.u32(agent.value),
@@ -56,11 +69,10 @@ final class SorobanReputationRegistry implements ReputationRegistry {
         ]),
       );
       for (var index = 1; index <= last; index++) {
-        final item = await _feedbackAt(agent, client, index);
-        if (item != null) feedback.add(item);
+        records.add(await _recordAt(agent, client, index));
       }
     }
-    return feedback;
+    return (records: records, clientPages: pages);
   }
 
   /// The server never signs: the consumer's wallet signs `give_feedback`,
@@ -73,10 +85,14 @@ final class SorobanReputationRegistry implements ReputationRegistry {
       );
 
   /// Every client that gave [agent] feedback, page by page until an empty one.
-  Future<List<StellarAddress>> _clientsOf(AgentId agent) async {
+  Future<({List<StellarAddress> clients, int pages})> _clientsOf(
+    AgentId agent,
+  ) async {
     final clients = <StellarAddress>[];
     var start = 0;
+    var pages = 0;
     while (true) {
+      pages++;
       final page = readVec(
         await _read('get_clients_paginated', [
           ScArg.u32(agent.value),
@@ -84,15 +100,14 @@ final class SorobanReputationRegistry implements ReputationRegistry {
           const ScArg.u32(reputationPageSize),
         ]),
       ).map(readAddress).toList();
-      if (page.isEmpty) return clients;
+      if (page.isEmpty) return (clients: clients, pages: pages);
       clients.addAll(page);
       start += reputationPageSize;
     }
   }
 
-  /// The feedback `client` gave at [index], or `null` when it is not a puls3
-  /// score.
-  Future<Feedback?> _feedbackAt(
+  /// The record `client` gave at [index], as the registry stores it.
+  Future<FeedbackRecord> _recordAt(
     AgentId agent,
     StellarAddress client,
     int index,
@@ -102,22 +117,21 @@ final class SorobanReputationRegistry implements ReputationRegistry {
       [ScArg.u32(agent.value), ScArg.address(client), ScArg.u64(index)],
       absentErrors: const {_feedbackNotFound},
     );
-    if (value == null) return null;
+    if (value == null) {
+      return FeedbackRecord.unreadable(
+        agentId: agent,
+        client: client,
+        index: index,
+      );
+    }
     final fields = readMap(value);
-    if (readBool(fields['is_revoked']) ||
-        readU32(fields['value_decimals']) != 0) {
-      return null;
-    }
-    final score = readI128(fields['value']);
-    if (score < BigInt.from(_lowestScore) ||
-        score > BigInt.from(_highestScore)) {
-      return null;
-    }
-    return Feedback(
-      hireId: null,
+    return FeedbackRecord(
       agentId: agent,
       client: client,
-      score: score.toInt(),
+      index: index,
+      value: readI128(fields['value']),
+      valueDecimals: readU32(fields['value_decimals']),
+      isRevoked: readBool(fields['is_revoked']),
     );
   }
 
