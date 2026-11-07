@@ -93,11 +93,10 @@ that hire raises `OutcomeUnknown` until the record is resolved by hand. An
 expired `fund` is first reconciled through the escrow job: `Funded` or later
 pays the hire, `Open` is `PreparationExpired`.
 
-`complete`, `reject` and `registerFull` are confirmed when the transaction
-succeeds but change nothing else (#97). Until then the hire status does not
-move, so the app may offer `prepareComplete` again and the contract rejects it
-as `TransactionFailed`. Recording the job id after `createJob` is a no-op until
-the hire lifecycle lands (#96).
+`submit`, `complete`, `reject`, `release`, `claimRefund` and `registerFull`
+are confirmed when the transaction succeeds. Hire status is then derived from
+those records (#208): `submitted`, `completed`, `rejected` or `expired`. The
+tracker does not write a status column. `setAgentWallet` stays untracked.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -125,9 +124,12 @@ Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
 `running`, `failed`), with the `result` and `failureReason`.
 
-A successful run leaves the hire `funded` with its result: the server-signed
-escrow `submit` that makes it `submitted` is #97. Until the #34 chain stores
-deployed manifests, the demo agents' manifests are seeded in
+A successful run stores the result and, when agent-wallet custody is
+configured, the runtime signs escrow `submit` with the custodied provider
+key (#208). The tracker confirms it and `getHire` then reports `submitted`.
+Seeded demo agents that still pay to the escrow admin cannot sign until
+[#209](https://github.com/Zer0-Knowledge-Hack/puls3/issues/209). Studio-deployed
+agents already have custodied wallets. Demo manifests are seeded in
 `lib/src/runtime/demo_manifests.dart`, keyed by the agent's `id` metadata
 (`agt-006` Copy Forge, `agt-007` Support Relay). Both run on Cloudflare
 Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`), the free provider of
@@ -158,7 +160,7 @@ model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. |
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `172800`. |
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
@@ -209,9 +211,49 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=86400 \
+PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
 dart run tool/e2e_relay_testnet.dart
 ```
+
+### Submit and complete proof on testnet (#208)
+
+`tool/e2e_submit_testnet.dart` continues past funding: the agent runtime
+signs escrow `submit` with the custodied provider key, then the consumer
+signs `complete` unchanged. It prints both transaction hashes with Stellar
+Expert links. Seed demo agents that still pay the escrow admin (`GAFUY…`)
+are skipped; the hire must be of a Studio-deployed agent whose wallet is in
+`agent_wallet`. Rebinding the seed catalog is #209.
+
+Default Serverpod mode is `test` (`postgres_test`, same as the relay proof).
+A Studio deploy against the local development server writes `agent_wallet`
+and the manifest to development Postgres (`localhost:8090`), so that agent
+is invisible in test mode. Stop `dart bin/main.dart` and set
+`PULS3_E2E_SERVERPOD_MODE=development` to use those rows.
+
+The same consumer secret and relay fee keys as the relay proof. Also:
+
+- `PULS3_AGENT_WALLET_SECRET_KEY` (custody cipher; see `docs/infra/secrets.md`)
+- Workers AI (`PULS3_WORKERS_AI_ACCOUNT_ID` + `workersAiApiToken`) or Anthropic,
+  so the run can finish
+- `PULS3_E2E_AGENT_ID` optional; otherwise the cheapest custodied agent
+- `PULS3_E2E_SERVERPOD_MODE` optional (`test` or `development`)
+
+```bash
+# Stop dart bin/main.dart first so ports 8080–8082 are free.
+docker start puls3_server-postgres-1 puls3_server-redis-1
+cd puls3_server
+set -a; . ../.env; set +a
+PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" \
+PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_PLATFORM_FEE_BPS=0 \
+PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
+PULS3_E2E_SERVERPOD_MODE=development \
+dart run tool/e2e_submit_testnet.dart
+```
+
+Paste the printed `submit` and `complete` hashes on PR #213.
 
 ### Feedback proof on testnet (#179)
 
@@ -514,7 +556,7 @@ per project.
    scloud variable set PULS3_INDEXER_ENABLED true
    scloud variable set PULS3_RUNTIME_ENABLED true
    scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
-   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 86400
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 172800
    scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
    scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
    scloud variable set PULS3_PLATFORM_FEE_BPS 0

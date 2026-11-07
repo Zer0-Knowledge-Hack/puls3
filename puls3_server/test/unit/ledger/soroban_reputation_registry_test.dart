@@ -89,6 +89,138 @@ void main() {
       expect(feedback.map((f) => f.score), [2]);
     });
 
+    group('no filtering beyond the public rules (#202)', () {
+      FakeReputationChain mixedChain() => FakeReputationChain()
+        ..add(7, _alice, _stored(5)) // counts
+        ..add(7, _alice, _stored(4, revoked: true)) // revoked
+        ..add(7, _alice, _stored(3)) // counts
+        ..add(7, _alice, _stored(2)) // unreadable (missing below)
+        ..add(7, _bob, _stored(25, decimals: 1)) // 2.5, not a whole score
+        ..add(7, _bob, _stored(9)) // outside 1 to 5
+        ..add(
+          7,
+          _bob,
+          _stored(1, tag1: 'quality'),
+        ) // counts: tags are no filter
+        ..missing.add((7, _alice, 4));
+
+      test('recordsOf returns every record the registry lists', () async {
+        final chain = mixedChain();
+
+        final records = await chain.adapter.recordsOf(AgentId(7));
+
+        expect(records, hasLength(7));
+        expect(
+          records.map((r) => (r.client, r.index)),
+          [
+            (_alice, 1),
+            (_alice, 2),
+            (_alice, 3),
+            (_alice, 4),
+            (_bob, 1),
+            (_bob, 2),
+            (_bob, 3),
+          ],
+        );
+        expect(records.map(exclusionOf), [
+          null,
+          FeedbackExclusion.revoked,
+          null,
+          FeedbackExclusion.unreadable,
+          FeedbackExclusion.notWholeScore,
+          FeedbackExclusion.outOfScale,
+          null,
+        ]);
+      });
+
+      test(
+        'an agent with no feedback reads one empty page and no records',
+        () async {
+          final chain = FakeReputationChain();
+
+          final read = await chain.adapter.readRecords(AgentId(7));
+
+          expect(read.records, isEmpty);
+          expect(read.clientPages, 1);
+          expect(await chain.adapter.feedbacksOf(AgentId(7)), isEmpty);
+        },
+      );
+
+      test('pagination reads every client page and drops no record', () async {
+        final chain = FakeReputationChain();
+        final clients = [
+          for (var i = 0; i < reputationPageSize + 1; i++) testAccount(i),
+        ];
+        for (final client in clients) {
+          chain.add(7, client, _stored(4));
+        }
+
+        final read = await chain.adapter.readRecords(AgentId(7));
+
+        // A full page, a page of one, and the empty page that ends the list.
+        expect(read.clientPages, 3);
+        expect(read.records, hasLength(reputationPageSize + 1));
+        expect(read.records.map((r) => r.client).toSet(), clients.toSet());
+        expect(countedFeedback(read.records), hasLength(clients.length));
+      });
+
+      test(
+        'equal scores from one client are separate records, all counted',
+        () async {
+          // The registry keys a record by (client, index): two 5s from Alice
+          // are two feedbacks, not a duplicate to drop.
+          final chain = FakeReputationChain()
+            ..add(7, _alice, _stored(5))
+            ..add(7, _alice, _stored(5));
+
+          final records = await chain.adapter.recordsOf(AgentId(7));
+          final feedback = await chain.adapter.feedbacksOf(AgentId(7));
+
+          expect(records.map((r) => r.index), [1, 2]);
+          expect(feedback.map((f) => f.score), [5, 5]);
+        },
+      );
+
+      test(
+        'a failure in the middle of a read throws, never a partial list',
+        () async {
+          final chain = FakeReputationChain()
+            ..add(7, _alice, _stored(5))
+            ..add(7, _alice, _stored(1))
+            ..add(7, _bob, _stored(1));
+          // The clients pages and Alice's last index answer; the next read fails.
+          chain.failAfterRequests = 3;
+
+          await expectLater(
+            chain.adapter.recordsOf(AgentId(7)),
+            throwsA(isA<LedgerUnavailable>()),
+          );
+          chain
+            ..requests.clear()
+            ..failAfterRequests = 3;
+          await expectLater(
+            chain.adapter.feedbacksOf(AgentId(7)),
+            throwsA(isA<LedgerUnavailable>()),
+          );
+        },
+      );
+
+      test('feedbacksOf is exactly countedFeedback of recordsOf', () async {
+        final records = await mixedChain().adapter.recordsOf(AgentId(7));
+        final feedback = await mixedChain().adapter.feedbacksOf(AgentId(7));
+
+        final expected = countedFeedback(records);
+        expect(feedback.map((f) => (f.client, f.score)), [
+          for (final f in expected) (f.client, f.score),
+        ]);
+        expect(feedback.map((f) => f.score), [5, 3, 1]);
+        // Every record either reaches the formula or has a public reason.
+        final excluded = records.where((r) => exclusionOf(r) != null).length;
+        expect(feedback.length + excluded, records.length);
+        expect(reputationOf(feedback), reputationOf(expected));
+      });
+    });
+
     test('archived registry state is unavailable, not empty', () async {
       final chain = FakeReputationChain()
         ..add(7, _alice, _stored(5))

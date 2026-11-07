@@ -354,14 +354,14 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
   test('limit or more untracked records do not starve a fund record '
       '(REL-001)', () async {
     create();
-    // Fillers of the purposes the tracker still leaves untracked.
-    final submit = await insert(
-      preparationId: null,
-      purpose: SubmissionPurpose.submit,
+    // Fillers of the purpose the tracker still leaves untracked.
+    final walletA = await insert(
+      preparationId: 'prep-agent-wallet-a',
+      purpose: SubmissionPurpose.setAgentWallet,
     );
-    final agentWallet = await insert(
+    final walletB = await insert(
       transactionHash: _txB,
-      preparationId: 'prep-agent-wallet',
+      preparationId: 'prep-agent-wallet-b',
       purpose: SubmissionPurpose.setAgentWallet,
     );
     clock = clock.add(const Duration(seconds: 1));
@@ -381,8 +381,8 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     await tracker.pass(repo);
 
     expect(first.untracked, 2);
-    expect(next.map((s) => s.id), [fund.id, submit.id]);
-    expect(next.map((s) => s.id), isNot(contains(agentWallet.id)));
+    expect(next.map((s) => s.id), [fund.id, walletA.id]);
+    expect(next.map((s) => s.id), isNot(contains(walletB.id)));
     expect(ledger.lookedUp, [fund.transactionHash]);
   });
 
