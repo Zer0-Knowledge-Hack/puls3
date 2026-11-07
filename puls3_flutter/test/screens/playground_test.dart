@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_client/puls3_client.dart' as api;
 import 'package:puls3_flutter/src/screens/playground.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
+import 'package:puls3_flutter/src/studio/server_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/ui/atoms/primary_button.dart';
+import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
 import '../helpers.dart';
 import '../studio/studio_fixtures.dart';
@@ -185,6 +188,210 @@ void main() {
       findsNothing,
     );
   });
+
+  ServerStudioGateway createServerGateway({
+    SaveProviderCredentialCall? saveProviderCredential,
+    TestRunCall? testRun,
+  }) {
+    return ServerStudioGateway(
+      saveDraft: (draft, draftId, revision, overwrite) async =>
+          throw UnimplementedError(),
+      getDraft: (draftId) async => throw UnimplementedError(),
+      listDrafts: () async => throw UnimplementedError(),
+      testRun: testRun ??
+          ((draftId, input) async => api.TestRunResult(
+                output: 'Real model output from server',
+                remainingDailyRuns: 9,
+              )),
+      saveProviderCredential: saveProviderCredential ??
+          ((provider, secret, accountId) async {}),
+      wallet: MockWallet(),
+    );
+  }
+
+  testWidgets(
+    'server gateway seam: missing credential disables Run and stays on screen',
+    (tester) async {
+      Puls3Fonts.useGoogleFonts = false;
+      final serverGateway = createServerGateway();
+      await tester.pumpWidget(
+        localizedTestApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Playground(
+                draft: savedDraft(1),
+                gateway: serverGateway,
+                owner: testOwner,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.text('Test runs are free and limited per day.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Demo test runner: no model answers yet.'),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('playground-credential')), findsOneWidget);
+      expect(find.byKey(const Key('playground-account')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('playground-input')),
+        'Draft test task',
+      );
+      await tester.pump();
+
+      expect(run(tester).onPressed, isNull);
+      expect(find.byKey(const Key('playground-credential')), findsOneWidget);
+      expect(find.byKey(const Key('playground-account')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'server gateway seam: successful test run saves credential and displays model output',
+    (tester) async {
+      Puls3Fonts.useGoogleFonts = false;
+      String? savedProvider;
+      String? savedSecret;
+      String? savedAccount;
+      int? runDraftId;
+      String? runInput;
+
+      final serverGateway = createServerGateway(
+        saveProviderCredential: (provider, secret, accountId) async {
+          savedProvider = provider;
+          savedSecret = secret;
+          savedAccount = accountId;
+        },
+        testRun: (draftId, input) async {
+          runDraftId = draftId;
+          runInput = input;
+          return api.TestRunResult(
+            output: 'Brief Bot: real model response from Workers AI',
+            remainingDailyRuns: 7,
+          );
+        },
+      );
+
+      await tester.pumpWidget(
+        localizedTestApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Playground(
+                draft: savedDraft(1),
+                gateway: serverGateway,
+                owner: testOwner,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('playground-credential')),
+        'cf-token-secret-123',
+      );
+      await tester.enterText(
+        find.byKey(const Key('playground-account')),
+        'cf-account-456',
+      );
+      await tester.enterText(
+        find.byKey(const Key('playground-input')),
+        'Summarize the ledger entry.',
+      );
+      await tester.pump();
+
+      expect(run(tester).onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('playground-run')));
+      await tester.pumpAndSettle();
+
+      expect(savedProvider, 'workers-ai');
+      expect(savedSecret, 'cf-token-secret-123');
+      expect(savedAccount, 'cf-account-456');
+      expect(runDraftId, 1);
+      expect(runInput, 'Summarize the ledger entry.');
+
+      expect(find.byKey(const Key('playground-result')), findsOneWidget);
+      expect(
+        find.text('Brief Bot: real model response from Workers AI'),
+        findsOneWidget,
+      );
+      expect(find.text('7 runs left today'), findsOneWidget);
+
+      expect(find.textContaining('Demo run:'), findsNothing);
+      expect(
+        find.textContaining('A real test run answers with the agent\'s model'),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('playground-result')),
+          matching: find.textContaining('cf-token-secret-123'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'server gateway seam: StudioTestQuotaExceeded stays on screen and disables Run',
+    (tester) async {
+      Puls3Fonts.useGoogleFonts = false;
+      final serverGateway = createServerGateway(
+        testRun: (draftId, input) async => throw api.Puls3ApiException(
+          code: 'TestQuotaExceeded',
+        ),
+      );
+
+      await tester.pumpWidget(
+        localizedTestApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Playground(
+                draft: savedDraft(1),
+                gateway: serverGateway,
+                owner: testOwner,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('playground-credential')),
+        'cf-token-quota',
+      );
+      await tester.enterText(
+        find.byKey(const Key('playground-account')),
+        'cf-account-quota',
+      );
+      await tester.enterText(
+        find.byKey(const Key('playground-input')),
+        'Task that hits quota',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('playground-run')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('playground-quota')), findsOneWidget);
+      expect(find.text('You used today\'s test runs.'), findsOneWidget);
+      expect(run(tester).onPressed, isNull);
+
+      await tester.enterText(
+        find.byKey(const Key('playground-input')),
+        'Another task while over quota',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('playground-quota')), findsOneWidget);
+      expect(find.text('You used today\'s test runs.'), findsOneWidget);
+      expect(run(tester).onPressed, isNull);
+    },
+  );
 }
 
 final class _LiveGateway extends FakeStudioGateway {

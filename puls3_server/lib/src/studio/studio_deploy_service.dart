@@ -584,7 +584,7 @@ final class StudioDeployService {
       await _drafts.markLive(
         draftId: row.draftId,
         liveVersion: version,
-        agentId: '${row.registryAgentId}',
+        agentId: 'studio-${row.draftId}',
       );
     } on InvalidManifest {
       return _publicationFailed(publishing);
