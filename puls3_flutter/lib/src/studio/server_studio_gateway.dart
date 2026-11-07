@@ -171,9 +171,7 @@ class ServerStudioGateway implements StudioGateway {
         'TestQuotaExceeded' => StudioTestQuotaExceeded(
           resetsAt: DateTime.tryParse(error.details?['resetsAt'] ?? ''),
         ),
-        'RuntimeUnavailable' => const StudioUnavailable(
-          'The test runner is unavailable.',
-        ),
+        'RuntimeUnavailable' => const StudioCredentialMissing(),
         'AgentExecutionFailed' => StudioRunFailed(
           error.details?['reason'] ?? 'The agent run failed.',
         ),
