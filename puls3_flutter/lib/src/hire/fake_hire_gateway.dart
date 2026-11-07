@@ -177,5 +177,6 @@ class FakeHireGateway implements HireGateway {
     decisionExplorerUrl: hire.decisionExplorerUrl,
     feedbackTransaction: feedbackTransaction ?? hire.feedbackTransaction,
     feedbackState: feedbackState ?? hire.feedbackState,
+    feedbackErrorCode: hire.feedbackErrorCode,
   );
 }

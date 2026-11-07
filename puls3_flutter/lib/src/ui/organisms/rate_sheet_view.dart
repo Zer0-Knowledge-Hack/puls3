@@ -48,7 +48,10 @@ class RateSheetView extends StatelessWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: commentController,
       builder: (context, comment, _) {
-        final tooLong = comment.text.length > feedbackCommentMaxLength;
+        // The same text and unit the server checks: the container sends the
+        // trimmed comment, and the domain counts its UTF-16 code units.
+        final length = comment.text.trim().length;
+        final tooLong = length > feedbackCommentMaxLength;
         final canSend = score != null && !tooLong && !sending;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,6 +84,17 @@ class RateSheetView extends StatelessWidget {
               maxLength: feedbackCommentMaxLength,
               // Over the limit stays editable and shows the inline error.
               maxLengthEnforcement: MaxLengthEnforcement.none,
+              buildCounter:
+                  (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  }) => Text(
+                    '$length/$feedbackCommentMaxLength',
+                    key: const ValueKey('rate-comment-counter'),
+                    style: Puls3Text.bodyMuted,
+                  ),
               decoration: InputDecoration(
                 hintText: l10n.rateCommentHint,
                 errorText: tooLong

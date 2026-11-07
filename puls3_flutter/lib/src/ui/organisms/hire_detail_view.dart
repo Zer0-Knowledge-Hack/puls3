@@ -281,11 +281,25 @@ class HireDetailView extends StatelessWidget {
   }
 
   /// F7: **Rate** on a completed hire with no rating, then the rating.
+  /// A rating that failed on chain says so: **Rate** again, or, when its
+  /// outcome is unknown, why rating is paused.
   List<Widget> _rating(BuildContext context) {
     final l10n = context.l10n;
     final rated = hire.feedbackTransaction != null;
     final score = ratedScore;
     return [
+      if (hire.feedbackFailed) ...[
+        const SizedBox(height: Puls3Spacing.lg),
+        SectionLabel(l10n.rateSection),
+        const SizedBox(height: Puls3Spacing.xs),
+        Text(
+          hire.feedbackOutcomeUnknown
+              ? l10n.rateOutcomeUnknown
+              : l10n.rateFailed(hire.feedbackErrorCode ?? 'failed'),
+          key: const ValueKey('hire-detail-rating-failed'),
+          style: Puls3Text.bodyMuted.copyWith(color: Puls3Colors.accent),
+        ),
+      ],
       if (rated) ...[
         const SizedBox(height: Puls3Spacing.lg),
         SectionLabel(l10n.rateSection),

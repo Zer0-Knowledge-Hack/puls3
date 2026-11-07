@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:puls3_domain/puls3_domain.dart' show feedbackCommentMaxLength;
 
 import '../hire/hire_flow_controller.dart' show walletErrorMessage;
 import '../hire/hire_gateway.dart';
@@ -109,6 +110,11 @@ class _RateHireSheetState extends State<RateHireSheet> {
       _fail(switch (e) {
         HireAlreadyRated() => l10n.rateAlreadyRated,
         HireWrongWallet() => l10n.rateWrongWallet,
+        HireNotRatable() => l10n.rateNotCompleted,
+        HireOwnerCannotRate() => l10n.rateOwnerCannotRate,
+        HireInvalidRating() => l10n.rateInvalid(feedbackCommentMaxLength),
+        HireRatingInProgress() => l10n.rateInProgress,
+        HireRatingOutcomeUnknown() => l10n.rateOutcomeUnknown,
         _ => e.message,
       });
     }

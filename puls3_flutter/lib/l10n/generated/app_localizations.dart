@@ -2313,7 +2313,7 @@ abstract class AppLocalizations {
   /// No description provided for @rateCommentHint.
   ///
   /// In en, this message translates to:
-  /// **'Optional comment'**
+  /// **'Optional comment. Comments are not published yet.'**
   String get rateCommentHint;
 
   /// No description provided for @rateCommentTooLong.
@@ -2381,6 +2381,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View rating on StellarExpert'**
   String get rateViewExplorer;
+
+  /// No description provided for @rateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating did not go through ({code}). Try again.'**
+  String rateFailed(String code);
+
+  /// No description provided for @rateOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not confirm whether your rating reached Stellar. Rating this hire is paused until puls3 resolves it.'**
+  String get rateOutcomeUnknown;
+
+  /// No description provided for @rateInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'A rating for this hire is still being confirmed. Check back in a moment.'**
+  String get rateInProgress;
+
+  /// No description provided for @rateNotCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a completed hire can be rated.'**
+  String get rateNotCompleted;
+
+  /// No description provided for @rateOwnerCannotRate.
+  ///
+  /// In en, this message translates to:
+  /// **'The owner of this agent cannot rate it.'**
+  String get rateOwnerCannotRate;
+
+  /// No description provided for @rateInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a score from 1 to 5 and keep the comment to {max} characters.'**
+  String rateInvalid(int max);
 }
 
 class _AppLocalizationsDelegate

@@ -1255,7 +1255,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get rateCommentHint => 'Optional comment';
+  String get rateCommentHint =>
+      'Optional comment. Comments are not published yet.';
 
   @override
   String rateCommentTooLong(int max) {
@@ -1293,4 +1294,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rateViewExplorer => 'View rating on StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Your rating did not go through ($code). Try again.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'We could not confirm whether your rating reached Stellar. Rating this hire is paused until puls3 resolves it.';
+
+  @override
+  String get rateInProgress =>
+      'A rating for this hire is still being confirmed. Check back in a moment.';
+
+  @override
+  String get rateNotCompleted => 'Only a completed hire can be rated.';
+
+  @override
+  String get rateOwnerCannotRate => 'The owner of this agent cannot rate it.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Pick a score from 1 to 5 and keep the comment to $max characters.';
+  }
 }

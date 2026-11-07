@@ -179,9 +179,13 @@ void main() {
       await expectCode('HireAlreadyRated', isA<HireAlreadyRated>());
       await expectCode('HireNotOwned', isA<HireWrongWallet>());
       await expectCode('HireNotFound', isA<HireNotFound>());
-      await expectCode('HireNotCompleted', isA<HireRejected>());
-      await expectCode('FeedbackFromAgentOwner', isA<HireRejected>());
-      await expectCode('InvalidFeedback', isA<HireRejected>());
+      await expectCode('HireNotCompleted', isA<HireNotRatable>());
+      await expectCode('FeedbackFromAgentOwner', isA<HireOwnerCannotRate>());
+      await expectCode('InvalidFeedback', isA<HireInvalidRating>());
+      // The relay blocks a new give_feedback while one is in flight or has
+      // an unknown outcome: never the raw server text.
+      await expectCode('SubmissionInProgress', isA<HireRatingInProgress>());
+      await expectCode('OutcomeUnknown', isA<HireRatingOutcomeUnknown>());
       await expectCode('NotAuthenticated', isA<HireNotSignedIn>());
     });
 
@@ -219,6 +223,18 @@ void main() {
       expect(failed.feedbackState, 'failed');
       expect(failed.feedbackExplorerUrl, isNull);
       expect(failed.feedbackPending, isFalse);
+      expect(failed.feedbackFailed, isTrue);
+      expect(failed.feedbackOutcomeUnknown, isFalse);
+
+      // The failure code reaches the app, so S06 can say why.
+      final unknown = await _gateway(
+        getHire: (_, _) async => _detail(
+          'confirmed',
+          feedbackSubmission: _feedback('failed', errorCode: 'OutcomeUnknown'),
+        ),
+      ).getHire(3, _consumer);
+      expect(unknown.feedbackErrorCode, 'OutcomeUnknown');
+      expect(unknown.feedbackOutcomeUnknown, isTrue);
     });
   });
 

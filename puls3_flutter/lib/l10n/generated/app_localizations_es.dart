@@ -1277,7 +1277,8 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get rateCommentHint => 'Comentario (opcional)';
+  String get rateCommentHint =>
+      'Comentario (opcional). Los comentarios todavía no se publican.';
 
   @override
   String rateCommentTooLong(int max) {
@@ -1316,4 +1317,30 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get rateViewExplorer => 'Ver la calificación en StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Tu calificación no se registró ($code). Inténtalo de nuevo.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'No pudimos confirmar si tu calificación llegó a Stellar. Calificar esta contratación queda en pausa hasta que puls3 lo resuelva.';
+
+  @override
+  String get rateInProgress =>
+      'Todavía se está confirmando una calificación de esta contratación. Vuelve en un momento.';
+
+  @override
+  String get rateNotCompleted =>
+      'Solo se puede calificar una contratación completada.';
+
+  @override
+  String get rateOwnerCannotRate =>
+      'El dueño de este agente no puede calificarlo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Elige un puntaje de 1 a 5 y deja el comentario en $max caracteres como máximo.';
+  }
 }

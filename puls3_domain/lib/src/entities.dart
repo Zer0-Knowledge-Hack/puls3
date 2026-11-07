@@ -1,4 +1,5 @@
 import 'errors.dart';
+import 'feedback_record.dart';
 import 'hire_status.dart';
 import 'stellar_address.dart';
 import 'values.dart';
@@ -309,12 +310,6 @@ final class Payment {
       hireId == hire.id && payee == agentWallet && amount == hire.price;
 }
 
-/// The lowest [Feedback.score].
-const feedbackMinScore = 1;
-
-/// The highest [Feedback.score].
-const feedbackMaxScore = 5;
-
 /// The longest [Feedback.comment], in characters.
 const feedbackCommentMaxLength = 500;
 
@@ -327,7 +322,7 @@ final class Feedback {
     required this.score,
     this.comment = '',
   }) {
-    if (score < feedbackMinScore || score > feedbackMaxScore) {
+    if (score < lowestFeedbackScore || score > highestFeedbackScore) {
       throw const InvalidFeedback(FeedbackProblem.scoreOutOfRange);
     }
     if (comment.length > feedbackCommentMaxLength) {

@@ -1270,7 +1270,8 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get rateCommentHint => 'Comentário (opcional)';
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
 
   @override
   String rateCommentTooLong(int max) {
@@ -1309,6 +1310,31 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Sua avaliação não foi registrada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não conseguimos confirmar se sua avaliação chegou à Stellar. A avaliação desta contratação fica pausada até a puls3 resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está sendo confirmada. Volte em instantes.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não pode avaliá-lo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário em até $max caracteres.';
+  }
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2577,7 +2603,8 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get rateCommentHint => 'Comentário (opcional)';
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
 
   @override
   String rateCommentTooLong(int max) {
@@ -2616,6 +2643,31 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Sua avaliação não foi registrada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não conseguimos confirmar se sua avaliação chegou à Stellar. A avaliação desta contratação fica pausada até a puls3 resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está sendo confirmada. Volte em instantes.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não pode avaliá-lo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário em até $max caracteres.';
+  }
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -3887,7 +3939,8 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   }
 
   @override
-  String get rateCommentHint => 'Comentário (opcional)';
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
 
   @override
   String rateCommentTooLong(int max) {
@@ -3926,4 +3979,29 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'A sua avaliação não foi registada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não foi possível confirmar se a sua avaliação chegou à Stellar. A avaliação desta contratação fica em pausa até a puls3 o resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está a ser confirmada. Volte dentro de momentos.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não o pode avaliar.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário até $max caracteres.';
+  }
 }

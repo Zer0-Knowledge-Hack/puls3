@@ -281,6 +281,7 @@ class ServerHireGateway implements HireGateway {
       decisionExplorerUrl: decision?.explorerUrl,
       feedbackTransaction: hire.feedbackReference,
       feedbackState: feedback?.state,
+      feedbackErrorCode: feedback?.errorCode,
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,
@@ -338,15 +339,13 @@ class ServerHireGateway implements HireGateway {
       // F7: the rating's own rules (FeedbackEndpoint, api.md).
       'HireNotOwned' when feedback => const HireWrongWallet(),
       'HireAlreadyRated' => const HireAlreadyRated(),
-      'HireNotCompleted' => const HireRejected(
-        'Only a completed hire can be rated.',
-      ),
-      'FeedbackFromAgentOwner' => const HireRejected(
-        'The owner of this agent cannot rate it.',
-      ),
-      'InvalidFeedback' => const HireRejected(
-        'Pick a score from 1 to 5 and keep the comment to 500 characters.',
-      ),
+      'HireNotCompleted' => const HireNotRatable(),
+      'FeedbackFromAgentOwner' => const HireOwnerCannotRate(),
+      'InvalidFeedback' => const HireInvalidRating(),
+      // The relay refuses a new give_feedback while an earlier one is in
+      // flight, or while one has an unknown outcome (api.md, Feedback).
+      'SubmissionInProgress' when feedback => const HireRatingInProgress(),
+      'OutcomeUnknown' when feedback => const HireRatingOutcomeUnknown(),
       'InvalidHireId' ||
       'HireNotFound' ||
       'HireNotOwned' => const HireNotFound(),

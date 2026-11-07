@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:puls3_domain/puls3_domain.dart'
-    show feedbackMaxScore, feedbackMinScore;
+    show highestFeedbackScore, lowestFeedbackScore;
 
 import '../../l10n/l10n.dart';
 import '../../theme/puls3_theme.dart';
 
-/// A row of stars from [feedbackMinScore] to [feedbackMaxScore] (S10).
+/// A row of stars from [lowestFeedbackScore] to [highestFeedbackScore] (S10).
 /// [score] is null until one is picked. Read-only when [onChanged] is null,
 /// as on S06 after the rating is sent.
 class ScorePicker extends StatelessWidget {
@@ -26,7 +26,11 @@ class ScorePicker extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var value = feedbackMinScore; value <= feedbackMaxScore; value++)
+        for (
+          var value = lowestFeedbackScore;
+          value <= highestFeedbackScore;
+          value++
+        )
           _Star(
             key: ValueKey('score-star-$value'),
             filled: value <= (score ?? 0),
