@@ -6,6 +6,8 @@
 
 This is the boundary between the Flutter app and Serverpod for the MVP. The app connects wallets and asks the user to sign what the server prepared. The server owns persistence, transaction preparation, relay submission, chain reads, escrow job verification, deploy orchestration, and agent execution. Endpoint implementations remain in issues #17–#21 and #35.
 
+Programs other than the app use this contract through the Dart SDK `puls3_sdk`, which never signs or submits a transaction: see [ADR-0007](../adr/0007-developer-sdk.md).
+
 ## Contract rules
 
 1. IDs and USDC amounts cross the wire as `int`; USDC values are always stroops, never `double`.
