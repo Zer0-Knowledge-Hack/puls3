@@ -1,0 +1,23 @@
+name: puls3_cli
+description: The puls3 command, a client of puls3_sdk. It never signs or submits a transaction.
+publish_to: none
+
+environment:
+  sdk: '^3.12.2'
+
+resolution: workspace
+
+executables:
+  puls3:
+
+dependencies:
+  args: ^2.7.0
+  puls3_sdk:
+    path: ../puls3_sdk
+
+dev_dependencies:
+  # Tests build the client exceptions the SDK lets through.
+  puls3_client:
+    path: ../puls3_client
+  lints: '>=3.0.0 <7.0.0'
+  test: ^1.25.5
