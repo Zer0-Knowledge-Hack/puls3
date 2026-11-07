@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "@remotion/cli": "4.0.526",
+    "@remotion/cli": "4.0.541",
     "@remotion/google-fonts": "4.0.526",
     "react": "19.2.3",
     "react-dom": "19.2.3",
