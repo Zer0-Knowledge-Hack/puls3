@@ -89,6 +89,108 @@ Consistent with ADR-0002 (#6) and ADR-0005 D5:
 - `isSelfRating(Feedback, {required StellarAddress owner})` and
   `rejectSelfRating(...)` — rule 3.
 
+## Verifying Agent Reputation
+
+Anyone can recompute the rating puls3 shows for an agent from the chain and
+compare it with what the server serves (#202, audit finding R-2b).
+
+### How the rating is computed
+
+The server reads every feedback record of the agent from the Reputation
+Registry (#14) with simulated contract calls, keeps the records that count
+(below) and serves `reputationOf()` over them: the Bayesian average of the
+[Formula](#formula), `m = 4.0`, `C = 5`, rounded to two decimals. The served
+`paidHireCount` is the number of records that count. The server keeps a rating
+for 60 s (`reputationCacheTtl`) before reading the registry again.
+
+### Why the formula stays off chain
+
+The registry stores raw feedback; ranking is a product decision (ADR-0005 D5,
+[On-chain vs. off-chain](#on-chain-vs-off-chain)). Keeping the formula in
+`puls3_domain` lets it change without a contract migration, and the same Dart
+code runs on the server and in the verification script, so a verifier never
+re-implements it.
+
+### How every on-chain feedback is taken into account
+
+The registry accepts feedback from any address and in any scale. A record does
+not count only for one of these four reasons, and no other rule exists
+(`exclusionOf` in `puls3_domain/lib/src/feedback_record.dart`):
+
+| Reason (`FeedbackExclusion`) | When |
+|---|---|
+| `unreadable` | The registry lists the record but `read_feedback` cannot load it |
+| `revoked` | Its submitter revoked it (`is_revoked`) |
+| `notWholeScore` | `value_decimals` is not 0 |
+| `outOfScale` | The value is outside 1 to 5 |
+
+- `SorobanReputationRegistry.recordsOf()` reads **every** record: all pages of
+  `get_clients_paginated` until the empty page, then `get_last_index` and
+  `read_feedback` for every index of every client.
+- `feedbacksOf()` is exactly `countedFeedback(recordsOf())`; the server adds no
+  filter of its own. Equal scores from one client are separate records
+  (`(client, index)` is the registry key) and all count.
+- A read that fails at any point throws: the server never computes a rating
+  from part of the records. It serves the last complete value it read, or
+  reports the catalog as unavailable when it never read one.
+
+`puls3_domain/test/feedback_record_test.dart` and
+`puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` check each
+of these: no record dropped without a public reason, every page read, no
+duplicate removed, an empty agent, a failure in the middle of a read.
+
+### Run the script
+
+From the repository root (a pub workspace, so the script needs no pubspec of its
+own). It reads the registry with simulations (no key, no signature) and calls
+the public catalog `agent.list`:
+
+```bash
+dart run scripts/verify_reputation.dart 7                                  # deployed server
+dart run scripts/verify_reputation.dart 7 --api http://localhost:8080      # local server
+```
+
+`7` is the agent's `registryId` (its id in the Identity Registry, shown in the
+catalog). Exit code: `0` match, `1` mismatch, `2` a read failed or bad arguments.
+
+### Read the result
+
+```
+registry : CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4
+agent    : 7
+pages    : 2 page(s) of get_clients_paginated (50 clients per page)
+records  : 1 listed, 1 counted
+  GABK…HF5H #1  value=5 decimals=0 revoked=false  counts
+
+recomputed: rating 4.17, 1 counted feedback
+served    : rating 4.17, paidHireCount 1 (https://puls3-hub-on-stellar.api.serverpod.space)
+MATCH: the served rating is the formula over every counted on-chain record.
+```
+
+- **pages**: how many client pages were read, the empty page that ends the
+  list included.
+- **records**: every record with `counts` or `excluded: <reason>`.
+- **recomputed vs served**: the rating and count from the chain next to the
+  server's. `MATCH` means the served rating is `reputationOf()` over every
+  counted record. `MISMATCH` means they differ.
+
+### Limitations
+
+- **Current state only.** The script reads the registry as it is now; Soroban
+  has no read at a past ledger, so a past rating cannot be recomputed. A
+  revoked feedback simply stops counting.
+- **The 60 s cache.** Right after a new or revoked feedback, the served value
+  can be up to a minute old: run the script again after a minute before reading
+  a `MISMATCH` as a fault.
+- **Archived state.** If registry entries expire (TTL), reads need a restore;
+  the script and the server then fail rather than show a partial rating.
+- **Same reader code.** The script reuses the server's Soroban reader and the
+  domain rule; to verify without puls3 code, call the same three registry
+  functions with `stellar contract invoke --send=no` and apply the four rules
+  and the [Formula](#formula) by hand.
+
+Step-by-step evidence: [`docs/verification/reputation.md`](../verification/reputation.md).
+
 ## Out of scope
 
 - The Reputation Registry contract (#14).

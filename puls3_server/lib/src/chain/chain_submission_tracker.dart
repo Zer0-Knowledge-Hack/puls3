@@ -24,17 +24,15 @@ const evidencePasses = 3;
 const defaultTrackerBatchLimit = 100;
 
 /// Purposes whose final outcomes use codes this tracker does not set yet.
-/// `setAgentWallet` expires as `AuthorizationExpired`, and `submit` fails as
-/// `EscrowCallFailed` after bounded retries (api.md). They stay `submitted`.
-/// `release`, `claimRefund`, `complete`, `reject` and `registerFull` are
-/// confirmed when the transaction succeeds, with no hire effect yet (#97).
-const _untrackedPurposes = {
-  SubmissionPurpose.setAgentWallet,
-  SubmissionPurpose.submit,
-};
+/// `setAgentWallet` expires as `AuthorizationExpired`. It stays `submitted`.
+/// `submit`, `release`, `claimRefund`, `complete`, `reject` and
+/// `registerFull` are confirmed when the transaction succeeds. Hire status
+/// is then derived from those confirmed records (#208).
+const _untrackedPurposes = {SubmissionPurpose.setAgentWallet};
 
-/// The permissionless calls whose third failure is `EscrowCallFailed`.
+/// Server-signed calls whose third failure is `EscrowCallFailed`.
 const _relayPurposes = {
+  SubmissionPurpose.submit,
   SubmissionPurpose.release,
   SubmissionPurpose.claimRefund,
 };
@@ -99,10 +97,10 @@ final class TrackerPassSummary {
 ///   is in memory and a restart starts it again), then fails
 ///   `JobEvidenceUnavailable`. The [EscrowEffects] result, given every valid
 ///   event of the transaction, decides `confirmed` or the failure code;
-///   `giveFeedback` needs no event. `complete`, `reject` and `registerFull`
-///   are confirmed with no domain effect: until #97 the hire status does not
-///   change, so the app may offer `prepareComplete` again and the contract
-///   then rejects it as `TransactionFailed`.
+///   `giveFeedback` needs no event. `submit`, `complete`, `reject`,
+///   `release`, `claimRefund` and `registerFull` are confirmed when the
+///   transaction succeeds. Hire status is derived from those confirmed
+///   records (#208); the tracker does not write a status column.
 ///
 /// The chain time is the lookup's latest ledger close time, because the
 /// envelope time bounds are checked against it. Only when the node does not
@@ -356,7 +354,8 @@ final class ChainSubmissionTracker {
         result = await _effects.onFunded(submission, events);
       case SubmissionPurpose.giveFeedback:
         result = await _effects.onFeedbackGiven(submission);
-      case SubmissionPurpose.release ||
+      case SubmissionPurpose.submit ||
+          SubmissionPurpose.release ||
           SubmissionPurpose.claimRefund ||
           SubmissionPurpose.complete ||
           SubmissionPurpose.reject ||
@@ -420,9 +419,10 @@ final class ChainSubmissionTracker {
   /// Always settles the record: `markFailed` either sets `failed` or finds
   /// it already final.
   ///
-  /// A `release` or `claim_refund` that fails after two failed envelopes of
-  /// the same hire and call is stored as `EscrowCallFailed` instead of
-  /// [code]: it is the failure that uses the last attempt (api.md).
+  /// A server-signed `submit`, `release` or `claim_refund` that fails after
+  /// two failed envelopes of the same hire and call is stored as
+  /// `EscrowCallFailed` instead of [code]: it is the failure that uses the
+  /// last attempt (api.md).
   Future<bool> _fail(
     ChainSubmissionStore store,
     StoredSubmission submission,
