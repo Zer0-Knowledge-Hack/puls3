@@ -7,6 +7,7 @@ import '../generated/protocol.dart' hide Hire, Payment;
 import '../runtime/hire_run_store.dart';
 import '../runtime/serverpod_hire_run_store.dart';
 import 'hire_lifecycle_store.dart';
+import 'hire_settlement.dart';
 
 /// PostgreSQL-backed implementation of [HireRepository] using Serverpod ORM.
 ///
@@ -141,9 +142,8 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
   }
 
   /// The wire view of [record]: no status until the job exists, `open`
-  /// after, `funded` once a payment is recorded, then `completed` or
-  /// `expired` once a server-signed `release` or `claim_refund` is
-  /// confirmed (see [_settlement]).
+  /// after, `funded` once a payment is recorded, then the escrow state
+  /// derived from confirmed submissions (see [_settlement]).
   Future<HireRow> _row(HireRecord record, {Transaction? transaction}) async {
     final payment = await HirePaymentRecord.db.findFirstRow(
       session,
@@ -170,14 +170,23 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
     );
   }
 
-  /// How a funded hire settled: `completed` after a confirmed `release`,
-  /// `expired` after a confirmed `claim_refund`, otherwise null.
+  /// How a funded hire settled, from its confirmed escrow submissions.
   ///
   /// The status is derived on read, so it needs no column and no write by
   /// the tracker. A confirmed record never changes, so concurrent trackers
-  /// and repeated reads agree. `release` wins when both exist, which the
-  /// contract makes impossible. It uses `chain_submission_hire_idx`.
+  /// and repeated reads agree. It uses `chain_submission_hire_idx`.
   Future<HireStatus?> _settlement(
+    int hireId, {
+    Transaction? transaction,
+  }) async {
+    final purposes = await _confirmedPurposes(
+      hireId,
+      transaction: transaction,
+    );
+    return fundedHireSettlement(purposes);
+  }
+
+  Future<Set<SubmissionPurpose>> _confirmedPurposes(
     int hireId, {
     Transaction? transaction,
   }) async {
@@ -187,19 +196,13 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
           t.hireId.equals(hireId) &
           t.state.equals(SubmissionState.confirmed.wireName) &
           t.purpose.inSet({
-            SubmissionPurpose.release.wireName,
-            SubmissionPurpose.claimRefund.wireName,
+            for (final purpose in settlementPurposes) purpose.wireName,
           }),
       transaction: transaction,
     );
-    final purposes = {for (final row in settled) row.purpose};
-    if (purposes.contains(SubmissionPurpose.release.wireName)) {
-      return HireStatus.completed;
-    }
-    if (purposes.contains(SubmissionPurpose.claimRefund.wireName)) {
-      return HireStatus.expired;
-    }
-    return null;
+    return {
+      for (final row in settled) ?SubmissionPurpose.tryParse(row.purpose),
+    };
   }
 
   @override
@@ -238,10 +241,29 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       where: (t) => t.hireId.equals(id.value),
     );
     final replayed = run == null ? funded : _replayRun(funded, run);
-    return switch (await _settlement(id.value)) {
-      HireStatus.completed => replayed.submit().complete(),
-      HireStatus.expired => replayed.expire(),
-      _ => replayed,
+    return _replaySettlement(
+      replayed,
+      await _confirmedPurposes(id.value),
+    );
+  }
+
+  /// [funded] moved through the domain to match its confirmed escrow
+  /// submissions. `reject` records `rejectedFrom` as `submitted` only when
+  /// a `submit` was also confirmed.
+  static Hire _replaySettlement(
+    Hire funded,
+    Set<SubmissionPurpose> purposes,
+  ) {
+    final settlement = fundedHireSettlement(purposes);
+    return switch (settlement) {
+      HireStatus.submitted => funded.submit(),
+      HireStatus.completed => funded.submit().complete(),
+      HireStatus.rejected =>
+        purposes.contains(SubmissionPurpose.submit)
+            ? funded.submit().reject()
+            : funded.reject(),
+      HireStatus.expired => funded.expire(),
+      _ => funded,
     };
   }
 

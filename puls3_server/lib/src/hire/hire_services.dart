@@ -142,6 +142,7 @@ final class HireWiring {
         runs: ServerpodHireRunStore(session),
         submissions: submissions,
         agents: agentOf,
+        jobs: ledger,
       ),
     );
   }

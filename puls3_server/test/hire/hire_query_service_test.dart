@@ -3,6 +3,7 @@ import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart' show HireRow;
 import 'package:puls3_server/src/hire/hire_query_service.dart';
+import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
 import 'package:test/test.dart';
@@ -27,11 +28,12 @@ void main() {
   late InMemoryHireRunStore runs;
   late Future<AgentSummary?> Function(int) agents;
 
-  HireQueryService query() => HireQueryService(
+  HireQueryService query({EscrowJobReader? jobs}) => HireQueryService(
     hires: rig.hires,
     runs: runs,
     submissions: rig.submissions,
     agents: (id) => agents(id),
+    jobs: jobs,
   );
 
   void queue(int hireId) => runs.enqueue(
@@ -118,6 +120,57 @@ void main() {
     expect(detail.hire.status, 'rejected');
     expect(detail.hire.runtimeStatus, isNull);
     expect(detail.hire.failureReason, isNull);
+  });
+
+  test('a submitted hire shows the approval deadline from the job', () async {
+    final hire = await rig.hire(status: HireStatus.submitted);
+    const deadline = 1800000100;
+
+    final detail = await query(
+      jobs: _Jobs(deadline),
+    ).getHire(rig.wallet, hire.id);
+
+    expect(detail.hire.status, 'submitted');
+    expect(
+      detail.approvalDeadline,
+      DateTime.fromMillisecondsSinceEpoch(deadline * 1000, isUtc: true),
+    );
+  });
+
+  test('a funded hire has no approval deadline yet', () async {
+    final hire = await rig.hire(status: HireStatus.funded);
+
+    final detail = await query(jobs: _Jobs(1800000100)).getHire(
+      rig.wallet,
+      hire.id,
+    );
+
+    expect(detail.approvalDeadline, isNull);
+  });
+
+  test('a completed hire still shows the approval deadline', () async {
+    final hire = await rig.hire(status: HireStatus.completed);
+    const deadline = 1800000100;
+
+    final detail = await query(
+      jobs: _Jobs(deadline),
+    ).getHire(rig.wallet, hire.id);
+
+    expect(
+      detail.approvalDeadline,
+      DateTime.fromMillisecondsSinceEpoch(deadline * 1000, isUtc: true),
+    );
+  });
+
+  test('a chain read failure leaves the approval deadline unset', () async {
+    final hire = await rig.hire(status: HireStatus.submitted);
+
+    final detail = await query(
+      jobs: _UnavailableJobs(),
+    ).getHire(rig.wallet, hire.id);
+
+    expect(detail.hire.status, 'submitted');
+    expect(detail.approvalDeadline, isNull);
   });
 
   test('a hire without a job has no expiry yet', () async {
@@ -268,5 +321,34 @@ void main() {
 
       expect(await rig.submissions.listByHire(hire.id), before);
     },
+  );
+}
+
+final class _UnavailableJobs implements EscrowJobReader {
+  @override
+  Future<EscrowJob?> escrowJob(int jobId) async =>
+      throw const LedgerUnavailable('rpc down');
+}
+
+final class _Jobs implements EscrowJobReader {
+  _Jobs(this.deadline);
+
+  final int deadline;
+
+  @override
+  Future<EscrowJob?> escrowJob(int jobId) async => EscrowJob(
+    client: StellarAddress.parse(alice),
+    provider: StellarAddress.parse(agentWallet),
+    evaluator: StellarAddress.parse(alice),
+    agentId: AgentId(7),
+    token: StellarAddress.parse(alice),
+    budget: BigInt.from(price),
+    feeBps: 0,
+    expiredAt: 1800000000,
+    description: 'triage',
+    state: EscrowJobState.submitted,
+    submittedAt: deadline - 60,
+    approvalDeadline: deadline,
+    deliverable: null,
   );
 }
