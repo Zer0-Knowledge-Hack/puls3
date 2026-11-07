@@ -29,7 +29,9 @@ before the fix.
 
 - `count.checked_add(1)` (`u64`) and the `decimal_counts` array cannot overflow
   in practice and stay as they are.
-- `get_summary` reads every index of each of 5 clients in one call; a client
-  with very many records can exhaust the invocation's read budget. That is a
-  separate resource-limit concern, not R-1, and is not changed here.
+- `get_summary` used to read every index of each of 5 clients in one call, so
+  a client with very many records could exhaust the invocation's read budget.
+  That is a separate resource-limit concern, not R-1. It was fixed separately
+  by #205 (PR #241, audit R-4): `get_summary` now reads at most
+  `MAX_SUMMARY_RECORDS = 50` records per call. This PR keeps that cap.
 - The off-chain rating (#202) never used `get_summary` and is unaffected.

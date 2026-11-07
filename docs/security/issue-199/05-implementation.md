@@ -9,8 +9,8 @@ Flutter, server, domain or other contract code is touched.
 | File | Change |
 |---|---|
 | `contracts/contracts/reputation-registry/src/lib.rs` | Write bound, read-time skip, `to_wad` helper |
-| `contracts/contracts/reputation-registry/src/test.rs` | 10 regression and preservation tests |
-| `contracts/contracts/reputation-registry/test_snapshots/test/*.json` | 10 new snapshots, one per new test (the crate commits its test snapshots) |
+| `contracts/contracts/reputation-registry/src/test.rs` | 12 regression and preservation tests (2 added after merging `main`) |
+| `contracts/contracts/reputation-registry/test_snapshots/test/*.json` | 12 new snapshots, one per new test (the crate commits its test snapshots) |
 | `docs/adr/0002-agent-registry-on-soroban.md` | #199 amendment in the Reputation Registry section; `MAX_ABS_WAD` and the `get_summary` doc in the interface listing |
 | `docs/security/issue-199/` | This record |
 

@@ -39,17 +39,22 @@ Reproduced on the unfixed contract: both the `1e30` case and the cumulative
 
 - `contracts/contracts/reputation-registry/src/lib.rs`
 - `contracts/contracts/reputation-registry/src/test.rs`
-- `contracts/contracts/reputation-registry/test_snapshots/test/` (10 new files)
+- `contracts/contracts/reputation-registry/test_snapshots/test/` (12 new files)
 - `docs/adr/0002-agent-registry-on-soroban.md`
 - `docs/security/issue-199/` (this folder)
 
 ## Evidence
 
-- 10 new tests; 6 of them fail on the unfixed contract and pass with the fix
+- 12 new tests. Of the first 10, 6 fail on the unfixed contract and pass with the fix; the 2 added after merging `main` were not run against the unfixed code
   ([06](06-test-results.md)).
-- `cargo fmt --all -- --check`: pass. `cargo clippy --all-targets -- -D warnings`:
-  pass, no warning. `cargo test`: 180 passed (reputation-registry 20, escrow 136,
-  identity-registry 23, placeholder 1). `stellar contract build`: pass.
+- After merging `main` (`2fb64b9`): `cargo fmt --all -- --check`: pass.
+  `cargo clippy --all-targets -- -D warnings`: pass, no warning. `cargo test`:
+  194 passed (reputation-registry 30, escrow 140, identity-registry 23,
+  placeholder 1). `stellar contract build`: pass; `reputation_registry.wasm`
+  21370 bytes, hash `8b1e6bb5…a364` (the change from the first run comes from
+  the contract changes merged from `main`, see [06](06-test-results.md)).
+- Two tests added after the merge: the negative cumulative overflow, and
+  skipped records using up the `MAX_SUMMARY_RECORDS` read cap.
 
 ## Acceptance criteria of #199
 
@@ -75,9 +80,7 @@ and stored pre-fix feedback no longer can either.
 - Deploy: upgrade the testnet registry (timelocked `propose_upgrade` /
   `execute_upgrade`) or redeploy. Not part of this change.
 - Out of scope, noted in [07](07-security-review.md): reporting skipped records
-  in the summary (would change the shared result shape), and the read budget of
-  `get_summary`: a client with more than ~393 records exceeds testnet's
-  400-entry footprint and makes the call fail (pre-existing, resource limit, not
-  overflow; recommended as a separate issue).
+  in the summary (would change the shared result shape). The read budget of
+  `get_summary` is now capped at `MAX_SUMMARY_RECORDS = 50` by #205 (PR #241).
 - Team review and merge of the pull request. The contract is **not deployed**:
   the testnet registry keeps the old WASM until the upgrade above.

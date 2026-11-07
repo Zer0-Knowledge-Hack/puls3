@@ -7,7 +7,7 @@
 | 1 | One feedback with `value = 1e30`, decimals 0, to block an agent's summary | Accepted; `get_summary` fails for any list with the attacker | Refused at write time (`ValueOutOfRange`) |
 | 2 | Same with a negative value (`-1e30`) | Same as 1 | Refused |
 | 3 | Several in-range records whose sum overflows (`1e20` each, decimals 0) | Accepted; the sum overflows and `get_summary` fails | Refused at write time: each exceeds `1e10` whole units |
-| 4 | Many records at the new bound to overflow the sum | n/a | Needs `17,014,118,347` records counted in one call; the footprint limit (400 entries on testnet) caps a call at 393, a worst sum of `3.93e30`, ~`4.3e7` times below `i128::MAX`. A test sums 25 records at the bound without overflow |
+| 4 | Many records at the new bound to overflow the sum | n/a | Needs `17,014,118,347` records counted in one call; `get_summary` reads at most `MAX_SUMMARY_RECORDS = 50` (#205), a worst sum of `5e29`, ~`3.4e8` times below `i128::MAX`. A test sums 25 records at the bound without overflow |
 | 5 | Records stored before the fix (already on chain) | Make `get_summary` fail | Skipped and not counted; the summary of the remaining records is returned |
 | 6 | Use decimals to slip a large value past the bound | `value_decimals ≤ 18` and `±1e38` only | The bound is on the normalized value, so every decimals setting maps to the same `1e10` whole-unit limit (tested for 0, 2, 7, 18) |
 | 7 | Revoke tricks: revoke a poisoned record, or poison then revoke | Revoked records were already skipped before normalization | Unchanged; a revoked stored `1e30` is never normalized (tested) |
@@ -53,14 +53,13 @@ and even without revocation, `get_summary` now skips it.
    `read_feedback` (see `docs/verification/reputation.md`).
 3. **Not yet deployed.** The testnet registry runs the old WASM until the
    timelocked upgrade or a redeploy.
-4. **Read budget, out of scope (pre-existing).** `get_summary` reads every
-   record of up to 5 clients in one call, and each record is a footprint entry.
-   With testnet's `tx_max_footprint_entries = 400`, a client with more than
-   about 393 records makes any `get_summary` that includes it exceed the
-   resource limits and fail, which is a denial of service that costs ~400
-   feedback transactions. It is a resource limit, not an arithmetic overflow,
-   it existed before this change, and fixing it needs a paginated or bounded
-   read (an ABI change). Recommended as a separate issue; not changed here.
+4. **Read budget: covered by #205.** Before #205, `get_summary` read every
+   record of up to 5 clients in one call, so a client with more than about 393
+   records made it exceed testnet's 400-entry footprint and fail. #205 (PR
+   #241, audit R-4) caps the read at `MAX_SUMMARY_RECORDS = 50` records,
+   without an ABI change. Records past the cap are not counted, and a skipped
+   (poisoned) legacy record still uses one of the 50 reads (tested). A caller
+   that needs every record pages with `get_last_index` and `read_feedback`.
 5. **Stellar 8004 divergence.** Values above the bound that Stellar 8004
    accepts are refused here. puls3 writes scores 1 to 5; third-party writers
    using larger scales above `1e10` whole units are affected. Recorded in

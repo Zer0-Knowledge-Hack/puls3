@@ -33,23 +33,26 @@ they are.
   `ValueOutOfRange` (8) when the multiplication overflows or `|wad| > 1e28`.
 - In whole units that is `|value| / 10^value_decimals ≤ 10^10`: for example
   `value ≤ 10^10` with `value_decimals = 0`, `value ≤ 10^28` with 18.
-- Why `1e28` covers the cumulative case (checked against the live network
-  limits, `stellar network settings --network testnet`, 2026-11-07):
+- Why `1e28` covers the cumulative case:
   - Overflow needs `|sum| > i128::MAX = 2^127 − 1 ≈ 1.7014e38`, i.e. at least
     `17,014,118,347` counted records of `1e28` in one call.
-  - Every record `get_summary` reads is a ledger entry
-    (`Feedback(agent, client, index)`) that must be in the transaction
-    footprint. Testnet: `tx_max_footprint_entries = 400`,
-    `tx_max_disk_read_entries = 200`, `tx_max_instructions = 400,000,000`.
-  - So one call can count at most `400 − 2 (instance, code) − 5 (LastIndex)
-    = 393` records, a worst sum of `393 × 1e28 = 3.93e30`: about `4.3e7` times
-    below `i128::MAX`. It would still be safe if the footprint limit grew
-    `10^7` times.
+  - Since #205 (PR #241, audit R-4, merged into this branch), `get_summary`
+    reads at most `MAX_SUMMARY_RECORDS = 50` records per call, across all
+    clients. So one call counts at most 50 records, a worst sum of
+    `50 × 1e28 = 5e29`: about `3.4e8` times below `i128::MAX`.
+  - Independently of that cap, the network bounds a call too: every record
+    read is a ledger entry in the transaction footprint (testnet
+    `tx_max_footprint_entries = 400`, checked with `stellar network settings
+    --network testnet` on 2026-11-07), so even without the cap a call could not
+    count more than about 393 records (`3.93e30`, still ~`4.3e7` times below
+    `i128::MAX`).
   - The bound is symmetric, so the negative side (`i128::MIN = −2^127`) is the
-    same. `count` is a `u64` (max `1.8e19`), far above 393.
+    same. `count` is a `u64` (max `1.8e19`), far above 50.
   - Intermediates: `to_wad` and the running sum are checked; `sum / count`
-    divides by a positive `count ≤ 393` (no `i128::MIN / −1`); the final
+    divides by a positive `count ≤ 50` (no `i128::MIN / −1`); the final
     `/ 10^(18 − mode)` divides by a positive power of ten.
+  - A skipped record still counts as one of the 50 reads (tested), so the cap
+    and the skip compose without reading more.
   - The cumulative case can therefore not be reached by new records; only
     records stored before the fix can trigger the read-time skip.
 - No new error code: `ValueOutOfRange` already means "value not accepted",

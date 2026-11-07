@@ -854,3 +854,48 @@ fn an_empty_client_list_is_still_an_error() {
         Err(Ok(ReputationError::ClientAddressesRequired)),
     ));
 }
+
+#[test]
+fn stored_records_whose_negative_sum_overflows_are_skipped_not_fatal() {
+    // The mirror of the positive case: two legacy records of -1e20 (decimals
+    // 0) each fit, but together they go below i128::MIN once normalized.
+    let ctx = setup();
+    let honest = Address::generate(&ctx.env);
+    let a = Address::generate(&ctx.env);
+    let b = Address::generate(&ctx.env);
+    ctx.give(&honest, ctx.agent_id, 5, 0);
+    ctx.store_legacy(&a, -HALF_OVERFLOW, 0, false);
+    // The second one would underflow the running sum: skipped.
+    ctx.store_legacy(&b, -HALF_OVERFLOW, 0, false);
+
+    let clients = soroban_vec![&ctx.env, honest.clone(), a.clone(), b.clone()];
+    let summary = ctx.summary(&clients);
+
+    assert_eq!(summary.count, 2);
+    assert_eq!(summary.summary_value_decimals, 0);
+    // (5 - 1e20) / 2, in whole units, truncated toward zero like the contract.
+    assert_eq!(summary.summary_value, (5 - HALF_OVERFLOW) / 2);
+}
+
+#[test]
+fn skipped_records_still_use_up_the_summary_read_cap() {
+    // #199 skips a record it cannot normalize, #205 stops after
+    // MAX_SUMMARY_RECORDS reads. A skipped record is still a read, so a client
+    // with that many poisoned legacy records leaves no room for the next
+    // client; listed first, the honest client still counts.
+    let ctx = setup();
+    let poisoned = Address::generate(&ctx.env);
+    let honest = Address::generate(&ctx.env);
+    for _ in 0..MAX_SUMMARY_RECORDS {
+        ctx.store_legacy(&poisoned, POISON, 0, false);
+    }
+    ctx.give(&honest, ctx.agent_id, 4, 0);
+
+    let poisoned_first = ctx.summary(&soroban_vec![&ctx.env, poisoned.clone(), honest.clone()]);
+    assert_eq!(poisoned_first.count, 0);
+    assert_eq!(poisoned_first.summary_value, 0);
+
+    let honest_first = ctx.summary(&soroban_vec![&ctx.env, honest.clone(), poisoned.clone()]);
+    assert_eq!(honest_first.count, 1);
+    assert_eq!(honest_first.summary_value, 4);
+}
