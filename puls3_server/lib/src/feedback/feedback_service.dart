@@ -18,7 +18,8 @@ const _probeScore = 1;
 ///
 /// The rules are the domain's [checkHireRateable] and [checkFeedbackAllowed];
 /// this service only feeds them from the stored hire and the chain and maps
-/// the errors to the wire catalog. The call itself is built by
+/// the errors to the wire catalog. The call names the hire's escrow job, so
+/// the rating carries a reference any reader can check on chain (#201). The call itself is built by
 /// [ReputationCalls] and relayed by the [EscrowRelayService], so the server
 /// never signs and the Reputation Registry ABI (#14) stays behind a port.
 ///
@@ -87,10 +88,16 @@ final class FeedbackService {
     final hire = await _ownedHire(wallet, hireId);
     final feedback = _feedbackOf(hire, wallet, score, comment);
     await _requireRateable(hire, wallet, await _isRated(hire.id));
+    // A completed hire has its escrow job: the call names it (#201). A hire
+    // without one has not started, so it is not completed.
+    final jobId =
+        hire.jobId ??
+        (throw _api('HireNotCompleted', {'status': HireStatus.open.name}));
     final call = _calls.giveFeedback(
       client: wallet,
       agent: AgentId(hire.agentId),
       feedback: feedback,
+      jobId: jobId,
     );
     return _relay.prepareFeedback(wallet, hire.id, call);
   }

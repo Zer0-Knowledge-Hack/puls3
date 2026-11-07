@@ -12,12 +12,12 @@ ReputationCalls reputationCallsFor(StellarConfig config) {
   final registry = config.reputationRegistry;
   return registry == null
       ? const UnwiredReputationCalls()
-      : SorobanReputationCalls(registry: registry);
+      : SorobanReputationCalls(registry: registry, escrow: config.escrow);
 }
 
 /// The [ReputationRegistry] of [config]: it reads the configured registry
-/// through [reader], else it is [UnwiredReputationRegistry] and every agent
-/// has no feedback.
+/// through [reader] and checks ratings against the configured escrow (#201),
+/// else it is [UnwiredReputationRegistry] and every agent has no feedback.
 ReputationRegistry reputationRegistryFor(
   StellarConfig config,
   ContractReader reader,
@@ -25,5 +25,9 @@ ReputationRegistry reputationRegistryFor(
   final registry = config.reputationRegistry;
   return registry == null
       ? const UnwiredReputationRegistry()
-      : SorobanReputationRegistry(reader, registry: registry);
+      : SorobanReputationRegistry(
+          reader,
+          registry: registry,
+          escrow: config.escrow,
+        );
 }

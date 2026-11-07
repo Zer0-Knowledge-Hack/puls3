@@ -28,15 +28,19 @@ final class FakeAgentOwners implements AgentOwnerReader {
 
 /// A [ReputationCalls] that records what it was asked to build.
 final class FakeReputationCalls implements ReputationCalls {
-  final built = <({StellarAddress client, AgentId agent, Feedback feedback})>[];
+  final built =
+      <
+        ({StellarAddress client, AgentId agent, Feedback feedback, int jobId})
+      >[];
 
   @override
   ContractCall giveFeedback({
     required StellarAddress client,
     required AgentId agent,
     required Feedback feedback,
+    required int jobId,
   }) {
-    built.add((client: client, agent: agent, feedback: feedback));
+    built.add((client: client, agent: agent, feedback: feedback, jobId: jobId));
     return ContractCall(
       contract: fakeReputationRegistry,
       function: 'give_feedback',

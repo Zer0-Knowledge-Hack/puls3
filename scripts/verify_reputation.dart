@@ -10,7 +10,8 @@
 // the script resolves `puls3_domain` and `puls3_server` without its own
 // pubspec.
 //
-// It prints every record the registry lists, whether it counts and why not,
+// It prints every record the registry lists, the paid job its `tag2` names
+// (checked with the escrow's `get_job`, #201), whether it counts and why not,
 // then the recomputed rating (domain `countedFeedback` + `reputationOf`, the
 // code the server runs) next to the served one. Exit code: 0 when they
 // match, 1 when they differ, 2 when a read fails.
@@ -58,25 +59,33 @@ Future<void> main(List<String> args) async {
         source: config.simulationSource,
       ),
       registry: registryAddress,
+      escrow: config.escrow,
     );
 
-    final (:records, :clientPages) = await registry.readRecords(agent);
-    final counted = countedFeedback(records);
+    final (:records, :provenance, :clientPages) = await registry.readRecords(
+      agent,
+    );
+    final counted = countedFeedback(records, provenance);
+    final exclusions = exclusionsOf(records, provenance);
     final recomputed = reputationOf(counted);
 
     print('registry : ${registryAddress.value}');
+    print('escrow   : ${config.escrow.value}');
     print('agent    : ${agent.value}');
     print(
       'pages    : $clientPages page(s) of get_clients_paginated '
       '($reputationPageSize clients per page)',
     );
     print('records  : ${records.length} listed, ${counted.length} counted');
-    for (final record in records) {
-      final reason = exclusionOf(record);
+    for (var i = 0; i < records.length; i++) {
+      final record = records[i];
+      final reason = exclusions[i];
+      final job = record.jobReference;
       print(
         '  ${_short(record.client)} #${record.index}  '
         'value=${record.value ?? '-'} decimals=${record.valueDecimals ?? '-'} '
-        'revoked=${record.isRevoked ?? '-'}  '
+        'revoked=${record.isRevoked ?? '-'} '
+        'job=${job == null ? '-' : _jobOf(job, provenance)}  '
         '${reason == null ? 'counts' : 'excluded: ${reason.name}'}',
       );
     }
@@ -162,6 +171,13 @@ Future<({double rating, int paidHireCount})?> _servedReputation(
     }
   }
   return null;
+}
+
+/// The job id and, when the escrow answered, its state.
+String _jobOf(PaidJobReference job, FeedbackProvenance provenance) {
+  if (job.escrow != provenance.escrow) return '${job.jobId}@other-escrow';
+  final read = provenance.jobs[job.jobId];
+  return read == null ? '${job.jobId}(unread)' : '${job.jobId}(${read.state.name})';
 }
 
 String _short(StellarAddress address) {

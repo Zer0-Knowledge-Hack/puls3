@@ -132,6 +132,10 @@ void main() {
       expect(calls.built.single.feedback.score, 4);
       expect(calls.built.single.feedback.comment, 'Great');
       expect(calls.built.single.client, _wallet);
+      // The call names the hire's escrow job, so the rating is checkable
+      // on chain (#201).
+      expect(calls.built.single.jobId, hire.jobId);
+      expect(hire.jobId, isNotNull);
       expect(rig.codec.built.single.spec.contract, fakeReputationRegistry);
     });
 

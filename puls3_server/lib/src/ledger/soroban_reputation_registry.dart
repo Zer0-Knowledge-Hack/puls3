@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
 import 'contract_reader.dart';
+import 'escrow_job.dart';
 import 'sc_val_json.dart';
 import 'xdr_invoke_encoder.dart';
 
@@ -12,39 +13,54 @@ const reputationPageSize = 50;
 /// already revoked, for `revoke_feedback`; for a read, it cannot be loaded).
 const _feedbackNotFound = 2;
 
+/// Escrow `JobNotFound`: no job has this id.
+const _escrowJobNotFound = 1;
+
 /// The [ReputationRegistry] over the Reputation Registry of #14
 /// (`contracts/contracts/reputation-registry`), read through simulated
 /// calls like the other registry readers: no signature, no submission.
 ///
 /// What it reads, per agent: `get_clients_paginated` for the clients,
-/// `get_last_index` for how many feedbacks each one gave, and
-/// `read_feedback` for each record.
+/// `get_last_index` for how many feedbacks each one gave, `read_feedback`
+/// for each record, then the escrow's `get_job` once for each job those
+/// records reference (#201).
 ///
 /// [recordsOf] returns every record the registry lists, raw. [feedbacksOf]
-/// is exactly `countedFeedback` of those records: the four public rules of
-/// the domain (`exclusionOf`: unreadable, revoked, not a whole score, outside
-/// 1 to 5) are the only reasons a record does not count, and this adapter
-/// adds none of its own (#202). Tags are not a filter: they carry no puls3
-/// meaning.
+/// is exactly `countedFeedback` of those records and of the jobs read from
+/// the configured [escrow]: the public rules of the domain (`exclusionOf`
+/// and `exclusionsOf`) are the only reasons a record does not count, and
+/// this adapter adds none of its own (#202). A record counts only when its
+/// `tag2` names a job of [escrow] that is `Completed` for the same client
+/// and agent, once per job; a score written straight to the contract
+/// without such a job does not count.
 ///
-/// The registry stores no hire and no comment, so the returned [Feedback] has
-/// no `hireId` (null: the `feedback_index` is the registry key, not a puls3
-/// hire) and an empty comment. Only `score` feeds `reputationOf`.
-///
-/// Reading is not gated by completed hires: the registry accepts feedback
-/// from any address, so a score written straight to the contract is counted.
+/// The registry stores no puls3 hire id and no comment, so the returned
+/// [Feedback] has no `hireId` (null: the `feedback_index` is the registry
+/// key, not a puls3 hire) and an empty comment. Only `score` feeds
+/// `reputationOf`.
 final class SorobanReputationRegistry implements ReputationRegistry {
-  SorobanReputationRegistry(this._reader, {required StellarAddress registry})
-    : _registry = registry;
+  SorobanReputationRegistry(
+    this._reader, {
+    required StellarAddress registry,
+    required StellarAddress escrow,
+  }) : _registry = registry,
+       _escrow = escrow;
 
   final ContractReader _reader;
   final StellarAddress _registry;
+  final StellarAddress _escrow;
 
-  /// A registry read failure is a [LedgerException]: the caller must not
-  /// treat it as "no feedback".
+  /// The escrow contract whose completed jobs make a rating count. It comes
+  /// from the configuration, never from a record.
+  StellarAddress get escrow => _escrow;
+
+  /// A registry or escrow read failure is a [LedgerException]: the caller
+  /// must not treat it as "no feedback".
   @override
-  Future<List<Feedback>> feedbacksOf(AgentId agent) async =>
-      countedFeedback(await recordsOf(agent));
+  Future<List<Feedback>> feedbacksOf(AgentId agent) async {
+    final (:records, :provenance, clientPages: _) = await readRecords(agent);
+    return countedFeedback(records, provenance);
+  }
 
   /// Every feedback record the registry lists for [agent], raw and in
   /// registry order (client by client, index by index), including the ones
@@ -52,11 +68,61 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   ///
   /// A registry read failure is a [LedgerException], never an empty list.
   Future<List<FeedbackRecord>> recordsOf(AgentId agent) async =>
-      (await readRecords(agent)).records;
+      (await _recordsOf(agent)).records;
 
-  /// [recordsOf] plus how many `get_clients_paginated` pages were read,
-  /// the empty page that ends the list included, for the verification tool.
-  Future<({List<FeedbackRecord> records, int clientPages})> readRecords(
+  /// [recordsOf], the jobs they reference read from [escrow], and how many
+  /// `get_clients_paginated` pages were read (the empty page that ends the
+  /// list included), for the verification tool.
+  Future<
+    ({
+      List<FeedbackRecord> records,
+      FeedbackProvenance provenance,
+      int clientPages,
+    })
+  >
+  readRecords(AgentId agent) async {
+    final (:records, :clientPages) = await _recordsOf(agent);
+    return (
+      records: records,
+      provenance: await provenanceOf(records),
+      clientPages: clientPages,
+    );
+  }
+
+  /// The jobs [records] reference on [escrow], each read once with
+  /// `get_job`. A job the escrow does not have is left out, so the domain
+  /// reports it as `jobUnreadable`; any other failure is a
+  /// [LedgerException].
+  Future<FeedbackProvenance> provenanceOf(
+    Iterable<FeedbackRecord> records,
+  ) async {
+    final jobs = <int, ReferencedJob>{};
+    for (final id in referencedJobIds(records, _escrow)) {
+      final value = await _reader.read(
+        _escrow,
+        'get_job',
+        [ScArg.u64(id)],
+        absentErrors: const {_escrowJobNotFound},
+      );
+      final job = value == null ? null : readOptional(value, decodeEscrowJob);
+      if (job == null) continue;
+      jobs[id] = ReferencedJob(
+        client: job.client,
+        agentId: job.agentId,
+        state: switch (job.state) {
+          EscrowJobState.open => JobState.open,
+          EscrowJobState.funded => JobState.funded,
+          EscrowJobState.submitted => JobState.submitted,
+          EscrowJobState.completed => JobState.completed,
+          EscrowJobState.rejected => JobState.rejected,
+          EscrowJobState.expired => JobState.expired,
+        },
+      );
+    }
+    return FeedbackProvenance(escrow: _escrow, jobs: jobs);
+  }
+
+  Future<({List<FeedbackRecord> records, int clientPages})> _recordsOf(
     AgentId agent,
   ) async {
     final (:clients, :pages) = await _clientsOf(agent);
@@ -132,6 +198,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
       value: readI128(fields['value']),
       valueDecimals: readU32(fields['value_decimals']),
       isRevoked: readBool(fields['is_revoked']),
+      tag2: readString(fields['tag2']),
     );
   }
 

@@ -114,8 +114,8 @@ re-implements it.
 ### How every on-chain feedback is taken into account
 
 The registry accepts feedback from any address and in any scale. A record does
-not count only for one of these four reasons, and no other rule exists
-(`exclusionOf` in `puls3_domain/lib/src/feedback_record.dart`):
+not count only for one of these reasons, and no other rule exists
+(`exclusionOf` and `exclusionsOf` in `puls3_domain/lib/src/feedback_record.dart`):
 
 | Reason (`FeedbackExclusion`) | When |
 |---|---|
@@ -123,13 +123,29 @@ not count only for one of these four reasons, and no other rule exists
 | `revoked` | Its submitter revoked it (`is_revoked`) |
 | `notWholeScore` | `value_decimals` is not 0 |
 | `outOfScale` | The value is outside 1 to 5 |
+| `noJobReference` | `tag2` is not a paid-job reference `puls3:job:v1:<escrow>:<job id>` (#201) |
+| `otherEscrow` | The reference names an escrow other than the configured one |
+| `jobUnreadable` | The escrow's `get_job` has no such job (or it cannot be loaded) |
+| `jobMismatch` | The job's `client` is not the record's client, or its `agent_id` is not the rated agent |
+| `jobNotCompleted` | The job is not `Completed` (not paid and settled, or refunded) |
+| `jobAlreadyRated` | An earlier record already counts for the same job |
+
+The last six tie each rating to a paid hire (#201). `Completed` is reachable
+only through `Funded` and `Submitted` and is terminal, so it proves that the
+client paid the full budget and the provider was paid. The escrow address
+comes from the reader's configuration, never from the record. A rating written
+straight to the contract, without such a job, is valid ERC-8004 data but does
+not count in puls3's rating; this includes every rating written before #201.
 
 - `SorobanReputationRegistry.recordsOf()` reads **every** record: all pages of
   `get_clients_paginated` until the empty page, then `get_last_index` and
   `read_feedback` for every index of every client.
-- `feedbacksOf()` is exactly `countedFeedback(recordsOf())`; the server adds no
-  filter of its own. Equal scores from one client are separate records
-  (`(client, index)` is the registry key) and all count.
+- It then reads the escrow's `get_job` once for each job those records name
+  (only for records that pass the score rules).
+- `feedbacksOf()` is exactly `countedFeedback(records, provenance)`; the server
+  adds no filter of its own. Equal scores from one client for two paid jobs are
+  separate records (`(client, index)` is the registry key) and both count; two
+  records for the same job count once, the first one.
 - A read that fails at any point throws: the server never computes a rating
   from part of the records. It serves the last complete value it read, or
   reports the catalog as unavailable when it never read one.
@@ -137,7 +153,8 @@ not count only for one of these four reasons, and no other rule exists
 `puls3_domain/test/feedback_record_test.dart` and
 `puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` check each
 of these: no record dropped without a public reason, every page read, no
-duplicate removed, an empty agent, a failure in the middle of a read.
+duplicate removed, an empty agent, a failure in the middle of a read, and each
+paid-job rule (#201).
 
 ### Run the script
 
@@ -169,7 +186,10 @@ MATCH: the served rating is the formula over every counted on-chain record.
 
 - **pages**: how many client pages were read, the empty page that ends the
   list included.
-- **records**: every record with `counts` or `excluded: <reason>`.
+- **records**: every record with `counts` or `excluded: <reason>`. Since #201
+  each line also shows `job=<id>(<state>)`, or `job=-` when `tag2` holds no
+  reference. The sample above was taken before #201; that record has no
+  reference, so the script now reports it as `excluded: noJobReference`.
 - **recomputed vs served**: the rating and count from the chain next to the
   server's. `MATCH` means the served rating is `reputationOf()` over every
   counted record. `MISMATCH` means they differ.
@@ -186,8 +206,8 @@ MATCH: the served rating is the formula over every counted on-chain record.
   the script and the server then fail rather than show a partial rating.
 - **Same reader code.** The script reuses the server's Soroban reader and the
   domain rule; to verify without puls3 code, call the same three registry
-  functions with `stellar contract invoke --send=no` and apply the four rules
-  and the [Formula](#formula) by hand.
+  functions and the escrow's `get_job` with `stellar contract invoke
+  --send=no` and apply the rules above and the [Formula](#formula) by hand.
 
 Step-by-step evidence: [`docs/verification/reputation.md`](../verification/reputation.md).
 
