@@ -316,7 +316,7 @@ a retry cannot orphan a funded account.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PULS3_AGENT_WALLET_SECRET_KEY` | none (required) | Base64 of a random 32-byte key (`openssl rand -base64 32`) that encrypts agent secrets at rest. **Back it up:** losing it makes every custodied account unrecoverable. When it is unset, creating an agent wallet fails with `AgentWalletCustodyUnavailable`. |
+| `PULS3_AGENT_WALLET_SECRET_KEY` | none (required) | Base64 of a random 32-byte key (`openssl rand -base64 32`) that encrypts agent secrets and builder provider credentials (#235) at rest. **Back it up:** losing it makes every custodied account unrecoverable. When it is unset, creating an agent wallet fails with `AgentWalletCustodyUnavailable`, and saving a builder credential fails as `RuntimeUnavailable`. |
 
 Funding the account and adding its USDC trustline, and the on-chain
 registration (`register_full` / `set_agent_wallet`), are the next part of #18.
