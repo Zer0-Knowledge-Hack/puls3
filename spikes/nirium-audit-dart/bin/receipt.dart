@@ -26,6 +26,13 @@ Future<void> main(List<String> arguments) async {
         ..addOption('record', help: 'Local record, needed for a hash anchor'),
     )
     ..addCommand(
+      'reverify',
+      ArgParser()
+        ..addOption('measure', mandatory: true, help: 'A measure output file')
+        ..addOption('key', mandatory: true, help: "puls3's attesting G… key")
+        ..addOption('record', help: 'Local record, needed for hash anchors'),
+    )
+    ..addCommand(
       'measure',
       _anchorOptions()
         ..addOption('count', defaultsTo: '20')
@@ -43,7 +50,7 @@ Future<void> main(List<String> arguments) async {
   } on FormatException catch (e) {
     stderr
       ..writeln('error: ${e.message}')
-      ..writeln('commands: keygen, anchor, verify, measure');
+      ..writeln('commands: keygen, anchor, verify, reverify, measure');
     exitCode = 64;
     return;
   }
@@ -55,6 +62,7 @@ Future<void> main(List<String> arguments) async {
       'keygen' => _keygen(command),
       'anchor' => await _anchor(command, client),
       'verify' => await _verify(command, client),
+      'reverify' => await _reverify(command, client),
       _ => await _measure(command, client),
     };
   } on FormatException catch (e) {
@@ -253,6 +261,60 @@ Future<int> _measure(ArgResults args, http.Client client) async {
   );
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(summary));
   return summary['verified'] == count ? 0 : 1;
+}
+
+/// Verifies again every CID a `measure` run anchored, without anchoring.
+Future<int> _reverify(ArgResults args, http.Client client) async {
+  final file = File(args.option('measure')!);
+  final run = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+  final local = args.option('record') == null
+      ? null
+      : (jsonDecode(File(args.option('record')!).readAsStringSync())
+                as Map)['record']
+            as Map<String, Object?>;
+  final ipfs = IpfsReader(client);
+  final times = <int>[];
+  var verified = 0;
+  final cids = [
+    for (final r in (run['rows'] as List).cast<Map>())
+      if (r['cid'] != null) r['cid'] as String,
+  ];
+  for (final cid in cids) {
+    final watch = Stopwatch()..start();
+    try {
+      final check = await verifyReceipt(
+        await ipfs.read(cid),
+        trustedKey: args.option('key')!.trim(),
+        chain: HorizonReader(client).settlement,
+        localRecord: local,
+      );
+      times.add(watch.elapsedMilliseconds);
+      if (check.ok) verified++;
+      stdout.writeln(
+        '$cid ${check.ok ? 'verified' : check.failures.join('; ')} '
+        '${watch.elapsedMilliseconds} ms',
+      );
+    } on Object catch (e) {
+      stdout.writeln('$cid error ${e.runtimeType}');
+    }
+  }
+  times.sort();
+  final summary = {
+    'cids': cids.length,
+    'verified': verified,
+    'verifyMs': {
+      'p50': times.isEmpty ? null : times[(times.length - 1) ~/ 2],
+      'p95': times.isEmpty ? null : times[((times.length - 1) * .95).round()],
+      'max': times.lastOrNull,
+    },
+  };
+  run['reverify'] = {
+    ...summary,
+    'at': DateTime.now().toUtc().toIso8601String(),
+  };
+  file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(run));
+  stdout.writeln(jsonEncode(summary));
+  return verified == cids.length ? 0 : 1;
 }
 
 void _save(String cid, Map<String, Object?> record, AuditAnchor anchor) {
