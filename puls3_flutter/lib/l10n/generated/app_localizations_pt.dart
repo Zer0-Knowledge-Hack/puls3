@@ -1023,6 +1023,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get playgroundProviderTokenHint => 'Guardado para os seus testes';
 
   @override
+  String get playgroundCredentialMissing =>
+      'Guarde a credencial do provedor e execute o rascunho de novo.';
+
+  @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
@@ -2268,6 +2272,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get playgroundProviderTokenHint => 'Guardado para os seus testes';
+
+  @override
+  String get playgroundCredentialMissing =>
+      'Salve a credencial do provedor e execute o rascunho de novo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
@@ -3518,6 +3526,10 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get playgroundProviderTokenHint => 'Guardado para os seus testes';
+
+  @override
+  String get playgroundCredentialMissing =>
+      'Guarde a credencial do fornecedor e volte a executar o rascunho.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';

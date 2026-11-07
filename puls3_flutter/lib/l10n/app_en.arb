@@ -390,6 +390,7 @@
   "playgroundLiveLead": "Test runs are free and limited per day.",
   "playgroundProviderToken": "Provider token",
   "playgroundProviderTokenHint": "Stored for your test runs",
+  "playgroundCredentialMissing": "Save your provider credential, then run the draft again.",
   "playgroundAccountId": "Cloudflare account id",
   "playgroundRunning": "Running… It stops at the runtime timeout.",
   "playgroundFailed": "The test run failed",
