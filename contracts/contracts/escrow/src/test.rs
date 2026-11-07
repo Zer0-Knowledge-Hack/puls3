@@ -2047,8 +2047,10 @@ fn admin_handover_moves_authority() {
     let ctx = setup();
     let new_admin = Address::generate(&ctx.env);
     ctx.escrow().set_admin(&ctx.admin, &new_admin);
+    ctx.escrow().accept_admin(&new_admin);
     let events = ctx.job_events();
     assert_eq!(ctx.escrow().admin(), new_admin);
+    assert_eq!(ctx.escrow().pending_admin(), None);
     assert_eq!(
         events,
         [AdminChanged {
@@ -2062,6 +2064,104 @@ fn admin_handover_moves_authority() {
         EscrowError::NotAdmin
     );
     ctx.escrow().set_fee_bps(&new_admin, &0);
+}
+
+/// Audit E-3 (#205): `set_admin` only proposes. Until the new admin accepts, the old
+/// admin keeps control, so a mistyped address cannot lock the configuration.
+#[test]
+fn set_admin_is_two_step_and_a_typo_loses_nothing() {
+    let ctx = setup();
+    let typo = Address::generate(&ctx.env);
+    ctx.escrow().set_admin(&ctx.admin, &typo);
+    let events = ctx.job_events();
+    assert_eq!(
+        events,
+        [AdminProposed {
+            current_admin: ctx.admin.clone(),
+            pending_admin: typo.clone(),
+        }
+        .to_xdr(&ctx.env, &ctx.escrow_id)]
+    );
+    assert_eq!(ctx.escrow().admin(), ctx.admin);
+    assert_eq!(ctx.escrow().pending_admin(), Some(typo.clone()));
+    // The old admin still configures the contract.
+    ctx.escrow().set_fee_bps(&ctx.admin, &0);
+
+    // Only the pending admin can accept.
+    let stranger = Address::generate(&ctx.env);
+    assert_eq!(
+        err(ctx.escrow().try_accept_admin(&stranger)),
+        EscrowError::NotPendingAdmin
+    );
+
+    // The admin corrects the typo: the new proposal replaces the old one.
+    let intended = Address::generate(&ctx.env);
+    ctx.escrow().set_admin(&ctx.admin, &intended);
+    assert_eq!(
+        err(ctx.escrow().try_accept_admin(&typo)),
+        EscrowError::NotPendingAdmin
+    );
+    ctx.escrow().accept_admin(&intended);
+    assert_eq!(ctx.escrow().admin(), intended);
+}
+
+#[test]
+fn proposing_the_current_admin_cancels_the_transfer() {
+    let ctx = setup();
+    let new_admin = Address::generate(&ctx.env);
+    ctx.escrow().set_admin(&ctx.admin, &new_admin);
+    ctx.escrow().set_admin(&ctx.admin, &ctx.admin);
+    assert_eq!(ctx.escrow().pending_admin(), None);
+    assert_eq!(
+        err(ctx.escrow().try_accept_admin(&new_admin)),
+        EscrowError::NoPendingAdmin
+    );
+    assert_eq!(ctx.escrow().admin(), ctx.admin);
+}
+
+/// Audit E-3 (#205): the treasury is snapshotted at `fund`, like `fee_bps`. A later
+/// `set_treasury` does not redirect the fee of a job already funded.
+#[test]
+fn set_treasury_does_not_redirect_a_funded_job() {
+    let (ctx, old_treasury) = setup_with_fee(250);
+    let in_flight = ctx.submitted(LATE_EXPIRY);
+
+    let new_treasury = Address::generate(&ctx.env);
+    ctx.escrow().set_treasury(&ctx.admin, &new_treasury);
+    let later = ctx.submitted(LATE_EXPIRY);
+
+    ctx.escrow().complete(&ctx.client, &in_flight, &ctx.hash(5));
+    assert_eq!(ctx.balance(&old_treasury), 250_000);
+    assert_eq!(ctx.balance(&new_treasury), 0);
+
+    ctx.escrow().complete(&ctx.client, &later, &ctx.hash(6));
+    assert_eq!(ctx.balance(&old_treasury), 250_000);
+    assert_eq!(ctx.balance(&new_treasury), 250_000);
+    assert_eq!(ctx.balance(&ctx.escrow_id), 0);
+}
+
+/// The treasury snapshot does not outlive its job: settling, rejecting or refunding
+/// removes it.
+#[test]
+fn the_treasury_snapshot_is_removed_when_the_job_ends() {
+    let (ctx, _treasury) = setup_with_fee(250);
+    let has_snapshot = |id: u64| {
+        ctx.env.as_contract(&ctx.escrow_id, || {
+            ctx.env
+                .storage()
+                .persistent()
+                .has(&DataKey::JobTreasury(id))
+        })
+    };
+    let completed = ctx.submitted(LATE_EXPIRY);
+    let rejected = ctx.funded(LATE_EXPIRY);
+    assert!(has_snapshot(completed));
+    assert!(has_snapshot(rejected));
+
+    ctx.escrow().complete(&ctx.client, &completed, &ctx.hash(5));
+    ctx.escrow().reject(&ctx.client, &rejected, &ctx.hash(6));
+    assert!(!has_snapshot(completed));
+    assert!(!has_snapshot(rejected));
 }
 
 // ---------------------------------------------------------------------------
@@ -2327,6 +2427,8 @@ fn contract_exports_exactly_the_specified_functions() {
         "set_approval_window",
         "set_identity_registry",
         "set_admin",
+        "accept_admin",
+        "pending_admin",
         "admin",
         "identity_registry",
         "treasury",
