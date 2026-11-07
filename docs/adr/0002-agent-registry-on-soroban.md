@@ -253,6 +253,10 @@ pub struct SummaryResult {
 
 /// `get_summary` reads at most this many clients per call.
 pub const MAX_SUMMARY_CLIENTS: u32 = 5;
+/// `get_summary` reads at most this many records per call, across clients (#205).
+pub const MAX_SUMMARY_RECORDS: u64 = 50;
+/// Responses a feedback accepts from outside the agent's side (#205).
+pub const MAX_THIRD_PARTY_RESPONSES: u32 = 20;
 /// `value` must be within ±1e38.
 pub const MAX_ABS_VALUE: i128 = 100_000_000_000_000_000_000_000_000_000_000_000_000;
 
@@ -319,8 +323,11 @@ impl ReputationRegistryContract {
     /// Only the client who gave it. Errors: `FeedbackNotFound` (also if already revoked).
     pub fn revoke_feedback(e: &Env, caller: Address, agent_id: u32, feedback_index: u64) -> Result<(), ReputationError>;
 
-    /// Anyone can respond (e.g. the agent owner disputing a review).
-    /// Errors: `EmptyValue` (empty `response_uri`), `FeedbackNotFound`.
+    /// Anyone can respond (e.g. the agent owner disputing a review), but a feedback
+    /// takes at most `MAX_THIRD_PARTY_RESPONSES` responses from outside the agent's
+    /// owner, operator and payment wallet, who are never capped (#205).
+    /// Errors: `EmptyValue` (empty `response_uri`), `FeedbackNotFound`,
+    /// `TooManyResponses`.
     pub fn append_response(
         e: &Env,
         caller: Address,
@@ -334,7 +341,8 @@ impl ReputationRegistryContract {
     pub fn read_feedback(e: &Env, agent_id: u32, client_address: Address, feedback_index: u64) -> Result<FeedbackData, ReputationError>;
 
     /// Average of the non-revoked feedback from the first `MAX_SUMMARY_CLIENTS` of
-    /// `client_addresses`, filtered by `tag1`/`tag2` when not empty. Values are
+    /// `client_addresses`, filtered by `tag1`/`tag2` when not empty, over at most
+    /// `MAX_SUMMARY_RECORDS` records; its reads extend no TTL (#205). Values are
     /// normalized to 18 decimals, averaged with checked arithmetic, and returned in the
     /// most frequent `value_decimals` (ties go to the lowest).
     /// Errors: `ClientAddressesRequired` (empty list), `AggregateOverflow`.
