@@ -24,22 +24,39 @@ typedef StoredFeedback = ({
   String tag2,
 });
 
-/// The Reputation Registry of #14 as a scripted Soroban RPC: it answers the
-/// three reads the adapter makes (`get_clients_paginated`, `get_last_index`,
-/// `read_feedback`) from [state], in the ScVal JSON the node returns with
-/// `xdrFormat: "json"`. No network is touched.
+/// An escrow job as the reader needs it: client, agent and state.
+typedef StoredJob = ({StellarAddress client, int agent, JobState state});
+
+/// The Reputation Registry of #14 and the escrow's `get_job` as a scripted
+/// Soroban RPC: it answers the reads the adapter makes
+/// (`get_clients_paginated`, `get_last_index`, `read_feedback` on the
+/// registry, `get_job` on the escrow) from [state] and [jobs], in the ScVal
+/// JSON the node returns with `xdrFormat: "json"`. No network is touched.
 ///
 /// An envelope the script does not know throws [StateError], so a call the
 /// adapter should not make fails the test instead of being answered.
 final class FakeReputationChain {
-  FakeReputationChain({StellarAddress? registry})
-    : registry = registry ?? _defaultRegistry;
+  FakeReputationChain({StellarAddress? registry, StellarAddress? escrow})
+    : registry = registry ?? _defaultRegistry,
+      escrow = escrow ?? defaultEscrow;
 
   static final _defaultRegistry = StellarAddress.parse(
     'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
   );
 
+  /// The escrow the adapter trusts unless a test says otherwise.
+  static final defaultEscrow = StellarAddress.parse(
+    'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
+  );
+
   final StellarAddress registry;
+  final StellarAddress escrow;
+
+  /// The escrow's jobs by id. A referenced id that is not here answers
+  /// `JobNotFound`.
+  final jobs = <int, StoredJob>{};
+
+  var _nextJob = 1000;
   final _source = StellarConfig.testnet.simulationSource;
 
   /// agent -> client (in registration order) -> feedback (index 1, 2, ...).
@@ -52,6 +69,12 @@ final class FakeReputationChain {
   /// The RPC bodies received, in order.
   final requests = <Map<String, Object?>>[];
 
+  /// How many of [requests] were answered as an escrow `get_job`.
+  var jobReads = 0;
+
+  /// The `get_job` envelopes of the last [_answers].
+  final _jobEnvelopes = <String>{};
+
   /// When set, every request gets this HTTP status.
   int? failWithStatus;
 
@@ -62,13 +85,36 @@ final class FakeReputationChain {
   /// When set, every simulation answers a `restorePreamble`.
   bool needsRestore = false;
 
-  /// Adds [feedback] for [client] under [agent].
+  /// Adds [feedback] for [client] under [agent], with its `tag2` as given.
   void add(int agent, StellarAddress client, StoredFeedback feedback) {
     state
         .putIfAbsent(agent, () => {})
         .putIfAbsent(client, () => [])
         .add(feedback);
   }
+
+  /// Adds [feedback] as the app writes it: a new escrow job of [client] for
+  /// [agent] in [jobState], named in `tag2`. Returns the job id.
+  int addPaid(
+    int agent,
+    StellarAddress client,
+    StoredFeedback feedback, {
+    JobState jobState = JobState.completed,
+  }) {
+    final id = _nextJob++;
+    jobs[id] = (client: client, agent: agent, state: jobState);
+    add(agent, client, (
+      value: feedback.value,
+      decimals: feedback.decimals,
+      revoked: feedback.revoked,
+      tag1: feedback.tag1,
+      tag2: reference(id),
+    ));
+    return id;
+  }
+
+  /// The `tag2` reference of job [id] on [escrow].
+  String reference(int id) => PaidJobReference(escrow: escrow, jobId: id).text;
 
   /// The adapter over this chain.
   SorobanReputationRegistry get adapter => SorobanReputationRegistry(
@@ -81,6 +127,7 @@ final class FakeReputationChain {
       source: _source,
     ),
     registry: registry,
+    escrow: escrow,
   );
 
   late final http.Client _client = MockClient((request) async {
@@ -102,6 +149,7 @@ final class FakeReputationChain {
       if (answer == null) {
         throw StateError('The fake chain has no answer for this envelope');
       }
+      if (_jobEnvelopes.contains(envelope)) jobReads++;
       result = answer;
     }
     return http.Response(
@@ -111,11 +159,15 @@ final class FakeReputationChain {
     );
   });
 
-  String _envelope(String function, List<ScArg> args) => encodeInvokeEnvelope(
+  String _envelope(
+    String function,
+    List<ScArg> args, {
+    StellarAddress? contract,
+  }) => encodeInvokeEnvelope(
     source: _source,
     fee: 100,
     sequence: 0,
-    contract: registry,
+    contract: contract ?? registry,
     function: function,
     args: args,
   );
@@ -168,7 +220,55 @@ final class FakeReputationChain {
         }
       }
     }
+    // get_job for every job id a stored record names on this escrow.
+    _jobEnvelopes.clear();
+    for (final byClient in state.values) {
+      for (final entries in byClient.values) {
+        for (final entry in entries) {
+          final reference = PaidJobReference.tryParse(entry.tag2);
+          if (reference == null || reference.escrow != escrow) continue;
+          final job = jobs[reference.jobId];
+          final envelope = _envelope('get_job', [
+            ScArg.u64(reference.jobId),
+          ], contract: escrow);
+          _jobEnvelopes.add(envelope);
+          answers[envelope] = job == null
+              ? {'error': 'HostError: Error(Contract, #1)\n'}
+              : value(_jobData(job));
+        }
+      }
+    }
     return answers;
+  }
+
+  /// An escrow `Job` as the node prints it (see
+  /// `test/unit/ledger/fixtures/simulate_escrow_job_3.json`).
+  Map<String, Object?> _jobData(StoredJob job) {
+    Map<String, Object?> entry(String key, Object? val) => {
+      'key': {'symbol': key},
+      'val': val,
+    };
+    return {
+      'map': [
+        entry('agent_id', {'u32': job.agent}),
+        entry('approval_deadline', {'u64': '0'}),
+        entry('budget', {'i128': '5000000'}),
+        entry('client', {'address': job.client.value}),
+        entry('deliverable', 'void'),
+        entry('description', {'string': 'puls3 test job'}),
+        entry('evaluator', {'address': job.client.value}),
+        entry('expired_at', {'u64': '1800000000'}),
+        entry('fee_bps', {'u32': 0}),
+        entry('provider', {
+          'address': 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+        }),
+        entry('state', {'u32': job.state.index}),
+        entry('submitted_at', {'u64': '0'}),
+        entry('token', {
+          'address': 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+        }),
+      ],
+    };
   }
 
   /// `FeedbackData` as the node prints it: a map with symbol keys.
@@ -208,9 +308,11 @@ final class ChainReputationRegistryRig implements ReputationRegistryRig {
   @override
   ReputationRegistry get registry => chain.adapter;
 
+  /// Each seeded feedback is written as the app writes it: for its own
+  /// completed escrow job (#201).
   @override
   void seed(SeededFeedback entry) =>
-      chain.add(entry.agent.value, entry.client, (
+      chain.addPaid(entry.agent.value, entry.client, (
         value: entry.score,
         decimals: 0,
         revoked: entry.revoked,

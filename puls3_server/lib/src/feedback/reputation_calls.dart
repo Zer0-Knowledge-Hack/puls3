@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../generated/protocol.dart';
@@ -24,11 +26,13 @@ final class ContractCall {
 /// The production implementation is [SorobanReputationCalls]; without a
 /// configured registry the wiring falls back to [UnwiredReputationCalls].
 abstract interface class ReputationCalls {
-  /// The call by which [client] leaves [feedback] about [agent].
+  /// The call by which [client] leaves [feedback] about [agent] for the
+  /// escrow job [jobId] of the hire (#201).
   ContractCall giveFeedback({
     required StellarAddress client,
     required AgentId agent,
     required Feedback feedback,
+    required int jobId,
   });
 }
 
@@ -48,19 +52,29 @@ abstract interface class ReputationCalls {
 /// - `caller` is the client, who signs (`caller.require_auth()`).
 /// - `value` is the score (1 to 5, the scale of #11) and `value_decimals` is
 ///   0, so the stored value is the score itself.
-/// - `tag1`, `tag2` and `endpoint` are empty: the registry's summary filter
-///   treats an empty tag as "any", and puls3 has no tag or endpoint scheme.
-/// - `feedback_uri` is empty and `feedback_hash` is 32 zero bytes: puls3 has
-///   no off-chain host for the comment, so the comment is not sent. It stays
-///   in the domain [Feedback] only.
+/// - `tag1` and `endpoint` are empty: puls3 has no category or endpoint
+///   scheme.
+/// - `tag2` is the [PaidJobReference] of the hire's escrow job
+///   (`puls3:job:v1:<escrow>:<job id>`, #201). It is the only free field the
+///   registry stores, so `read_feedback` returns it and any reader can check
+///   the job against the escrow, long after the event is gone. puls3 never
+///   filters `get_summary` by `tag2`.
+/// - `feedback_uri` is the same reference: the ERC-8004 pointer, in the
+///   event.
+/// - `feedback_hash` is the SHA-256 of [feedbackCommitment] (reference,
+///   agent, client, score), so the event binds the rating to its job.
 ///
-/// The hire is not an argument either: the registry has no hire field (the
-/// paid-hire rule is applied off-chain, ADR-0005 D5).
+/// The comment is not sent: puls3 has no off-chain host for it. It stays in
+/// the domain [Feedback] only. The paid-hire rule itself is applied by
+/// readers (ADR-0005 D5): the reference only lets them check it.
 final class SorobanReputationCalls implements ReputationCalls {
-  const SorobanReputationCalls({required this.registry});
+  const SorobanReputationCalls({required this.registry, required this.escrow});
 
   /// The Reputation Registry contract.
   final StellarAddress registry;
+
+  /// The escrow contract whose jobs the references name.
+  final StellarAddress escrow;
 
   /// The registry's own function name.
   static const function = 'give_feedback';
@@ -73,21 +87,33 @@ final class SorobanReputationCalls implements ReputationCalls {
     required StellarAddress client,
     required AgentId agent,
     required Feedback feedback,
-  }) => ContractCall(
-    contract: registry,
-    function: function,
-    args: [
-      ScArg.address(client),
-      ScArg.u32(agent.value),
-      ScArg.i128(feedback.score),
-      const ScArg.u32(scoreDecimals),
-      const ScArg.string(''),
-      const ScArg.string(''),
-      const ScArg.string(''),
-      const ScArg.string(''),
-      ScArg.bytes32(Uint8List(32)),
-    ],
-  );
+    required int jobId,
+  }) {
+    final job = PaidJobReference(escrow: escrow, jobId: jobId);
+    final commitment = feedbackCommitment(
+      job: job,
+      agent: agent,
+      client: client,
+      score: feedback.score,
+    );
+    return ContractCall(
+      contract: registry,
+      function: function,
+      args: [
+        ScArg.address(client),
+        ScArg.u32(agent.value),
+        ScArg.i128(feedback.score),
+        const ScArg.u32(scoreDecimals),
+        const ScArg.string(''),
+        ScArg.string(job.text),
+        const ScArg.string(''),
+        ScArg.string(job.text),
+        ScArg.bytes32(
+          Uint8List.fromList(sha256.convert(utf8.encode(commitment)).bytes),
+        ),
+      ],
+    );
+  }
 }
 
 /// The [ReputationCalls] used while `PULS3_STELLAR_REPUTATION_REGISTRY` is
@@ -104,6 +130,7 @@ final class UnwiredReputationCalls implements ReputationCalls {
     required StellarAddress client,
     required AgentId agent,
     required Feedback feedback,
+    required int jobId,
   }) => throw HireConfigurationMissing(setting: setting);
 }
 
