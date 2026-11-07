@@ -49,7 +49,7 @@ Saved drafts appear in **My agents** (`/studio/agents`) under Drafts.
 
 **When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"The test runner is unavailable."** Enter both fields and run again. A bad token reaches Cloudflare and comes back as "The test run failed".
 
-> **Known limit.** The server keeps builder credentials in memory. A server restart or redeploy forgets them, and test runs and hires of your agent then fail as a missing credential until you run one test run again, which stores the token again.
+> **Known limit.** The server keeps builder credentials in memory. A server restart or redeploy forgets them, and test runs and hires of your agent then fail as a missing credential until you run one test run again, which stores the token again. Fix tracked in [#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235).
 
 ## 4. Deploy on testnet
 
