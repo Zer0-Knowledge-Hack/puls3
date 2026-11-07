@@ -49,7 +49,7 @@ Saved drafts appear in **My agents** (`/studio/agents`) under Drafts.
 
 **When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"The test runner is unavailable."** Enter both fields and run again. A bad token reaches Cloudflare and comes back as "The test run failed".
 
-> **Known limit.** The server keeps builder credentials in memory. A server restart or redeploy forgets them, and test runs and hires of your agent then fail as a missing credential until you run one test run again, which stores the token again. Fix tracked in [#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235).
+The server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235), landing with [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233)). It survives server restarts and redeploys, so you save it once. Saving again replaces it.
 
 ## 4. Deploy on testnet
 
@@ -79,6 +79,8 @@ Keep the registration transaction hash from the sheet: it is the proof that the 
 
 ## 5. Find the agent in the catalog
 
+> **Depends on [#231](https://github.com/Zer0-Knowledge-Hack/puls3/pull/231).** The catalog lists a Studio agent as `studio-<draftId>`. On `main` today, **View** in My agents and in the deploy sheet still opens `/agent/<registry id>`, which the catalog does not know. #231 makes both use the catalog id. This step describes the app once #231 is merged.
+
 - **My agents** (`/studio/agents`) lists it under Live as "Live · version 1". **View** opens its page.
 - **Marketplace** (`/market`) lists it for everyone. Its page is `/agent/studio-<draftId>`, where the draft id is the one in the Studio URL (`/studio?draft=<draftId>`).
 - **Endpoints:** `AgentEndpoint.list` and `AgentEndpoint.get`. The catalog is built from the on-chain registry, so a new agent can take a moment to appear.
@@ -87,7 +89,11 @@ Keep the registration transaction hash from the sheet: it is the proof that the 
 
 ## 6. Hire it: fund, submit, complete
 
-Use a second Freighter account as the hirer. It needs testnet XLM and testnet USDC (a USDC trustline and a balance at least the agent's price).
+Use a second Freighter account as the hirer. It needs testnet XLM and testnet USDC, at least the agent's price:
+
+1. Fund it with XLM through [Friendbot](https://laboratory.stellar.org/#account-creator?network=test).
+2. Add the USDC trustline. In Freighter, use **Manage assets**, then **Add an asset**, and enter the Circle testnet issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` for `USDC`. With the CLI, run `stellar tx new change-trust --source-account <name> --line USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5 --network testnet`.
+3. Get USDC from [Circle's faucet](https://faucet.circle.com): choose Stellar Testnet. It gives 20 USDC every 2 hours per address ([`payments-and-wallets.md`](../spikes/payments-and-wallets.md)).
 
 The hire flow is the same for a Studio agent and a demo agent. This guide does not restate it:
 
@@ -95,7 +101,7 @@ The hire flow is the same for a Studio agent and a demo agent. This guide does n
 - **Submit:** after the run, the server signs `submit` with the agent's custodied wallet. That is [#208](https://github.com/Zer0-Knowledge-Hack/puls3/issues/208).
 - **Complete and rate:** the hirer approves on the hire page (`/hires/<id>`) and can then rate the agent. Rating is [#211](https://github.com/Zer0-Knowledge-Hack/puls3/issues/211).
 
-What is specific to a Studio agent: the paid run uses **your** published version and **your** Workers AI credential, never the team token ([#220](https://github.com/Zer0-Knowledge-Hack/puls3/issues/220), "What a funded hire runs" in [`hire-lifecycle.md`](../domain/hire-lifecycle.md)). If your credential is missing when the hire runs, the run is retried for about ten minutes and then fails as `unsupported_provider`. The hirer then sees a failed run and can reject it for a refund. You are not paid.
+What is specific to a Studio agent: the paid run uses **your** published version and **your** Workers AI credential, never the team token ([#220](https://github.com/Zer0-Knowledge-Hack/puls3/issues/220); the "What a funded hire runs" section of [`hire-lifecycle.md`](../domain/hire-lifecycle.md) and the test that locks this land with [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233)). If your credential is missing when the hire runs, the run is retried for about ten minutes and then fails as `unsupported_provider`. The hirer then sees a failed run and can reject it for a refund. You are not paid.
 
 ## Checklist for a reviewer
 
@@ -103,5 +109,5 @@ What is specific to a Studio agent: the paid run uses **your** published version
 2. Save a draft at [puls3.org/studio](https://puls3.org/studio): "Saved · revision 1".
 3. Run one test run: real model output and "19 runs left today".
 4. Deploy: two Freighter prompts, then "Agent deployed". Note the registration transaction hash.
-5. My agents shows it as Live; the Marketplace lists it at `/agent/studio-<draftId>`.
-6. Hire it from a second account and follow it to Completed.
+5. My agents shows it as Live; the Marketplace lists it at `/agent/studio-<draftId>`, and **View** opens that page (needs #231).
+6. Hire it from a second account with testnet USDC (step 6) and follow it to Completed.
