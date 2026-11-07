@@ -20,7 +20,6 @@ import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import '../ledger/stellar_envelope_codec.dart';
-import '../studio/builder_task_runner.dart';
 import '../studio/serverpod_studio_agent_version_store.dart';
 import '../studio/studio_endpoint.dart';
 import 'adapters/anthropic_runtime.dart';
@@ -30,9 +29,9 @@ import 'demo_manifests.dart';
 import 'hire_runner.dart';
 import 'missed_run_backfill.dart';
 import 'provider_router.dart';
+import 'run_execution.dart';
 import 'run_manifest.dart';
 import 'runtime_config.dart';
-import 'runtime_task.dart';
 import 'serverpod_due_submit_source.dart';
 import 'serverpod_hire_run_store.dart';
 import 'studio_run_manifest_source.dart';
@@ -188,12 +187,10 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
       ),
     ),
     runner: agentRunner,
-    execute: (manifest, input) {
-      if (manifest is! OwnedRunManifest) {
-        return agentRunner.run(manifest.task(input));
-      }
-      return _runOwned(manifest, input);
-    },
+    execute: runExecutor(
+      team: agentRunner,
+      credentials: StudioEndpoint.credentials.find,
+    ),
     // A run still `running` a minute past the timeout was interrupted.
     staleAfter: config.timeout + const Duration(minutes: 1),
     log: log,
@@ -318,23 +315,6 @@ final class _SubmitWiring {
     }
     return due.length;
   }
-}
-
-/// Runs a Studio agent on the builder's credential. A missing credential
-/// fails the run; the team token is not consulted.
-Future<String> _runOwned(OwnedRunManifest manifest, String input) async {
-  final credential = await StudioEndpoint.credentials.find(
-    owner: manifest.owner,
-    provider: manifest.provider,
-  );
-  final account = credential?.accountId;
-  if (credential == null ||
-      credential.secret.isEmpty ||
-      (manifest.provider == WorkersAiRuntime.provider &&
-          (account == null || account.isEmpty))) {
-    throw RuntimeUnsupportedProvider(manifest.provider);
-  }
-  return runBuilderTask(manifest.task(input), credential);
 }
 
 /// What is wrong with the provider credentials at startup, as log lines
