@@ -69,6 +69,10 @@ pub enum EscrowError {
     NothingToWithdraw = 116,
     /// `create_job`: the evaluator is the provider (a provider cannot approve its own work).
     EvaluatorIsProvider = 117,
+    /// `accept_admin`: no admin transfer is pending.
+    NoPendingAdmin = 118,
+    /// `accept_admin`: the caller is not the pending admin.
+    NotPendingAdmin = 119,
 }
 
 #[contracttype]
@@ -116,6 +120,10 @@ pub enum DataKey {
     AllowedToken(Address),
     /// Pull-payment balance owed to `(recipient, token)` after a failed payout.
     Claimable(Address, Address),
+    /// The admin proposed by `set_admin`, until it calls `accept_admin`.
+    PendingAdmin,
+    /// The treasury snapshotted at `fund` for a job with a fee, read at settlement.
+    JobTreasury(u64),
 }
 
 #[contractevent]
@@ -238,6 +246,13 @@ pub struct RegistryUpdated {
 
 #[contractevent]
 #[derive(Clone)]
+pub struct AdminProposed {
+    pub current_admin: Address,
+    pub pending_admin: Address,
+}
+
+#[contractevent]
+#[derive(Clone)]
 pub struct AdminChanged {
     pub old_admin: Address,
     pub new_admin: Address,
@@ -317,7 +332,8 @@ impl EscrowContract {
         Ok(())
     }
 
-    /// Admin only. The treasury is read at settlement time.
+    /// Admin only. Applies to jobs funded afterwards: a job with a fee snapshots the
+    /// treasury at `fund`, like `fee_bps`, and is paid there (audit E-3).
     pub fn set_treasury(e: &Env, caller: Address, treasury: Address) -> Result<(), EscrowError> {
         require_admin(e, &caller)?;
         e.storage().instance().set(&DataKey::Treasury, &treasury);
@@ -384,16 +400,53 @@ impl EscrowContract {
     }
 
     /// Admin only. The admin configures the contract and has no power over job funds.
+    ///
+    /// The first of two steps (audit E-3): it records `new_admin` as pending and emits
+    /// `AdminProposed`. The admin changes only when `new_admin` calls `accept_admin`, so
+    /// a mistyped address cannot take configuration control away. Calling it again
+    /// replaces the pending admin; proposing the current admin cancels the transfer.
     pub fn set_admin(e: &Env, caller: Address, new_admin: Address) -> Result<(), EscrowError> {
         require_admin(e, &caller)?;
-        e.storage().instance().set(&DataKey::Admin, &new_admin);
-        AdminChanged {
-            old_admin: caller,
-            new_admin,
+        let instance = e.storage().instance();
+        if new_admin == caller {
+            instance.remove(&DataKey::PendingAdmin);
+        } else {
+            instance.set(&DataKey::PendingAdmin, &new_admin);
+        }
+        AdminProposed {
+            current_admin: caller,
+            pending_admin: new_admin,
         }
         .publish(e);
         extend_instance(e);
         Ok(())
+    }
+
+    /// Pending admin only. Completes `set_admin` and emits `AdminChanged`.
+    pub fn accept_admin(e: &Env, caller: Address) -> Result<(), EscrowError> {
+        caller.require_auth();
+        let instance = e.storage().instance();
+        let pending: Address = instance
+            .get(&DataKey::PendingAdmin)
+            .ok_or(EscrowError::NoPendingAdmin)?;
+        if pending != caller {
+            return Err(EscrowError::NotPendingAdmin);
+        }
+        let old_admin = Self::admin(e);
+        instance.set(&DataKey::Admin, &caller);
+        instance.remove(&DataKey::PendingAdmin);
+        AdminChanged {
+            old_admin,
+            new_admin: caller,
+        }
+        .publish(e);
+        extend_instance(e);
+        Ok(())
+    }
+
+    /// The admin proposed by `set_admin` and not accepted yet.
+    pub fn pending_admin(e: &Env) -> Option<Address> {
+        e.storage().instance().get(&DataKey::PendingAdmin)
     }
 
     /// Creates an `Open` job. The provider must be the registry wallet of `agent_id`.
@@ -496,6 +549,13 @@ impl EscrowContract {
         job.fee_bps = fee_bps;
         job.state = JobState::Funded;
         save_job(e, job_id, &job);
+        // A later `set_treasury` must not redirect this job's fee (audit E-3).
+        if fee_bps > 0 {
+            let treasury = Self::treasury(e).ok_or(EscrowError::TreasuryNotSet)?;
+            let key = DataKey::JobTreasury(job_id);
+            e.storage().persistent().set(&key, &treasury);
+            extend_persistent(e, &key);
+        }
         TokenClient::new(e, &job.token).transfer(
             &job.client,
             e.current_contract_address(),
@@ -621,6 +681,7 @@ impl EscrowContract {
         };
         job.state = JobState::Rejected;
         save_job(e, job_id, &job);
+        drop_job_treasury(e, job_id);
         if refunded > 0 {
             refund_client(e, &job);
         }
@@ -649,6 +710,7 @@ impl EscrowContract {
         }
         job.state = JobState::Expired;
         save_job(e, job_id, &job);
+        drop_job_treasury(e, job_id);
         refund_client(e, &job);
         JobExpired {
             job_id,
@@ -761,6 +823,10 @@ impl EscrowContract {
         if e.storage().persistent().has(&key) {
             extend_persistent(e, &key);
         }
+        let treasury = DataKey::JobTreasury(job_id);
+        if e.storage().persistent().has(&treasury) {
+            extend_persistent(e, &treasury);
+        }
     }
 
     /// Anyone can call it. Keeps the instance and a deferred payout entry alive. It does
@@ -855,11 +921,20 @@ fn settle(
 ) -> Result<(), EscrowError> {
     let fee = compute_fee(job.budget, job.fee_bps);
     let payout = job.budget - fee;
+    // The treasury snapshotted at `fund`. A job without a snapshot falls back to the
+    // current treasury.
+    let snapshot_key = DataKey::JobTreasury(job_id);
+    let snapshot: Option<Address> = e.storage().persistent().get(&snapshot_key);
     let treasury = if fee > 0 {
-        Some(EscrowContract::treasury(e).ok_or(EscrowError::TreasuryNotSet)?)
+        Some(
+            snapshot
+                .or_else(|| EscrowContract::treasury(e))
+                .ok_or(EscrowError::TreasuryNotSet)?,
+        )
     } else {
         None
     };
+    drop_job_treasury(e, job_id);
     job.state = JobState::Completed;
     save_job(e, job_id, &job);
     if payout > 0 {
@@ -913,6 +988,14 @@ fn pay_or_defer(
 }
 
 /// Returns the full budget to the stored client, never to the caller. No fee.
+/// Removes the treasury snapshotted at `fund`: a settled or refunded job pays no fee
+/// any more.
+fn drop_job_treasury(e: &Env, job_id: u64) {
+    e.storage()
+        .persistent()
+        .remove(&DataKey::JobTreasury(job_id));
+}
+
 fn refund_client(e: &Env, job: &Job) {
     TokenClient::new(e, &job.token).transfer(
         &e.current_contract_address(),

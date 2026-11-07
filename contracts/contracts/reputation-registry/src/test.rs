@@ -4,8 +4,10 @@ extern crate std;
 
 use super::*;
 use identity_registry::{IdentityRegistryContract, IdentityRegistryContractClient};
-use soroban_sdk::testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke};
-use soroban_sdk::{vec as soroban_vec, IntoVal};
+use soroban_sdk::testutils::{
+    storage::Persistent as _, Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke,
+};
+use soroban_sdk::{vec as soroban_vec, Event, IntoVal};
 
 struct Ctx {
     env: Env,
@@ -284,6 +286,179 @@ fn append_response_is_open_but_needs_feedback_and_a_uri() {
         ),
         Err(Ok(ReputationError::FeedbackNotFound)),
     ));
+}
+
+// ---------------------------------------------------------------------------
+// Audit hardening (#205)
+// ---------------------------------------------------------------------------
+
+impl Ctx {
+    fn respond(&self, responder: &Address, client: &Address) -> Result<(), ReputationError> {
+        match self.rep().try_append_response(
+            responder,
+            &self.agent_id,
+            client,
+            &1,
+            &self.s("https://reply.example/1"),
+            &self.hash(9),
+        ) {
+            Ok(Ok(())) => Ok(()),
+            Err(Ok(e)) => Err(e),
+            other => panic!("unexpected result {other:?}"),
+        }
+    }
+
+    fn summary_count(&self, clients: &[&Address]) -> u64 {
+        let mut list = Vec::new(&self.env);
+        for client in clients {
+            list.push_back((*client).clone());
+        }
+        self.rep()
+            .get_summary(&self.agent_id, &list, &self.s(""), &self.s(""))
+            .count
+    }
+
+    fn feedback_ttl(&self, client: &Address, index: u64) -> u32 {
+        self.env.as_contract(&self.rep_id, || {
+            self.env.storage().persistent().get_ttl(&DataKey::Feedback(
+                self.agent_id,
+                client.clone(),
+                index,
+            ))
+        })
+    }
+
+    fn advance_ledgers(&self, ledgers: u32) {
+        let now = self.env.ledger().sequence();
+        self.env.ledger().set_sequence_number(now + ledgers);
+    }
+}
+
+/// R-4: `get_summary` stops at `MAX_SUMMARY_RECORDS` records, across clients.
+#[test]
+fn summary_reads_at_most_max_summary_records() {
+    let ctx = setup();
+    let first = Address::generate(&ctx.env);
+    let second = Address::generate(&ctx.env);
+    for _ in 0..MAX_SUMMARY_RECORDS + 5 {
+        ctx.give(&first, ctx.agent_id, 5, 0);
+    }
+    ctx.give(&second, ctx.agent_id, 1, 0);
+
+    assert_eq!(ctx.summary_count(&[&first]), MAX_SUMMARY_RECORDS);
+    // The cap is shared: the second client's record is past it.
+    assert_eq!(ctx.summary_count(&[&first, &second]), MAX_SUMMARY_RECORDS);
+    // Under the cap, every record still counts.
+    assert_eq!(ctx.summary_count(&[&second]), 1);
+}
+
+/// R-4: `get_summary` is a view and does not extend the TTL of what it reads.
+#[test]
+fn summary_does_not_extend_ttl() {
+    let ctx = setup();
+    let reviewer = Address::generate(&ctx.env);
+    ctx.give(&reviewer, ctx.agent_id, 5, 0);
+    // Below TTL_THRESHOLD, where any extending read would bump it.
+    ctx.advance_ledgers(TTL_BUMP - TTL_THRESHOLD + 10);
+    let before = ctx.feedback_ttl(&reviewer, 1);
+    assert!(before < TTL_THRESHOLD);
+
+    assert_eq!(ctx.summary_count(&[&reviewer]), 1);
+    assert_eq!(ctx.feedback_ttl(&reviewer, 1), before);
+
+    // `read_feedback` still keeps the record alive, as before.
+    ctx.rep().read_feedback(&ctx.agent_id, &reviewer, &1);
+    assert!(ctx.feedback_ttl(&reviewer, 1) > before);
+}
+
+/// R-5: third parties are capped per feedback; the agent's side never is.
+#[test]
+fn third_party_responses_are_capped_but_the_agent_can_always_answer() {
+    let ctx = setup();
+    let reviewer = Address::generate(&ctx.env);
+    ctx.give(&reviewer, ctx.agent_id, 2, 0);
+
+    let spammer = Address::generate(&ctx.env);
+    for _ in 0..MAX_THIRD_PARTY_RESPONSES {
+        ctx.respond(&spammer, &reviewer).unwrap();
+    }
+    assert_eq!(
+        ctx.respond(&spammer, &reviewer),
+        Err(ReputationError::TooManyResponses)
+    );
+    let other = Address::generate(&ctx.env);
+    assert_eq!(
+        ctx.respond(&other, &reviewer),
+        Err(ReputationError::TooManyResponses)
+    );
+
+    // The owner and the payment wallet still answer.
+    ctx.respond(&ctx.agent_owner, &reviewer).unwrap();
+    let identity = IdentityRegistryContractClient::new(&ctx.env, &ctx.identity_id);
+    let payout = Address::generate(&ctx.env);
+    identity.set_agent_wallet(&ctx.agent_owner, &ctx.agent_id, &payout);
+    ctx.respond(&payout, &reviewer).unwrap();
+    assert_eq!(
+        ctx.rep().get_response_count(&ctx.agent_id, &reviewer, &1),
+        MAX_THIRD_PARTY_RESPONSES + 2
+    );
+}
+
+/// R-6: proposing and cancelling an upgrade emit events.
+#[test]
+fn upgrade_proposal_and_cancel_emit_events() {
+    let ctx = setup();
+    let now = ctx.env.ledger().sequence();
+    ctx.rep().propose_upgrade(&ctx.hash(1));
+    let events = ctx.env.events().all().filter_by_contract(&ctx.rep_id);
+    assert_eq!(
+        events,
+        [UpgradeProposed {
+            wasm_hash: ctx.hash(1),
+            proposed_at: now,
+            executable_at: now + TIMELOCK_LEDGERS,
+            expires_at: now + TIMELOCK_LEDGERS + UPGRADE_EXECUTION_WINDOW,
+        }
+        .to_xdr(&ctx.env, &ctx.rep_id)]
+    );
+
+    ctx.rep().cancel_upgrade();
+    let events = ctx.env.events().all().filter_by_contract(&ctx.rep_id);
+    assert_eq!(
+        events,
+        [UpgradeCancelled {
+            wasm_hash: ctx.hash(1),
+        }
+        .to_xdr(&ctx.env, &ctx.rep_id)]
+    );
+    assert!(ctx.rep().pending_upgrade().is_none());
+}
+
+/// R-6: a proposal expires after its execution window and can then be replaced.
+#[test]
+fn upgrade_proposal_expires_after_its_window() {
+    let ctx = setup();
+    ctx.rep().propose_upgrade(&ctx.hash(1));
+
+    assert!(matches!(
+        ctx.rep().try_execute_upgrade(),
+        Err(Ok(ReputationError::TimelockNotExpired)),
+    ));
+    // Still pending inside the window: a second proposal is refused.
+    ctx.advance_ledgers(TIMELOCK_LEDGERS + UPGRADE_EXECUTION_WINDOW);
+    assert!(matches!(
+        ctx.rep().try_propose_upgrade(&ctx.hash(2)),
+        Err(Ok(ReputationError::UpgradeAlreadyProposed)),
+    ));
+
+    ctx.advance_ledgers(1);
+    assert!(matches!(
+        ctx.rep().try_execute_upgrade(),
+        Err(Ok(ReputationError::UpgradeProposalExpired)),
+    ));
+    // The expired proposal is replaced by a new one.
+    ctx.rep().propose_upgrade(&ctx.hash(2));
+    assert_eq!(ctx.rep().pending_upgrade().unwrap().wasm_hash, ctx.hash(2));
 }
 
 #[test]
