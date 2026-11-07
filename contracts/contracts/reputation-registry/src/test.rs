@@ -608,3 +608,249 @@ fn submitter_auth_is_required_without_mock_all_auths() {
     );
     assert_eq!(rep.get_last_index(&agent_id, &reviewer), 1);
 }
+
+// --- #199: one poisoned feedback must not make get_summary fail ---
+
+/// 1e30, the value of the audit's proof of concept.
+const POISON: i128 = 1_000_000_000_000_000_000_000_000_000_000;
+/// The largest accepted whole value: `MAX_ABS_WAD` with 0 decimals.
+const MAX_WHOLE: i128 = 10_000_000_000;
+/// 1e20 with 0 decimals: 1e38 normalized, fits alone, two of them do not.
+const HALF_OVERFLOW: i128 = 100_000_000_000_000_000_000;
+
+type GiveResult = Result<
+    Result<(), soroban_sdk::ConversionError>,
+    Result<ReputationError, soroban_sdk::InvokeError>,
+>;
+
+impl Ctx {
+    fn try_give(&self, caller: &Address, value: i128, decimals: u32) -> GiveResult {
+        self.rep().try_give_feedback(
+            caller,
+            &self.agent_id,
+            &value,
+            &decimals,
+            &self.s("quality"),
+            &self.s("speed"),
+            &self.s("https://agent.example/endpoint"),
+            &self.s("https://reviews.example/1"),
+            &self.hash(7),
+        )
+    }
+
+    /// Writes a record straight into storage, as one accepted before the
+    /// #199 bound would be: the fixed `give_feedback` refuses these values.
+    fn store_legacy(&self, client: &Address, value: i128, decimals: u32, revoked: bool) {
+        self.env.as_contract(&self.rep_id, || {
+            if !client_exists(&self.env, self.agent_id, client) {
+                add_client(&self.env, self.agent_id, client).unwrap();
+            }
+            let index = get_last_index(&self.env, self.agent_id, client) + 1;
+            set_last_index(&self.env, self.agent_id, client, index);
+            set_feedback(
+                &self.env,
+                self.agent_id,
+                client,
+                index,
+                &FeedbackData {
+                    value,
+                    value_decimals: decimals,
+                    is_revoked: revoked,
+                    tag1: self.s("quality"),
+                    tag2: self.s("speed"),
+                },
+            );
+        });
+    }
+
+    fn summary(&self, clients: &Vec<Address>) -> SummaryResult {
+        self.rep()
+            .get_summary(&self.agent_id, clients, &self.s(""), &self.s(""))
+    }
+}
+
+#[test]
+fn audit_poc_value_1e30_is_rejected_at_give_feedback() {
+    let ctx = setup();
+    let attacker = Address::generate(&ctx.env);
+
+    assert!(matches!(
+        ctx.try_give(&attacker, POISON, 0),
+        Err(Ok(ReputationError::ValueOutOfRange)),
+    ));
+    assert!(matches!(
+        ctx.try_give(&attacker, -POISON, 0),
+        Err(Ok(ReputationError::ValueOutOfRange)),
+    ));
+    // Nothing was stored and nothing was emitted.
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &attacker), 0);
+    assert_eq!(ctx.events(), 0);
+}
+
+#[test]
+fn wad_bound_accepts_the_limit_and_rejects_one_more_for_every_decimals() {
+    let ctx = setup();
+    let client = Address::generate(&ctx.env);
+    for decimals in [0u32, 2, 7, 18] {
+        // MAX_ABS_WAD / 10^(18 - decimals): the largest value with these decimals.
+        let limit = MAX_ABS_WAD / pow10(18 - decimals);
+        assert!(
+            ctx.try_give(&client, limit, decimals).is_ok(),
+            "dec {decimals}"
+        );
+        assert!(
+            ctx.try_give(&client, -limit, decimals).is_ok(),
+            "dec {decimals}"
+        );
+        assert!(
+            matches!(
+                ctx.try_give(&client, limit + 1, decimals),
+                Err(Ok(ReputationError::ValueOutOfRange)),
+            ),
+            "dec {decimals}"
+        );
+        assert!(
+            matches!(
+                ctx.try_give(&client, -(limit + 1), decimals),
+                Err(Ok(ReputationError::ValueOutOfRange)),
+            ),
+            "dec {decimals}"
+        );
+    }
+    assert_eq!(MAX_ABS_WAD / pow10(18), MAX_WHOLE);
+    // The ±1e38 range check still comes first.
+    assert!(matches!(
+        ctx.try_give(&client, MAX_ABS_VALUE + 1, 18),
+        Err(Ok(ReputationError::ValueOutOfRange)),
+    ));
+    // Eight accepted records: two signs, four decimals.
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &client), 8);
+}
+
+#[test]
+fn the_audit_cumulative_case_is_rejected_at_write_time() {
+    let ctx = setup();
+    let a = Address::generate(&ctx.env);
+    // Fits the WAD scale alone, but two of them overflow the sum: refused.
+    assert!(matches!(
+        ctx.try_give(&a, HALF_OVERFLOW, 0),
+        Err(Ok(ReputationError::ValueOutOfRange)),
+    ));
+}
+
+#[test]
+fn many_records_at_the_bound_still_sum_without_overflow() {
+    let ctx = setup();
+    let mut clients: Vec<Address> = soroban_vec![&ctx.env];
+    for _ in 0..MAX_SUMMARY_CLIENTS {
+        let client = Address::generate(&ctx.env);
+        for _ in 0..5 {
+            ctx.give(&client, ctx.agent_id, MAX_WHOLE, 0);
+        }
+        clients.push_back(client);
+    }
+
+    let summary = ctx.summary(&clients);
+
+    assert_eq!(summary.count, 25);
+    assert_eq!(summary.summary_value, MAX_WHOLE);
+    assert_eq!(summary.summary_value_decimals, 0);
+}
+
+#[test]
+fn a_poisoned_stored_record_is_skipped_and_the_summary_still_returns() {
+    let ctx = setup();
+    let honest = Address::generate(&ctx.env);
+    let other = Address::generate(&ctx.env);
+    let attacker = Address::generate(&ctx.env);
+    ctx.give(&honest, ctx.agent_id, 5, 0);
+    ctx.give(&other, ctx.agent_id, 3, 0);
+    // The PoC record, stored before the bound existed.
+    ctx.store_legacy(&attacker, POISON, 0, false);
+
+    let clients = soroban_vec![&ctx.env, honest.clone(), attacker.clone(), other.clone()];
+    let summary = ctx.summary(&clients);
+
+    // Only the two valid records count: (5 + 3) / 2.
+    assert_eq!(summary.count, 2);
+    assert_eq!(summary.summary_value, 4);
+    assert_eq!(summary.summary_value_decimals, 0);
+}
+
+#[test]
+fn stored_records_whose_sum_overflows_are_skipped_not_fatal() {
+    let ctx = setup();
+    let honest = Address::generate(&ctx.env);
+    let a = Address::generate(&ctx.env);
+    let b = Address::generate(&ctx.env);
+    ctx.give(&honest, ctx.agent_id, 5, 0);
+    // The second large record would overflow the running sum: skipped.
+    ctx.store_legacy(&a, HALF_OVERFLOW, 0, false);
+    ctx.store_legacy(&b, HALF_OVERFLOW, 0, false);
+
+    let clients = soroban_vec![&ctx.env, honest.clone(), a.clone(), b.clone()];
+    let summary = ctx.summary(&clients);
+
+    assert_eq!(summary.count, 2);
+    // (5 + 1e20) / 2, in whole units (decimals 0).
+    assert_eq!(summary.summary_value, (5 + HALF_OVERFLOW) / 2);
+}
+
+#[test]
+fn a_summary_of_only_poisoned_records_is_empty_not_an_error() {
+    let ctx = setup();
+    let attacker = Address::generate(&ctx.env);
+    ctx.store_legacy(&attacker, POISON, 0, false);
+
+    let summary = ctx.summary(&soroban_vec![&ctx.env, attacker.clone()]);
+
+    assert_eq!(summary.count, 0);
+    assert_eq!(summary.summary_value, 0);
+    assert_eq!(summary.summary_value_decimals, 0);
+}
+
+#[test]
+fn revoked_records_are_skipped_before_normalization() {
+    let ctx = setup();
+    let honest = Address::generate(&ctx.env);
+    let attacker = Address::generate(&ctx.env);
+    ctx.give(&honest, ctx.agent_id, 4, 0);
+    ctx.give(&honest, ctx.agent_id, 2, 0);
+    // A revoked poisoned record and a revoked normal one: neither counts.
+    ctx.store_legacy(&attacker, POISON, 0, true);
+    ctx.rep().revoke_feedback(&honest, &ctx.agent_id, &2);
+
+    let summary = ctx.summary(&soroban_vec![&ctx.env, honest.clone(), attacker.clone()]);
+
+    assert_eq!(summary.count, 1);
+    assert_eq!(summary.summary_value, 4);
+}
+
+#[test]
+fn normal_values_with_mixed_decimals_still_average_correctly() {
+    let ctx = setup();
+    let a = Address::generate(&ctx.env);
+    let b = Address::generate(&ctx.env);
+    let c = Address::generate(&ctx.env);
+    ctx.give(&a, ctx.agent_id, 45, 1); // 4.5
+    ctx.give(&b, ctx.agent_id, 35, 1); // 3.5
+    ctx.give(&c, ctx.agent_id, 3, 0); // 3
+
+    let summary = ctx.summary(&soroban_vec![&ctx.env, a.clone(), b.clone(), c.clone()]);
+
+    // Mode decimals 1; (4.5 + 3.5 + 3) / 3 = 3.666, truncated to 3.6.
+    assert_eq!(summary.count, 3);
+    assert_eq!(summary.summary_value_decimals, 1);
+    assert_eq!(summary.summary_value, 36);
+}
+
+#[test]
+fn an_empty_client_list_is_still_an_error() {
+    let ctx = setup();
+    let empty: Vec<Address> = soroban_vec![&ctx.env];
+    assert!(matches!(
+        ctx.rep()
+            .try_get_summary(&ctx.agent_id, &empty, &ctx.s(""), &ctx.s("")),
+        Err(Ok(ReputationError::ClientAddressesRequired)),
+    ));
+}
