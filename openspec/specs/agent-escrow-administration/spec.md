@@ -67,7 +67,7 @@ The contract MUST expose `set_token_allowed(caller, token, allowed: bool)` and t
 `set_fee_bps(caller, fee_bps)` and `set_treasury(caller, treasury: Address)` (admin only). Getters `fee_bps()` and `treasury() -> Option<Address>`.
 - `fee_bps > MAX_FEE_BPS` (1,000 bps) MUST fail with `InvalidFeeBps`.
 - Setting `fee_bps > 0` while no treasury is set MUST fail with `TreasuryNotSet`.
-- A change applies only to jobs funded after the change (the job snapshots `fee_bps` on `fund`); the `treasury` is read at settlement. Emits `FeeConfigUpdated(fee_bps, treasury)`.
+- A change applies only to jobs funded after the change: the job snapshots `fee_bps` on `fund`, and a job with a fee also snapshots the `treasury` on `fund` and is paid there at settlement (#205, audit E-3). Emits `FeeConfigUpdated(fee_bps, treasury)`.
 - Setting `fee_bps = 0` MUST be allowed at any time.
 
 #### Scenario: enable a fee later
@@ -133,17 +133,21 @@ The contract MUST expose `set_token_allowed(caller, token, allowed: bool)` and t
 - **THEN** `NotAdmin`
 
 ### Requirement: A6. admin handover
-`set_admin(caller, new_admin)` (admin only) replaces the admin. Emits `AdminChanged(old, new)`. The admin has NO power over job funds: it cannot move, freeze, redirect, or cancel any job, and it cannot pause `claim_refund`. The admin MUST NOT be able to change a job's client, provider, evaluator, budget or expiry.
+The handover takes two steps (#205, audit E-3). `set_admin(caller, new_admin)` (admin only) records `new_admin` as pending and emits `AdminProposed(current, pending)`; the admin does not change yet. `accept_admin(caller)` by the pending admin completes it and emits `AdminChanged(old, new)`; anyone else gets `NotPendingAdmin`, and with nothing pending `NoPendingAdmin`. A new `set_admin` replaces the pending admin, and `set_admin(caller, caller)` cancels it. `pending_admin() -> Option<Address>` reads it. The admin has NO power over job funds: it cannot move, freeze, redirect, or cancel any job, and it cannot pause `claim_refund`. The admin MUST NOT be able to change a job's client, provider, evaluator, budget or expiry.
 
 #### Scenario: handover
-- **WHEN** the admin calls `set_admin(new)`
+- **WHEN** the admin calls `set_admin(new)` and `new` calls `accept_admin(new)`
 - **THEN** the old admin's next admin call fails with `NotAdmin` and the new admin's succeeds
+
+#### Scenario: a mistyped admin changes nothing
+- **WHEN** the admin calls `set_admin(typo)`
+- **THEN** the admin is unchanged and keeps every admin call until an address it controls accepts
 
 #### Scenario: admin cannot touch funds
 - **THEN** the contract exposes no admin function that transfers job tokens (no sweep, rescue, pause or force-settle)
 
 ### Requirement: A7. getters and version
-The contract MUST expose `admin()`, `identity_registry()`, `treasury()`, `fee_bps()`, `max_expiry()`, `approval_window()`, `is_token_allowed(token)` and `version() -> String`.
+The contract MUST expose `admin()`, `pending_admin()`, `identity_registry()`, `treasury()`, `fee_bps()`, `max_expiry()`, `approval_window()`, `is_token_allowed(token)` and `version() -> String`.
 
 #### Scenario: getters reflect state
 - **AFTER** each admin update
