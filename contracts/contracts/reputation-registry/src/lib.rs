@@ -23,6 +23,11 @@ pub const TIMELOCK_LEDGERS: u32 = 51_840;
 pub const MAX_SUMMARY_CLIENTS: u32 = 5;
 /// `value` must be within ±1e38.
 pub const MAX_ABS_VALUE: i128 = 100_000_000_000_000_000_000_000_000_000_000_000_000;
+/// `value` normalized to 18 decimals (`value * 10^(18 - value_decimals)`) must
+/// be within ±1e28, i.e. at most 1e10 whole units. Stricter than Stellar 8004
+/// (#199): one record cannot overflow the WAD scale, and `get_summary` would
+/// need over 1.7e10 records in one call to overflow its i128 sum.
+pub const MAX_ABS_WAD: i128 = 10_000_000_000_000_000_000_000_000_000;
 const CONTRACT_VERSION: &str = "0.1.0";
 
 #[contracttype]
@@ -211,6 +216,12 @@ impl ReputationRegistryContract {
         if !(-MAX_ABS_VALUE..=MAX_ABS_VALUE).contains(&value) {
             return Err(ReputationError::ValueOutOfRange);
         }
+        // #199: a value that cannot be normalized, or is so large that a few
+        // of them overflow the summary's running sum, is not accepted.
+        match to_wad(value, value_decimals) {
+            Some(wad) if (-MAX_ABS_WAD..=MAX_ABS_WAD).contains(&wad) => {}
+            _ => return Err(ReputationError::ValueOutOfRange),
+        }
 
         let identity = IdentityRegistryClient::new(e, &get_identity_registry(e));
         if !identity.agent_exists(&agent_id) {
@@ -330,6 +341,12 @@ impl ReputationRegistryContract {
 
     /// WAD-normalized average of the non-revoked feedback of the first
     /// `MAX_SUMMARY_CLIENTS` clients, filtered by `tag1`/`tag2` when not empty.
+    ///
+    /// A record that cannot be normalized to 18 decimals, or whose addition
+    /// would overflow the running sum, is skipped and not counted, so one
+    /// stored record can never make the whole call fail (#199). Since
+    /// `give_feedback` bounds new values by `MAX_ABS_WAD`, only records stored
+    /// before that bound can be skipped.
     pub fn get_summary(
         e: &Env,
         agent_id: u32,
@@ -367,13 +384,15 @@ impl ReputationRegistryContract {
                 } else {
                     fb.value_decimals
                 };
-                let normalized = fb
-                    .value
-                    .checked_mul(pow10(18 - dec))
-                    .ok_or(ReputationError::AggregateOverflow)?;
-                sum_wad = sum_wad
-                    .checked_add(normalized)
-                    .ok_or(ReputationError::AggregateOverflow)?;
+                // #199: skip a record that does not fit instead of failing
+                // the summary for every client.
+                let Some(normalized) = to_wad(fb.value, dec) else {
+                    continue;
+                };
+                let Some(next_sum) = sum_wad.checked_add(normalized) else {
+                    continue;
+                };
+                sum_wad = next_sum;
                 decimal_counts[dec as usize] += 1;
                 count = count
                     .checked_add(1)
@@ -751,6 +770,12 @@ const POW10: [i128; 19] = [
 
 fn pow10(exp: u32) -> i128 {
     POW10[exp as usize]
+}
+
+/// `value` scaled to 18 decimals (WAD), or `None` when it does not fit in an
+/// `i128`. `decimals` must be at most 18.
+fn to_wad(value: i128, decimals: u32) -> Option<i128> {
+    value.checked_mul(pow10(18 - decimals))
 }
 
 mod test;
