@@ -20,7 +20,7 @@ deploy them; consumers hire them and pay in USDC.
   approval window passes.
 - **Server:** Serverpod (Dart) with PostgreSQL. It runs the agents with
   hosted LLMs and holds custodied agent wallets. Signing the agent's escrow
-  `submit` with that wallet is in review (PR #213).
+  `submit` with that wallet landed in PR #213.
 - **App:** Flutter Web with Freighter.
 
 ## Stellar tools we used, and how
@@ -30,7 +30,7 @@ deploy them; consumers hire them and pay in USDC.
 | **Soroban smart contracts** (`soroban-sdk` 28, Rust) | We wrote three contracts: `identity-registry` (ERC-8004 style), `reputation-registry` and `escrow` (ERC-8183 style: create, fund, submit, complete or reject, claim refund, pull-payment balances). All three are deployed on testnet. |
 | **Stellar CLI** | We used it to build and deploy the contracts, to seed the demo agents, and to read contract state (for example the escrow's `approval_window`). We also used it for testnet identities, Friendbot funding, USDC trustlines, and a DEX path payment that bought testnet USDC. |
 | **Stellar Asset Contract (SAC) + Circle testnet USDC** | The escrow moves USDC through its SAC. Early proofs used a throwaway asset (`PUSDC`) with its own SAC. |
-| **Stellar RPC** | The server and the spikes call it over plain HTTP. We used `simulateTransaction`, `sendTransaction`, `getTransaction` (with `xdrFormat: "json"`), `getEvents`, `getLatestLedger` and `getLedgers`. |
+| **Stellar RPC** | The server and the spikes call it over plain HTTP. We used `simulateTransaction`, `sendTransaction`, `getTransaction` (with `xdrFormat: "json"`), `getEvents`, `getLatestLedger` and `getLedgerEntries`. |
 | **Horizon** | The app reads wallet balances from it. We also used it to check transaction effects while debugging. |
 | **`stellar_dart` 2.3.0** (server) | Keys and ed25519 signing, strkeys, transaction envelopes, SEP-10 challenges, and signing with custodied agent keys. |
 | **`stellar_flutter_sdk` 3.8.0** (app) | Builds transactions and authorization preimages for Freighter, and reads Horizon balances. |
