@@ -299,8 +299,9 @@ impl ReputationRegistryContract {
     ) -> Result<(), ReputationError>;
 
     /// `caller.require_auth()`. The agent must exist (`AgentNotFound`), and the caller
-    /// must not own it (`SelfFeedback`, checked with `is_authorized_or_owner` on the
-    /// Identity Registry). `hire_id` must be authorized for this agent and caller and
+    /// must not own it or be its payment wallet (`SelfFeedback`, checked with
+    /// `is_authorized_or_owner` and `get_agent_wallet` on the Identity Registry,
+    /// #200). `hire_id` must be authorized for this agent and caller and
     /// not previously consumed. Consumption and feedback storage are atomic.
     /// Stores feedback under the next index for (agent, caller),
     /// starting at 1. `endpoint`, `feedback_uri`, `feedback_hash` are only emitted.
