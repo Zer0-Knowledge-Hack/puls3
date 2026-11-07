@@ -268,7 +268,12 @@ impl ReputationRegistryContract {
         if !identity.agent_exists(&agent_id) {
             return Err(ReputationError::AgentNotFound);
         }
-        if identity.is_authorized_or_owner(&caller, &agent_id) {
+        // The agent's side is its owner (or an approved operator) and its
+        // payment wallet, which `set_agent_wallet` can point at another address
+        // (audit finding R-3, #200). Neither may rate the agent.
+        if identity.is_authorized_or_owner(&caller, &agent_id)
+            || identity.get_agent_wallet(&agent_id).as_ref() == Some(&caller)
+        {
             return Err(ReputationError::SelfFeedback);
         }
 

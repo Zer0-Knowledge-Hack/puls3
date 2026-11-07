@@ -148,6 +148,90 @@ fn owner_cannot_rate_own_agent() {
     ));
 }
 
+/// `give_feedback` from `caller` with valid arguments, returning the result.
+fn try_give(
+    ctx: &Ctx,
+    caller: &Address,
+) -> Result<
+    Result<(), soroban_sdk::ConversionError>,
+    Result<ReputationError, soroban_sdk::InvokeError>,
+> {
+    ctx.rep().try_give_feedback(
+        caller,
+        &ctx.agent_id,
+        &5,
+        &0,
+        &ctx.s("quality"),
+        &ctx.s("speed"),
+        &ctx.s("https://agent.example/endpoint"),
+        &ctx.s("https://reviews.example/1"),
+        &ctx.hash(7),
+    )
+}
+
+/// Audit finding R-3 (#200): after `set_agent_wallet` points payments at a
+/// different address, that wallet must not be able to rate its own agent.
+#[test]
+fn agent_wallet_cannot_rate_own_agent() {
+    let ctx = setup();
+    let identity = IdentityRegistryContractClient::new(&ctx.env, &ctx.identity_id);
+    let payout = Address::generate(&ctx.env);
+    identity.set_agent_wallet(&ctx.agent_owner, &ctx.agent_id, &payout);
+    assert_eq!(
+        identity.get_agent_wallet(&ctx.agent_id),
+        Some(payout.clone())
+    );
+
+    assert!(matches!(
+        try_give(&ctx, &payout),
+        Err(Ok(ReputationError::SelfFeedback)),
+    ));
+    // Nothing was stored for the rejected wallet.
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &payout), 0);
+    assert_eq!(ctx.events(), 0);
+
+    // The owner is still rejected, and an honest client still rates.
+    assert!(matches!(
+        try_give(&ctx, &ctx.agent_owner),
+        Err(Ok(ReputationError::SelfFeedback)),
+    ));
+    let client = Address::generate(&ctx.env);
+    ctx.give(&client, ctx.agent_id, 5, 0);
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &client), 1);
+}
+
+/// A wallet that stopped being the agent's payment wallet is an ordinary
+/// client again.
+#[test]
+fn former_agent_wallet_can_rate_after_it_is_replaced() {
+    let ctx = setup();
+    let identity = IdentityRegistryContractClient::new(&ctx.env, &ctx.identity_id);
+    let old_wallet = Address::generate(&ctx.env);
+    let new_wallet = Address::generate(&ctx.env);
+    identity.set_agent_wallet(&ctx.agent_owner, &ctx.agent_id, &old_wallet);
+    identity.set_agent_wallet(&ctx.agent_owner, &ctx.agent_id, &new_wallet);
+
+    ctx.give(&old_wallet, ctx.agent_id, 5, 0);
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &old_wallet), 1);
+    assert!(matches!(
+        try_give(&ctx, &new_wallet),
+        Err(Ok(ReputationError::SelfFeedback)),
+    ));
+}
+
+/// An agent with no payment wallet still accepts honest feedback.
+#[test]
+fn agent_without_wallet_accepts_client_feedback() {
+    let ctx = setup();
+    let identity = IdentityRegistryContractClient::new(&ctx.env, &ctx.identity_id);
+    identity.unset_agent_wallet(&ctx.agent_owner, &ctx.agent_id);
+    assert_eq!(identity.get_agent_wallet(&ctx.agent_id), None);
+
+    let client = Address::generate(&ctx.env);
+    ctx.give(&client, ctx.agent_id, 4, 0);
+    assert_eq!(ctx.rep().get_last_index(&ctx.agent_id, &client), 1);
+}
+
 #[test]
 fn value_decimals_and_range_are_checked() {
     let ctx = setup();
