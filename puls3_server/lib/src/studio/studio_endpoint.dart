@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:meta/meta.dart';
 import 'package:puls3_domain/puls3_domain.dart' as domain;
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
+import '../agent/aes_gcm_secret_cipher.dart';
 import '../agent/agent_wallet_custody.dart';
+import '../agent/secret_cipher.dart';
+import '../agent/wallet_custody_config.dart';
 import '../hire/session_wallet.dart';
 import '../ledger/stellar_config.dart';
 import 'builder_credential.dart';
@@ -12,6 +17,7 @@ import 'studio_deploy_store.dart';
 import 'studio_deploy_transport.dart';
 import 'studio_deploy_wiring.dart';
 import 'builder_task_runner.dart';
+import 'serverpod_builder_credential_store.dart';
 import 'serverpod_studio_draft_store.dart';
 import 'studio_draft_errors.dart';
 import 'studio_draft_service.dart';
@@ -34,12 +40,46 @@ class StudioEndpoint extends Endpoint {
   static StudioDeployService Function(Session session)? _deploys;
   static StudioDeployWiring? _deployWiring;
   static final MemoryTestRunQuota _quota = MemoryTestRunQuota();
-  static final MemoryBuilderCredentialStore _credentials =
-      MemoryBuilderCredentialStore();
+  static BuilderCredentialStore Function(Session session)? _credentialStores;
+  static SecretCipher? _credentialCipher;
 
-  /// The process-wide builder credentials. A hire of a Studio agent uses
-  /// this store and never the team provider token.
-  static BuilderCredentialStore get credentials => _credentials;
+  /// The builder credentials in [session]'s database (#235), encrypted with
+  /// the custody key. Test runs and every hire of a Studio agent read this
+  /// store, never the team provider token.
+  ///
+  /// Throws [StudioRuntimeUnavailable] when `PULS3_AGENT_WALLET_SECRET_KEY`
+  /// is missing or invalid: no credential is stored in plain text or in
+  /// memory instead.
+  static BuilderCredentialStore credentialsOn(Session session) {
+    final override = _credentialStores;
+    if (override != null) return override(session);
+    return ServerpodBuilderCredentialStore(
+      session,
+      cipher: _credentialCipher ??= _cipherFromEnvironment(),
+    );
+  }
+
+  static SecretCipher _cipherFromEnvironment() {
+    final WalletCustodyConfig custody;
+    try {
+      custody = WalletCustodyConfig.fromEnvironment(Platform.environment);
+    } on AgentWalletCustodyUnavailable {
+      throw const StudioRuntimeUnavailable();
+    } on ArgumentError {
+      throw const StudioRuntimeUnavailable();
+    }
+    return AesGcmSecretCipher(
+      keys: {custody.keyVersion: custody.secretKey},
+      writeKeyVersion: custody.keyVersion,
+    );
+  }
+
+  /// Replaces where builder credentials are stored, for tests. `null`
+  /// restores the encrypted Postgres store.
+  @visibleForTesting
+  static set credentialStores(
+    BuilderCredentialStore Function(Session session)? builder,
+  ) => _credentialStores = builder;
 
   @override
   bool get requireLogin => true;
@@ -59,7 +99,7 @@ class StudioEndpoint extends Endpoint {
       _services = builder;
 
   /// Replaces how a request's test runs are built, for tests. `null`
-  /// restores the in-memory quota and credential store.
+  /// restores the in-memory quota and the [credentialsOn] store.
   @visibleForTesting
   static set testRuns(
     StudioTestRunService Function(Session session)? builder,
@@ -83,7 +123,7 @@ class StudioEndpoint extends Endpoint {
     return StudioTestRunService(
       drafts: _serviceOn(session),
       quota: _quota,
-      credentials: _credentials,
+      credentials: credentialsOn(session),
       policy: studioServerModelPolicy,
       run: runBuilderTask,
     );
@@ -93,8 +133,9 @@ class StudioEndpoint extends Endpoint {
     final builder = _deploys;
     if (builder != null) return builder(session);
     try {
-      return (_deployWiring ??= StudioDeployWiring.fromEnvironment())
-          .serviceOn(session);
+      return (_deployWiring ??= StudioDeployWiring.fromEnvironment()).serviceOn(
+        session,
+      );
     } on AgentWalletCustodyUnavailable {
       throw Puls3ApiException(code: 'AgentWalletCreationFailed');
     } on HireConfigurationMissing catch (missing) {

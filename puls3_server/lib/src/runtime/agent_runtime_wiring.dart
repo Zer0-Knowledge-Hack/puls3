@@ -22,6 +22,7 @@ import '../ledger/stellar_config.dart';
 import '../ledger/stellar_envelope_codec.dart';
 import '../studio/serverpod_studio_agent_version_store.dart';
 import '../studio/studio_endpoint.dart';
+import '../studio/studio_test_errors.dart';
 import 'adapters/anthropic_runtime.dart';
 import 'adapters/workers_ai_runtime.dart';
 import 'agent_runner.dart';
@@ -189,7 +190,21 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     runner: agentRunner,
     execute: runExecutor(
       team: agentRunner,
-      credentials: StudioEndpoint.credentials.find,
+      // A fresh session per lookup: the run itself can take minutes.
+      credentials: ({required owner, required provider}) async {
+        final session = await pod.createSession();
+        try {
+          return await StudioEndpoint.credentialsOn(
+            session,
+          ).find(owner: owner, provider: provider);
+        } on StudioRuntimeUnavailable {
+          // No custody key: no credential can be read, so the run fails as
+          // a missing credential. It never falls back to the team token.
+          return null;
+        } finally {
+          await session.close();
+        }
+      },
     ),
     // A run still `running` a minute past the timeout was interrupted.
     staleAfter: config.timeout + const Duration(minutes: 1),
