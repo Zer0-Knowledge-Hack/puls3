@@ -196,6 +196,8 @@ void main() {
           prepareReject: (_, _) => throw UnimplementedError(),
           submitEscrowCall: (_, _, _) => throw UnimplementedError(),
           getHire: (_, _) => throw UnimplementedError(),
+          prepareFeedback: (_, _, _) => throw UnimplementedError(),
+          submitFeedback: (_, _, _) => throw UnimplementedError(),
           session: walletSession,
         );
 
