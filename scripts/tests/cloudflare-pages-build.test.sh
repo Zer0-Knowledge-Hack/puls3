@@ -107,6 +107,57 @@ else
   bad "passes PULS3_STUDIO as a dart-define" "$(cat "$log")"
 fi
 
+# 4a-1. The production branch selects the server Studio with no PULS3_STUDIO.
+log="$WORK/studio-production"
+run_build "$log" CF_PAGES_BRANCH=main "${pins[@]}"
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=PULS3_AUTH_SERVER_SIGNING_KEY=$server_key --dart-define=PULS3_AUTH_HOME_DOMAIN=example.api.serverpod.space --dart-define=PULS3_AUTH_WEB_AUTH_DOMAIN=example.api.serverpod.space --dart-define=STUDIO=server" "$log"; then
+  ok "the production branch defaults STUDIO to server"
+else
+  bad "the production branch defaults STUDIO to server" "$(cat "$log")"
+fi
+
+# 4a-2. A preview branch keeps the labelled demo.
+log="$WORK/studio-preview"
+run_build "$log" CF_PAGES_BRANCH=feat/219-live-studio
+if grep -qx "flutter cwd=puls3_flutter build web --release" "$log"; then
+  ok "a preview branch keeps the demo Studio"
+else
+  bad "a preview branch keeps the demo Studio" "$(cat "$log")"
+fi
+
+# 4a-3. PULS3_STUDIO=demo opts the production branch out.
+log="$WORK/studio-demo"
+run_build "$log" CF_PAGES_BRANCH=main PULS3_STUDIO=demo
+if grep -qx "flutter cwd=puls3_flutter build web --release --dart-define=STUDIO=demo" "$log"; then
+  ok "PULS3_STUDIO=demo opts the production branch out"
+else
+  bad "PULS3_STUDIO=demo opts the production branch out" "$(cat "$log")"
+fi
+
+# 4a-4. The production branch still fails closed without the SEP-10 pins.
+log="$WORK/studio-production-no-pins"
+if run_build "$log" CF_PAGES_BRANCH=main; then
+  bad "the production Studio without pins exits non-zero" "exit 0"
+elif grep -q '^git' "$log"; then
+  bad "the production Studio without pins stops before cloning" "$(cat "$log")"
+elif grep -q "needs PULS3_AUTH_SERVER_SIGNING_KEY" "$log.out"; then
+  ok "the production Studio without pins fails closed"
+else
+  bad "the production Studio without pins fails closed" "$(cat "$log.out")"
+fi
+
+# 4a-5. A value that is neither server nor demo is refused.
+log="$WORK/studio-typo"
+if run_build "$log" PULS3_STUDIO=production; then
+  bad "an unknown PULS3_STUDIO exits non-zero" "exit 0"
+elif grep -q '^git' "$log"; then
+  bad "an unknown PULS3_STUDIO stops before cloning" "$(cat "$log")"
+elif grep -q "must be 'server' or 'demo'" "$log.out"; then
+  ok "an unknown PULS3_STUDIO is refused"
+else
+  bad "an unknown PULS3_STUDIO is refused" "$(cat "$log.out")"
+fi
+
 # 4b. A real-hire build without every SEP-10 pin stops before cloning.
 for missing in PULS3_AUTH_SERVER_SIGNING_KEY PULS3_AUTH_HOME_DOMAIN PULS3_AUTH_WEB_AUTH_DOMAIN; do
   log="$WORK/hire-no-$missing"

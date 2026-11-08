@@ -1030,6 +1030,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playgroundProviderTokenHint => 'Se guarda para tus pruebas';
 
   @override
+  String get playgroundCredentialMissing =>
+      'Guarda tu credencial del proveedor y vuelve a ejecutar el borrador.';
+
+  @override
   String get playgroundAccountId => 'Id de cuenta de Cloudflare';
 
   @override
@@ -1256,4 +1260,91 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get hireDecisionFailed =>
       'No se pudo enviar la decisión. Inténtalo de nuevo.';
+
+  @override
+  String get rateHire => 'Calificar esta contratación';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Calificar a $agent';
+  }
+
+  @override
+  String get rateClose => 'Cerrar';
+
+  @override
+  String get rateScore => 'Puntaje';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrellas';
+  }
+
+  @override
+  String get rateCommentHint =>
+      'Comentario (opcional). Los comentarios todavía no se publican.';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'El comentario puede tener hasta $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar calificación';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Solo demostración: firmar aquí no envía ninguna calificación.';
+
+  @override
+  String get rateNotSent =>
+      'Calificación no enviada: cancelaste la firma en tu wallet.';
+
+  @override
+  String get rateWrongWallet => 'Califica con la wallet que contrató.';
+
+  @override
+  String get rateAlreadyRated => 'Ya calificaste esta contratación.';
+
+  @override
+  String get rateSection => 'Tu calificación';
+
+  @override
+  String get rateConfirming =>
+      'Calificación enviada. Esperando la confirmación de Stellar.';
+
+  @override
+  String get rateSaved => 'Calificación guardada';
+
+  @override
+  String get rateViewExplorer => 'Ver la calificación en StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Tu calificación no se registró ($code). Inténtalo de nuevo.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'No pudimos confirmar si tu calificación llegó a Stellar. Calificar esta contratación queda en pausa hasta que puls3 lo resuelva.';
+
+  @override
+  String get rateInProgress =>
+      'Todavía se está confirmando una calificación de esta contratación. Vuelve en un momento.';
+
+  @override
+  String get rateNotCompleted =>
+      'Solo se puede calificar una contratación completada.';
+
+  @override
+  String get rateOwnerCannotRate =>
+      'El dueño de este agente no puede calificarlo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Elige un puntaje de 1 a 5 y deja el comentario en $max caracteres como máximo.';
+  }
 }
