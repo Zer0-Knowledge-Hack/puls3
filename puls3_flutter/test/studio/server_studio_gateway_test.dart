@@ -164,7 +164,7 @@ void main() {
     );
     expect(
       () => missing.testRun(1, 'Hi', owner: 'G'),
-      throwsA(isA<StudioUnavailable>()),
+      throwsA(isA<StudioCredentialMissing>()),
     );
 
     final long = gateway(
@@ -197,8 +197,8 @@ void main() {
         accountId: 'builder-account',
         owner: 'G',
       );
-      fail('expected StudioUnavailable');
-    } on StudioUnavailable catch (e) {
+      fail('expected StudioCredentialMissing');
+    } on StudioCredentialMissing catch (e) {
       expect(provider, 'workers-ai');
       expect(secret, token);
       expect(accountId, 'builder-account');

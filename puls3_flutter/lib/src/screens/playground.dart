@@ -85,6 +85,12 @@ class _PlaygroundState extends State<Playground> {
         _status = PlaygroundStatus.quotaExceeded;
         _error = _quotaMessage(l10n, e.resetsAt);
       });
+    } on StudioCredentialMissing {
+      if (!mounted) return;
+      setState(() {
+        _status = PlaygroundStatus.failed;
+        _error = l10n.playgroundCredentialMissing;
+      });
     } on StudioGatewayException catch (e) {
       if (!mounted) return;
       setState(() {
