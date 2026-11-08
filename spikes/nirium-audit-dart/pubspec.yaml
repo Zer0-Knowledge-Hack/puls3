@@ -1,0 +1,17 @@
+name: nirium_audit_spike
+description: Spike that anchors and verifies a Nirium receipt for a settled puls3 escrow job on testnet (#246).
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '^3.12.2'
+
+dependencies:
+  args: ^2.7.0
+  crypto: ^3.0.7
+  http: ^1.6.0
+  stellar_dart: ^2.3.0
+
+dev_dependencies:
+  lints: '>=3.0.0 <7.0.0'
+  test: ^1.25.5
