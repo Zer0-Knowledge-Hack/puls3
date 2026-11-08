@@ -5,7 +5,7 @@
 
 What each screen shows and how it behaves in every state, so "done" is not a matter of opinion. Each section gives the purpose, the flows it belongs to, the data shown (named exactly as in the domain model), the four states, the actions and where they lead, and the components it uses. The [component inventory](#component-inventory) maps every reusable widget to its screens.
 
-**Wireframes.** Every screen has a desktop (1440 px) and a mobile (390 px) wireframe in [`wireframes/`](wireframes/), named `<screen-id>-<width>.png`. S02 and S03 also have one per state (`-loading`, `-empty`, `-error`), and S06 has its failed-run and deadline-passed states. They are low to mid fidelity: the layout, components and labels are the app's, set in Roboto rather than the final brand fonts, and colors are only indicative (final visuals are #24). Screens that exist render from the app; S05, S06 and S10 are not built yet and are drawn from the same components after flows F6 and F7. To regenerate them after a UI change:
+**Wireframes.** Every screen has a desktop (1440 px) and a mobile (390 px) wireframe in [`wireframes/`](wireframes/), named `<screen-id>-<width>.png`. S02 and S03 also have one per state (`-loading`, `-empty`, `-error`), and S06 has its failed-run and deadline-passed states. They are low to mid fidelity: the layout, components and labels are the app's, set in Roboto rather than the final brand fonts, and colors are only indicative (final visuals are #24). Screens that exist render from the app; S05 is not built yet, and S05, S06 and S10 are drawn from the same components after flows F6 and F7. To regenerate them after a UI change:
 
 ```
 cd puls3_flutter
@@ -29,7 +29,7 @@ flutter test tool/wireframes/wireframes_test.dart --update-goldens
 | [`S07-studio`](#s07-studio) | `/studio` | F4, F8, F9, F10 | Yes | [1440](wireframes/S07-studio-1440.png) · [390](wireframes/S07-studio-390.png) |
 | [`S08-deploy-sheet`](#s08-deploy-sheet) | Bottom sheet over S07 | F4, F10, F11 | Yes | [1440](wireframes/S08-deploy-sheet-1440.png) · [390](wireframes/S08-deploy-sheet-390.png) |
 | [`S09-wallet-connect`](#s09-wallet-connect) | Sheet over any screen | F1 | Yes | [1440](wireframes/S09-wallet-connect-1440.png) · [390](wireframes/S09-wallet-connect-390.png) |
-| [`S10-rate-sheet`](#s10-rate-sheet) | Bottom sheet over S06 | F7 | No | [1440](wireframes/S10-rate-sheet-1440.png) · [390](wireframes/S10-rate-sheet-390.png) |
+| [`S10-rate-sheet`](#s10-rate-sheet) | Bottom sheet over S06 | F7 | Yes | [1440](wireframes/S10-rate-sheet-1440.png) · [390](wireframes/S10-rate-sheet-390.png) |
 | [`S11-playground`](#s11-playground) | Panel beside the S07 preview (desktop), sheet over S07 (phone) | F9 | No | [1440](wireframes/S11-playground-1440.png) · [390](wireframes/S11-playground-390.png) |
 | [`S12-my-agents`](#s12-my-agents) | `/studio/agents` | F10, F11 | No | [1440](wireframes/S12-my-agents-1440.png) · [390](wireframes/S12-my-agents-390.png) |
 
@@ -226,7 +226,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 ### S10-rate-sheet
 
-**Purpose:** rate a completed hire. **Flows:** F7. **Not built yet.**
+**Purpose:** rate a completed hire. **Flows:** F7.
 
 **Data:** the agent's `Agent.name`, `Feedback.score` (1 to 5), `Feedback.comment` (optional, up to 500 characters).
 
@@ -239,7 +239,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 
 **Actions:** **Send rating** → wallet signs `give_feedback` → S06.
 
-**Components:** `PrimaryButton`, star picker (new), text field.
+**Components:** `RateSheetView` (container: `RateHireSheet`), `ScorePicker`, `PrimaryButton`, text field.
 
 ---
 
@@ -279,6 +279,7 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `KeyValueRow` | `AgentDetailView`, `HirePaymentView` | S03, S04, S06 |
 | `ProgressStepRow` | `DeployStepper` | S06, S08 |
 | `ScreenHeader` | planned pages | S05, S06, S12 |
+| `ScorePicker` | `RateSheetView`, `HireDetailView` | S06, S10 |
 | `AgentVersionRow` | `MyAgentsList` | S12 |
 | `TestRunResultCard` | `PlaygroundPanel` | S11 |
 | `WalletChip` | `TopBar` | all |
@@ -298,3 +299,4 @@ Atomic design, as in `puls3_flutter/lib/src/ui/`. Presentational widgets get the
 | `DeployFlowView`, `DeployStepper`, `DeployPhaseCard`, `DeployErrorPanel`, `DeploySuccess` | S08 |
 | `PlaygroundPanel` | S11 |
 | `MyAgentsList` | S12 |
+| `RateSheetView` | S10 |
