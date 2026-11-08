@@ -71,7 +71,7 @@ jobs:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_domain
         run: dart analyze --fatal-infos && dart test
 
@@ -102,7 +102,7 @@ jobs:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-      - run: flutter pub get && dart pub global activate serverpod_cli 4.0.4
+      - run: flutter pub get --enforce-lockfile && dart pub global activate serverpod_cli 4.0.4
       - name: Configure test passwords
         shell: bash
         run: |
@@ -131,7 +131,7 @@ jobs:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_flutter
         run: flutter analyze --fatal-infos && flutter test && flutter build web --release
 

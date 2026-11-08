@@ -229,6 +229,20 @@ class ScriptedHireGateway implements HireGateway {
       _prep('reject');
 
   @override
+  Future<EscrowPreparation> prepareFeedback(
+    int hireId,
+    int score,
+    String comment,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<EscrowSubmission> submitFeedback(
+    int hireId,
+    EscrowPreparation preparation,
+    String signedTransaction,
+  ) => throw UnimplementedError();
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,

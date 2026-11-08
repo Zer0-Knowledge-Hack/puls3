@@ -9,10 +9,11 @@ import '../atoms/primary_button.dart';
 import '../atoms/section_label.dart';
 import '../molecules/key_value_row.dart';
 import '../molecules/progress_step_row.dart';
+import '../molecules/score_picker.dart';
 import '../molecules/screen_header.dart';
 
-/// S06 hire detail (flow F6): the hire's status, the agent run, the result
-/// and the payment link. Presentational: the container polls the hire and
+/// S06 hire detail (flows F6 and F7): the hire's status, the agent run, the
+/// result, the payment link and the rating. Presentational: the container polls the hire and
 /// passes it with the callbacks. It never calls the client.
 class HireDetailView extends StatelessWidget {
   const HireDetailView({
@@ -30,6 +31,9 @@ class HireDetailView extends StatelessWidget {
     this.deadlinePassed = false,
     this.approving = false,
     this.rejecting = false,
+    this.onRate,
+    this.onOpenFeedback,
+    this.ratedScore,
     this.isDemo = false,
     this.banner,
   });
@@ -54,6 +58,17 @@ class HireDetailView extends StatelessWidget {
   final bool deadlinePassed;
   final bool approving;
   final bool rejecting;
+
+  /// Opens S10. Null hides **Rate** (the hire is not completed, or it is
+  /// already rated).
+  final VoidCallback? onRate;
+
+  /// Opens the `give_feedback` transaction on StellarExpert.
+  final VoidCallback? onOpenFeedback;
+
+  /// The score sent from this screen. The server keeps only the rating's
+  /// transaction, so a reload shows that it was rated without the score.
+  final int? ratedScore;
   final bool isDemo;
 
   bool get _acting => approving || rejecting;
@@ -182,6 +197,7 @@ class HireDetailView extends StatelessWidget {
           ),
         ],
         ..._decision(context),
+        ..._rating(context),
         const SizedBox(height: Puls3Spacing.xxl),
       ],
     );
@@ -259,6 +275,70 @@ class HireDetailView extends StatelessWidget {
           variant: PrimaryButtonVariant.outline,
           expand: true,
           onPressed: onOpenDecision,
+        ),
+      ],
+    ];
+  }
+
+  /// F7: **Rate** on a completed hire with no rating, then the rating.
+  /// A rating that failed on chain says so: **Rate** again, or, when its
+  /// outcome is unknown, why rating is paused.
+  List<Widget> _rating(BuildContext context) {
+    final l10n = context.l10n;
+    final rated = hire.feedbackTransaction != null;
+    final score = ratedScore;
+    return [
+      if (hire.feedbackFailed) ...[
+        const SizedBox(height: Puls3Spacing.lg),
+        SectionLabel(l10n.rateSection),
+        const SizedBox(height: Puls3Spacing.xs),
+        Text(
+          hire.feedbackOutcomeUnknown
+              ? l10n.rateOutcomeUnknown
+              : l10n.rateFailed(hire.feedbackErrorCode ?? 'failed'),
+          key: const ValueKey('hire-detail-rating-failed'),
+          style: Puls3Text.bodyMuted.copyWith(color: Puls3Colors.accent),
+        ),
+      ],
+      if (rated) ...[
+        const SizedBox(height: Puls3Spacing.lg),
+        SectionLabel(l10n.rateSection),
+        const SizedBox(height: Puls3Spacing.xs),
+        if (score != null)
+          ScorePicker(
+            key: const ValueKey('hire-detail-score'),
+            score: score,
+            size: 24,
+          ),
+        Text(
+          hire.feedbackPending
+              ? l10n.rateConfirming
+              : score != null
+              ? l10n.rateSaved
+              : l10n.rateAlreadyRated,
+          key: const ValueKey('hire-detail-rating'),
+          style: Puls3Text.bodyMuted,
+        ),
+        if (onOpenFeedback != null && !isDemo) ...[
+          const SizedBox(height: Puls3Spacing.md),
+          PrimaryButton(
+            key: const ValueKey('hire-detail-feedback'),
+            label: l10n.rateViewExplorer,
+            icon: Icons.open_in_new_rounded,
+            variant: PrimaryButtonVariant.outline,
+            expand: true,
+            onPressed: onOpenFeedback,
+          ),
+        ],
+      ],
+      if (onRate != null) ...[
+        const SizedBox(height: Puls3Spacing.md),
+        PrimaryButton(
+          key: const ValueKey('hire-detail-rate'),
+          label: l10n.rateHire,
+          icon: Icons.star_outline_rounded,
+          expand: true,
+          onPressed: onRate,
         ),
       ],
     ];
