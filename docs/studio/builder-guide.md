@@ -47,9 +47,11 @@ Saved drafts appear in **My agents** (`/studio/agents`) under Drafts.
 - **What you get:** the model output, labelled "Test run: not paid, nothing on chain", and "N runs left today". Test runs are free and limited to 20 per wallet per UTC day; after that you see "You used today's test runs. They reset at HH:MM."
 - **The token is write-only.** The server never returns it, and the app does not show it again.
 
-**When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"The test runner is unavailable."** Enter both fields and run again. A bad token reaches Cloudflare and comes back as "The test run failed".
+**When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"Save your provider credential, then run the draft again."** Enter both fields and run again. A token that is saved but wrong reaches Cloudflare and comes back as "The test run failed".
 
-The server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235), landing with [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233)). It survives server restarts and redeploys, so you save it once. Saving again replaces it.
+> **Known limit ([#249](https://github.com/Zer0-Knowledge-Hack/puls3/issues/249)).** The server sends the same `RuntimeUnavailable` when it rejects the credential you are saving (for example a Workers AI token without the account id) and when it cannot store credentials at all. The panel then also asks you to save your credential. If it persists after you entered both fields, the server is misconfigured, not your token. #249 gives each case its own message.
+
+The server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235)). It survives server restarts and redeploys, so you save it once. Saving again replaces it.
 
 ## 4. Deploy on testnet
 
@@ -79,7 +81,7 @@ Keep the registration transaction hash from the sheet: it is the proof that the 
 
 ## 5. Find the agent in the catalog
 
-> **Depends on [#231](https://github.com/Zer0-Knowledge-Hack/puls3/pull/231).** The catalog lists a Studio agent as `studio-<draftId>`. On `main` today, **View** in My agents and in the deploy sheet still opens `/agent/<registry id>`, which the catalog does not know. #231 makes both use the catalog id. This step describes the app once #231 is merged.
+> **Depends on the catalog id fix in [#231](https://github.com/Zer0-Knowledge-Hack/puls3/pull/231).** The catalog lists a Studio agent as `studio-<draftId>`. On `main` today, **View** in My agents and in the deploy sheet still opens `/agent/<registry id>`, which the catalog does not know. #231 makes both use the catalog id. Until it is merged, open the agent from the **Marketplace** or type `/agent/studio-<draftId>`.
 
 - **My agents** (`/studio/agents`) lists it under Live as "Live · version 1". **View** opens its page.
 - **Marketplace** (`/market`) lists it for everyone. Its page is `/agent/studio-<draftId>`, where the draft id is the one in the Studio URL (`/studio?draft=<draftId>`).
@@ -109,5 +111,5 @@ What is specific to a Studio agent: the paid run uses **your** published version
 2. Save a draft at [puls3.org/studio](https://puls3.org/studio): "Saved · revision 1".
 3. Run one test run: real model output and "19 runs left today".
 4. Deploy: two Freighter prompts, then "Agent deployed". Note the registration transaction hash.
-5. My agents shows it as Live; the Marketplace lists it at `/agent/studio-<draftId>`, and **View** opens that page (needs #231).
+5. My agents shows it as Live; the Marketplace lists it at `/agent/studio-<draftId>`. **View** opens that page once #231 is merged.
 6. Hire it from a second account with testnet USDC (step 6) and follow it to Completed.
