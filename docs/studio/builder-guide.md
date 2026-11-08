@@ -49,9 +49,9 @@ Saved drafts appear in **My agents** (`/studio/agents`) under Drafts.
 
 **When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"Save your provider credential, then run the draft again."** Enter both fields and run again. A token that is saved but wrong reaches Cloudflare and comes back as "The test run failed".
 
-> **Known limit ([#249](https://github.com/Zer0-Knowledge-Hack/puls3/issues/249)).** The server sends the same `RuntimeUnavailable` when it rejects the credential you are saving (for example a Workers AI token without the account id) and when it cannot store credentials at all. The panel then also asks you to save your credential. If it persists after you entered both fields, the server is misconfigured, not your token. #249 gives each case its own message.
+> **Known limit ([#249](https://github.com/Zer0-Knowledge-Hack/puls3/issues/249)).** The server sends the same `RuntimeUnavailable` when it rejects the credential you are saving (for example a Workers AI token without the account id), and, once #233 lands, when the server has no key to store credentials. The panel then also asks you to save your credential. If it persists after you entered both fields, check that the token and the account id belong to the same Cloudflare account; after #233, it can also mean the server is misconfigured. #249 gives each case its own message.
 
-The server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235)). It survives server restarts and redeploys, so you save it once. Saving again replaces it.
+Once [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233) lands, the server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235)), so it survives restarts and redeploys and you save it once. Until then it is kept in memory: after a server restart or redeploy, save it again. Saving again replaces it.
 
 ## 4. Deploy on testnet
 
