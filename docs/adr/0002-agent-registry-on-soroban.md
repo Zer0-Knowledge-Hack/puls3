@@ -228,6 +228,8 @@ The read model and shared feedback fields follow the Stellar 8004 Reputation Reg
 
 > **Superseded by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D5:** the trusted `authorize_feedback` authorizer and the payment-backed `give_feedback` gate are removed. The paid-hire rule is proven by a completed ERC-8183 escrow job and applied by readers; the drop-in registry is [#14](https://github.com/Zer0-Knowledge-Hack/puls3/issues/14).
 
+> **Amended by [#199](https://github.com/Zer0-Knowledge-Hack/puls3/issues/199) (security audit R-1):** a stricter value bound than Stellar 8004, so one feedback cannot make `get_summary` fail. `give_feedback` also rejects, with the existing `ValueOutOfRange`, any value whose 18-decimal (WAD) form exceeds `MAX_ABS_WAD = 1e28` (at most `1e10` whole units, for example `value ≤ 1e10` with `value_decimals = 0`). With that bound the summary's `i128` sum would need more than `1.7e10` records in one call to overflow, which no transaction can read. `get_summary` skips, and does not count, a stored record it cannot normalize or add (records written before the bound) instead of returning `AggregateOverflow`. Signatures, types, events and error codes are unchanged; the deviation is behavioral: values Stellar 8004 accepts above the bound are refused, and a summary that Stellar 8004 would fail is returned without the record. Analysis and evidence: [`docs/security/issue-199/`](../security/issue-199/README.md).
+
 Before feedback, the Serverpod payment verifier confirms the expected asset, amount, recipient, successful transaction, and that the payment reference has not already funded another hire. It derives a deterministic `hire_id` from the puls3 hire record and verified transaction reference, then asks the configured authorizer to register `(hire_id, agent_id, client_address)`. The authorizer must authenticate, and the contract rejects a second authorization for the same `hire_id`. `give_feedback` requires the same client to authenticate, checks the tuple, and marks the authorization consumed in the same contract invocation that stores feedback. If that invocation fails, neither state change may persist. Revocation does not reset the consumed flag.
 
 The registry therefore enforces **one authorization and at most one feedback per `hire_id`**; it does not prove that the identifier represents a real payment. Payment validity and one-payment/one-hire idempotency remain trusted responsibilities of the Serverpod verifier and authorizer. The authorizer custody and recovery policy remains owned by ADR-0003.
@@ -259,6 +261,8 @@ pub const MAX_SUMMARY_RECORDS: u64 = 50;
 pub const MAX_THIRD_PARTY_RESPONSES: u32 = 20;
 /// `value` must be within ±1e38.
 pub const MAX_ABS_VALUE: i128 = 100_000_000_000_000_000_000_000_000_000_000_000_000;
+/// `value * 10^(18 - value_decimals)` must be within ±1e28 (#199, stricter than Stellar 8004).
+pub const MAX_ABS_WAD: i128 = 10_000_000_000_000_000_000_000_000_000;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -344,8 +348,10 @@ impl ReputationRegistryContract {
     /// `client_addresses`, filtered by `tag1`/`tag2` when not empty, over at most
     /// `MAX_SUMMARY_RECORDS` records; its reads extend no TTL (#205). Values are
     /// normalized to 18 decimals, averaged with checked arithmetic, and returned in the
-    /// most frequent `value_decimals` (ties go to the lowest).
-    /// Errors: `ClientAddressesRequired` (empty list), `AggregateOverflow`.
+    /// most frequent `value_decimals` (ties go to the lowest). A stored record that
+    /// cannot be normalized or added without overflow is skipped and not counted (#199).
+    /// Errors: `ClientAddressesRequired` (empty list); `AggregateOverflow` only if the
+    /// record count overflows `u64` (unreachable).
     pub fn get_summary(
         e: &Env,
         agent_id: u32,

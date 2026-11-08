@@ -1253,6 +1253,92 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Só demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: você cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Você já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'Sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. Aguardando a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação salva';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Sua avaliação não foi registrada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não conseguimos confirmar se sua avaliação chegou à Stellar. A avaliação desta contratação fica pausada até a puls3 resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está sendo confirmada. Volte em instantes.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não pode avaliá-lo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário em até $max caracteres.';
+  }
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2504,6 +2590,92 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'Enviando…';
+
+  @override
+  String get rateDemo =>
+      'Só demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: você cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Você já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'Sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. Aguardando a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação salva';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'Sua avaliação não foi registrada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não conseguimos confirmar se sua avaliação chegou à Stellar. A avaliação desta contratação fica pausada até a puls3 resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está sendo confirmada. Volte em instantes.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não pode avaliá-lo.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário em até $max caracteres.';
+  }
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -3758,4 +3930,90 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get hireDecisionFailed =>
       'Não foi possível enviar a decisão. Tente de novo.';
+
+  @override
+  String get rateHire => 'Avaliar esta contratação';
+
+  @override
+  String rateTitle(String agent) {
+    return 'Avaliar $agent';
+  }
+
+  @override
+  String get rateClose => 'Fechar';
+
+  @override
+  String get rateScore => 'Nota';
+
+  @override
+  String rateStars(int score) {
+    return '$score de 5 estrelas';
+  }
+
+  @override
+  String get rateCommentHint =>
+      'Comentário (opcional). Os comentários ainda não são publicados.';
+
+  @override
+  String rateCommentTooLong(int max) {
+    return 'O comentário pode ter até $max caracteres.';
+  }
+
+  @override
+  String get rateSend => 'Enviar avaliação';
+
+  @override
+  String get rateSending => 'A enviar…';
+
+  @override
+  String get rateDemo =>
+      'Apenas demonstração: assinar aqui não envia nenhuma avaliação.';
+
+  @override
+  String get rateNotSent =>
+      'Avaliação não enviada: cancelou a assinatura na sua carteira.';
+
+  @override
+  String get rateWrongWallet => 'Avalie com a carteira que contratou.';
+
+  @override
+  String get rateAlreadyRated => 'Já avaliou esta contratação.';
+
+  @override
+  String get rateSection => 'A sua avaliação';
+
+  @override
+  String get rateConfirming =>
+      'Avaliação enviada. A aguardar a confirmação da Stellar.';
+
+  @override
+  String get rateSaved => 'Avaliação guardada';
+
+  @override
+  String get rateViewExplorer => 'Ver a avaliação no StellarExpert';
+
+  @override
+  String rateFailed(String code) {
+    return 'A sua avaliação não foi registada ($code). Tente novamente.';
+  }
+
+  @override
+  String get rateOutcomeUnknown =>
+      'Não foi possível confirmar se a sua avaliação chegou à Stellar. A avaliação desta contratação fica em pausa até a puls3 o resolver.';
+
+  @override
+  String get rateInProgress =>
+      'Uma avaliação desta contratação ainda está a ser confirmada. Volte dentro de momentos.';
+
+  @override
+  String get rateNotCompleted =>
+      'Só é possível avaliar uma contratação concluída.';
+
+  @override
+  String get rateOwnerCannotRate => 'O dono deste agente não o pode avaliar.';
+
+  @override
+  String rateInvalid(int max) {
+    return 'Escolha uma nota de 1 a 5 e mantenha o comentário até $max caracteres.';
+  }
 }
