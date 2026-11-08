@@ -1030,6 +1030,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playgroundProviderTokenHint => 'Se guarda para tus pruebas';
 
   @override
+  String get playgroundCredentialMissing =>
+      'Guarda tu credencial del proveedor y vuelve a ejecutar el borrador.';
+
+  @override
   String get playgroundAccountId => 'Id de cuenta de Cloudflare';
 
   @override

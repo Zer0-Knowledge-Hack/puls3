@@ -1,0 +1,14 @@
+{
+  "name": "x402-reference-run",
+  "private": true,
+  "description": "Reference x402 client for spike #164. Testnet only. Not product code.",
+  "type": "module",
+  "scripts": {
+    "pay": "node pay.mjs"
+  },
+  "dependencies": {
+    "@x402/core": "2.30.0",
+    "@x402/fetch": "2.30.0",
+    "@x402/stellar": "2.30.0"
+  }
+}

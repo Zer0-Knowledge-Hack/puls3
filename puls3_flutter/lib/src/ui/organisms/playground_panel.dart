@@ -81,6 +81,8 @@ class PlaygroundPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final running = status == PlaygroundStatus.running;
+    final credentialSecret = this.credentialSecret;
+    final credentialAccountId = this.credentialAccountId;
     return Container(
       key: const Key('playground-panel'),
       padding: const EdgeInsets.all(Puls3Spacing.md),
@@ -124,6 +126,22 @@ class PlaygroundPanel extends StatelessWidget {
                 labelText: context.l10n.playgroundProviderToken,
                 hintText: context.l10n.playgroundProviderTokenHint,
               ),
+            ),
+            ListenableBuilder(
+              listenable: credentialSecret,
+              builder: (context, _) {
+                if (credentialSecret.text.trim().isNotEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: Puls3Spacing.xs),
+                  child: Text(
+                    context.l10n.playgroundCredentialMissing,
+                    key: const Key('playground-credential-missing'),
+                    style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: Puls3Spacing.sm),
           ],

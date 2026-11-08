@@ -1890,6 +1890,12 @@ abstract class AppLocalizations {
   /// **'Stored for your test runs'**
   String get playgroundProviderTokenHint;
 
+  /// No description provided for @playgroundCredentialMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your provider credential, then run the draft again.'**
+  String get playgroundCredentialMissing;
+
   /// No description provided for @playgroundAccountId.
   ///
   /// In en, this message translates to:
