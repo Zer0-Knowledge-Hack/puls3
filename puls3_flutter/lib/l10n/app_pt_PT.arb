@@ -303,6 +303,7 @@
   "playgroundLiveLead": "Os testes são grátis e têm limite por dia.",
   "playgroundProviderToken": "Token do fornecedor",
   "playgroundProviderTokenHint": "Guardado para os seus testes",
+  "playgroundCredentialMissing": "Guarde a credencial do fornecedor e volte a executar o rascunho.",
   "playgroundAccountId": "Id da conta Cloudflare",
   "playgroundRunning": "A executar… Para ao chegar ao tempo limite.",
   "playgroundFailed": "O teste falhou",
