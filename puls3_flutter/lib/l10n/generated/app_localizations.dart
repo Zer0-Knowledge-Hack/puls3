@@ -2285,6 +2285,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The decision could not be sent. Try again.'**
   String get hireDecisionFailed;
+
+  /// No description provided for @rateHire.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate this hire'**
+  String get rateHire;
+
+  /// No description provided for @rateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate {agent}'**
+  String rateTitle(String agent);
+
+  /// No description provided for @rateClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get rateClose;
+
+  /// No description provided for @rateScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Score'**
+  String get rateScore;
+
+  /// No description provided for @rateStars.
+  ///
+  /// In en, this message translates to:
+  /// **'{score} of 5 stars'**
+  String rateStars(int score);
+
+  /// No description provided for @rateCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional comment. Comments are not published yet.'**
+  String get rateCommentHint;
+
+  /// No description provided for @rateCommentTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the comment to {max} characters.'**
+  String rateCommentTooLong(int max);
+
+  /// No description provided for @rateSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send rating'**
+  String get rateSend;
+
+  /// No description provided for @rateSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get rateSending;
+
+  /// No description provided for @rateDemo.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo only: signing here sends no rating.'**
+  String get rateDemo;
+
+  /// No description provided for @rateNotSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating not sent: you cancelled the signature in your wallet.'**
+  String get rateNotSent;
+
+  /// No description provided for @rateWrongWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate with the wallet that hired.'**
+  String get rateWrongWallet;
+
+  /// No description provided for @rateAlreadyRated.
+  ///
+  /// In en, this message translates to:
+  /// **'You already rated this hire.'**
+  String get rateAlreadyRated;
+
+  /// No description provided for @rateSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating'**
+  String get rateSection;
+
+  /// No description provided for @rateConfirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating sent. Waiting for Stellar to confirm it.'**
+  String get rateConfirming;
+
+  /// No description provided for @rateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating saved'**
+  String get rateSaved;
+
+  /// No description provided for @rateViewExplorer.
+  ///
+  /// In en, this message translates to:
+  /// **'View rating on StellarExpert'**
+  String get rateViewExplorer;
+
+  /// No description provided for @rateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating did not go through ({code}). Try again.'**
+  String rateFailed(String code);
+
+  /// No description provided for @rateOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not confirm whether your rating reached Stellar. Rating this hire is paused until puls3 resolves it.'**
+  String get rateOutcomeUnknown;
+
+  /// No description provided for @rateInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'A rating for this hire is still being confirmed. Check back in a moment.'**
+  String get rateInProgress;
+
+  /// No description provided for @rateNotCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a completed hire can be rated.'**
+  String get rateNotCompleted;
+
+  /// No description provided for @rateOwnerCannotRate.
+  ///
+  /// In en, this message translates to:
+  /// **'The owner of this agent cannot rate it.'**
+  String get rateOwnerCannotRate;
+
+  /// No description provided for @rateInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a score from 1 to 5 and keep the comment to {max} characters.'**
+  String rateInvalid(int max);
 }
 
 class _AppLocalizationsDelegate
