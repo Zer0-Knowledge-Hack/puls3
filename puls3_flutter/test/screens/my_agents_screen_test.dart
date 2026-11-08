@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/src/data/agent_repository.dart';
+import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
 import '../helpers.dart';
 import '../studio/studio_fixtures.dart';
+
+const _studioAgent = Agent(
+  id: 'studio-1',
+  name: 'Studio Agent One',
+  description: 'Deployed live from Agent Studio.',
+  skills: ['Live testing'],
+  priceUsdcStroops: 1000000,
+  rating: 5.0,
+  stellarAddress: 'GCDSVE4MGRNDOWEP7HX7HGMECBFAZPDI2J5PDGWDLOLLLIUIXFFSQFXZ',
+  model: 'Workers AI',
+);
 
 /// S12 (F11) with the demo gateway: no wallet, loading, empty, error and
 /// Retry, the grouped rows and their actions, in both viewports.
@@ -19,6 +32,7 @@ void main() {
     Iterable<StudioDraft> drafts = const [],
     StudioGatewayException? listError,
     Size size = const Size(1440, 1000),
+    AgentRepository? repository,
   }) async {
     final owner = wallet?.address;
     final studio = FakeStudioGateway(
@@ -34,6 +48,7 @@ void main() {
       wallet: wallet,
       studioGateway: studio,
       size: size,
+      repository: repository ?? const InMemoryAgentRepository(testAgents),
     );
     return studio;
   }
@@ -140,6 +155,42 @@ void main() {
     expect(find.text('Ledger Scout'), findsWidgets);
     expect(find.textContaining('Monitors Stellar accounts'), findsWidgets);
   });
+
+  testWidgets(
+    'reloading My agents shows the draft as live with its catalog id and View navigates to it',
+    (tester) async {
+      await pumpMyAgents(
+        tester,
+        wallet: connected(),
+        repository: const InMemoryAgentRepository([
+          _studioAgent,
+          ...testAgents,
+        ]),
+        drafts: [
+          savedDraft(
+            1,
+            name: 'Studio Agent One',
+            state: DraftDeployState.live,
+            liveVersion: 1,
+            agentId: 'studio-1',
+          ),
+        ],
+      );
+      await advance(tester, const Duration(milliseconds: 400));
+
+      expect(find.text('LIVE'), findsOneWidget);
+      expect(find.text('Studio Agent One'), findsOneWidget);
+      expect(find.text('Live · version 1'), findsOneWidget);
+      expect(find.byKey(const Key('my-agents-view-1')), findsOneWidget);
+      expect(find.byKey(const Key('my-agents-edit-1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('my-agents-view-1')));
+      await advance(tester, const Duration(milliseconds: 400));
+
+      expect(find.text('Deployed live from Agent Studio.'), findsOneWidget);
+      expect(find.text('Hire'), findsOneWidget);
+    },
+  );
 
   testWidgets('Continue editing opens the draft in the Studio', (
     tester,

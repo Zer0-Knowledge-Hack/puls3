@@ -182,6 +182,9 @@ void main() {
     );
 
     expect(row.state, 'active');
+    final draft = await rig.drafts.get(owner: rig.owner, draftId: draftId);
+    expect(draft.deployState, 'live');
+    expect(draft.agentId, 'studio-$draftId');
     final document = jsonEncode(registrationDocument(rig.validated));
     expect(document.contains(rig.validated.systemPrompt), isFalse);
     expect(document, contains('https://puls3.org'));

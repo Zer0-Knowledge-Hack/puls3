@@ -27,7 +27,7 @@ Future<void> deployStudioManifest(
             owner: owner,
             state: DraftDeployState.live,
             // A demo deploy is not in the catalog: nothing to view.
-            agentId: result.isDemo ? null : '${result.agentId}',
+            agentId: result.isDemo ? null : 'studio-$draftId',
           ),
   );
 }
