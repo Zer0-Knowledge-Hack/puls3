@@ -1,4 +1,5 @@
 import 'errors.dart';
+import 'feedback_record.dart';
 import 'hire_status.dart';
 import 'stellar_address.dart';
 import 'values.dart';
@@ -309,6 +310,9 @@ final class Payment {
       hireId == hire.id && payee == agentWallet && amount == hire.price;
 }
 
+/// The longest [Feedback.comment], in characters.
+const feedbackCommentMaxLength = 500;
+
 /// The score and optional comment a consumer leaves about a paid hire.
 final class Feedback {
   Feedback({
@@ -318,10 +322,10 @@ final class Feedback {
     required this.score,
     this.comment = '',
   }) {
-    if (score < 1 || score > 5) {
+    if (score < lowestFeedbackScore || score > highestFeedbackScore) {
       throw const InvalidFeedback(FeedbackProblem.scoreOutOfRange);
     }
-    if (comment.length > 500) {
+    if (comment.length > feedbackCommentMaxLength) {
       throw const InvalidFeedback(FeedbackProblem.commentTooLong);
     }
   }
