@@ -15,9 +15,13 @@ dart analyze
 dart test
 ```
 
-The tests use fixtures and make no network calls. The fixtures are the
-`complete` transaction of job 3 from Horizon, and two signed documents from
-Nirium's repository.
+The tests use fixtures and make no network calls. The fixtures are:
+
+- the `complete` transaction of job 3 from Horizon;
+- escrow job 3 from Soroban RPC (`getLedgerEntries`);
+- the two documents Nirium's gateway served for our anchors, byte for byte
+  (`*.ipfs`, marked binary in `.gitattributes`), so their CIDs recompute;
+- two signed documents from Nirium's repository.
 
 ## Run against testnet
 
@@ -33,7 +37,8 @@ TX=ee6dfb528145c0e8d8e2d4420d47598d94c3d6698f2a60125d032e909a8e50c4
 # Anchor the full record (default) or only its hash (--mode hash).
 dart run bin/receipt.dart anchor --tx $TX --registry-id 7 --key-file attester.secret
 
-# Verify from IPFS: the hash, puls3's signature, and the transaction on Horizon.
+# Verify from IPFS: the CID, the hash, puls3's signature, the transaction on
+# Horizon and the escrow job on Soroban RPC.
 # A hash-only anchor also needs --record out/<cid>.json.
 dart run bin/receipt.dart verify --cid <cid> --key <attesting G… key>
 

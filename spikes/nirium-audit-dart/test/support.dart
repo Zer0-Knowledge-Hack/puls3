@@ -54,3 +54,27 @@ Map<String, Object?> anchoredDoc(Map<String, Object?> body) {
     'anchoredAt': '2026-11-07T00:00:00.000Z',
   };
 }
+
+/// Escrow job 3 as Soroban RPC returned it (`getLedgerEntries`).
+EscrowJob job3Job() =>
+    escrowJobFromEntry(fixture('escrow-job3-entry.json')['xdr'] as String);
+
+/// A [JobLookup] that knows only job 3, or answers [job] for it.
+JobLookup job3Lookup([EscrowJob? job]) => (contract, jobId) async {
+  if (contract != escrow || jobId != '3') {
+    throw StateError('unknown job $jobId on $contract');
+  }
+  return job ?? job3Job();
+};
+
+/// The bytes the Nirium gateway served for [cid] (`test/fixtures/<cid>.ipfs`).
+List<int> served(String cid) =>
+    File('test/fixtures/$cid.ipfs').readAsBytesSync();
+
+/// The record anchor and the hash-only anchor of job 3 (2026-11-07).
+const recordCid = 'QmSSRjPwEzpmr9xbEhgAc6xR1Y4rtjJyjckTELR1ra8TuB';
+const hashCid = 'QmUrMP68deCRbwyt4EVgkjL2ENWMSgvRQzVFkjSTJGkNWf';
+
+/// The throwaway attesting key of the live run (public key only).
+const spikeAttester =
+    'GCOHAMUMAKDNXGVGIK2P7MUDBC4BHVINPJ7QXE2Z436BBMBV2RMIGWS4';

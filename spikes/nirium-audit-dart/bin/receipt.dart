@@ -162,6 +162,7 @@ Future<int> _verify(ArgResults args, http.Client client) async {
     doc,
     trustedKey: args.option('key')!.trim(),
     chain: HorizonReader(client).settlement,
+    job: SorobanJobReader(client).job,
     localRecord: local,
   );
   watch.stop();
@@ -207,6 +208,7 @@ Future<int> _measure(ArgResults args, http.Client client) async {
         await ipfs.read(anchor.cid),
         trustedKey: signer.address,
         chain: HorizonReader(client).settlement,
+        job: SorobanJobReader(client).job,
         localRecord: record,
       );
       row['verifyMs'] = verifyWatch.elapsedMilliseconds;
@@ -286,6 +288,7 @@ Future<int> _reverify(ArgResults args, http.Client client) async {
         await ipfs.read(cid),
         trustedKey: args.option('key')!.trim(),
         chain: HorizonReader(client).settlement,
+        job: SorobanJobReader(client).job,
         localRecord: local,
       );
       times.add(watch.elapsedMilliseconds);

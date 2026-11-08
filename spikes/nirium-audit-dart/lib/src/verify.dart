@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import 'escrow_job.dart';
 import 'receipt.dart';
 import 'settlement.dart';
 
@@ -33,13 +34,16 @@ final class ReceiptCheck {
 /// - The record must match the chain: the transaction read by [chain] is a
 ///   `complete` on the same escrow and job, with the same asset and
 ///   transfers, and the named agent wallet was paid.
+/// - The escrow job read by [job] names the same agent id and pays the same
+///   wallet, and is completed. The escrow checked that wallet against the
+///   identity registry when the job was created.
 ///
-/// The CID itself is not recomputed: the document is trusted to be what the
-/// gateway served for that CID.
+/// The CID is checked where [doc] is read (`IpfsReader`), not here.
 Future<ReceiptCheck> verifyReceipt(
   Map<String, Object?> doc, {
   required String trustedKey,
   required SettlementLookup chain,
+  required JobLookup job,
   Map<String, Object?>? localRecord,
 }) async {
   final failures = <String>[];
@@ -89,7 +93,7 @@ Future<ReceiptCheck> verifyReceipt(
     failures.add('the attestation signature does not cover this record');
   }
 
-  failures.addAll(await _checkChain(record, doc, chain));
+  failures.addAll(await _checkChain(record, doc, chain, job));
   return ReceiptCheck(failures, record: record);
 }
 
@@ -97,6 +101,7 @@ Future<List<String>> _checkChain(
   Map<String, Object?> record,
   Map<String, Object?> doc,
   SettlementLookup chain,
+  JobLookup jobLookup,
 ) async {
   final unknown = record.keys.toSet().difference(receiptFields);
   if (record['schema'] != receiptSchema || unknown.isNotEmpty) {
@@ -138,6 +143,23 @@ Future<List<String>> _checkChain(
   final wallet = (record['agent'] as Map?)?['wallet'];
   if (!settlement.transfers.any((t) => t.to == wallet)) {
     failures.add('the agent wallet $wallet was not paid in this transaction');
+  }
+
+  final EscrowJob job;
+  try {
+    job = await jobLookup(settlement.escrowContract, settlement.jobId);
+  } on Object catch (e) {
+    return [...failures, 'the escrow job could not be read: $e'];
+  }
+  final registryId = (record['agent'] as Map?)?['registry_id'];
+  if ('${job.agentId}' != registryId) {
+    failures.add('agent: record #$registryId, escrow job #${job.agentId}');
+  }
+  if (job.provider != wallet) {
+    failures.add('wallet: record $wallet, escrow job pays ${job.provider}');
+  }
+  if (job.state != EscrowJob.completed) {
+    failures.add('the escrow job is in state ${job.state}, not completed');
   }
   return failures;
 }

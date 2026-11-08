@@ -4,15 +4,17 @@
 
 A puls3 receipt for a settled escrow job was anchored on Nirium's testnet
 Audit Trail and verified from IPFS **without calling Nirium**. The receipt
-says which puls3 agent was paid, for which job, and how much. puls3 signs it,
-and the verifier checks it against the `complete` transaction on the chain.
-Twenty more anchors stayed inside Nirium's published limit, with no rejection.
+says which puls3 agent was paid, for which job, and how much. puls3 signs it.
+The verifier recomputes the CID from the bytes the gateway serves, and checks
+the record against the `complete` transaction and against the escrow job,
+which binds the agent id to the wallet it pays. Twenty more anchors stayed
+inside Nirium's published limit, with no rejection.
 
 This is what Stellar alone does not give us. The transaction proves that
 money moved from the escrow to an address. The receipt adds, under puls3's
 signature, that the address is agent #7 and that the payment settled job 3.
-The chain check means a signed receipt cannot lie about the payee or the
-amount.
+The chain check means a signed receipt cannot lie about the payee, the agent
+or the amount.
 
 Go here means a follow-up issue for the hire flow, not code in `main`. What
 that issue needs is in [What a real integration needs](#what-a-real-integration-needs).
@@ -78,8 +80,12 @@ Nirium's 20 a minute per IP. All the CIDs are in
 |---|---|---|---|
 | Anchor (`POST /api/audit/log`) | 1.6 s | 1.8 s | 1.8 s |
 | Verify (IPFS, signature, Horizon), 5 to 15 minutes after anchoring | 0.4 s | 0.8 s | 1.6 s |
+| Verify again with the CID and the escrow job (Soroban RPC), 2026-11-08 | 2.5 s | 3.5 s | 4.0 s |
 
 - **20 of 20 anchored**, with no 429 and no other error.
+- **20 of 20 verified again** after findings 4 and 5 were closed, with the
+  CID recomputed and the escrow job read. The two job 3 receipts also
+  verified again. The extra time is the Soroban RPC read.
 - **0 of 20 could be read from IPFS right after anchoring.** Nirium's Filebase
   gateway timed out after 20 s for each one. **5 to 15 minutes later, 20 of 20
   verified.** A CID is usable for verification only after it propagates. A real
@@ -111,15 +117,26 @@ the limit.
    record with the `complete` transaction: escrow, job, ledger, close time,
    asset and transfers. It also refuses a receipt whose agent wallet was not
    paid (tested).
-4. **The CID itself is not recomputed**, here or in Nirium's verifier. The
-   document is trusted to be what the gateway served for that CID. Closing
-   this needs CID recomputation or a gateway that returns verifiable blocks.
-   That is follow-up work.
-5. **Agent identity is checked only against the payment.** The verifier checks
-   that the named wallet was paid. It does not yet read the identity registry
-   to confirm that registry id 7 maps to that wallet. That is the
-   `get_agent_wallet` read already on the registry, and it is item 2 of the
-   letter of intent.
+4. **The CID can be recomputed, so the gateway need not be trusted.**
+   Nirium's verifier does not recompute it. Nirium adds each document as one
+   dag-pb UnixFS block with a CIDv0 (`Qm…`), and the CID of the bytes the
+   gateway serves is the sha-256 of that block. The verifier recomputes it
+   and skips a gateway whose bytes do not match. Both live CIDs recompute
+   exactly, and tests use the served bytes. This covers documents of one
+   block (up to 256 KiB, a receipt is about 1 KiB). A `bafy…` CID or a larger
+   document is refused, not trusted.
+5. **The agent is checked against the escrow job, not the current registry.**
+   `create_job` accepts a job only when its `provider` is the identity
+   registry's wallet for its `agent_id` (`verify_provider`), and the job
+   keeps both. The verifier reads the job with Soroban RPC
+   (`getLedgerEntries`, no transaction, no signer) and requires the same
+   agent id, the same wallet, and the `Completed` state. Reading the
+   registry's `get_agent_wallet` today would be wrong for old receipts: a
+   wallet rebound later (#209) would fail every earlier receipt of that
+   agent. This is item 2 of the letter of intent, answered with data the
+   chain already keeps. Limit: a job entry archived after its TTL cannot be
+   read until it is restored, so verification of an old receipt can fail
+   for that reason.
 6. **Full record or hash only.** Every field of this record is already public
    on the chain, so anchoring the full record costs no privacy and lets anyone
    verify with only the CID. Hash only keeps the record off IPFS, but then
@@ -140,7 +157,8 @@ These items are for a follow-up issue, not this spike.
   transaction, and anchor it from a queue that retries on 429 and never blocks
   the hire.
 - Store the CID with the hire, and show it on hire detail once it verifies.
-- Read the identity registry for the agent wallet (finding 5).
+- Read the escrow job with the receipt, and decide how long job entries stay
+  live (finding 5).
 - Fees: free during the beta. After the beta, a per-request fee over x402 is
   to be agreed with Nirium beforehand (letter of intent).
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'cid.dart';
 import 'settlement.dart';
 
 /// Nirium's testnet Audit Trail node.
@@ -93,11 +94,16 @@ final class IpfsReader {
   final http.Client _http;
   final List<Uri> _gateways;
 
-  /// The JSON document at [cid]. Throws [StateError] naming each gateway's
-  /// answer when none returns a JSON object.
+  /// The JSON document at [cid]. A gateway's answer counts only when its
+  /// bytes hash to [cid], so a gateway cannot serve another document.
+  /// Throws [StateError] naming each gateway's answer when none returns a
+  /// matching JSON object.
+  ///
+  /// Only CIDv0 (`Qm…`) single-block documents, which is what the Nirium
+  /// node returns, can be recomputed; any other CID is refused.
   Future<Map<String, Object?>> read(String cid) async {
-    if (!RegExp(r'^[A-Za-z0-9]{46,100}$').hasMatch(cid)) {
-      throw ArgumentError.value(cid, 'cid', 'is not a CID');
+    if (!RegExp(r'^Qm[1-9A-HJ-NP-Za-km-z]{44}$').hasMatch(cid)) {
+      throw ArgumentError.value(cid, 'cid', 'is not a CIDv0');
     }
     final failures = <String>[];
     for (final gateway in _gateways) {
@@ -106,7 +112,12 @@ final class IpfsReader {
             .get(gateway.resolve(cid))
             .timeout(const Duration(seconds: 20));
         if (response.statusCode == 200) {
-          final doc = jsonDecode(response.body);
+          final bytes = response.bodyBytes;
+          if (bytes.length > maxSingleBlockFile || cidV0ForFile(bytes) != cid) {
+            failures.add('${gateway.host}: content does not hash to the CID');
+            continue;
+          }
+          final doc = jsonDecode(utf8.decode(bytes));
           if (doc is Map<String, Object?>) return doc;
           failures.add('${gateway.host}: not a JSON object');
         } else {

@@ -22,11 +22,13 @@ void main() {
     Map<String, Object?> d, {
     Map<String, Object?>? local,
     SettlementLookup chain = _job3Chain,
+    JobLookup? job,
     String? key,
   }) => verifyReceipt(
     d,
     trustedKey: key ?? signer.address,
     chain: chain,
+    job: job ?? job3Lookup(),
     localRecord: local,
   );
 
@@ -76,7 +78,9 @@ void main() {
         anchorBody(record, signer: signer, mode: AnchorMode.record),
       );
       final check = await verify(d);
-      expect(check.failures.single, contains('was not paid'));
+      expect(check.failures, hasLength(2));
+      expect(check.failures.first, contains('was not paid'));
+      expect(check.failures.last, startsWith('wallet: record'));
     });
 
     test('a hash-only receipt fails for a changed local record', () async {
@@ -145,6 +149,55 @@ void main() {
       ]);
     });
 
+    test('the escrow job must name the same agent', () async {
+      final check = await verify(
+        doc(),
+        job: job3Lookup(
+          const EscrowJob(agentId: 8, provider: ledgerScoutWallet, state: 3),
+        ),
+      );
+      expect(check.failures, ['agent: record #7, escrow job #8']);
+    });
+
+    test('the escrow job must pay the named wallet', () async {
+      // A wallet that was paid in the transaction but is not the job's
+      // provider (for example a fee) cannot be named as the agent.
+      const other = 'GBXHIBZLBY52TEKDSIVNNOK6XEVEEKXKVNPQXBYTH6SFX6ETG5KBWDC3';
+      final check = await verify(
+        doc(),
+        job: job3Lookup(const EscrowJob(agentId: 7, provider: other, state: 3)),
+      );
+      expect(check.failures.single, startsWith('wallet: record'));
+    });
+
+    test('the escrow job must be completed', () async {
+      final check = await verify(
+        doc(),
+        job: job3Lookup(
+          const EscrowJob(agentId: 7, provider: ledgerScoutWallet, state: 2),
+        ),
+      );
+      expect(check.failures, ['the escrow job is in state 2, not completed']);
+    });
+
+    test('an escrow job that cannot be read fails', () async {
+      final check = await verify(
+        doc(),
+        job: (_, _) async => throw StateError('archived'),
+      );
+      expect(check.failures.single, contains('escrow job could not be read'));
+    });
+
+    test('the live record anchor verifies offline', () async {
+      // The bytes Nirium's gateway served on 2026-11-07, with the chain and
+      // the escrow job from fixtures.
+      final d =
+          jsonDecode(utf8.decode(served(recordCid))) as Map<String, Object?>;
+      final check = await verify(d, key: spikeAttester);
+      expect(check.failures, isEmpty);
+      expect((check.record!['agent'] as Map)['registry_id'], '7');
+    });
+
     test('a record on another network is refused', () async {
       final d = doc()..['network'] = 'stellar:pubnet';
       final check = await verify(d);
@@ -196,13 +249,56 @@ void main() {
         MockClient((request) async {
           asked.add(request.url.host);
           return request.url.host == 'ipfs.io'
-              ? http.Response(jsonEncode(doc()), 200)
+              ? http.Response.bytes(served(recordCid), 200)
               : http.Response('rate limited', 429);
         }),
       );
-      final got = await reader.read('Qm${'a' * 44}');
-      expect(got['content_sha256'], doc()['content_sha256']);
+      final got = await reader.read(recordCid);
+      expect(got['content_sha256'], startsWith('16db1a9a'));
       expect(asked, ['nirium.myfilebase.com', 'ipfs.io']);
+    });
+
+    test('IpfsReader skips a gateway that serves another document', () async {
+      final reader = IpfsReader(
+        MockClient((request) async {
+          if (request.url.host == 'nirium.myfilebase.com') {
+            // A valid JSON document, but not the one at this CID.
+            return http.Response.bytes(served(hashCid), 200);
+          }
+          return http.Response.bytes(served(recordCid), 200);
+        }),
+      );
+      final got = await reader.read(recordCid);
+      expect(got['record'], isNotNull);
+    });
+
+    test('IpfsReader refuses a document no gateway serves intact', () async {
+      final tampered = utf8
+          .decode(served(recordCid))
+          .replaceFirst('0.5000000', '5.0000000');
+      final reader = IpfsReader(
+        MockClient((_) async => http.Response(tampered, 200)),
+      );
+      await expectLater(
+        reader.read(recordCid),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'm',
+            contains('content does not hash to the CID'),
+          ),
+        ),
+      );
+    });
+
+    test('IpfsReader refuses a CID it cannot recompute', () async {
+      final reader = IpfsReader(
+        MockClient((_) async => fail('no request expected')),
+      );
+      await expectLater(
+        reader.read('bafy${'a' * 55}'),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('IpfsReader names every gateway when none answers', () async {
@@ -210,7 +306,7 @@ void main() {
         MockClient((_) async => http.Response('no', 504)),
       );
       await expectLater(
-        reader.read('Qm${'a' * 44}'),
+        reader.read(recordCid),
         throwsA(
           isA<StateError>().having(
             (e) => e.message,
@@ -243,6 +339,48 @@ void main() {
       final s = await reader.settlement(job3Tx);
       expect(s.jobId, '3');
       expect(s.transfers.single.to, ledgerScoutWallet);
+    });
+
+    test('SorobanJobReader asks getLedgerEntries for the job key', () async {
+      late Map<String, Object?> sent;
+      final reader = SorobanJobReader(
+        MockClient((request) async {
+          sent = jsonDecode(request.body) as Map<String, Object?>;
+          final entry = fixture('escrow-job3-entry.json');
+          return http.Response(
+            jsonEncode({
+              'jsonrpc': '2.0',
+              'id': 1,
+              'result': {
+                'entries': [
+                  {'xdr': entry['xdr']},
+                ],
+              },
+            }),
+            200,
+          );
+        }),
+      );
+      final job = await reader.job(escrow, '3');
+      expect(sent['method'], 'getLedgerEntries');
+      expect((sent['params'] as Map)['keys'], [jobLedgerKey(escrow, '3')]);
+      expect(job.agentId, 7);
+    });
+
+    test('SorobanJobReader fails for a job with no live entry', () async {
+      final reader = SorobanJobReader(
+        MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'jsonrpc': '2.0',
+              'id': 1,
+              'result': {'entries': <Object>[]},
+            }),
+            200,
+          ),
+        ),
+      );
+      await expectLater(reader.job(escrow, '3'), throwsStateError);
     });
   });
 }

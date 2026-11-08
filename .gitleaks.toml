@@ -57,8 +57,10 @@ regexTarget = "match"
 paths = ['''docs/architecture/examples/sep10/challenge\.json''']
 regexes = ['''^SADQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQP54X$''']
 
-# The Nirium spike (#246) keeps two signed documents from Nirium's repository
-# as fixtures. Their `"key"` is the attesting agent's public Stellar address
+# The Nirium spike (#246) keeps signed documents as fixtures: two from
+# Nirium's repository (.json) and the two its gateway served for our anchors
+# (.ipfs, kept byte for byte so their CIDs can be recomputed). Their `"key"`
+# is the attesting agent's public Stellar address
 # (G…), which generic-api-key reads as a key. Only a public G address on a
 # `"key"` line in those fixtures is allowed; a seed (S…) is still reported.
 [[allowlists]]
@@ -66,5 +68,5 @@ description = "Public G addresses in the Nirium spike fixtures"
 condition = "AND"
 targetRules = ["generic-api-key"]
 regexTarget = "line"
-paths = ['''spikes/nirium-audit-dart/test/fixtures/.*\.json''']
+paths = ['''spikes/nirium-audit-dart/test/fixtures/.*\.(json|ipfs)''']
 regexes = ['''"key":\s*"G[A-Z2-7]{55}"''']
