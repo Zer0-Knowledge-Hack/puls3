@@ -1,0 +1,26 @@
+{
+  "record": {
+    "agent": {
+      "registry_id": "7",
+      "wallet": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY"
+    },
+    "asset": "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+    "closed_at": "2026-10-04T19:45:27Z",
+    "escrow_contract": "CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2",
+    "job_id": "3",
+    "ledger": "5023908",
+    "network": "stellar:testnet",
+    "schema": "puls3.escrow.settlement.v1",
+    "settle_tx": "ee6dfb528145c0e8d8e2d4420d47598d94c3d6698f2a60125d032e909a8e50c4",
+    "transfers": [
+      {
+        "amount": "0.5000000",
+        "to": "GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY"
+      }
+    ]
+  },
+  "cid": "QmUrMP68deCRbwyt4EVgkjL2ENWMSgvRQzVFkjSTJGkNWf",
+  "content_sha256": "16db1a9a6df4408b37c86de758f18a496eb4a6db03cb34c391b6abc37b9a7eaa",
+  "anchoredAt": "2026-11-07T22:54:03.408Z",
+  "gatewayUrl": "https://gateway.pinata.cloud/ipfs/QmUrMP68deCRbwyt4EVgkjL2ENWMSgvRQzVFkjSTJGkNWf"
+}
