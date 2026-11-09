@@ -90,6 +90,7 @@ class Puls3App extends StatefulWidget {
     this.studioGateway,
     this.hireGateway,
     this.hireFlowStore,
+    this.onWalletDisconnect,
     this.localeStore,
     this.locale,
     this.initialLocation = '/',
@@ -118,6 +119,10 @@ class Puls3App extends StatefulWidget {
   /// Where unfinished hires are kept: the browser's storage by default.
   final HireFlowStore? hireFlowStore;
 
+  /// Drops the wallet's server session when the wallet is disconnected
+  /// (#261). `main.dart` passes the same [WalletSession] the gateways use.
+  final Future<void> Function()? onWalletDisconnect;
+
   /// Where the language tag is kept: the browser's storage by default.
   final LocaleStore? localeStore;
 
@@ -135,7 +140,10 @@ class _Puls3AppState extends State<Puls3App> {
     widget.repository,
     fallback: widget.demoRepository,
   )..load();
-  late final WalletController _wallet = WalletController(widget.wallet);
+  late final WalletController _wallet = WalletController(
+    widget.wallet,
+    onDisconnect: widget.onWalletDisconnect,
+  );
   late final GoRouter _router = buildRouter(
     initialLocation: widget.initialLocation,
   );

@@ -55,6 +55,7 @@ Future<void> pumpApp(
   AgentRepository? demoRepository,
   MockWallet? wallet,
   StudioGateway? studioGateway,
+  Future<void> Function()? onWalletDisconnect,
   LocaleStore? localeStore,
   Locale? locale = const Locale('en'),
 }) async {
@@ -70,6 +71,7 @@ Future<void> pumpApp(
       demoRepository: demoRepository,
       wallet: wallet ?? MockWallet(),
       studioGateway: studioGateway,
+      onWalletDisconnect: onWalletDisconnect,
       initialLocation: location,
       localeStore: localeStore,
       locale: locale,
