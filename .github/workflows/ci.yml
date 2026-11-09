@@ -92,7 +92,7 @@ jobs:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_sdk
         run: dart analyze --fatal-infos && dart test
 

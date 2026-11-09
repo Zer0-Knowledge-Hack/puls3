@@ -50,17 +50,34 @@ final class Puls3Sdk {
 }
 
 /// [apiUrl] as the generated client expects it: absolute, `http` or `https`,
-/// and ending in `/`.
+/// with a path ending in `/`, and no query or fragment (the client appends
+/// endpoint paths to it).
 String normalizeApiUrl(Uri apiUrl) {
   if (!apiUrl.isAbsolute ||
       (apiUrl.scheme != 'http' && apiUrl.scheme != 'https') ||
-      apiUrl.host.isEmpty) {
+      apiUrl.host.isEmpty ||
+      apiUrl.hasQuery ||
+      apiUrl.hasFragment) {
     throw ArgumentError.value(
       apiUrl.toString(),
       'apiUrl',
-      'must be an absolute http or https URL',
+      'must be an absolute http or https URL with no query or fragment',
     );
   }
-  final text = apiUrl.toString();
-  return text.endsWith('/') ? text : '$text/';
+  final path = apiUrl.path.endsWith('/') ? apiUrl.path : '${apiUrl.path}/';
+  return apiUrl.replace(path: path).toString();
+}
+
+/// [stroops] (7 decimals) as a USDC amount, with integer arithmetic only
+/// (contract rule 1): at least 2 decimals, trailing zeros past them dropped.
+/// `5000000` is `0.50`, `12345678` is `1.2345678`.
+String formatUsdc(int stroops) {
+  final sign = stroops < 0 ? '-' : '';
+  final value = stroops.abs();
+  final whole = value ~/ 10000000;
+  var fraction = (value % 10000000).toString().padLeft(7, '0');
+  while (fraction.length > 2 && fraction.endsWith('0')) {
+    fraction = fraction.substring(0, fraction.length - 1);
+  }
+  return '$sign$whole.$fraction';
 }

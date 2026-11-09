@@ -1,6 +1,6 @@
 # ADR-0007: Developer SDK (`puls3_sdk`)
 
-- **Status:** Proposed. The catalog part is implemented; the session decision ([Open decision 1](#open-decisions)) is pending.
+- **Status:** Proposed. The catalog part is implemented (#229); the session decision ([Open decision 1](#open-decisions)) and the session-bound operations are [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259).
 - **Date:** 2026-11-05
 - **Issue:** #222 (week 2 of the developer platform)
 - **Clients of this package:** the `puls3` CLI (#224), the MCP server (#226)

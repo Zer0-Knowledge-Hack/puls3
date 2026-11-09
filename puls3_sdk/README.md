@@ -5,7 +5,8 @@ hire and Studio calls. **It never signs or submits a transaction.** The design
 is [ADR-0007](../docs/adr/0007-developer-sdk.md).
 
 This version covers the catalog, which needs no session. Hire and Studio
-calls wait for the session decision in ADR-0007.
+calls wait for the session decision in ADR-0007, tracked in
+[#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259).
 
 ## Use it from this repo
 

@@ -97,14 +97,42 @@ void main() {
       );
     });
 
-    test('refuses a relative or non-http URL', () {
-      for (final url in ['api.puls3.test', 'ftp://api.puls3.test', '/v1']) {
+    test('adds the slash to the path of a URL with a base path', () {
+      expect(
+        normalizeApiUrl(Uri.parse('https://puls3.test/api')),
+        'https://puls3.test/api/',
+      );
+    });
+
+    test('refuses a relative or non-http URL, a query or a fragment', () {
+      for (final url in [
+        'api.puls3.test',
+        'ftp://api.puls3.test',
+        '/v1',
+        'https://api.puls3.test/?a=1',
+        'https://api.puls3.test/#top',
+      ]) {
         expect(
           () => Puls3Sdk.connect(Uri.parse(url)),
           throwsArgumentError,
           reason: url,
         );
       }
+    });
+  });
+
+  group('formatUsdc', () {
+    test('uses integer stroops, never a double', () {
+      expect(formatUsdc(5000000), '0.50');
+      expect(formatUsdc(12500000), '1.25');
+      expect(formatUsdc(12345678), '1.2345678');
+      expect(formatUsdc(0), '0.00');
+      expect(formatUsdc(-1), '-0.0000001');
+    });
+
+    test('is exact where a double is not', () {
+      // 2^53 + 1 stroops cannot be held exactly in a double.
+      expect(formatUsdc(9007199254740993), '900719925.4740993');
     });
   });
 }
