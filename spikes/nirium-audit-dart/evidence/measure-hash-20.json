@@ -1,0 +1,173 @@
+{
+  "summary": {
+    "mode": "hash",
+    "count": 20,
+    "intervalMs": 3500,
+    "anchored": 20,
+    "verified": 0,
+    "errors": [
+      "StateError: Bad state: no gateway returned QmcjsAfBr5cpe2gjGn6oEfaRVaoUY8a1cnX5KkdztrRuMF (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmQkLL6JEr9u1Ffwv7zMn5XQ3iWwEGd21rRGnmHXzsJP7h (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmNa4Q1AExjBgvLdjKuYDQgqPSHqbGDpYuvYKkVJHaNfrR (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmcpjgtfbUfehqnJXnMDuHiR5vHtC3QxBGHp56577P2cA7 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmSfYKZkiFXdTHUdPwmLWnEaeXq5X7gbV2DH14ysQF1tFh (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmbH9JnDmmWJPuRhmCLMCa21vYVgN71fVBTvPBQkJZtkjf (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmZhQt2jYNGU736AnxyX7J7T7Ynwpj2QjSN2aaRLJngtQb (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmRnpDrNxEvAEJHhCaF61uiK72WygdssWJcZrtUFBnQLVk (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned Qmf9ptVfuEtjH1p35opn7RSh7Kavmd4FA78WhvGfN1VLkb (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmbTm9vsAq148RSzXyWKjRFNEsDKScgXGewvsJL2JLmqDK (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmYYZD6vTVTBub7XFwyguQdQDn9ULDyNdDXaaWdchNkVZD (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmcWg4McMYgCzHdK3fsv4ZXj4jupSNpXi8pnBJP9RKt5ho (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmVoJAtzYBYsHHZUMCwLLQbxPYDBjT9MTPN3bbYwJ4TV2n (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmfYemHqJrQRf6vr3Ru9ZABds7SfXwLHMvsbiqMSNxoyu6 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmYdsppNhiPbfYq5UkiijTA63uVApKkY1Lds8o9vcqekxH (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmUQySBMqwcnoBQSDLQTqSVomTDBKZoujXcutxfowpW3Vd (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmWB2JLzDE9H8vmM33YDQsZkSHuDosf5swuf9fCZVxBT4Q (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmSAzFKtp3uoUh2jvrx8wKfYvupKdWSBk6XCZR1SJqbGMU (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmXJzTHeGQ4BvPGQjP59TRTu97da8DHwSRVxn95EuQxYw1 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)",
+      "StateError: Bad state: no gateway returned QmXMtNs6t3Epr5vha7HDCxoHNrQmzvnJYJxDTJVUQVRmXL (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    ],
+    "anchorMs": {
+      "p50": 1575,
+      "p95": 1809,
+      "max": 1833
+    },
+    "verifyMs": {
+      "p50": null,
+      "p95": null,
+      "max": null
+    }
+  },
+  "rows": [
+    {
+      "i": 0,
+      "anchorMs": 1750,
+      "cid": "QmcjsAfBr5cpe2gjGn6oEfaRVaoUY8a1cnX5KkdztrRuMF",
+      "error": "StateError: Bad state: no gateway returned QmcjsAfBr5cpe2gjGn6oEfaRVaoUY8a1cnX5KkdztrRuMF (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 1,
+      "anchorMs": 1650,
+      "cid": "QmQkLL6JEr9u1Ffwv7zMn5XQ3iWwEGd21rRGnmHXzsJP7h",
+      "error": "StateError: Bad state: no gateway returned QmQkLL6JEr9u1Ffwv7zMn5XQ3iWwEGd21rRGnmHXzsJP7h (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 2,
+      "anchorMs": 1467,
+      "cid": "QmNa4Q1AExjBgvLdjKuYDQgqPSHqbGDpYuvYKkVJHaNfrR",
+      "error": "StateError: Bad state: no gateway returned QmNa4Q1AExjBgvLdjKuYDQgqPSHqbGDpYuvYKkVJHaNfrR (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 3,
+      "anchorMs": 1696,
+      "cid": "QmcpjgtfbUfehqnJXnMDuHiR5vHtC3QxBGHp56577P2cA7",
+      "error": "StateError: Bad state: no gateway returned QmcpjgtfbUfehqnJXnMDuHiR5vHtC3QxBGHp56577P2cA7 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 4,
+      "anchorMs": 1607,
+      "cid": "QmSfYKZkiFXdTHUdPwmLWnEaeXq5X7gbV2DH14ysQF1tFh",
+      "error": "StateError: Bad state: no gateway returned QmSfYKZkiFXdTHUdPwmLWnEaeXq5X7gbV2DH14ysQF1tFh (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 5,
+      "anchorMs": 1809,
+      "cid": "QmbH9JnDmmWJPuRhmCLMCa21vYVgN71fVBTvPBQkJZtkjf",
+      "error": "StateError: Bad state: no gateway returned QmbH9JnDmmWJPuRhmCLMCa21vYVgN71fVBTvPBQkJZtkjf (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 6,
+      "anchorMs": 1575,
+      "cid": "QmZhQt2jYNGU736AnxyX7J7T7Ynwpj2QjSN2aaRLJngtQb",
+      "error": "StateError: Bad state: no gateway returned QmZhQt2jYNGU736AnxyX7J7T7Ynwpj2QjSN2aaRLJngtQb (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 7,
+      "anchorMs": 1353,
+      "cid": "QmRnpDrNxEvAEJHhCaF61uiK72WygdssWJcZrtUFBnQLVk",
+      "error": "StateError: Bad state: no gateway returned QmRnpDrNxEvAEJHhCaF61uiK72WygdssWJcZrtUFBnQLVk (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 8,
+      "anchorMs": 1559,
+      "cid": "Qmf9ptVfuEtjH1p35opn7RSh7Kavmd4FA78WhvGfN1VLkb",
+      "error": "StateError: Bad state: no gateway returned Qmf9ptVfuEtjH1p35opn7RSh7Kavmd4FA78WhvGfN1VLkb (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 9,
+      "anchorMs": 1503,
+      "cid": "QmbTm9vsAq148RSzXyWKjRFNEsDKScgXGewvsJL2JLmqDK",
+      "error": "StateError: Bad state: no gateway returned QmbTm9vsAq148RSzXyWKjRFNEsDKScgXGewvsJL2JLmqDK (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 10,
+      "anchorMs": 1583,
+      "cid": "QmYYZD6vTVTBub7XFwyguQdQDn9ULDyNdDXaaWdchNkVZD",
+      "error": "StateError: Bad state: no gateway returned QmYYZD6vTVTBub7XFwyguQdQDn9ULDyNdDXaaWdchNkVZD (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 11,
+      "anchorMs": 1540,
+      "cid": "QmcWg4McMYgCzHdK3fsv4ZXj4jupSNpXi8pnBJP9RKt5ho",
+      "error": "StateError: Bad state: no gateway returned QmcWg4McMYgCzHdK3fsv4ZXj4jupSNpXi8pnBJP9RKt5ho (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 12,
+      "anchorMs": 1646,
+      "cid": "QmVoJAtzYBYsHHZUMCwLLQbxPYDBjT9MTPN3bbYwJ4TV2n",
+      "error": "StateError: Bad state: no gateway returned QmVoJAtzYBYsHHZUMCwLLQbxPYDBjT9MTPN3bbYwJ4TV2n (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 13,
+      "anchorMs": 1567,
+      "cid": "QmfYemHqJrQRf6vr3Ru9ZABds7SfXwLHMvsbiqMSNxoyu6",
+      "error": "StateError: Bad state: no gateway returned QmfYemHqJrQRf6vr3Ru9ZABds7SfXwLHMvsbiqMSNxoyu6 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 14,
+      "anchorMs": 1441,
+      "cid": "QmYdsppNhiPbfYq5UkiijTA63uVApKkY1Lds8o9vcqekxH",
+      "error": "StateError: Bad state: no gateway returned QmYdsppNhiPbfYq5UkiijTA63uVApKkY1Lds8o9vcqekxH (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 15,
+      "anchorMs": 1417,
+      "cid": "QmUQySBMqwcnoBQSDLQTqSVomTDBKZoujXcutxfowpW3Vd",
+      "error": "StateError: Bad state: no gateway returned QmUQySBMqwcnoBQSDLQTqSVomTDBKZoujXcutxfowpW3Vd (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 16,
+      "anchorMs": 1833,
+      "cid": "QmWB2JLzDE9H8vmM33YDQsZkSHuDosf5swuf9fCZVxBT4Q",
+      "error": "StateError: Bad state: no gateway returned QmWB2JLzDE9H8vmM33YDQsZkSHuDosf5swuf9fCZVxBT4Q (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 17,
+      "anchorMs": 1630,
+      "cid": "QmSAzFKtp3uoUh2jvrx8wKfYvupKdWSBk6XCZR1SJqbGMU",
+      "error": "StateError: Bad state: no gateway returned QmSAzFKtp3uoUh2jvrx8wKfYvupKdWSBk6XCZR1SJqbGMU (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 18,
+      "anchorMs": 1514,
+      "cid": "QmXJzTHeGQ4BvPGQjP59TRTu97da8DHwSRVxn95EuQxYw1",
+      "error": "StateError: Bad state: no gateway returned QmXJzTHeGQ4BvPGQjP59TRTu97da8DHwSRVxn95EuQxYw1 (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    },
+    {
+      "i": 19,
+      "anchorMs": 1460,
+      "cid": "QmXMtNs6t3Epr5vha7HDCxoHNrQmzvnJYJxDTJVUQVRmXL",
+      "error": "StateError: Bad state: no gateway returned QmXMtNs6t3Epr5vha7HDCxoHNrQmzvnJYJxDTJVUQVRmXL (nirium.myfilebase.com: TimeoutException; ipfs.io: HandshakeException; dweb.link: HandshakeException)"
+    }
+  ],
+  "reverify": {
+    "cids": 20,
+    "verified": 20,
+    "verifyMs": {
+      "p50": 408,
+      "p95": 834,
+      "max": 1638
+    },
+    "at": "2026-11-07T23:03:53.505862Z"
+  }
+}
