@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show IOException, OSError, SocketException, TlsException;
 
 import 'package:args/args.dart';
 import 'package:puls3_sdk/puls3_sdk.dart';
@@ -123,6 +124,12 @@ Future<int> runPuls3(
     // Not reached, timed out, or an HTTP error before any endpoint answered.
     err.writeln('error: Unreachable: $apiText: ${e.message}');
     return ExitCodes.unavailable;
+  } on IOException catch (e) {
+    // Below the client: a TLS handshake the machine refuses (for example a
+    // certificate it does not trust) or a socket error. Same exit as above,
+    // never a stack trace.
+    err.writeln('error: Unreachable: $apiText: ${_ioMessage(e)}');
+    return ExitCodes.unavailable;
   } finally {
     sdk.close();
   }
@@ -228,15 +235,14 @@ Map<String, Object?> _toJson(AgentSummary agent) => {
   'paidHireCount': agent.paidHireCount,
 };
 
-/// [stroops] (7 decimals) as a USDC amount with at least two decimals and no
-/// trailing zeros past them, without going through a double.
-String formatUsdc(int stroops) {
-  final sign = stroops < 0 ? '-' : '';
-  final value = stroops.abs();
-  final whole = value ~/ 10000000;
-  var fraction = (value % 10000000).toString().padLeft(7, '0');
-  while (fraction.length > 2 && fraction.endsWith('0')) {
-    fraction = fraction.substring(0, fraction.length - 1);
-  }
-  return '$sign$whole.$fraction';
+/// The message of a TLS or socket failure, with the OS reason when there is
+/// one (for example `CERTIFICATE_VERIFY_FAILED: self signed certificate`).
+String _ioMessage(IOException e) {
+  final (String message, OSError? os) = switch (e) {
+    TlsException() => (e.message, e.osError),
+    SocketException() => (e.message, e.osError),
+    _ => ('$e', null),
+  };
+  final reason = os?.message.trim() ?? '';
+  return reason.isEmpty ? message : '$message: $reason';
 }

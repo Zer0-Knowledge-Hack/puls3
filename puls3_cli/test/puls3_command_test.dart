@@ -227,6 +227,40 @@ void main() {
         'error: Unreachable: https://api.puls3.test: connection refused',
       );
     });
+
+    test('a TLS handshake failure exits 69 without a stack trace', () async {
+      final run = await _puls3(
+        [..._api, 'catalog', 'list'],
+        catalog: _FakeCatalog(
+          error: const HandshakeException(
+            'Handshake error in client',
+            OSError('CERTIFICATE_VERIFY_FAILED: self signed certificate'),
+          ),
+        ),
+      );
+      expect(run.code, ExitCodes.unavailable);
+      expect(run.out, isEmpty);
+      expect(
+        run.err.trim(),
+        'error: Unreachable: https://api.puls3.test: Handshake error in '
+        'client: CERTIFICATE_VERIFY_FAILED: self signed certificate',
+      );
+    });
+
+    test('a socket error exits 69', () async {
+      final run = await _puls3(
+        [..._api, 'catalog', 'list'],
+        catalog: _FakeCatalog(
+          error: const SocketException('Failed host lookup: api.puls3.test'),
+        ),
+      );
+      expect(run.code, ExitCodes.unavailable);
+      expect(
+        run.err.trim(),
+        'error: Unreachable: https://api.puls3.test: Failed host lookup: '
+        'api.puls3.test',
+      );
+    });
   });
 
   group('API URL', () {
@@ -297,7 +331,7 @@ void main() {
     }
   });
 
-  group('formatUsdc', () {
+  group('formatUsdc, from puls3_sdk, as the CLI prints prices', () {
     test('keeps two decimals and drops trailing zeros past them', () {
       expect(formatUsdc(0), '0.00');
       expect(formatUsdc(5000000), '0.50');
