@@ -4,8 +4,8 @@ import 'wallet_session.dart';
 
 /// Labelled demo of the hire backend. It prepares harmless, never-submitted
 /// Testnet envelopes, so a real wallet still shows its prompts, and moves
-/// no funds. Created hires are readable as submitted so F6 can be walked
-/// without a server.
+/// no funds. Created hires are readable as submitted so F6 and then F7 can
+/// be walked without a server.
 class FakeHireGateway implements HireGateway {
   FakeHireGateway({this.delay = const Duration(milliseconds: 400)});
 
@@ -70,6 +70,40 @@ class FakeHireGateway implements HireGateway {
   }
 
   @override
+  Future<EscrowPreparation> prepareFeedback(
+    int hireId,
+    int score,
+    String comment,
+  ) async {
+    await Future<void>.delayed(delay);
+    if (_progress[hireId]?.feedbackTransaction != null) {
+      throw const HireAlreadyRated();
+    }
+    return _prepare(hireId, 'giveFeedback');
+  }
+
+  @override
+  Future<EscrowSubmission> submitFeedback(
+    int hireId,
+    EscrowPreparation preparation,
+    String signedTransaction,
+  ) async {
+    await Future<void>.delayed(delay);
+    final current = _progress[hireId];
+    if (current != null) {
+      // A demo reference: the screen shows the rating, with no explorer
+      // link since nothing was sent.
+      _progress[hireId] = _copy(
+        current,
+        status: current.status ?? 'completed',
+        feedbackTransaction: 'demo-feedback-$hireId',
+        feedbackState: 'confirmed',
+      );
+    }
+    return const EscrowSubmission(transactionHash: '', state: 'demo');
+  }
+
+  @override
   Future<EscrowSubmission> submit(
     int hireId,
     EscrowPreparation preparation,
@@ -124,6 +158,8 @@ class FakeHireGateway implements HireGateway {
     HireProgress hire, {
     required String status,
     String? rejectedFrom,
+    String? feedbackTransaction,
+    String? feedbackState,
   }) => HireProgress(
     hireId: hire.hireId,
     agentName: hire.agentName,
@@ -139,5 +175,8 @@ class FakeHireGateway implements HireGateway {
     approvalDeadline: hire.approvalDeadline,
     decisionTransaction: hire.decisionTransaction,
     decisionExplorerUrl: hire.decisionExplorerUrl,
+    feedbackTransaction: feedbackTransaction ?? hire.feedbackTransaction,
+    feedbackState: feedbackState ?? hire.feedbackState,
+    feedbackErrorCode: hire.feedbackErrorCode,
   );
 }

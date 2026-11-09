@@ -228,6 +228,8 @@ The read model and shared feedback fields follow the Stellar 8004 Reputation Reg
 
 > **Superseded by [ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md) D5:** the trusted `authorize_feedback` authorizer and the payment-backed `give_feedback` gate are removed. The paid-hire rule is proven by a completed ERC-8183 escrow job and applied by readers; the drop-in registry is [#14](https://github.com/Zer0-Knowledge-Hack/puls3/issues/14).
 
+> **Amended by [#199](https://github.com/Zer0-Knowledge-Hack/puls3/issues/199) (security audit R-1):** a stricter value bound than Stellar 8004, so one feedback cannot make `get_summary` fail. `give_feedback` also rejects, with the existing `ValueOutOfRange`, any value whose 18-decimal (WAD) form exceeds `MAX_ABS_WAD = 1e28` (at most `1e10` whole units, for example `value ≤ 1e10` with `value_decimals = 0`). With that bound the summary's `i128` sum would need more than `1.7e10` records in one call to overflow, which no transaction can read. `get_summary` skips, and does not count, a stored record it cannot normalize or add (records written before the bound) instead of returning `AggregateOverflow`. Signatures, types, events and error codes are unchanged; the deviation is behavioral: values Stellar 8004 accepts above the bound are refused, and a summary that Stellar 8004 would fail is returned without the record. Analysis and evidence: [`docs/security/issue-199/`](../security/issue-199/README.md).
+
 > **Amended by [#201](https://github.com/Zer0-Knowledge-Hack/puls3/issues/201) (security audit R-2a):** each rating puls3 writes names its paid hire on chain, with no ABI change. The consumer's `give_feedback` carries `tag2 = feedback_uri = "puls3:job:v1:<escrow contract>:<job id>"` and `feedback_hash = SHA-256(feedbackCommitment)` over the reference, agent, client and score. `tag2` is used because it is the only free field the registry stores, so `read_feedback` returns it long after the event leaves RPC retention. puls3's reader counts a record only when the **configured** escrow's `get_job(job_id)` is `Completed`, with `client` equal to the record's client and `agent_id` equal to the rated agent, and only the first such record per job. This is the reader rule ADR-0005 D5 decided, not a contract gate: signatures, types, events and error codes are unchanged, the contract still accepts any rating, and records without a valid reference (all ratings written before #201 included) are valid ERC-8004 data that do not count in puls3's rating. `get_summary`'s `tag2` filter is not meaningful for puls3 records. Not covered: an owner who pays a real job from a second wallet (#200). Analysis: [`docs/security/issue-201/`](../security/issue-201/README.md).
 
 Before feedback, the Serverpod payment verifier confirms the expected asset, amount, recipient, successful transaction, and that the payment reference has not already funded another hire. It derives a deterministic `hire_id` from the puls3 hire record and verified transaction reference, then asks the configured authorizer to register `(hire_id, agent_id, client_address)`. The authorizer must authenticate, and the contract rejects a second authorization for the same `hire_id`. `give_feedback` requires the same client to authenticate, checks the tuple, and marks the authorization consumed in the same contract invocation that stores feedback. If that invocation fails, neither state change may persist. Revocation does not reset the consumed flag.
@@ -255,8 +257,14 @@ pub struct SummaryResult {
 
 /// `get_summary` reads at most this many clients per call.
 pub const MAX_SUMMARY_CLIENTS: u32 = 5;
+/// `get_summary` reads at most this many records per call, across clients (#205).
+pub const MAX_SUMMARY_RECORDS: u64 = 50;
+/// Responses a feedback accepts from outside the agent's side (#205).
+pub const MAX_THIRD_PARTY_RESPONSES: u32 = 20;
 /// `value` must be within ±1e38.
 pub const MAX_ABS_VALUE: i128 = 100_000_000_000_000_000_000_000_000_000_000_000_000;
+/// `value * 10^(18 - value_decimals)` must be within ±1e28 (#199, stricter than Stellar 8004).
+pub const MAX_ABS_WAD: i128 = 10_000_000_000_000_000_000_000_000_000;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -297,8 +305,9 @@ impl ReputationRegistryContract {
     ) -> Result<(), ReputationError>;
 
     /// `caller.require_auth()`. The agent must exist (`AgentNotFound`), and the caller
-    /// must not own it (`SelfFeedback`, checked with `is_authorized_or_owner` on the
-    /// Identity Registry). `hire_id` must be authorized for this agent and caller and
+    /// must not own it or be its payment wallet (`SelfFeedback`, checked with
+    /// `is_authorized_or_owner` and `get_agent_wallet` on the Identity Registry,
+    /// #200). `hire_id` must be authorized for this agent and caller and
     /// not previously consumed. Consumption and feedback storage are atomic.
     /// Stores feedback under the next index for (agent, caller),
     /// starting at 1. `endpoint`, `feedback_uri`, `feedback_hash` are only emitted.
@@ -320,8 +329,11 @@ impl ReputationRegistryContract {
     /// Only the client who gave it. Errors: `FeedbackNotFound` (also if already revoked).
     pub fn revoke_feedback(e: &Env, caller: Address, agent_id: u32, feedback_index: u64) -> Result<(), ReputationError>;
 
-    /// Anyone can respond (e.g. the agent owner disputing a review).
-    /// Errors: `EmptyValue` (empty `response_uri`), `FeedbackNotFound`.
+    /// Anyone can respond (e.g. the agent owner disputing a review), but a feedback
+    /// takes at most `MAX_THIRD_PARTY_RESPONSES` responses from outside the agent's
+    /// owner, operator and payment wallet, who are never capped (#205).
+    /// Errors: `EmptyValue` (empty `response_uri`), `FeedbackNotFound`,
+    /// `TooManyResponses`.
     pub fn append_response(
         e: &Env,
         caller: Address,
@@ -335,10 +347,13 @@ impl ReputationRegistryContract {
     pub fn read_feedback(e: &Env, agent_id: u32, client_address: Address, feedback_index: u64) -> Result<FeedbackData, ReputationError>;
 
     /// Average of the non-revoked feedback from the first `MAX_SUMMARY_CLIENTS` of
-    /// `client_addresses`, filtered by `tag1`/`tag2` when not empty. Values are
+    /// `client_addresses`, filtered by `tag1`/`tag2` when not empty, over at most
+    /// `MAX_SUMMARY_RECORDS` records; its reads extend no TTL (#205). Values are
     /// normalized to 18 decimals, averaged with checked arithmetic, and returned in the
-    /// most frequent `value_decimals` (ties go to the lowest).
-    /// Errors: `ClientAddressesRequired` (empty list), `AggregateOverflow`.
+    /// most frequent `value_decimals` (ties go to the lowest). A stored record that
+    /// cannot be normalized or added without overflow is skipped and not counted (#199).
+    /// Errors: `ClientAddressesRequired` (empty list); `AggregateOverflow` only if the
+    /// record count overflows `u64` (unreachable).
     pub fn get_summary(
         e: &Env,
         agent_id: u32,

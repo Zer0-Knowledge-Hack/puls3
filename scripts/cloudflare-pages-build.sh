@@ -13,6 +13,20 @@ FLUTTER_VERSION=3.44.4
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FLUTTER_DIR="${PULS3_FLUTTER_DIR:-$REPO_ROOT/flutter}"
 
+# The production branch runs the real Studio. Preview branches and local
+# builds keep the labelled demo unless PULS3_STUDIO is set explicitly.
+studio="${PULS3_STUDIO:-}"
+if [ -z "$studio" ] && [ "${CF_PAGES_BRANCH:-}" = main ]; then
+  studio=server
+fi
+case "$studio" in
+  '' | demo | server) ;;
+  *)
+    echo "PULS3_STUDIO must be 'server' or 'demo'." >&2
+    exit 1
+    ;;
+esac
+
 # The SEP-10 values the app checks every sign-in challenge against (#136).
 # A static Pages build has no server-published config.json `auth`, so the
 # Pages project pins them. All three are public; the key is the server's
@@ -26,10 +40,10 @@ if [ -n "${PULS3_AUTH_SERVER_SIGNING_KEY:-}" ] &&
 fi
 # A real hire or Studio signs in with the wallet, so it must not run with
 # unpinned challenge checks.
-if [ "${PULS3_HIRE:-}" = server ] || [ "${PULS3_STUDIO:-}" = server ]; then
+if [ "${PULS3_HIRE:-}" = server ] || [ "$studio" = server ]; then
   for name in "${auth_vars[@]}"; do
     if [ -z "${!name:-}" ]; then
-      echo "PULS3_HIRE=server or PULS3_STUDIO=server needs $name (see puls3_server/README.md)." >&2
+      echo "PULS3_HIRE=server or the server Studio needs $name (see puls3_server/README.md)." >&2
       exit 1
     fi
   done
@@ -54,10 +68,11 @@ for name in "${auth_vars[@]}"; do
     build_args+=("--dart-define=$name=${!name}")
   fi
 done
-# Set PULS3_STUDIO=server so the public Studio saves, test-runs and deploys
-# for real. Unset keeps the labelled demo.
-if [ -n "${PULS3_STUDIO:-}" ]; then
-  build_args+=("--dart-define=STUDIO=$PULS3_STUDIO")
+# The public Studio saves, test-runs and deploys for real on the production
+# branch. PULS3_STUDIO=demo opts a production build out; preview branches
+# keep the labelled demo.
+if [ -n "$studio" ]; then
+  build_args+=("--dart-define=STUDIO=$studio")
 fi
 
 cd "$REPO_ROOT/puls3_flutter"

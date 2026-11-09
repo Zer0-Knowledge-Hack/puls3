@@ -21,8 +21,24 @@ pub const TTL_BUMP: u32 = 1_036_800;
 pub const TIMELOCK_LEDGERS: u32 = 51_840;
 /// `get_summary` reads at most this many clients per call.
 pub const MAX_SUMMARY_CLIENTS: u32 = 5;
+/// `get_summary` reads at most this many feedback records per call, across
+/// all clients (audit R-4, #205). Records past the cap are not counted.
+pub const MAX_SUMMARY_RECORDS: u64 = 50;
+/// Responses a feedback accepts from anyone other than the agent's owner,
+/// operator or payment wallet (audit R-5, #205). The agent's side is never
+/// capped, so spam cannot block its answer.
+pub const MAX_THIRD_PARTY_RESPONSES: u32 = 20;
+/// Ledgers after the timelock during which an upgrade proposal can still be
+/// executed (about 7 days). After that it has expired and must be proposed
+/// again (audit R-6, #205).
+pub const UPGRADE_EXECUTION_WINDOW: u32 = 120_960;
 /// `value` must be within ±1e38.
 pub const MAX_ABS_VALUE: i128 = 100_000_000_000_000_000_000_000_000_000_000_000_000;
+/// `value` normalized to 18 decimals (`value * 10^(18 - value_decimals)`) must
+/// be within ±1e28, i.e. at most 1e10 whole units. Stricter than Stellar 8004
+/// (#199): one record cannot overflow the WAD scale, and `get_summary` would
+/// need over 1.7e10 records in one call to overflow its i128 sum.
+pub const MAX_ABS_WAD: i128 = 10_000_000_000_000_000_000_000_000_000;
 const CONTRACT_VERSION: &str = "0.1.0";
 
 #[contracttype]
@@ -91,6 +107,12 @@ pub enum ReputationError {
     NoUpgradeProposed = 10,
     TimelockNotExpired = 11,
     UpgradeAlreadyProposed = 12,
+    // 100+: puls3 additions, outside the Stellar 8004 range.
+    /// `append_response`: the feedback has `MAX_THIRD_PARTY_RESPONSES`
+    /// responses from outside the agent's side.
+    TooManyResponses = 100,
+    /// `execute_upgrade`: the proposal is past its execution window.
+    UpgradeProposalExpired = 101,
 }
 
 /// Ownership errors, matching the OpenZeppelin Stellar `OwnableError` codes.
@@ -166,12 +188,36 @@ pub struct OwnershipRenounced {
     pub old_owner: Address,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeProposed {
+    pub wasm_hash: BytesN<32>,
+    pub proposed_at: u32,
+    /// First ledger at which `execute_upgrade` succeeds.
+    pub executable_at: u32,
+    /// Last ledger at which `execute_upgrade` succeeds.
+    pub expires_at: u32,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeCancelled {
+    pub wasm_hash: BytesN<32>,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeExecuted {
+    pub wasm_hash: BytesN<32>,
+}
+
 /// Cross-contract view of the puls3 Identity Registry (issue #13). Names and
 /// argument order match the deployed Identity Registry.
 #[contractclient(name = "IdentityRegistryClient")]
 pub trait IdentityRegistryInterface {
     fn agent_exists(e: &Env, agent_id: u32) -> bool;
     fn is_authorized_or_owner(e: &Env, spender: Address, agent_id: u32) -> bool;
+    fn get_agent_wallet(e: &Env, agent_id: u32) -> Option<Address>;
 }
 
 #[contract]
@@ -211,12 +257,23 @@ impl ReputationRegistryContract {
         if !(-MAX_ABS_VALUE..=MAX_ABS_VALUE).contains(&value) {
             return Err(ReputationError::ValueOutOfRange);
         }
+        // #199: a value that cannot be normalized, or is so large that a few
+        // of them overflow the summary's running sum, is not accepted.
+        match to_wad(value, value_decimals) {
+            Some(wad) if (-MAX_ABS_WAD..=MAX_ABS_WAD).contains(&wad) => {}
+            _ => return Err(ReputationError::ValueOutOfRange),
+        }
 
         let identity = IdentityRegistryClient::new(e, &get_identity_registry(e));
         if !identity.agent_exists(&agent_id) {
             return Err(ReputationError::AgentNotFound);
         }
-        if identity.is_authorized_or_owner(&caller, &agent_id) {
+        // The agent's side is its owner (or an approved operator) and its
+        // payment wallet, which `set_agent_wallet` can point at another address
+        // (audit finding R-3, #200). Neither may rate the agent.
+        if identity.is_authorized_or_owner(&caller, &agent_id)
+            || identity.get_agent_wallet(&agent_id).as_ref() == Some(&caller)
+        {
             return Err(ReputationError::SelfFeedback);
         }
 
@@ -283,8 +340,11 @@ impl ReputationRegistryContract {
         Ok(())
     }
 
-    /// Appends a response to `client_address`'s feedback. Callable by anyone.
-    /// Emits `ResponseAppended`.
+    /// Appends a response to `client_address`'s feedback. Callable by anyone,
+    /// but a feedback takes at most `MAX_THIRD_PARTY_RESPONSES` responses
+    /// from outside the agent's side (`TooManyResponses`). The agent's owner,
+    /// operator and payment wallet can always respond. Emits
+    /// `ResponseAppended`.
     pub fn append_response(
         e: &Env,
         caller: Address,
@@ -301,6 +361,14 @@ impl ReputationRegistryContract {
         }
         get_feedback(e, agent_id, &client_address, feedback_index)
             .ok_or(ReputationError::FeedbackNotFound)?;
+
+        // The identity registry is read only once the cap is reached.
+        if get_response_count(e, agent_id, &client_address, feedback_index)
+            >= MAX_THIRD_PARTY_RESPONSES
+            && !is_agent_side(e, &caller, agent_id)
+        {
+            return Err(ReputationError::TooManyResponses);
+        }
 
         increment_response_count(e, agent_id, &client_address, feedback_index)?;
 
@@ -330,6 +398,17 @@ impl ReputationRegistryContract {
 
     /// WAD-normalized average of the non-revoked feedback of the first
     /// `MAX_SUMMARY_CLIENTS` clients, filtered by `tag1`/`tag2` when not empty.
+    ///
+    /// It reads at most `MAX_SUMMARY_RECORDS` records in all, in client
+    /// order and oldest first; records past the cap are not counted. A
+    /// reader that needs every record pages with `get_last_index` and
+    /// `read_feedback`. It is a view: its reads do not extend any TTL.
+    ///
+    /// A record that cannot be normalized to 18 decimals, or whose addition
+    /// would overflow the running sum, is skipped and not counted, so one
+    /// stored record can never make the whole call fail (#199). Since
+    /// `give_feedback` bounds new values by `MAX_ABS_WAD`, only records stored
+    /// before that bound can be skipped.
     pub fn get_summary(
         e: &Env,
         agent_id: u32,
@@ -345,12 +424,17 @@ impl ReputationRegistryContract {
         let mut sum_wad: i128 = 0;
         let mut count: u64 = 0;
         let mut decimal_counts = [0u64; 19];
+        let mut read: u64 = 0;
 
-        for idx in 0..limit {
+        'clients: for idx in 0..limit {
             let client = client_addresses.get(idx).unwrap();
-            let last = get_last_index(e, agent_id, &client);
+            let last = peek_last_index(e, agent_id, &client);
             for i in 1..=last {
-                let Some(fb) = get_feedback(e, agent_id, &client, i) else {
+                if read >= MAX_SUMMARY_RECORDS {
+                    break 'clients;
+                }
+                read += 1;
+                let Some(fb) = peek_feedback(e, agent_id, &client, i) else {
                     continue;
                 };
                 if fb.is_revoked {
@@ -367,13 +451,15 @@ impl ReputationRegistryContract {
                 } else {
                     fb.value_decimals
                 };
-                let normalized = fb
-                    .value
-                    .checked_mul(pow10(18 - dec))
-                    .ok_or(ReputationError::AggregateOverflow)?;
-                sum_wad = sum_wad
-                    .checked_add(normalized)
-                    .ok_or(ReputationError::AggregateOverflow)?;
+                // #199: skip a record that does not fit instead of failing
+                // the summary for every client.
+                let Some(normalized) = to_wad(fb.value, dec) else {
+                    continue;
+                };
+                let Some(next_sum) = sum_wad.checked_add(normalized) else {
+                    continue;
+                };
+                sum_wad = next_sum;
                 decimal_counts[dec as usize] += 1;
                 count = count
                     .checked_add(1)
@@ -447,38 +533,64 @@ impl ReputationRegistryContract {
 
     // --- Timelocked upgrade ---
 
+    /// Owner only. Proposes `new_wasm_hash`, executable after
+    /// `TIMELOCK_LEDGERS` and for `UPGRADE_EXECUTION_WINDOW` ledgers after
+    /// that. An expired proposal can be replaced. Emits `UpgradeProposed`.
     pub fn propose_upgrade(e: &Env, new_wasm_hash: BytesN<32>) -> Result<(), ReputationError> {
         require_owner(e);
-        if get_pending_upgrade(e).is_some() {
-            return Err(ReputationError::UpgradeAlreadyProposed);
+        let now = e.ledger().sequence();
+        if let Some(pending) = get_pending_upgrade(e) {
+            if !upgrade_expired(&pending, now) {
+                return Err(ReputationError::UpgradeAlreadyProposed);
+            }
         }
         set_pending_upgrade(
             e,
             &UpgradeProposal {
-                wasm_hash: new_wasm_hash,
-                proposed_at: e.ledger().sequence(),
+                wasm_hash: new_wasm_hash.clone(),
+                proposed_at: now,
             },
         );
+        UpgradeProposed {
+            wasm_hash: new_wasm_hash,
+            proposed_at: now,
+            executable_at: now.saturating_add(TIMELOCK_LEDGERS),
+            expires_at: upgrade_expires_at(now),
+        }
+        .publish(e);
         Ok(())
     }
 
+    /// Owner only. Emits `UpgradeCancelled`.
     pub fn cancel_upgrade(e: &Env) -> Result<(), ReputationError> {
         require_owner(e);
-        if get_pending_upgrade(e).is_none() {
-            return Err(ReputationError::NoUpgradeProposed);
-        }
+        let proposal = get_pending_upgrade(e).ok_or(ReputationError::NoUpgradeProposed)?;
         remove_pending_upgrade(e);
+        UpgradeCancelled {
+            wasm_hash: proposal.wasm_hash,
+        }
+        .publish(e);
         Ok(())
     }
 
+    /// Owner only. Runs the proposal once its timelock has passed and before
+    /// it expires (`UpgradeProposalExpired`). Emits `UpgradeExecuted`.
     pub fn execute_upgrade(e: &Env) -> Result<(), ReputationError> {
         require_owner(e);
         let proposal = get_pending_upgrade(e).ok_or(ReputationError::NoUpgradeProposed)?;
-        let elapsed = e.ledger().sequence().saturating_sub(proposal.proposed_at);
+        let now = e.ledger().sequence();
+        let elapsed = now.saturating_sub(proposal.proposed_at);
         if elapsed < TIMELOCK_LEDGERS {
             return Err(ReputationError::TimelockNotExpired);
         }
+        if upgrade_expired(&proposal, now) {
+            return Err(ReputationError::UpgradeProposalExpired);
+        }
         remove_pending_upgrade(e);
+        UpgradeExecuted {
+            wasm_hash: proposal.wasm_hash.clone(),
+        }
+        .publish(e);
         e.deployer()
             .update_current_contract(ContractExecutable::Wasm(proposal.wasm_hash));
         Ok(())
@@ -607,6 +719,39 @@ fn get_feedback(e: &Env, agent_id: u32, client: &Address, index: u64) -> Option<
             .extend_ttl(&key, TTL_THRESHOLD, TTL_BUMP);
     }
     data
+}
+
+/// `get_feedback` without the TTL extension, for views (audit R-4).
+fn peek_feedback(e: &Env, agent_id: u32, client: &Address, index: u64) -> Option<FeedbackData> {
+    e.storage()
+        .persistent()
+        .get(&DataKey::Feedback(agent_id, client.clone(), index))
+}
+
+/// `get_last_index` without the TTL extension, for views (audit R-4).
+fn peek_last_index(e: &Env, agent_id: u32, client: &Address) -> u64 {
+    e.storage()
+        .persistent()
+        .get(&DataKey::LastIndex(agent_id, client.clone()))
+        .unwrap_or(0)
+}
+
+/// The agent's owner, an approved operator, or its payment wallet.
+fn is_agent_side(e: &Env, caller: &Address, agent_id: u32) -> bool {
+    let identity = IdentityRegistryClient::new(e, &get_identity_registry(e));
+    identity.is_authorized_or_owner(caller, &agent_id)
+        || identity.get_agent_wallet(&agent_id).as_ref() == Some(caller)
+}
+
+/// Last ledger at which a proposal made at `proposed_at` can be executed.
+fn upgrade_expires_at(proposed_at: u32) -> u32 {
+    proposed_at
+        .saturating_add(TIMELOCK_LEDGERS)
+        .saturating_add(UPGRADE_EXECUTION_WINDOW)
+}
+
+fn upgrade_expired(proposal: &UpgradeProposal, now: u32) -> bool {
+    now > upgrade_expires_at(proposal.proposed_at)
 }
 
 fn set_last_index(e: &Env, agent_id: u32, client: &Address, index: u64) {
@@ -751,6 +896,12 @@ const POW10: [i128; 19] = [
 
 fn pow10(exp: u32) -> i128 {
     POW10[exp as usize]
+}
+
+/// `value` scaled to 18 decimals (WAD), or `None` when it does not fit in an
+/// `i128`. `decimals` must be at most 18.
+fn to_wad(value: i128, decimals: u32) -> Option<i128> {
+    value.checked_mul(pow10(18 - decimals))
 }
 
 mod test;
