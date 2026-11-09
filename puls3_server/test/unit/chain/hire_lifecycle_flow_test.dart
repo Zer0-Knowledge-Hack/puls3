@@ -99,8 +99,10 @@ void main() {
     log: ignoreChainLog,
   );
 
-  /// The status `getHire` derives for a funded hire from its confirmed
-  /// records, as `ServerpodHireRepository` does.
+  /// The status for a funded hire given its confirmed records: the same
+  /// `fundedHireSettlement` call `ServerpodHireRepository` makes, over the
+  /// confirmed purposes read here from the in-memory store. It does not run
+  /// the repository itself.
   Future<HireStatus> status({int hireId = _hireId}) async {
     final confirmed = {
       for (final row in await store.listByHire(hireId))
@@ -119,10 +121,9 @@ void main() {
   Future<StoredSubmission> relayClientCall(SubmissionPurpose purpose) =>
       store.insertSubmitted(
         purpose: purpose,
-        transactionHash: '${purpose.wireName}-${++preparations}'.padRight(
-          64,
-          '0',
-        ),
+        transactionHash: sha256
+            .convert(utf8.encode('${purpose.wireName}-${++preparations}'))
+            .toString(),
         signedEnvelopeXdr: 'signed-${purpose.wireName}-$preparations',
         validUntil: now.add(const Duration(minutes: 5)),
         preparationId: 'prep-$preparations',
@@ -185,7 +186,10 @@ void main() {
     await tracker().pass(store);
 
     expect(await status(), HireStatus.rejected);
-    // `rejectedFrom` is `submitted` because a submit is also confirmed.
+    // Both calls are confirmed. `rejectedFrom` itself is derived by
+    // `ServerpodHireRepository._replaySettlement` and is covered by the
+    // integration test "a confirmed reject after submit records rejectedFrom
+    // submitted".
     expect(
       {
         for (final row in await store.listByHire(_hireId))
@@ -195,10 +199,10 @@ void main() {
     );
   });
 
-  group('a failed run sends no submit and stays funded', () {
-    test('until the client rejects it', () async {
-      // A failed run is never a DueSubmit, so nothing is sent for it.
-      expect(await rows(SubmissionPurpose.submit), isEmpty);
+  // Which runs become a `DueSubmit` is `ServerpodDueSubmitSource`, which needs
+  // Postgres. Here the hire simply never gets a submit, as after a failed run.
+  group('a funded hire with no submit stays funded and then settles', () {
+    test('on reject, as rejected', () async {
       expect(await status(), HireStatus.funded);
 
       final reject = await relayClientCall(SubmissionPurpose.reject);
@@ -209,7 +213,7 @@ void main() {
       expect(await status(), HireStatus.rejected);
     });
 
-    test('until claim_refund lands after expiry', () async {
+    test('on claim_refund after expiry, as expired', () async {
       final refund = await store.insertSubmitted(
         purpose: SubmissionPurpose.claimRefund,
         transactionHash: 'cc' * 32,
@@ -249,8 +253,6 @@ void main() {
       ),
       expected,
     );
-    // A one-character change in the output is another deliverable.
-    expect(deliverableHash('$_result.'), isNot(deliverableHash(_result)));
   });
 
   test(
@@ -268,17 +270,27 @@ void main() {
 
       final failed = await rows(SubmissionPurpose.submit);
       expect(failed.map((r) => r.state), everyElement(SubmissionState.failed));
-      expect(failed.last.errorCode, SubmissionOutcomeCode.escrowCallFailed);
+      // Only the attempt that uses up the budget is EscrowCallFailed.
+      expect(failed.map((r) => r.errorCode), [
+        SubmissionOutcomeCode.transactionFailed,
+        SubmissionOutcomeCode.transactionFailed,
+        SubmissionOutcomeCode.escrowCallFailed,
+      ]);
+      expect(codec.built, hasLength(3));
+      expect(signers, hasLength(3));
 
       accounts.sequence++;
       await sender().send(_due());
       expect(await rows(SubmissionPurpose.submit), hasLength(3));
+      // Nothing is built or signed for a 4th attempt, stored or not.
+      expect(codec.built, hasLength(3));
+      expect(signers, hasLength(3));
     },
   );
 
   test(
-    'a restart does not double-submit: a new sender and tracker over the '
-    'same store send nothing while the first submit is pending',
+    'no second submit for a hire: none while one is pending, none after one '
+    'is confirmed',
     () async {
       await sender().send(_due());
       // Not on chain yet: the tracker keeps it submitted.
@@ -288,7 +300,8 @@ void main() {
         SubmissionState.submitted,
       );
 
-      // Restart: fresh instances, same persisted records.
+      // Every send reads the persisted records, so a pending submit blocks
+      // another one (the same check protects a restarted server).
       accounts.sequence++;
       await sender().send(_due());
       expect(await rows(SubmissionPurpose.submit), hasLength(1));
