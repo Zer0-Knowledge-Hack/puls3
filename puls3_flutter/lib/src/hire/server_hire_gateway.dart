@@ -282,6 +282,7 @@ class ServerHireGateway implements HireGateway {
       feedbackTransaction: hire.feedbackReference,
       feedbackState: feedback?.state,
       feedbackErrorCode: feedback?.errorCode,
+      feedbackScore: detail.feedbackScore,
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,

@@ -29,6 +29,7 @@ abstract class EscrowPreparation
     required this.validUntil,
     this.jobExpiredAt,
     this.rejectReason,
+    this.feedbackScore,
     required this.createdAt,
     this.supersededAt,
     this.submittedAt,
@@ -46,6 +47,7 @@ abstract class EscrowPreparation
     required DateTime validUntil,
     int? jobExpiredAt,
     String? rejectReason,
+    int? feedbackScore,
     required DateTime createdAt,
     DateTime? supersededAt,
     DateTime? submittedAt,
@@ -66,6 +68,7 @@ abstract class EscrowPreparation
       ),
       jobExpiredAt: jsonSerialization['jobExpiredAt'] as int?,
       rejectReason: jsonSerialization['rejectReason'] as String?,
+      feedbackScore: jsonSerialization['feedbackScore'] as int?,
       createdAt: _is.DateTimeJsonExtension.fromJson(
         jsonSerialization['createdAt'],
       ),
@@ -119,6 +122,9 @@ abstract class EscrowPreparation
   /// Reject reason baked into a reject envelope.
   String? rejectReason;
 
+  /// Score of a giveFeedback preparation, kept so a reload can show it (#242).
+  int? feedbackScore;
+
   DateTime createdAt;
 
   /// Set when a newer preparation replaced this one.
@@ -145,6 +151,7 @@ abstract class EscrowPreparation
     DateTime? validUntil,
     int? jobExpiredAt,
     String? rejectReason,
+    int? feedbackScore,
     DateTime? createdAt,
     DateTime? supersededAt,
     DateTime? submittedAt,
@@ -164,6 +171,7 @@ abstract class EscrowPreparation
       'validUntil': validUntil.toJson(),
       if (jobExpiredAt != null) 'jobExpiredAt': jobExpiredAt,
       if (rejectReason != null) 'rejectReason': rejectReason,
+      if (feedbackScore != null) 'feedbackScore': feedbackScore,
       'createdAt': createdAt.toJson(),
       if (supersededAt != null) 'supersededAt': supersededAt?.toJson(),
       if (submittedAt != null) 'submittedAt': submittedAt?.toJson(),
@@ -218,6 +226,7 @@ class _EscrowPreparationImpl extends EscrowPreparation {
     required DateTime validUntil,
     int? jobExpiredAt,
     String? rejectReason,
+    int? feedbackScore,
     required DateTime createdAt,
     DateTime? supersededAt,
     DateTime? submittedAt,
@@ -233,6 +242,7 @@ class _EscrowPreparationImpl extends EscrowPreparation {
          validUntil: validUntil,
          jobExpiredAt: jobExpiredAt,
          rejectReason: rejectReason,
+         feedbackScore: feedbackScore,
          createdAt: createdAt,
          supersededAt: supersededAt,
          submittedAt: submittedAt,
@@ -254,6 +264,7 @@ class _EscrowPreparationImpl extends EscrowPreparation {
     DateTime? validUntil,
     Object? jobExpiredAt = _Undefined,
     Object? rejectReason = _Undefined,
+    Object? feedbackScore = _Undefined,
     DateTime? createdAt,
     Object? supersededAt = _Undefined,
     Object? submittedAt = _Undefined,
@@ -270,6 +281,7 @@ class _EscrowPreparationImpl extends EscrowPreparation {
       validUntil: validUntil ?? this.validUntil,
       jobExpiredAt: jobExpiredAt is int? ? jobExpiredAt : this.jobExpiredAt,
       rejectReason: rejectReason is String? ? rejectReason : this.rejectReason,
+      feedbackScore: feedbackScore is int? ? feedbackScore : this.feedbackScore,
       createdAt: createdAt ?? this.createdAt,
       supersededAt: supersededAt is DateTime?
           ? supersededAt
@@ -338,6 +350,11 @@ class EscrowPreparationUpdateTable
         value,
       );
 
+  _is.ColumnValue<int, int> feedbackScore(int? value) => _is.ColumnValue(
+    table.feedbackScore,
+    value,
+  );
+
   _is.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
       _is.ColumnValue(
         table.createdAt,
@@ -401,6 +418,10 @@ class EscrowPreparationTable extends _is.Table<int?> {
       'rejectReason',
       this,
     );
+    feedbackScore = _is.ColumnInt(
+      'feedbackScore',
+      this,
+    );
     createdAt = _is.ColumnDateTime(
       'createdAt',
       this,
@@ -447,6 +468,9 @@ class EscrowPreparationTable extends _is.Table<int?> {
   /// Reject reason baked into a reject envelope.
   late final _is.ColumnString rejectReason;
 
+  /// Score of a giveFeedback preparation, kept so a reload can show it (#242).
+  late final _is.ColumnInt feedbackScore;
+
   late final _is.ColumnDateTime createdAt;
 
   /// Set when a newer preparation replaced this one.
@@ -468,6 +492,7 @@ class EscrowPreparationTable extends _is.Table<int?> {
     validUntil,
     jobExpiredAt,
     rejectReason,
+    feedbackScore,
     createdAt,
     supersededAt,
     submittedAt,

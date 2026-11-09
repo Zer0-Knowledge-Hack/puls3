@@ -25,6 +25,8 @@ fields:
   jobExpiredAt: int?
   ### Reject reason baked into a reject envelope.
   rejectReason: String?
+  ### Score of a giveFeedback preparation, kept so a reload can show it (#242).
+  feedbackScore: int?
   createdAt: DateTime
   ### Set when a newer preparation replaced this one.
   supersededAt: DateTime?

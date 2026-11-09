@@ -127,8 +127,15 @@ final class EscrowRelayService {
   Future<PreparedTransaction> prepareFeedback(
     StellarAddress wallet,
     int hireId,
-    ContractCall call,
-  ) => _prepare(wallet, hireId, SubmissionPurpose.giveFeedback, call: call);
+    ContractCall call, {
+    int? feedbackScore,
+  }) => _prepare(
+    wallet,
+    hireId,
+    SubmissionPurpose.giveFeedback,
+    call: call,
+    feedbackScore: feedbackScore,
+  );
 
   Future<PreparedTransaction> _prepare(
     StellarAddress wallet,
@@ -136,6 +143,7 @@ final class EscrowRelayService {
     SubmissionPurpose purpose, {
     String? reason,
     ContractCall? call,
+    int? feedbackScore,
   }) async {
     final hire = await _ownedHire(wallet, hireId);
     if (reason != null && reason.trim().isEmpty) {
@@ -184,7 +192,7 @@ final class EscrowRelayService {
     final stored = await _preparations.inTransaction((transaction) async {
       await _preparations.supersedeCurrent(hire.id, transaction: transaction);
       return _preparations.insert(
-        newPreparation(draft, hire.id),
+        newPreparation(draft, hire.id, feedbackScore: feedbackScore),
         transaction: transaction,
       );
     });
@@ -221,19 +229,23 @@ final class EscrowRelayService {
   );
 
   /// The row to store for [draft] once its [hireId] is known.
-  NewPreparation newPreparation(PreparationDraft draft, int hireId) =>
-      NewPreparation(
-        preparationId: _newPreparationId(),
-        hireId: hireId,
-        purpose: draft.purpose,
-        signer: draft.signer.value,
-        unsignedEnvelopeXdr: draft.envelope.envelopeXdr,
-        transactionHash: draft.envelope.hashHex,
-        sequence: draft.sequence,
-        validUntil: draft.validUntil,
-        jobExpiredAt: draft.jobExpiredAt,
-        rejectReason: draft.rejectReason,
-      );
+  NewPreparation newPreparation(
+    PreparationDraft draft,
+    int hireId, {
+    int? feedbackScore,
+  }) => NewPreparation(
+    preparationId: _newPreparationId(),
+    hireId: hireId,
+    purpose: draft.purpose,
+    signer: draft.signer.value,
+    unsignedEnvelopeXdr: draft.envelope.envelopeXdr,
+    transactionHash: draft.envelope.hashHex,
+    sequence: draft.sequence,
+    validUntil: draft.validUntil,
+    jobExpiredAt: draft.jobExpiredAt,
+    rejectReason: draft.rejectReason,
+    feedbackScore: feedbackScore,
+  );
 
   /// The wire form of a stored preparation.
   PreparedTransaction preparedOf(StoredPreparation stored) =>
