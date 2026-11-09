@@ -18,6 +18,7 @@ import '../ui/molecules/error_banner.dart';
 import '../ui/organisms/hire_detail_view.dart';
 import '../ui/organisms/site_footer.dart';
 import '../wallet/wallet_port.dart';
+import 'rate_hire_sheet.dart';
 
 Future<void> _launch(Uri url) async {
   await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -27,11 +28,12 @@ Future<void> _copy(String text) => Clipboard.setData(ClipboardData(text: text));
 
 enum _Status { loading, ready, notFound, needsWallet, needsSignIn, error }
 
-/// `/hires/:id` (S06, flow F6): the container. It reads the hire with the
-/// connected wallet (`HireEndpoint.getHire`) and polls it every
-/// [pollInterval] until the hire is terminal. Approve and Reject sign
-/// `complete` / `reject` through [HireGateway]; the presentational view
-/// never calls the client.
+/// `/hires/:id` (S06, flows F6 and F7): the container. It reads the hire
+/// with the connected wallet (`HireEndpoint.getHire`) and polls it every
+/// [pollInterval] until the hire is terminal and its rating, if any, is
+/// confirmed. Approve and Reject sign `complete` / `reject` through
+/// [HireGateway]; Rate opens S10. The presentational view never calls the
+/// client.
 class HireDetailScreen extends StatefulWidget {
   const HireDetailScreen({
     super.key,
@@ -62,6 +64,9 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   bool _busy = false;
   bool _approving = false;
   bool _rejecting = false;
+
+  /// The score sent from S10 in this visit (the server does not return it).
+  int? _ratedScore;
   Timer? _poll;
   WalletController? _wallet;
   String? _address;
@@ -106,6 +111,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   void _restart() {
     setState(() {
       _hire = null;
+      _ratedScore = null;
       _error = null;
       _status = _Status.loading;
     });
@@ -137,7 +143,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
         _busy = false;
         _status = _Status.ready;
       });
-      if (!hire.stage.isFinal) {
+      if (!hire.stage.isFinal || hire.feedbackPending) {
         _poll = Timer(widget.pollInterval, () => unawaited(_load()));
       }
     } on HireGatewayException catch (e) {
@@ -210,6 +216,27 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
         hire.decisionExplorerUrl ??
         stellarExpertTxUrl(hire.decisionTransaction!);
     unawaited(widget.openUrl(Uri.parse(url)));
+  }
+
+  void _openFeedback(HireProgress hire) {
+    final url =
+        hire.feedbackExplorerUrl ??
+        stellarExpertTxUrl(hire.feedbackTransaction!);
+    unawaited(widget.openUrl(Uri.parse(url)));
+  }
+
+  Future<void> _rate(HireProgress hire) async {
+    final consumer = _address;
+    if (consumer == null) return;
+    final score = await showRateHireSheet(
+      context,
+      hire: hire,
+      consumer: consumer,
+    );
+    if (score == null || !mounted) return;
+    setState(() => _ratedScore = score);
+    // Polls until the tracker confirms the `give_feedback`.
+    await _load();
   }
 
   Future<void> _decide({required bool approve}) async {
@@ -357,6 +384,11 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
             !hire.approvalWindowOpen(widget.now()),
         approving: _approving,
         rejecting: _rejecting,
+        onRate: hire.canRate ? () => unawaited(_rate(hire)) : null,
+        onOpenFeedback: hire.feedbackTransaction == null
+            ? null
+            : () => _openFeedback(hire),
+        ratedScore: _ratedScore,
         isDemo: AppScope.of(context).hireGateway.isDemo,
         banner: error == null
             ? null

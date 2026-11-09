@@ -73,20 +73,39 @@ void main() {
     );
   });
 
-  test(
-    'a succeeded run shows its result while the hire waits for submit',
-    () async {
-      final hire = await rig.hire(status: HireStatus.funded);
-      queue(hire.id);
-      await runs.markRunning(hire.id, rig.clock);
-      await runs.markSucceeded(hire.id, 'Category: billing.', rig.clock);
+  test('a succeeded run hides its result until the agent submits it, so '
+      'the client cannot read it and reject for a refund (#204)', () async {
+    final hire = await rig.hire(status: HireStatus.funded);
+    queue(hire.id);
+    await runs.markRunning(hire.id, rig.clock);
+    await runs.markSucceeded(hire.id, 'Category: billing.', rig.clock);
 
-      final detail = await query().getHire(rig.wallet, hire.id);
+    final detail = await query().getHire(rig.wallet, hire.id);
 
-      expect(detail.hire.runtimeStatus, 'running');
-      expect(detail.result, 'Category: billing.');
-    },
-  );
+    expect(detail.hire.status, 'funded');
+    expect(detail.hire.runtimeStatus, 'running');
+    expect(detail.result, isNull);
+  });
+
+  group('the result is shown only once the agent submitted it (#204)', () {
+    const output = 'Category: billing.';
+    final shown = {HireStatus.submitted, HireStatus.completed};
+
+    for (final status in HireStatus.values) {
+      final visible = shown.contains(status);
+      test('${status.name}: ${visible ? 'shown' : 'hidden'}', () async {
+        final hire = await rig.hire(status: status);
+        queue(hire.id);
+        await runs.markRunning(hire.id, rig.clock);
+        await runs.markSucceeded(hire.id, output, rig.clock);
+
+        final detail = await query().getHire(rig.wallet, hire.id);
+
+        expect(detail.hire.status, status.name);
+        expect(detail.result, visible ? output : isNull);
+      });
+    }
+  });
 
   test('a failed run shows failed with its safe reason', () async {
     final hire = await rig.hire(status: HireStatus.funded);
