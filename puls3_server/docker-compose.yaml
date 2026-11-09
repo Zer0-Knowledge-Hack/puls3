@@ -39,6 +39,26 @@ services:
     environment:
       - REDIS_REPLICATION_MODE=master
 
+  # Ephemeral local Stellar network (#253): core, Horizon, RPC and Friendbot on
+  # 8000. `--local` is the current quickstart name for a standalone network;
+  # the passphrase is "Standalone Network ; February 2017". Run
+  # scripts/setup-local-soroban.sh after this is healthy.
+  soroban_standalone:
+    image: stellar/quickstart:testing
+    ports:
+      - "8000:8000"
+    command: ["--local", "--enable", "core,horizon,rpc"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' http://localhost:8000/rpc >/dev/null",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 20s
+
 volumes:
   puls3_data:
   puls3_test_data:
