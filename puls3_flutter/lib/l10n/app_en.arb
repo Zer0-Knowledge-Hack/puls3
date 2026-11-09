@@ -390,6 +390,7 @@
   "playgroundLiveLead": "Test runs are free and limited per day.",
   "playgroundProviderToken": "Provider token",
   "playgroundProviderTokenHint": "Stored for your test runs",
+  "playgroundCredentialMissing": "Save your provider credential, then run the draft again.",
   "playgroundAccountId": "Cloudflare account id",
   "playgroundRunning": "Running… It stops at the runtime timeout.",
   "playgroundFailed": "The test run failed",
@@ -489,5 +490,57 @@
   "hireDemoDecision": "Demo only: signing here does not move funds.",
   "hireApproving": "Approving…",
   "hireRejecting": "Rejecting…",
-  "hireDecisionFailed": "The decision could not be sent. Try again."
+  "hireDecisionFailed": "The decision could not be sent. Try again.",
+  "rateHire": "Rate this hire",
+  "rateTitle": "Rate {agent}",
+  "@rateTitle": {
+    "placeholders": {
+      "agent": {"type": "String"}
+    }
+  },
+  "rateClose": "Close",
+  "rateScore": "Score",
+  "rateStars": "{score} of 5 stars",
+  "@rateStars": {
+    "placeholders": {
+      "score": {"type": "int"}
+    }
+  },
+  "rateCommentHint": "Optional comment. Comments are not published yet.",
+  "rateCommentTooLong": "Keep the comment to {max} characters.",
+  "@rateCommentTooLong": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "rateSend": "Send rating",
+  "rateSending": "Sending…",
+  "rateDemo": "Demo only: signing here sends no rating.",
+  "rateNotSent": "Rating not sent: you cancelled the signature in your wallet.",
+  "rateWrongWallet": "Rate with the wallet that hired.",
+  "rateAlreadyRated": "You already rated this hire.",
+  "rateSection": "Your rating",
+  "rateConfirming": "Rating sent. Waiting for Stellar to confirm it.",
+  "rateSaved": "Rating saved",
+  "rateViewExplorer": "View rating on StellarExpert",
+  "rateFailed": "Your rating did not go through ({code}). Try again.",
+  "@rateFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "rateOutcomeUnknown": "We could not confirm whether your rating reached Stellar. Rating this hire is paused until puls3 resolves it.",
+  "rateInProgress": "A rating for this hire is still being confirmed. Check back in a moment.",
+  "rateNotCompleted": "Only a completed hire can be rated.",
+  "rateOwnerCannotRate": "The owner of this agent cannot rate it.",
+  "rateInvalid": "Pick a score from 1 to 5 and keep the comment to {max} characters.",
+  "@rateInvalid": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  }
 }

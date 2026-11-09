@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_client/puls3_client.dart' as api;
 import 'package:puls3_flutter/src/screens/playground.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
+import 'package:puls3_flutter/src/studio/server_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/ui/atoms/primary_button.dart';
+import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
 
 import '../helpers.dart';
 import '../studio/studio_fixtures.dart';
+
+/// The real server adapter with its network seams replaced, so the widget
+/// runs the same mapping a live server uses.
+ServerStudioGateway serverGateway({
+  SaveProviderCredentialCall? saveProviderCredential,
+  TestRunCall? testRun,
+}) => ServerStudioGateway(
+  saveDraft: (draft, draftId, revision, overwrite) async =>
+      throw UnimplementedError(),
+  getDraft: (_) async => throw UnimplementedError(),
+  listDrafts: () async => const [],
+  testRun:
+      testRun ??
+      ((draftId, input) async =>
+          api.TestRunResult(output: 'ok', remainingDailyRuns: 19)),
+  saveProviderCredential:
+      saveProviderCredential ?? ((provider, secret, accountId) async {}),
+  wallet: MockWallet(),
+);
 
 /// S11 states (F9) with the demo gateway: empty, over the limit, running,
 /// success, failure and Try again, and the daily quota.
@@ -28,6 +50,20 @@ void main() {
         home: Scaffold(
           body: SingleChildScrollView(
             child: Playground(draft: draft, gateway: studio, owner: testOwner),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> pumpLive(WidgetTester tester, StudioGateway gateway) async {
+    Puls3Fonts.useGoogleFonts = false;
+    draft = savedDraft(1);
+    await tester.pumpWidget(
+      localizedTestApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Playground(draft: draft, gateway: gateway, owner: testOwner),
           ),
         ),
       ),
@@ -184,6 +220,154 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('a live server run asks for a credential before it starts', (
+    tester,
+  ) async {
+    await pumpLive(tester, serverGateway());
+    await type(tester, 'hello');
+
+    expect(find.byKey(const Key('playground-credential')), findsOneWidget);
+    expect(
+      find.text('Save your provider credential, then run the draft again.'),
+      findsOneWidget,
+    );
+    expect(run(tester).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const Key('playground-credential-missing')),
+      findsNothing,
+    );
+    // Workers AI also needs the account id.
+    expect(run(tester).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+    expect(run(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('a live server run saves the credential and shows the answer', (
+    tester,
+  ) async {
+    String? provider;
+    String? secret;
+    String? accountId;
+    String? sentInput;
+    int? sentDraft;
+    final gateway = serverGateway(
+      saveProviderCredential: (nextProvider, nextSecret, nextAccount) async {
+        provider = nextProvider;
+        secret = nextSecret;
+        accountId = nextAccount;
+      },
+      testRun: (draftId, input) async {
+        sentDraft = draftId;
+        sentInput = input;
+        return api.TestRunResult(
+          output: 'five bullets',
+          remainingDailyRuns: 19,
+        );
+      },
+    );
+    await pumpLive(tester, gateway);
+    await type(tester, 'A long note.');
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('playground-run')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(provider, 'workers-ai');
+    expect(secret, 'builder-token');
+    expect(accountId, 'builder-account');
+    expect(sentDraft, 1);
+    expect(sentInput, 'A long note.');
+    expect(find.byKey(const Key('playground-result')), findsOneWidget);
+    expect(find.text('five bullets'), findsOneWidget);
+    expect(find.text('19 runs left today'), findsOneWidget);
+    expect(find.textContaining('Demo run'), findsNothing);
+  });
+
+  testWidgets('a missing server credential stays on screen', (tester) async {
+    await pumpLive(
+      tester,
+      serverGateway(
+        testRun: (draftId, input) async =>
+            throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+      ),
+    );
+    await type(tester, 'hello');
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('playground-run')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('playground-error')), findsOneWidget);
+    expect(
+      find.text('Save your provider credential, then run the draft again.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('playground-credential')), findsOneWidget);
+    expect(find.byKey(const Key('playground-input')), findsOneWidget);
+  });
+
+  testWidgets('the server quota stays on screen and disables Run', (
+    tester,
+  ) async {
+    await pumpLive(
+      tester,
+      serverGateway(
+        testRun: (draftId, input) async => throw api.Puls3ApiException(
+          code: 'TestQuotaExceeded',
+          details: {'resetsAt': '2026-11-06T00:00:00.000Z'},
+        ),
+      ),
+    );
+    await type(tester, 'hello');
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('playground-run')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('playground-quota')), findsOneWidget);
+
+    expect(find.textContaining('You used today\'s test runs'), findsOneWidget);
+    expect(run(tester).onPressed, isNull);
   });
 }
 

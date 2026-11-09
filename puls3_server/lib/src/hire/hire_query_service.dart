@@ -65,7 +65,7 @@ final class HireQueryService {
       ),
       agent: agent,
       input: hire.input ?? '',
-      result: run?.result,
+      result: showsResult(hire.status) ? run?.result : null,
       jobId: jobId,
       expiresAt: jobId == null
           ? null
@@ -78,6 +78,17 @@ final class HireQueryService {
       feedbackSubmission: feedback?.toProtocol(),
     );
   }
+
+  /// Whether a hire in [status] shows the agent's output (#204, audit E-1).
+  ///
+  /// The output is the deliverable, so the client reads it once the agent
+  /// has submitted it on chain, to evaluate it (`submitted`), and keeps it
+  /// after approving (`completed`). While the hire is `funded` the escrow
+  /// still lets the client reject with a full refund, so an output shown
+  /// before `submit` lands would be a free service. A `rejected` or
+  /// `expired` hire was refunded and shows none.
+  static bool showsResult(HireStatus? status) =>
+      status == HireStatus.submitted || status == HireStatus.completed;
 
   /// The job's approval window, once the agent has submitted. A chain read
   /// that fails leaves the deadline unset so the hire stays readable.

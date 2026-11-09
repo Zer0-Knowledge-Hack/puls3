@@ -178,3 +178,11 @@ final class StudioRunFailed extends StudioGatewayException {
 final class StudioUnavailable extends StudioGatewayException {
   const StudioUnavailable(super.message);
 }
+
+/// The builder has no usable provider credential for the draft's model
+/// (`RuntimeUnavailable` from the credential check). Saving a credential in
+/// the playground and retrying is safe.
+final class StudioCredentialMissing extends StudioGatewayException {
+  const StudioCredentialMissing()
+    : super('Save a valid provider credential, then run the draft again.');
+}

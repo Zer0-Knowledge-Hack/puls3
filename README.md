@@ -226,6 +226,8 @@ flutter run -d chrome
 
 The app reads the server URL from [`puls3_flutter/assets/config.json`](puls3_flutter/assets/config.json) (`http://localhost:8080`); override it with `--dart-define=PULS3_API_URL=<url>`. Stop the server with `Ctrl+C`, then `docker compose stop`.
 
+For contract work and E2E tests, [docs/testing/local-environment.md](docs/testing/local-environment.md) starts a local Soroban node, deploys the three contracts and writes the matching server env file.
+
 `scripts/setup-local-secrets.sh` writes `puls3_server/.env` (Postgres/Redis passwords) and `puls3_server/config/passwords.yaml` with random values; `.env.example` copied to the root `.env` is public configuration. **No real secret is required** to run locally.
 
 ### Quality gates

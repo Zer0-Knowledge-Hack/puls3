@@ -19,7 +19,7 @@ Future<void> main() async {
     final agents = await sdk.listAgents();
     stdout.writeln('${agents.length} agents');
     for (final agent in agents) {
-      final usdc = (agent.priceUsdcStroops / 10000000).toStringAsFixed(2);
+      final usdc = formatUsdc(agent.priceUsdcStroops);
       stdout.writeln(
         '${agent.id.padRight(10)} #${agent.registryId.toString().padRight(4)} '
         '$usdc USDC  ${agent.rating.toStringAsFixed(1)}★  ${agent.name}',
