@@ -57,13 +57,16 @@ Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API
 
 1. **How a program without the app gets a wallet session.** `HireEndpoint`, `StudioEndpoint` and `FeedbackEndpoint` require login. The only way to log in is the SEP-10 challenge, which the wallet signs (`WalletAuthEndpoint.createChallenge` / `verifyChallenge`). So every row marked "Session" above needs a session, and D1 says the SDK does not sign.
 
+   **Token rotation rules out the simplest option.** The server uses the `serverpod_auth_core_server` 4.0.4 defaults (`JwtConfigFromPasswords()`, nothing overridden): an access token lives **10 minutes**, a refresh token **14 days**, and **every refresh rotates the refresh token**. The old one then fails with `RefreshTokenInvalidSecretException` (`jwt_config.dart`, `jwt.dart`). Found on #222 (Pericena).
+
    | Option | What it means | Trade-off |
    |---|---|---|
-   | **A. Session tokens from the environment** (recommended) | The SDK takes an access token and a refresh token (for example `PULS3_ACCESS_TOKEN`, `PULS3_REFRESH_TOKEN`) and refreshes through the standard Serverpod JWT path. The app gets a "copy session for CLI" action. | Keeps "no wallet key outside the wallet". Needs a small app change, and a token on disk is a bearer secret with an expiry. |
-   | B. Sign only the login challenge | The CLI and the MCP server read a wallet key file (never an argument) and sign the SEP-10 challenge, and nothing else. | Simple, but it puts a wallet key on the developer's machine, and the rule becomes "signs only the login challenge". |
-   | C. Catalog only | Ship `listAgents` / `getAgent` with no session; the session rows wait for a later issue. | No new secret at all, but the CLI and MCP milestones lose most of their commands. |
+   | A. Tokens from the environment | The SDK takes an access token and a refresh token (`PULS3_ACCESS_TOKEN`, `PULS3_REFRESH_TOKEN`) copied from the app. | **Does not work as written.** The first refresh, at most 10 minutes later, rotates the refresh token, so the environment value is dead from then on. If the app's own token is copied, whichever side refreshes first signs the other out. |
+   | **A′. A separate CLI session, persisted** (recommended) | The signed-in app asks the server for a **second session** for the same wallet. The developer passes its refresh token once (`PULS3_REFRESH_TOKEN`); the SDK's session provider stores the rotated tokens in a user-only file (for example `~/.config/puls3/session.json`, mode 0600) and refreshes from there. | Keeps "no wallet key outside the wallet" and survives rotation without touching the app's session. Costs one `requireLogin` server endpoint that issues a session for the caller's own `authUserId`, the app's "copy session for CLI" action, and the session file. A stolen CLI token reaches only that wallet's hires and drafts, cannot move funds (every `prepare*` is unsigned), and can be revoked on its own. |
+   | B. Sign only the login challenge | The CLI and the MCP server read a wallet key file (never an argument) and sign the SEP-10 challenge, and nothing else. | No rotation problem, but it puts a wallet key on the developer's machine, and the rule becomes "signs only the login challenge". |
+   | C. Catalog only | Ship `listAgents` / `getAgent` with no session; the session rows wait. | No new secret at all, but the CLI and MCP milestones lose most of their commands. The fallback if A′ cannot take a server change in time. |
 
-   Asked on #222. Until it is decided, the package ships the catalog only.
+   Asked on #222; the operations and the session provider are #259. Until it is decided, the package ships the catalog only.
 
 ## Consequences
 
