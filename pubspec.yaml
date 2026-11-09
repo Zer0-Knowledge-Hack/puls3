@@ -11,3 +11,53 @@ workspace:
   - puls3_flutter
   - spikes/flutter-stellar-wallet
 
+dev_dependencies:
+  melos: ^8.10.1
+
+# Melos 8 reads its configuration from this file, not from a separate
+# melos.yaml. Install it with `dart pub global activate melos` (#254).
+melos:
+  repository: https://github.com/Zer0-Knowledge-Hack/puls3
+  scripts:
+    analyze:
+      description: Analyze every package with its own SDK (Dart or Flutter).
+      exec:
+        command: |
+          case "$MELOS_PACKAGE_NAME" in
+            puls3_flutter) flutter analyze --fatal-infos ;;
+            *) dart analyze --fatal-infos ;;
+          esac
+        concurrency: 4
+    "test:unit":
+      description: Unit and widget tests that need no external services.
+      exec:
+        command: |
+          case "$MELOS_PACKAGE_NAME" in
+            puls3_domain) dart test ;;
+            puls3_server) dart test test/unit test/agent test/feedback test/hire test/ledger test/protocol test/spike test/studio ;;
+            puls3_flutter) flutter test ;;
+            *) ;;
+          esac
+        concurrency: 4
+        failFast: true
+    "test:integration":
+      description: Serverpod integration tests (Postgres :9090 and Redis :9091).
+      exec:
+        command: |
+          if [ "$MELOS_PACKAGE_NAME" = puls3_server ]; then
+            exec dart test test/integration
+          fi
+        concurrency: 1
+    "test:e2e":
+      description: E2E suites against the local Soroban sandbox (#253/#255).
+      exec:
+        command: |
+          if [ "$MELOS_PACKAGE_NAME" = puls3_server ]; then
+            if [ -d test/e2e ]; then
+              exec dart test test/e2e
+            else
+              echo "No puls3_server/test/e2e yet (see #255)."
+            fi
+          fi
+        concurrency: 1
+
