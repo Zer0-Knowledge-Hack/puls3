@@ -312,6 +312,12 @@ class ServerHireGateway implements HireGateway {
       throw _map(e, fund: fund, feedback: feedback);
     } on TimeoutException {
       throw const HireBackendUnavailable('The puls3 server did not answer.');
+    } on ServerpodClientUnauthorized {
+      // The client already tried its one refresh. A 401 here means the
+      // stored session is expired or revoked: forget it and ask for a new
+      // challenge instead of reporting an unreachable server (#261).
+      await _session?.forget();
+      throw const HireNotSignedIn();
     } on ServerpodClientException {
       throw const HireBackendUnavailable('The puls3 server did not answer.');
     }

@@ -18,6 +18,7 @@ jobs:
       app: ${{ steps.paths.outputs.app }}
       contracts: ${{ steps.paths.outputs.contracts }}
       docker: ${{ steps.paths.outputs.docker }}
+      sdk: ${{ steps.paths.outputs.sdk }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -29,11 +30,11 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          domain=false server=false app=false contracts=false docker=false
+          domain=false server=false app=false contracts=false docker=false sdk=false
           while IFS= read -r path; do
             case "$path" in
               pubspec.yaml|pubspec.lock)
-                domain=true; server=true; app=true; docker=true ;;
+                domain=true; server=true; app=true; docker=true; sdk=true ;;
               puls3_domain/*)
                 domain=true; server=true; docker=true ;;
               docs/architecture/examples/*)
@@ -43,13 +44,15 @@ jobs:
               .dockerignore)
                 docker=true ;;
               puls3_client/*)
-                server=true; app=true ;;
+                server=true; app=true; sdk=true ;;
+              puls3_sdk/*|puls3_mcp/*)
+                sdk=true ;;
               puls3_flutter/*)
                 app=true ;;
               contracts/*)
                 contracts=true ;;
               .github/workflows/ci.yml)
-                domain=true; server=true; app=true; contracts=true; docker=true ;;
+                domain=true; server=true; app=true; contracts=true; docker=true; sdk=true ;;
             esac
           done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "domain=$domain" >> "$GITHUB_OUTPUT"
@@ -57,6 +60,7 @@ jobs:
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "contracts=$contracts" >> "$GITHUB_OUTPUT"
           echo "docker=$docker" >> "$GITHUB_OUTPUT"
+          echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
 
   domain:
     needs: changes
@@ -73,6 +77,25 @@ jobs:
           restore-keys: ${{ runner.os }}-pub-
       - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_domain
+        run: dart analyze --fatal-infos && dart test
+
+  sdk:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: {flutter-version: '3.44.4', cache: true}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+      - run: flutter pub get --enforce-lockfile
+      - working-directory: puls3_sdk
+        run: dart analyze --fatal-infos && dart test
+      - working-directory: puls3_mcp
         run: dart analyze --fatal-infos && dart test
 
   server:
@@ -206,20 +229,21 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, domain, server, app, docker, scripts, contracts]
+    needs: [changes, domain, sdk, server, app, docker, scripts, contracts]
     runs-on: ubuntu-latest
     steps:
       - name: Require every applicable component
         env:
           CHANGES: ${{ needs.changes.result }}
           DOMAIN: ${{ needs.domain.result }}
+          SDK: ${{ needs.sdk.result }}
           SERVER: ${{ needs.server.result }}
           APP: ${{ needs.app.result }}
           DOCKER: ${{ needs.docker.result }}
           SCRIPTS: ${{ needs.scripts.result }}
           CONTRACTS: ${{ needs.contracts.result }}
         run: |
-          for result in "$CHANGES" "$DOMAIN" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS"; do
+          for result in "$CHANGES" "$DOMAIN" "$SDK" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS"; do
             if [[ "$result" != success && "$result" != skipped ]]; then
               echo "A required CI job finished with: $result" >&2
               exit 1

@@ -64,6 +64,10 @@ Any other event in any state throws `InvalidHireTransition(from, event)`. That i
 | `rejectedFrom` | `open`, `funded`, `submitted` | `reject()` | Set once, when the hire is rejected |
 | `feedbackReference` | the `give_feedback` transaction hash | `recordFeedback(feedback, reference:)` | Only on a `completed` hire (`HireNotCompleted`), at most once (`HireAlreadyRated`), and only for feedback for this hire and agent, left by its consumer (`FeedbackDoesNotMatchHire`). The status does not change |
 
+### What a funded hire runs
+
+The run executes the agent's manifest at the version the hire pinned when it was created (`Hire.manifestVersion`, read from the agent's `puls3.manifestVersion` metadata). For an agent deployed from Agent Studio, that is the `AgentVersion` the builder published, and the model call uses the builder's own provider credential for that model's provider. The team Workers AI token and the seeded demo manifests are never used for a Studio agent: a missing or incomplete builder credential fails the run as `unsupported_provider`, after the usual retries, so a builder who saves the credential in time still gets the run. A later published version does not change a hire that already pinned an earlier one. Seeded demo agents run their seeded manifest on the team provider. `puls3_server/test/unit/runtime/studio_hire_run_test.dart` locks these rules (#220).
+
 ## Rules this guarantees
 
 - **A new hire always starts in `open`.** The public constructor cannot create a hire in any other state.
