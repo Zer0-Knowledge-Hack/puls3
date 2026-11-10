@@ -7,6 +7,7 @@ environment:
 workspace:
   - puls3_domain
   - puls3_client
+  - puls3_sdk
   - puls3_server
   - puls3_flutter
   - spikes/flutter-stellar-wallet
