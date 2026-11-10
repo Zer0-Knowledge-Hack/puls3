@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart' show ReputationRegistry;
 
 import '../ledger/contract_reader.dart';
+import '../ledger/escrow_job.dart';
 import '../ledger/soroban_reputation_registry.dart';
 import '../ledger/stellar_config.dart';
 import 'reputation_calls.dart';
@@ -29,5 +30,6 @@ ReputationRegistry reputationRegistryFor(
           reader,
           registry: registry,
           escrow: config.escrow,
+          jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
         );
 }

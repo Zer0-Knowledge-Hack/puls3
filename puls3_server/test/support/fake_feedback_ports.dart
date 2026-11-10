@@ -33,6 +33,9 @@ final class FakeReputationCalls implements ReputationCalls {
         ({StellarAddress client, AgentId agent, Feedback feedback, int jobId})
       >[];
 
+  /// When set, [giveFeedback] throws it instead of building the call.
+  Object? failure;
+
   @override
   ContractCall giveFeedback({
     required StellarAddress client,
@@ -40,6 +43,8 @@ final class FakeReputationCalls implements ReputationCalls {
     required Feedback feedback,
     required int jobId,
   }) {
+    final failure = this.failure;
+    if (failure != null) throw failure;
     built.add((client: client, agent: agent, feedback: feedback, jobId: jobId));
     return ContractCall(
       contract: fakeReputationRegistry,

@@ -43,7 +43,10 @@ final class ContractReader {
       ),
     );
     if (result.containsKey('restorePreamble')) {
-      throw LedgerUnavailable('$function needs its archived state restored');
+      throw LedgerUnavailable(
+        '$function needs its archived state restored',
+        archived: true,
+      );
     }
     final error = result['error'];
     if (error is String && error.isNotEmpty) {

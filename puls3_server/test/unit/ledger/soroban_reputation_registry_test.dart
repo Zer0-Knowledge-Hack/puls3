@@ -225,6 +225,72 @@ void main() {
           throwsA(isA<LedgerUnavailable>()),
         );
       });
+
+      test('an archived job excludes only its own record', () async {
+        // A job past its TTL answers a restorePreamble. That one record is
+        // jobUnreadable; the agent's other ratings still count, so nobody
+        // can blank a reputation by pointing a record at an archived job.
+        final chain = FakeReputationChain();
+        chain.addPaid(7, _alice, _stored(5));
+        final archived = chain.addPaid(7, _alice, _stored(1));
+        chain.addPaid(7, _bob, _stored(4));
+        chain.archivedJobs.add(archived);
+
+        final read = await chain.adapter.readRecords(AgentId(7));
+
+        expect(exclusionsOf(read.records, read.provenance), [
+          null,
+          FeedbackExclusion.jobUnreadable,
+          null,
+        ]);
+        expect(
+          (await chain.adapter.feedbacksOf(AgentId(7))).map((f) => f.score),
+          [5, 4],
+        );
+      });
+
+      test('a job in a final state is read once per adapter', () async {
+        final chain = FakeReputationChain();
+        chain.addPaid(7, _alice, _stored(5));
+        chain.addPaid(7, _bob, _stored(4), jobState: JobState.funded);
+        final adapter = chain.adapter;
+
+        await adapter.feedbacksOf(AgentId(7));
+        expect(chain.jobReads, 2);
+
+        // The completed job is not read again; the funded one can still
+        // change, so it is.
+        final counted = await adapter.feedbacksOf(AgentId(7));
+        expect(chain.jobReads, 3);
+        expect(counted.map((f) => f.score), [5]);
+      });
+
+      test('a completed job keeps counting after it archives', () async {
+        final chain = FakeReputationChain();
+        final job = chain.addPaid(7, _alice, _stored(5));
+        final adapter = chain.adapter;
+        await adapter.feedbacksOf(AgentId(7));
+
+        chain.archivedJobs.add(job);
+
+        expect(
+          (await adapter.feedbacksOf(AgentId(7))).map((f) => f.score),
+          [5],
+        );
+      });
+
+      test('reads more jobs than one batch, each once', () async {
+        final chain = FakeReputationChain();
+        const count = jobReadConcurrency * 2 + 3;
+        for (var i = 0; i < count; i++) {
+          chain.addPaid(7, i.isEven ? _alice : _bob, _stored(1 + i % 5));
+        }
+
+        final counted = await chain.adapter.feedbacksOf(AgentId(7));
+
+        expect(counted, hasLength(count));
+        expect(chain.jobReads, count);
+      });
     });
 
     group('no filtering beyond the public rules (#202, #201)', () {

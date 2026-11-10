@@ -2,6 +2,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 
 import 'contract_reader.dart';
 import 'escrow_job.dart';
+import 'ledger_errors.dart';
 import 'sc_val_json.dart';
 import 'xdr_invoke_encoder.dart';
 
@@ -13,8 +14,8 @@ const reputationPageSize = 50;
 /// already revoked, for `revoke_feedback`; for a read, it cannot be loaded).
 const _feedbackNotFound = 2;
 
-/// Escrow `JobNotFound`: no job has this id.
-const _escrowJobNotFound = 1;
+/// How many `get_job` reads run at once.
+const jobReadConcurrency = 8;
 
 /// The [ReputationRegistry] over the Reputation Registry of #14
 /// (`contracts/contracts/reputation-registry`), read through simulated
@@ -43,12 +44,20 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     this._reader, {
     required StellarAddress registry,
     required StellarAddress escrow,
+    required EscrowJobReader jobs,
   }) : _registry = registry,
-       _escrow = escrow;
+       _escrow = escrow,
+       _jobs = jobs;
 
   final ContractReader _reader;
   final StellarAddress _registry;
   final StellarAddress _escrow;
+  final EscrowJobReader _jobs;
+
+  /// Jobs read in a final state (`Completed`, `Rejected`, `Expired`). The
+  /// escrow never changes them again, so they are not read twice, and a job
+  /// that later archives keeps counting while this process runs.
+  final _final = <int, ReferencedJob>{};
 
   /// The escrow contract whose completed jobs make a rating count. It comes
   /// from the configuration, never from a record.
@@ -90,36 +99,62 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   }
 
   /// The jobs [records] reference on [escrow], each read once with
-  /// `get_job`. A job the escrow does not have is left out, so the domain
-  /// reports it as `jobUnreadable`; any other failure is a
-  /// [LedgerException].
+  /// `get_job`, [jobReadConcurrency] at a time. A job in a final state is
+  /// read only once per process.
+  ///
+  /// A job the escrow does not have, or whose entry is archived, is left out,
+  /// so the domain reports that one record as `jobUnreadable` and every other
+  /// record still counts. Any other failure (the node, the network) is a
+  /// [LedgerException] for the whole read, as for the registry reads.
   Future<FeedbackProvenance> provenanceOf(
     Iterable<FeedbackRecord> records,
   ) async {
     final jobs = <int, ReferencedJob>{};
+    final toRead = <int>[];
     for (final id in referencedJobIds(records, _escrow)) {
-      final value = await _reader.read(
-        _escrow,
-        'get_job',
-        [ScArg.u64(id)],
-        absentErrors: const {_escrowJobNotFound},
-      );
-      final job = value == null ? null : readOptional(value, decodeEscrowJob);
-      if (job == null) continue;
-      jobs[id] = ReferencedJob(
-        client: job.client,
-        agentId: job.agentId,
-        state: switch (job.state) {
-          EscrowJobState.open => JobState.open,
-          EscrowJobState.funded => JobState.funded,
-          EscrowJobState.submitted => JobState.submitted,
-          EscrowJobState.completed => JobState.completed,
-          EscrowJobState.rejected => JobState.rejected,
-          EscrowJobState.expired => JobState.expired,
-        },
-      );
+      final known = _final[id];
+      if (known != null) {
+        jobs[id] = known;
+      } else {
+        toRead.add(id);
+      }
+    }
+    for (var start = 0; start < toRead.length; start += jobReadConcurrency) {
+      final end = start + jobReadConcurrency < toRead.length
+          ? start + jobReadConcurrency
+          : toRead.length;
+      final batch = toRead.sublist(start, end);
+      final read = await Future.wait([for (final id in batch) _job(id)]);
+      for (var i = 0; i < batch.length; i++) {
+        final job = read[i];
+        if (job == null) continue;
+        jobs[batch[i]] = job;
+        if (job.state == JobState.completed ||
+            job.state == JobState.rejected ||
+            job.state == JobState.expired) {
+          _final[batch[i]] = job;
+        }
+      }
     }
     return FeedbackProvenance(escrow: _escrow, jobs: jobs);
+  }
+
+  /// Job [id], or null when the escrow has no such job or its entry is
+  /// archived.
+  Future<ReferencedJob?> _job(int id) async {
+    final EscrowJob? job;
+    try {
+      job = await _jobs.escrowJob(id);
+    } on LedgerUnavailable catch (e) {
+      if (e.archived) return null;
+      rethrow;
+    }
+    if (job == null) return null;
+    return ReferencedJob(
+      client: job.client,
+      agentId: job.agentId,
+      state: job.state.domain,
+    );
   }
 
   Future<({List<FeedbackRecord> records, int clientPages})> _recordsOf(

@@ -24,6 +24,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/ledger/contract_reader.dart';
+import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
@@ -49,17 +50,19 @@ Future<void> main(List<String> args) async {
 
   final client = http.Client();
   try {
-    final registry = SorobanReputationRegistry(
-      ContractReader(
-        SorobanRpcClient(
-          httpClient: client,
-          url: config.rpcUrl,
-          timeout: const Duration(seconds: 20),
-        ),
-        source: config.simulationSource,
+    final reader = ContractReader(
+      SorobanRpcClient(
+        httpClient: client,
+        url: config.rpcUrl,
+        timeout: const Duration(seconds: 20),
       ),
+      source: config.simulationSource,
+    );
+    final registry = SorobanReputationRegistry(
+      reader,
       registry: registryAddress,
       escrow: config.escrow,
+      jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
     );
 
     final (:records, :provenance, :clientPages) = await registry.readRecords(

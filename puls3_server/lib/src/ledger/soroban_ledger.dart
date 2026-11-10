@@ -39,7 +39,6 @@ const _registryUriNotSet = 2;
 const _registryAgentNotFound = 3;
 
 /// Escrow `JobNotFound`: there is no job with that id.
-const _escrowJobNotFound = 1;
 
 /// Reads the Stellar chain through Soroban RPC. It never signs or submits,
 /// although the [SorobanRpcClient] it uses can submit.
@@ -60,6 +59,7 @@ final class SorobanLedger
   final SorobanRpcClient _rpc;
   final StellarConfig _config;
   final ContractReader _reader;
+  late final _jobs = ContractEscrowJobReader(_reader, escrow: _config.escrow);
 
   Future<Object?> _read(
     StellarAddress contract,
@@ -127,15 +127,7 @@ final class SorobanLedger
 
   /// Escrow `get_job`, or `null` when the job does not exist.
   @override
-  Future<EscrowJob?> escrowJob(int jobId) async {
-    final value = await _read(
-      _config.escrow,
-      'get_job',
-      [ScArg.u64(jobId)],
-      absentErrors: const {_escrowJobNotFound},
-    );
-    return value == null ? null : readOptional(value, decodeEscrowJob);
-  }
+  Future<EscrowJob?> escrowJob(int jobId) => _jobs.escrowJob(jobId);
 
   /// Escrow `is_expired`. This adapter only simulates the view; it does not
   /// submit `release` or `claim_refund`.

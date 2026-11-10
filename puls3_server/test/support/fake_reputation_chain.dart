@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/ledger/contract_reader.dart';
+import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
@@ -55,6 +56,10 @@ final class FakeReputationChain {
   /// The escrow's jobs by id. A referenced id that is not here answers
   /// `JobNotFound`.
   final jobs = <int, StoredJob>{};
+
+  /// Job ids whose entry is archived: their `get_job` answers a
+  /// `restorePreamble`, as a job past its TTL does.
+  final archivedJobs = <int>{};
 
   var _nextJob = 1000;
   final _source = StellarConfig.testnet.simulationSource;
@@ -117,18 +122,22 @@ final class FakeReputationChain {
   String reference(int id) => PaidJobReference(escrow: escrow, jobId: id).text;
 
   /// The adapter over this chain.
-  SorobanReputationRegistry get adapter => SorobanReputationRegistry(
-    ContractReader(
+  SorobanReputationRegistry get adapter {
+    final reader = ContractReader(
       SorobanRpcClient(
         httpClient: _client,
         url: StellarConfig.testnet.rpcUrl,
         timeout: const Duration(seconds: 1),
       ),
       source: _source,
-    ),
-    registry: registry,
-    escrow: escrow,
-  );
+    );
+    return SorobanReputationRegistry(
+      reader,
+      registry: registry,
+      escrow: escrow,
+      jobs: ContractEscrowJobReader(reader, escrow: escrow),
+    );
+  }
 
   late final http.Client _client = MockClient((request) async {
     final body = jsonDecode(request.body) as Map<String, Object?>;
@@ -232,6 +241,10 @@ final class FakeReputationChain {
             ScArg.u64(reference.jobId),
           ], contract: escrow);
           _jobEnvelopes.add(envelope);
+          if (archivedJobs.contains(reference.jobId)) {
+            answers[envelope] = {'restorePreamble': <String, Object?>{}};
+            continue;
+          }
           answers[envelope] = job == null
               ? {'error': 'HostError: Error(Contract, #1)\n'}
               : value(_jobData(job));

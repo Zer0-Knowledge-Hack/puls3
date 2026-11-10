@@ -88,17 +88,19 @@ final class FeedbackService {
     final hire = await _ownedHire(wallet, hireId);
     final feedback = _feedbackOf(hire, wallet, score, comment);
     await _requireRateable(hire, wallet, await _isRated(hire.id));
-    // A completed hire has its escrow job: the call names it (#201). A hire
-    // without one has not started, so it is not completed.
-    final jobId =
-        hire.jobId ??
-        (throw _api('HireNotCompleted', {'status': HireStatus.open.name}));
-    final call = _calls.giveFeedback(
-      client: wallet,
-      agent: AgentId(hire.agentId),
-      feedback: feedback,
-      jobId: jobId,
-    );
+    final ContractCall call;
+    try {
+      // `_requireRateable` checked that the hire has its escrow job.
+      call = _calls.giveFeedback(
+        client: wallet,
+        agent: AgentId(hire.agentId),
+        feedback: feedback,
+        jobId: hire.jobId!,
+      );
+    } on ArgumentError {
+      // A job id outside what a `PaidJobReference` can name (#201).
+      throw _api('ChainDataUnavailable', {'reason': 'jobId'});
+    }
     return _relay.prepareFeedback(wallet, hire.id, call);
   }
 
@@ -152,6 +154,12 @@ final class FeedbackService {
   ) async {
     // A hire without a job has not started: it is not completed.
     final status = hire.status ?? HireStatus.open;
+    // The rating names the hire's escrow job (#201), so a hire without one
+    // cannot be rated, whatever its status. Checked before the owner read,
+    // and the same for eligibility and prepare.
+    if (hire.jobId == null) {
+      throw _api('HireNotCompleted', {'status': status.name});
+    }
     try {
       checkHireRateable(status: status, rated: rated, matchesHire: true);
       final owner = await _ownerOf(hire.agentId);
