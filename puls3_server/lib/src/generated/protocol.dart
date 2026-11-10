@@ -50,6 +50,7 @@ import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
 import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
+import 'studio/builder_credential_record.dart' as _i4wr3q5v;
 import 'studio/manifest_model.dart' as _ihtr58tu;
 import 'studio/manifest_price.dart' as _iyhnvuqa;
 import 'studio/manifest_skill.dart' as _ige837u7;
@@ -87,6 +88,7 @@ export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
 export 'runtime/hire_run.dart';
 export 'studio/agent_manifest_draft.dart';
+export 'studio/builder_credential_record.dart';
 export 'studio/manifest_model.dart';
 export 'studio/manifest_price.dart';
 export 'studio/manifest_skill.dart';
@@ -304,6 +306,90 @@ class Protocol extends _is.DatabaseSerializationManager {
           ],
           type: 'btree',
           isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'builder_credential',
+      dartName: 'BuilderCredentialRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'owner',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'provider',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'accountId',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'ciphertext',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'nonce',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'mac',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'keyVersion',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'builder_credential_owner_provider_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'owner',
+            ),
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'provider',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
           isPrimary: false,
         ),
       ],
@@ -1522,6 +1608,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _i1fcn02s.AgentManifestDraft) {
       return _i1fcn02s.AgentManifestDraft.fromJson(data) as T;
     }
+    if (t == _i4wr3q5v.BuilderCredentialRecord) {
+      return _i4wr3q5v.BuilderCredentialRecord.fromJson(data) as T;
+    }
     if (t == _ihtr58tu.ManifestModel) {
       return _ihtr58tu.ManifestModel.fromJson(data) as T;
     }
@@ -1665,6 +1754,12 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _i1fcn02s.AgentManifestDraft.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_i4wr3q5v.BuilderCredentialRecord?>()) {
+      return (data != null
+              ? _i4wr3q5v.BuilderCredentialRecord.fromJson(data)
+              : null)
+          as T;
+    }
     if (t == _is.getType<_ihtr58tu.ManifestModel?>()) {
       return (data != null ? _ihtr58tu.ManifestModel.fromJson(data) : null)
           as T;
@@ -1776,6 +1871,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _iw9spjs5.HireRunRecord => 'HireRunRecord',
       _i1fcn02s.AgentManifestDraft => 'AgentManifestDraft',
+      _i4wr3q5v.BuilderCredentialRecord => 'BuilderCredentialRecord',
       _ihtr58tu.ManifestModel => 'ManifestModel',
       _iyhnvuqa.ManifestPrice => 'ManifestPrice',
       _ige837u7.ManifestSkill => 'ManifestSkill',
@@ -1856,6 +1952,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'HireRunRecord';
       case _i1fcn02s.AgentManifestDraft():
         return 'AgentManifestDraft';
+      case _i4wr3q5v.BuilderCredentialRecord():
+        return 'BuilderCredentialRecord';
       case _ihtr58tu.ManifestModel():
         return 'ManifestModel';
       case _iyhnvuqa.ManifestPrice():
@@ -1985,6 +2083,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'AgentManifestDraft') {
       return deserialize<_i1fcn02s.AgentManifestDraft>(data['data']);
     }
+    if (dataClassName == 'BuilderCredentialRecord') {
+      return deserialize<_i4wr3q5v.BuilderCredentialRecord>(data['data']);
+    }
     if (dataClassName == 'ManifestModel') {
       return deserialize<_ihtr58tu.ManifestModel>(data['data']);
     }
@@ -2070,6 +2171,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _i7gyvijy.HirePaymentRecord.t;
       case _iw9spjs5.HireRunRecord:
         return _iw9spjs5.HireRunRecord.t;
+      case _i4wr3q5v.BuilderCredentialRecord:
+        return _i4wr3q5v.BuilderCredentialRecord.t;
       case _irxkujl5.StudioAgentVersionRecord:
         return _irxkujl5.StudioAgentVersionRecord.t;
       case _ie0z856o.StudioDeployRecord:
