@@ -74,8 +74,9 @@ void main() {
       Session session,
       int hireId,
       SubmissionPurpose purpose,
-      SubmissionState state,
-    ) async {
+      SubmissionState state, {
+      String? errorCode,
+    }) async {
       serial++;
       await ChainSubmission.db.insertRow(
         session,
@@ -83,6 +84,7 @@ void main() {
           purpose: purpose.wireName,
           transaction: 'e${serial.toRadixString(16).padLeft(63, '0')}',
           state: state.wireName,
+          errorCode: errorCode,
           updatedAt: DateTime.utc(2026, 10, 26),
           hireId: hireId,
           sendAttempts: 0,
@@ -148,6 +150,26 @@ void main() {
         final due = await ServerpodDueSubmitSource(session).list();
 
         expect(due.map((d) => d.hireId), [fresh]);
+      },
+    );
+
+    test(
+      'a terminal simulation failure closes the hire after one row',
+      () async {
+        final session = sessionBuilder.build();
+        await custody(session);
+        final hireId = await succeeded(session);
+        await relay(
+          session,
+          hireId,
+          SubmissionPurpose.submit,
+          SubmissionState.failed,
+          errorCode: SubmissionOutcomeCode.escrowCallFailed,
+        );
+
+        final due = await ServerpodDueSubmitSource(session).list();
+
+        expect(due, isEmpty);
       },
     );
 

@@ -118,6 +118,20 @@ abstract interface class ChainSubmissionStore {
     Transaction? transaction,
   });
 
+  /// Persists a terminal failed record that never had an envelope, for a
+  /// server-side simulation the contract rejected deterministically (#262).
+  ///
+  /// Throws [ChainSubmissionConflict] when [transactionHash] already has a
+  /// record. [errorCode] must be one of [SubmissionOutcomeCode.all].
+  Future<StoredSubmission> insertFailed({
+    required SubmissionPurpose purpose,
+    required String transactionHash,
+    required String errorCode,
+    int? hireId,
+    String? explorerUrl,
+    Transaction? transaction,
+  });
+
   /// The record of [preparationId], or `null`.
   Future<StoredSubmission?> findByPreparation(String preparationId);
 

@@ -455,7 +455,15 @@ final class EscrowRelayService {
       inclusionFee: inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _accounts.simulate(spec);
+    final SimulationData simulation;
+    try {
+      simulation = await _accounts.simulate(spec);
+    } on LedgerException {
+      // A wallet-signed prepare reports an unreadable or rejected simulation
+      // as ChainUnavailable, as before. Only the server-signed submit sender
+      // acts on a deterministic contract code (#262).
+      throw chainUnavailable();
+    }
     final PreparedEnvelope envelope;
     try {
       envelope = _codec.build(spec, simulation);

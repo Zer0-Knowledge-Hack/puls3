@@ -30,11 +30,12 @@ final class AccountAuthority {
 /// what wallet auth reads before it accepts a signature: the signer's sequence
 /// number, the simulation of the call, and the account's signer thresholds.
 ///
-/// [sequenceOf] and [simulate] fail as `ChainUnavailable` with
-/// `details.reason = simulationFailed` (P3): a hire cannot tell a missing
-/// account, an unreachable node and a rejected simulation apart.
-/// [authorityOf] returns `null` when the account does not exist, and the same
-/// `ChainUnavailable` when the node cannot be read.
+/// [sequenceOf] and an unreachable [simulate] fail as `ChainUnavailable`
+/// with `details.reason = simulationFailed` (P3). A simulation the contract
+/// rejects deterministically stays a [LedgerContractError], so callers that
+/// can stop retrying on a contract code (#262) see it. [authorityOf] returns
+/// `null` when the account does not exist, and the same `ChainUnavailable`
+/// when the node cannot be read.
 abstract interface class ChainAccounts {
   /// The sequence number [account] has on the ledger now.
   Future<int> sequenceOf(StellarAddress account);
@@ -77,6 +78,11 @@ final class RpcChainAccounts implements ChainAccounts {
     );
     try {
       return await _rpc.simulateTransactionBase64(envelope);
+    } on LedgerContractError {
+      // The contract rejected the call deterministically: callers that can
+      // act on the code (the submit sender, #262) must see it, not a generic
+      // "chain unavailable".
+      rethrow;
     } on LedgerException {
       throw chainUnavailable();
     }

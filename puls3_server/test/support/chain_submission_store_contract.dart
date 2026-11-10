@@ -70,6 +70,24 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     expect(stored.lastCheckedAt, clock);
   });
 
+  test('insertFailed stores a terminal record without an envelope', () async {
+    create();
+
+    final stored = await repo.insertFailed(
+      purpose: SubmissionPurpose.submit,
+      transactionHash: _txA,
+      errorCode: SubmissionOutcomeCode.escrowCallFailed,
+      hireId: 7,
+    );
+
+    expect(stored.state, SubmissionState.failed);
+    expect(stored.errorCode, SubmissionOutcomeCode.escrowCallFailed);
+    expect(stored.purpose, SubmissionPurpose.submit);
+    expect(stored.hireId, 7);
+    expect(stored.preparationId, isNull);
+    expect(stored.signedEnvelopeXdr, isEmpty);
+  });
+
   test('findByPreparation returns the stored record or null', () async {
     create();
     final stored = await insert();

@@ -10,6 +10,7 @@ import 'package:puls3_server/src/chain/escrow_deadline.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/hire/chain_accounts.dart';
 import 'package:puls3_server/src/ledger/envelope_codec.dart';
+import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
 import 'package:test/test.dart';
@@ -192,6 +193,36 @@ void main() {
 
     expect(store.all, isEmpty);
     expect(sent, isEmpty);
+  });
+
+  test('a deterministic simulation rejection is stored as terminal', () async {
+    accounts.failure = const LedgerContractError(106, 'SubmitTooLate');
+
+    await sender().send(_due());
+
+    expect(codec.built, isEmpty);
+    expect(sent, isEmpty);
+    final record = store.all.single;
+    expect(record.purpose, SubmissionPurpose.submit);
+    expect(record.state, SubmissionState.failed);
+    expect(record.errorCode, SubmissionOutcomeCode.escrowCallFailed);
+    expect(record.hireId, 4);
+    expect(record.transactionHash, hasLength(64));
+  });
+
+  test('a network simulation failure is not stored and is retried', () async {
+    accounts.failure = const LedgerUnavailable('rpc down');
+
+    await sender().send(_due());
+
+    expect(store.all, isEmpty);
+    expect(codec.built, isEmpty);
+
+    accounts.failure = null;
+    await sender().send(_due());
+
+    expect(store.all.single.state, SubmissionState.submitted);
+    expect(sent, hasLength(1));
   });
 
   test('the third refused submit is labelled EscrowCallFailed', () async {

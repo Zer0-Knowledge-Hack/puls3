@@ -107,7 +107,14 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
       if (row.state == SubmissionState.confirmed.wireName) {
         closed.add(hireId);
       } else if (row.purpose == SubmissionPurpose.submit.wireName) {
-        failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        // A deterministic simulation rejection is stored as EscrowCallFailed
+        // and is terminal after one pass (#262). The third refused envelope
+        // uses the same code, so this also closes the normal attempt bound.
+        if (row.errorCode == SubmissionOutcomeCode.escrowCallFailed) {
+          closed.add(hireId);
+        } else {
+          failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        }
       }
     }
     for (final MapEntry(key: hireId, value: failed) in failedSubmits.entries) {

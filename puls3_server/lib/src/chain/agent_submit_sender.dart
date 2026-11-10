@@ -144,6 +144,17 @@ final class AgentSubmitSender {
         validUntil: until.millisecondsSinceEpoch ~/ 1000,
       );
       prepared = _codec.build(spec, await _accounts.simulate(spec));
+    } on LedgerContractError catch (e) {
+      // The contract rejected the simulation deterministically: another pass
+      // would get the same answer. Store the terminal failure so the hire
+      // stops being listed and `getHire` can say why (#262).
+      _log(
+        ChainLogLevel.warning,
+        'Submit simulation for hire ${due.hireId} was rejected with '
+        'contract error #${e.code}; no more attempts',
+      );
+      await _recordSimulationFailure(due, e.code);
+      return;
     } on LedgerException catch (e) {
       _log(
         ChainLogLevel.warning,
@@ -224,6 +235,35 @@ final class AgentSubmitSender {
       _log(
         ChainLogLevel.warning,
         'Sending submission ${record.id} failed: $e; it stays submitted',
+      );
+    }
+  }
+
+  /// Stores a terminal failed `submit` for a deterministic simulation
+  /// rejection (#262). No envelope exists, so [transactionHash] is a stable
+  /// synthetic id: it is never sent and the tracker only lists submitted
+  /// records. `EscrowCallFailed` is the catalog's terminal server-signed
+  /// code; the contract number stays in the log.
+  Future<void> _recordSimulationFailure(DueSubmit due, int contractCode) async {
+    final hash = sha256
+        .convert(
+          utf8.encode(
+            'submit-simulation-failed:${due.hireId}:${due.jobId}:$contractCode',
+          ),
+        )
+        .toString();
+    try {
+      await _submissions.insertFailed(
+        purpose: SubmissionPurpose.submit,
+        transactionHash: hash,
+        errorCode: SubmissionOutcomeCode.escrowCallFailed,
+        hireId: due.hireId,
+      );
+    } on ChainSubmissionConflict catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Hire ${due.hireId} already recorded this submit simulation failure '
+        '(${e.index.name})',
       );
     }
   }
