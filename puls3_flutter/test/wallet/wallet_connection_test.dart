@@ -31,7 +31,13 @@ void main() {
     testWidgets('connecting, then connected with a short address, Testnet '
         'and Disconnect', (tester) async {
       final wallet = MockWallet();
-      await pumpApp(tester, location: '/market', wallet: wallet);
+      var forgotten = 0;
+      await pumpApp(
+        tester,
+        location: '/market',
+        wallet: wallet,
+        onWalletDisconnect: () async => forgotten++,
+      );
       await _openSheet(tester);
 
       await tester.tap(find.text('Connect Demo wallet'));
@@ -53,6 +59,8 @@ void main() {
       expect(_state('disconnected'), findsOneWidget);
       expect(wallet.address, isNull);
       expect(find.text('Connect wallet'), findsOneWidget);
+      // The app wires the disconnect to the wallet session's forget().
+      expect(forgotten, 1);
     });
 
     testWidgets('rejected: recoverable, no crash', (tester) async {
@@ -298,6 +306,20 @@ void main() {
       await controller.disconnect();
       expect(controller.status, WalletStatus.disconnected);
       expect(controller.address, isNull);
+    });
+
+    test('disconnect forgets the wallet session', () async {
+      var forgotten = 0;
+      final controller = WalletController(
+        fastWallet(),
+        onDisconnect: () async => forgotten++,
+      );
+      await controller.connect();
+
+      await controller.disconnect();
+
+      expect(forgotten, 1);
+      expect(controller.status, WalletStatus.disconnected);
     });
   });
 

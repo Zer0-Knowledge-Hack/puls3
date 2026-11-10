@@ -1,0 +1,16 @@
+name: puls3_sdk
+description: Dart SDK for the puls3 API (catalog, hire, studio). It never signs or submits a transaction. See docs/adr/0007-developer-sdk.md.
+publish_to: none
+
+environment:
+  sdk: '^3.12.2'
+
+resolution: workspace
+
+dependencies:
+  puls3_client:
+    path: ../puls3_client
+
+dev_dependencies:
+  lints: '>=3.0.0 <7.0.0'
+  test: ^1.25.5
