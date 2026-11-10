@@ -287,6 +287,37 @@ void main() {
       );
     });
 
+    test('a session that cannot refresh asks for a new sign-in', () async {
+      final gateway = _gateway(
+        createHire: (_, _, _, _) async => throw ServerpodClientUnauthorized(),
+      );
+      await expectLater(
+        gateway.createHire(
+          agentId: 9,
+          consumer: _consumer,
+          input: 'x',
+          requestId: 'r',
+        ),
+        throwsA(isA<HireNotSignedIn>()),
+      );
+    });
+
+    test('a network failure is still a retryable server error', () async {
+      final gateway = _gateway(
+        createHire: (_, _, _, _) async =>
+            throw const ServerpodClientNetworkException('offline'),
+      );
+      await expectLater(
+        gateway.createHire(
+          agentId: 9,
+          consumer: _consumer,
+          input: 'x',
+          requestId: 'r',
+        ),
+        throwsA(isA<HireBackendUnavailable>()),
+      );
+    });
+
     test('prepareFund waits while the create_job confirms', () async {
       var calls = 0;
       final gateway = _gateway(

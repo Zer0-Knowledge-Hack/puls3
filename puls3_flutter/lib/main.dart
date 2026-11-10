@@ -42,7 +42,7 @@ WalletPort _createWallet() => switch (_walletKind) {
 /// `--dart-define=HIRE=server`. The server needs wallet sessions (#136).
 const _hireKind = String.fromEnvironment('HIRE', defaultValue: 'demo');
 
-HireGateway? _createHireGateway(Client client, String configJson) =>
+HireGateway? _createHireGateway(Client client, WalletSession session) =>
     switch (_hireKind) {
       'demo' => null,
       'server' => ServerHireGateway(
@@ -55,7 +55,7 @@ HireGateway? _createHireGateway(Client client, String configJson) =>
         getHire: client.hire.getHire,
         prepareFeedback: client.feedback.prepareFeedback,
         submitFeedback: client.feedback.submitFeedback,
-        session: _walletSession(client, configJson),
+        session: session,
         readFunds: readTestnetFunds,
       ),
       // A typo must not silently ship the demo.
@@ -88,7 +88,7 @@ const _studioKind = String.fromEnvironment('STUDIO', defaultValue: 'demo');
 StudioGateway? _createStudioGateway(
   Client client,
   WalletPort wallet,
-  String configJson,
+  WalletSession session,
 ) => switch (_studioKind) {
   'demo' => null,
   'server' => ServerStudioGateway(
@@ -98,7 +98,7 @@ StudioGateway? _createStudioGateway(
     testRun: client.studio.testRun,
     saveProviderCredential: client.studio.saveProviderCredential,
     wallet: wallet,
-    session: _walletSession(client, configJson),
+    session: session,
   ),
   _ => throw StateError(
     'Unknown STUDIO "$_studioKind": use "demo" or "server".',
@@ -110,7 +110,7 @@ StudioGateway? _createStudioGateway(
 DeployGateway? _createDeployGateway(
   Client client,
   WalletPort wallet,
-  String configJson,
+  WalletSession session,
 ) => switch (_studioKind) {
   'demo' => null,
   'server' => ServerDeployGateway(
@@ -120,7 +120,7 @@ DeployGateway? _createDeployGateway(
     prepareWalletAuthorization: client.studio.prepareWalletAuthorization,
     submitWalletAuthorization: client.studio.submitWalletAuthorization,
     wallet: wallet,
-    session: _walletSession(client, configJson),
+    session: session,
   ),
   _ => throw StateError(
     'Unknown STUDIO "$_studioKind": use "demo" or "server".',
@@ -137,6 +137,9 @@ Future<void> main() async {
     ..authSessionManager = FlutterAuthSessionManager();
 
   final wallet = _createWallet();
+  // One session for hire, Studio and deploy: the same wallet session, and
+  // the one disconnect forgets (#261).
+  final session = _walletSession(client, configJson);
   runApp(
     Puls3App(
       // The server catalog (#17). When it is unreachable the bundled demo
@@ -147,9 +150,10 @@ Future<void> main() async {
       ),
       demoRepository: AssetAgentRepository(),
       wallet: wallet,
-      hireGateway: _createHireGateway(client, configJson),
-      studioGateway: _createStudioGateway(client, wallet, configJson),
-      deployGateway: _createDeployGateway(client, wallet, configJson),
+      onWalletDisconnect: session.forget,
+      hireGateway: _createHireGateway(client, session),
+      studioGateway: _createStudioGateway(client, wallet, session),
+      deployGateway: _createDeployGateway(client, wallet, session),
     ),
   );
 }
