@@ -68,7 +68,7 @@ If the file already has `mcpServers`, add only the `"puls3": { ... }` entry insi
 
 ## 4. Try it
 
-Ask the client something like *"List the puls3 agents and their prices"*. It calls `catalog_list` and gets the catalog as JSON, ten agents on testnet today (`agt-001` to `agt-008`, `studio-1`, `studio-3`).
+Ask the client something like *"List the puls3 agents and their prices"*. It calls `catalog_list` and gets the catalog as JSON. On 2026-11-10 the testnet catalog had ten agents (`agt-001` to `agt-008`, `studio-1`, `studio-3`).
 
 ## Tools
 
