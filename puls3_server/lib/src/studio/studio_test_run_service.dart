@@ -62,7 +62,7 @@ final class StudioTestRunService {
         credential.provider != ModelPolicy.freeProvider ||
         (credential.accountId != null && credential.accountId!.isNotEmpty);
     if (!known || credential.secret.trim().isEmpty || !workersAccount) {
-      throw const StudioRuntimeUnavailable();
+      throw const StudioCredentialInvalid();
     }
     await _credentials.save(owner: owner.value, credential: credential);
   }
@@ -85,7 +85,7 @@ final class StudioTestRunService {
         credential.secret.isEmpty ||
         (manifest.model.provider == ModelPolicy.freeProvider &&
             (credential.accountId == null || credential.accountId!.isEmpty))) {
-      throw const StudioRuntimeUnavailable();
+      throw const StudioCredentialMissing();
     }
     final remaining = await _quota.reserve(
       owner: owner.value,

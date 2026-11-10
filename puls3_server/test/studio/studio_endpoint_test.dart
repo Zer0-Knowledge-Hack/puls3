@@ -305,7 +305,7 @@ void main() {
     }
   });
 
-  test('a missing credential is RuntimeUnavailable', () async {
+  test('a missing credential is CredentialMissing', () async {
     final saved = await StudioDraftService(store).save(
       owner: StellarAddress.parse(owner),
       document: {
@@ -343,13 +343,13 @@ void main() {
         isA<Puls3ApiException>().having(
           (e) => e.code,
           'code',
-          'RuntimeUnavailable',
+          'CredentialMissing',
         ),
       ),
     );
   });
 
-  test('an empty provider secret is RuntimeUnavailable', () async {
+  test('an empty provider secret is CredentialInvalid', () async {
     StudioEndpoint.testRuns = (_) => StudioTestRunService(
       drafts: StudioDraftService(store),
       quota: MemoryTestRunQuota(),
@@ -368,7 +368,7 @@ void main() {
         isA<Puls3ApiException>().having(
           (e) => e.code,
           'code',
-          'RuntimeUnavailable',
+          'CredentialInvalid',
         ),
       ),
     );

@@ -231,6 +231,8 @@ class StudioEndpoint extends Endpoint {
         code: 'TestQuotaExceeded',
         details: {'resetsAt': e.resetsAt.toUtc().toIso8601String()},
       );
+    } on StudioCredentialMissing {
+      throw Puls3ApiException(code: 'CredentialMissing');
     } on StudioRuntimeUnavailable {
       throw Puls3ApiException(code: 'RuntimeUnavailable');
     } on StudioRunFailed catch (e) {
@@ -259,6 +261,8 @@ class StudioEndpoint extends Endpoint {
           accountId: accountId,
         ),
       );
+    } on StudioCredentialInvalid {
+      throw Puls3ApiException(code: 'CredentialInvalid');
     } on StudioRuntimeUnavailable {
       throw Puls3ApiException(code: 'RuntimeUnavailable');
     }

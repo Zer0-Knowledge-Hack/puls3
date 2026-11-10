@@ -391,6 +391,7 @@
   "playgroundProviderToken": "Provider token",
   "playgroundProviderTokenHint": "Stored for your test runs",
   "playgroundCredentialMissing": "Save your provider credential, then run the draft again.",
+  "playgroundCredentialInvalid": "That provider credential is not valid. Check the token and account id.",
   "playgroundAccountId": "Cloudflare account id",
   "playgroundRunning": "Running… It stops at the runtime timeout.",
   "playgroundFailed": "The test run failed",

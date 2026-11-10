@@ -91,6 +91,12 @@ class _PlaygroundState extends State<Playground> {
         _status = PlaygroundStatus.failed;
         _error = l10n.playgroundCredentialMissing;
       });
+    } on StudioCredentialInvalid {
+      if (!mounted) return;
+      setState(() {
+        _status = PlaygroundStatus.failed;
+        _error = l10n.playgroundCredentialInvalid;
+      });
     } on StudioGatewayException catch (e) {
       if (!mounted) return;
       setState(() {

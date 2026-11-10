@@ -1896,6 +1896,12 @@ abstract class AppLocalizations {
   /// **'Save your provider credential, then run the draft again.'**
   String get playgroundCredentialMissing;
 
+  /// No description provided for @playgroundCredentialInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'That provider credential is not valid. Check the token and account id.'**
+  String get playgroundCredentialInvalid;
+
   /// No description provided for @playgroundAccountId.
   ///
   /// In en, this message translates to:

@@ -8,8 +8,26 @@ final class StudioTestQuotaExceeded implements Exception {
   String toString() => 'StudioTestQuotaExceeded';
 }
 
-/// The draft cannot be run: no builder credential for its provider, or the
-/// provider is not wired. The message never includes a prompt or a secret.
+/// The draft cannot be run: no builder credential for its provider. The
+/// message never includes a prompt or a secret.
+final class StudioCredentialMissing implements Exception {
+  const StudioCredentialMissing();
+
+  @override
+  String toString() => 'StudioCredentialMissing';
+}
+
+/// The credential the builder tried to save is not usable (unknown provider,
+/// empty secret, or Workers AI without an account id).
+final class StudioCredentialInvalid implements Exception {
+  const StudioCredentialInvalid();
+
+  @override
+  String toString() => 'StudioCredentialInvalid';
+}
+
+/// The Studio runtime, or its credential store, is unavailable: for example
+/// the server has no custody key. It is not the builder's fault.
 final class StudioRuntimeUnavailable implements Exception {
   const StudioRuntimeUnavailable();
 

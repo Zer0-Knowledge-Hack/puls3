@@ -304,6 +304,7 @@
   "playgroundProviderToken": "Token do provedor",
   "playgroundProviderTokenHint": "Guardado para os seus testes",
   "playgroundCredentialMissing": "Guarde a credencial do provedor e execute o rascunho de novo.",
+  "playgroundCredentialInvalid": "Essa credencial do provedor não é válida. Verifique o token e o id da conta.",
   "playgroundAccountId": "Id da conta Cloudflare",
   "playgroundRunning": "Executando… Para ao chegar no tempo limite.",
   "playgroundFailed": "O teste falhou",

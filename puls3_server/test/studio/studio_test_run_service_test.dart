@@ -122,7 +122,7 @@ void main() {
 
       await expectLater(
         () => box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi'),
-        throwsA(isA<StudioRuntimeUnavailable>()),
+        throwsA(isA<StudioCredentialMissing>()),
       );
       expect(box.tasks, isEmpty);
 
@@ -133,6 +133,35 @@ void main() {
         input: 'Hi',
       );
       expect(result.remainingDailyRuns, studioDailyTestRuns - 1);
+    },
+  );
+
+  test(
+    'an unusable credential is CredentialInvalid, not a missing one',
+    () async {
+      final box = harness();
+
+      for (final credential in const [
+        BuilderProviderCredential(
+          provider: 'workers-ai',
+          secret: '   ',
+          accountId: 'builder-account',
+        ),
+        BuilderProviderCredential(
+          provider: 'workers-ai',
+          secret: 'builder-token',
+        ),
+        BuilderProviderCredential(provider: 'unknown', secret: 'builder-token'),
+      ]) {
+        await expectLater(
+          () => box.runs.saveCredential(
+            owner: wallet(owner),
+            credential: credential,
+          ),
+          throwsA(isA<StudioCredentialInvalid>()),
+          reason: '${credential.provider} ${credential.accountId}',
+        );
+      }
     },
   );
 
