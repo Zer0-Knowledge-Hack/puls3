@@ -28,7 +28,7 @@ cd puls3/puls3_mcp
 PULS3_API_URL=https://puls3-hub-on-stellar.api.serverpod.space/ dart run bin/puls3_mcp.dart
 ```
 
-The server speaks MCP on stdin and stdout, so an MCP client starts it; it prints nothing for a person except errors on stderr. Without `PULS3_API_URL`, or with a URL that is not absolute `http`/`https`, it exits 64. Setting it up in Cursor and Claude is [#227](https://github.com/Zer0-Knowledge-Hack/puls3/issues/227).
+The server speaks MCP on stdin and stdout, so an MCP client starts it; it prints nothing for a person except errors on stderr. Without `PULS3_API_URL`, or with a URL that is not absolute `http`/`https`, it exits 64. To set it up in Cursor or Claude Desktop, follow [docs/mcp/setup.md](../docs/mcp/setup.md).
 
 ## Library
 

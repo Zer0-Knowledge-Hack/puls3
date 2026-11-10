@@ -4,7 +4,7 @@
 - **Date:** 2026-11-05
 - **Issue:** #222 (week 2 of the developer platform)
 - **Clients of this package:** the `puls3` CLI (#224), the MCP server (#226)
-- **Guides:** SDK quickstart (#223), CLI reference (#225), MCP setup (#227)
+- **Guides:** SDK quickstart (#223), CLI reference (#225), [MCP setup](../mcp/setup.md) (#227)
 - **Related:** [API contract](../architecture/api.md) · [ADR-0001](0001-system-architecture.md) · [secrets](../infra/secrets.md)
 
 ## Context
