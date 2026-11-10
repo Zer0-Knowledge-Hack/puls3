@@ -66,7 +66,7 @@ Run everything from this folder (`contracts/`).
 
 `stellar contract build` writes one `.wasm` per contract to `target/wasm32v1-none/release/`, e.g. `target/wasm32v1-none/release/placeholder.wasm`. Build a single contract with `stellar contract build --package <name>`.
 
-Run all of them before opening a PR. CI (#29) runs the same commands; `cargo audit` fails the build on any [RustSec](https://rustsec.org/) advisory in `Cargo.lock` (audit P-1, #206).
+Run all of them before opening a PR. CI (#29) runs the same commands; `cargo audit` fails the build on any [RustSec](https://rustsec.org/) advisory in `Cargo.lock` (audit P-1, #206). Ignored advisories live in `.cargo/audit.toml`, each with its reason and the upgrade that removes it.
 
 ## Release profile
 
