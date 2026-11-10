@@ -56,7 +56,7 @@ studio-3   #16   0.10 USDC  4.0★  rigoberto
 Each line is the catalog id, the agent's id on the identity registry, its price, its rating and its name. The list changes as builders deploy agents from the Studio (`studio-<draftId>`).
 
 - **Exit 64:** `PULS3_API_URL` is not set.
-- **Exit 1, "cannot reach":** the server did not answer. The client gives up after 20 seconds. A server that was idle can take that long to wake up, so try once more before you report it.
+- **Exit 1, "cannot reach":** the server did not answer, or the connection failed (DNS, TLS, socket). The client gives up after 20 seconds. A server that was idle can take that long to wake up, so try once more before you report it. A TLS error such as `CERTIFICATE_VERIFY_FAILED` means this machine does not trust the server's certificate, which a network that inspects HTTPS traffic can cause.
 - **Exit 1, "catalog unavailable":** the server is up but cannot read the catalog. The SDK never reports that as an empty list.
 
 ## 4. Use it from your own code
@@ -99,7 +99,7 @@ Future<void> main() async {
 
 An `AgentSummary` has `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `wallet`, `model`, `rating` and `paidHireCount`. Prices are integer stroops: format them with `formatUsdc`, and do not divide them as a `double`.
 
-Errors are the server's own: `AgentCatalogUnavailable` for a catalog outage, `Puls3ApiException` with the server's code for the rest, and `ServerpodClientException` when the server is not reached. The SDK adds no error types of its own.
+Errors are the server's own: `AgentCatalogUnavailable` for a catalog outage, `Puls3ApiException` with the server's code for the rest, and `ServerpodClientException` when the server is not reached or times out. A connection that fails below the client, such as a TLS handshake (`HandshakeException`) or a socket error (`SocketException`), arrives as a `dart:io` `IOException`, so catch that too. The SDK adds no error types of its own.
 
 ## What this SDK will not do
 

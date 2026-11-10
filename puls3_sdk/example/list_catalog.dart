@@ -32,6 +32,11 @@ Future<void> main() async {
     // The server was not reached, timed out or answered with an HTTP error.
     stderr.writeln('cannot reach $apiUrl: ${e.message}');
     exitCode = 1;
+  } on IOException catch (e) {
+    // Below the client: a TLS handshake the machine refuses (for example a
+    // certificate it does not trust) or a socket error.
+    stderr.writeln('cannot reach $apiUrl: $e');
+    exitCode = 1;
   } finally {
     sdk.close();
   }
