@@ -17,7 +17,7 @@ A stdio [MCP](https://modelcontextprotocol.io/) server for puls3. An agent in an
 
 The hire and Studio tools need a wallet session, which the SDK does not have yet ([ADR-0007](../docs/adr/0007-developer-sdk.md), Open decision 1). They are listed already so that their names and arguments do not change when #259 lands.
 
-Any other tool name is refused. An agent has these fields: `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `priceUsdc`, `wallet`, `model`, `rating`, `paidHireCount`. A failure is a tool error with one line, `error: <code>: <message>`, using the same codes as the CLI (`AgentCatalogUnavailable`, `Unreachable`, or the server's own code).
+Any other tool name is refused. An agent has these fields: `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `priceUsdc`, `wallet`, `model`, `rating`, `paidHireCount`. A failure is a tool error with one line, `error: <code>: <message>`, using the same codes as the CLI (`AgentCatalogUnavailable`, `Unreachable`, or the server's own code). Any other failure is `Internal`, with the detail on the server's stderr, never as a stack trace to the client. A URL in an error never carries user info (`https://user:token@host/` shows as `https://host/`).
 
 ## Run it
 

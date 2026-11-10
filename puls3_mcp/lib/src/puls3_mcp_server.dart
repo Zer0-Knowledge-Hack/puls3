@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show IOException;
+import 'dart:io' show IOException, stderr;
 
 import 'package:dart_mcp/server.dart';
 import 'package:puls3_sdk/puls3_sdk.dart';
@@ -29,8 +29,9 @@ const sessionPending =
 /// rates or submits a transaction: a prepared envelope is returned unsigned
 /// for a wallet to sign, never sent.
 base class Puls3McpServer extends MCPServer with ToolsSupport {
-  Puls3McpServer(super.channel, {required this.sdk, required this.apiUrl})
-    : super.fromStreamChannel(
+  Puls3McpServer(super.channel, {required this.sdk, required String apiUrl})
+    : apiUrl = redactedUrl(apiUrl),
+      super.fromStreamChannel(
         implementation: Implementation(name: 'puls3', version: '0.1.0'),
         instructions:
             'Reads the puls3 agent catalog on Stellar testnet. The tools '
@@ -47,7 +48,7 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
   /// The SDK the tools call. The caller owns it and closes it.
   final Puls3Sdk sdk;
 
-  /// The server URL, as the errors name it.
+  /// The server URL, as the errors name it, without any user info.
   final String apiUrl;
 
   final _catalogList = Tool(
@@ -174,6 +175,15 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
       return _error('Unreachable', '$apiUrl: ${e.message}');
     } on IOException catch (e) {
       return _error('Unreachable', '$apiUrl: $e');
+    } catch (e, stack) {
+      // Anything else (a StateError, a response the client cannot read):
+      // dart_mcp would return '$e\n$stack' to the client. The detail goes
+      // to stderr for whoever runs the server, never to the client.
+      stderr.writeln('puls3_mcp: unexpected ${e.runtimeType}: $e\n$stack');
+      return _error(
+        'Internal',
+        'unexpected ${e.runtimeType}; see the server log',
+      );
     }
   }
 }
@@ -193,6 +203,14 @@ Map<String, Object?> agentJson(AgentSummary agent) => {
   'rating': agent.rating,
   'paidHireCount': agent.paidHireCount,
 };
+
+/// [url] without its user info, so a `https://user:token@host/` never
+/// reaches the client in an error. Text that is not a URL stays as it is.
+String redactedUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.userInfo.isEmpty) return url;
+  return uri.replace(userInfo: '').toString();
+}
 
 CallToolResult _json(Object value) =>
     CallToolResult(content: [TextContent(text: jsonEncode(value))]);

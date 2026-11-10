@@ -93,6 +93,7 @@ Every failure is a tool error with one line, `error: <code>: <message>`:
 | `AgentCatalogUnavailable` | The server is up but cannot read the catalog. | Try again later. The tool never shows that as an empty list. |
 | `NotFound` | `catalog_get` with an id the catalog does not have. | Check the id with `catalog_list`. |
 | `SessionUnavailable` | A hire or Studio tool, before #259. | Use [puls3.org](https://puls3.org/). |
+| `Internal` | Something unexpected failed inside the server. | The detail is in the client's MCP log for `puls3` (the server's stderr). Report it with that line. |
 
 If the client shows no tools at all, the process did not start. Run the same command in a terminal:
 

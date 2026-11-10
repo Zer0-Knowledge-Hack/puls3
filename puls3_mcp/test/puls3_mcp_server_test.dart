@@ -55,12 +55,15 @@ final class _Session {
   final ServerConnection client;
   final Puls3McpServer server;
 
-  static Future<_Session> start(_FakeCatalog catalog) async {
+  static Future<_Session> start(
+    _FakeCatalog catalog, {
+    String apiUrl = 'https://api.puls3.test/',
+  }) async {
     final channels = StreamChannelController<String>();
     final server = Puls3McpServer(
       channels.local,
       sdk: Puls3Sdk.withApi(catalog: catalog),
-      apiUrl: 'https://api.puls3.test/',
+      apiUrl: apiUrl,
     );
     final client = MCPClient(
       Implementation(name: 'test client', version: '0.0.1'),
@@ -90,9 +93,11 @@ void main() {
   late _FakeCatalog catalog;
   late _Session session;
 
-  Future<void> start(_FakeCatalog fake) async {
+  Future<void> start(_FakeCatalog fake, {String? apiUrl}) async {
     catalog = fake;
-    session = await _Session.start(fake);
+    session = apiUrl == null
+        ? await _Session.start(fake)
+        : await _Session.start(fake, apiUrl: apiUrl);
   }
 
   tearDown(() => session.close());
@@ -166,6 +171,30 @@ void main() {
         );
       },
     );
+
+    test('any other failure is Internal, without a stack trace', () async {
+      await start(_FakeCatalog(error: StateError('client is closed')));
+      final result = await session.call('catalog_list');
+      expect(result.isError, isTrue);
+      expect(
+        _text(result),
+        'error: Internal: unexpected StateError; see the server log',
+      );
+    });
+
+    test('the URL in an error never carries user info', () async {
+      await start(
+        _FakeCatalog(
+          error: const ServerpodClientNetworkException('connection refused'),
+        ),
+        apiUrl: 'https://user:s3cret@api.puls3.test/',
+      );
+      final result = await session.call('catalog_list');
+      expect(
+        _text(result),
+        'error: Unreachable: https://api.puls3.test/: connection refused',
+      );
+    });
 
     test('a server error keeps its code', () async {
       await start(
