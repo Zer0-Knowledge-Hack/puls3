@@ -68,6 +68,7 @@ puls3 is in **early development**. What exists today:
 - ✅ A hire funded through the puls3 server's escrow relay: the server prepares the envelopes, the consumer signs, and the server verifies, relays and confirms them ([evidence](#server-escrow-relay-hire-1-job-6))
 - ✅ The pure Dart domain model ([`puls3_domain/`](puls3_domain/))
 - 📘 Build, test-run and deploy your own agent on testnet: [Agent Studio builder guide](docs/studio/builder-guide.md)
+- ✅ A `puls3` command line that reads the catalog ([`puls3_cli/`](puls3_cli/), [reference](docs/cli/reference.md)); it never signs
 - 🚧 Reputation Registry contract
 - 🚧 Backend, the app wired to the chain, and agent execution
 
@@ -190,10 +191,12 @@ puls3_server/    Serverpod backend
 puls3_client/    Generated client shared by app and server
 contracts/       Soroban workspace: identity-registry, escrow, placeholder; deployments/ holds testnet.json and demo-agents.json
 scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh), seed (seed-demo-agents.sh) and funding (fund-testnet-accounts.sh) scripts
+puls3_cli/       The puls3 command line, a client of puls3_sdk
 spikes/          Payments proof of concept (payments-poc)
 docs/adr/        Architecture decision records
 docs/verification/ How to verify the on-chain evidence (onchain.md)
 docs/studio/      Agent Studio builder guide (builder-guide.md)
+docs/cli/         puls3 command line reference (reference.md)
 docs/brand/      Brand guide, design tokens
 assets/brand/    Logos, marks, favicons, fonts
 design/          Design sources (logo lab)
