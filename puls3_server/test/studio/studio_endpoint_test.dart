@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:puls3_domain/puls3_domain.dart' hide AgentManifestDraft;
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/session_wallet.dart';
@@ -61,6 +63,7 @@ void main() {
     StudioEndpoint.sessionWallet = null;
     StudioEndpoint.services = null;
     StudioEndpoint.testRuns = null;
+    StudioEndpoint.credentialStores = null;
   });
 
   AgentManifestDraft draft({String? systemPrompt}) => AgentManifestDraft(
@@ -368,6 +371,80 @@ void main() {
           'RuntimeUnavailable',
         ),
       ),
+    );
+  });
+
+  group('builder credential store (#235)', () {
+    test('saveProviderCredential and testRun use the endpoint store', () async {
+      final saved = await StudioDraftService(store).save(
+        owner: StellarAddress.parse(owner),
+        document: {
+          'name': 'Copy Forge',
+          'description': 'Rewrites a paragraph in a calmer voice.',
+          'skills': [
+            {'id': 'rewrite', 'name': 'Rewrite'},
+          ],
+          'model': {
+            'provider': 'workers-ai',
+            'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          },
+          'system_prompt': prompt,
+          'input': {'type': 'text', 'max_chars': 100},
+          'output': {'type': 'markdown', 'max_chars': 2000},
+          'price': {'asset': 'USDC', 'amount': 1000000},
+        },
+      );
+      final credentials = MemoryBuilderCredentialStore();
+      StudioEndpoint.credentialStores = (_) => credentials;
+      BuilderProviderCredential? used;
+      StudioEndpoint.testRuns = (s) => StudioTestRunService(
+        drafts: StudioDraftService(store),
+        quota: MemoryTestRunQuota(),
+        credentials: StudioEndpoint.credentialsOn(s),
+        policy: studioServerModelPolicy,
+        run: (task, credential) async {
+          used = credential;
+          return 'ok';
+        },
+      );
+
+      await endpoint.saveProviderCredential(
+        session,
+        'workers-ai',
+        'builder-token',
+        'builder-account',
+      );
+      await endpoint.testRun(session, saved.draftId, 'Hi');
+
+      expect(used!.secret, 'builder-token');
+      expect(
+        (await credentials.find(
+          owner: owner,
+          provider: 'workers-ai',
+        ))!.accountId,
+        'builder-account',
+      );
+    });
+
+    test(
+      'without the custody key a credential is refused, not kept in memory',
+      () async {
+        try {
+          await endpoint.saveProviderCredential(
+            session,
+            'workers-ai',
+            'builder-token',
+            'builder-account',
+          );
+          fail('expected RuntimeUnavailable');
+        } on Puls3ApiException catch (e) {
+          expect(e.code, 'RuntimeUnavailable');
+          expect('$e', isNot(contains('builder-token')));
+        }
+      },
+      skip: Platform.environment.containsKey('PULS3_AGENT_WALLET_SECRET_KEY')
+          ? 'PULS3_AGENT_WALLET_SECRET_KEY is set in this environment'
+          : false,
     );
   });
 }
