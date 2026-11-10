@@ -34,6 +34,8 @@ The SDK talks to one puls3 server. The example reads its URL from `PULS3_API_URL
 export PULS3_API_URL=https://puls3-hub-on-stellar.api.serverpod.space/
 ```
 
+In Windows PowerShell: `$env:PULS3_API_URL = "https://puls3-hub-on-stellar.api.serverpod.space/"`.
+
 That is the public testnet server. For a server running locally (see [Build and run](../../README.md#build-and-run)), use `http://localhost:8080/`.
 
 The URL must be absolute, `http` or `https`, with no query or fragment. `Puls3Sdk.connect` adds the trailing `/` when it is missing and throws `ArgumentError` for anything else.
@@ -53,11 +55,12 @@ agt-002    #8    1.25 USDC  4.0★  Remit Pilot
 studio-3   #16   0.10 USDC  4.0★  rigoberto
 ```
 
-Each line is the catalog id, the agent's id on the identity registry, its price, its rating and its name. The list changes as builders deploy agents from the Studio (`studio-<draftId>`).
+Each line is the catalog id, the agent's id on the identity registry, its price, its rating and its name. The list changes as builders deploy agents from the Studio (`studio-<draftId>`), and ratings change as hires are rated, so your output will differ from this one.
 
-- **Exit 64:** `PULS3_API_URL` is not set.
+- **Exit 64:** `PULS3_API_URL` is not set, or is not an absolute `http`/`https` URL without a query or fragment.
 - **Exit 1, "cannot reach":** the server did not answer, or the connection failed (DNS, TLS, socket). The client gives up after 20 seconds. A server that was idle can take that long to wake up, so try once more before you report it. A TLS error such as `CERTIFICATE_VERIFY_FAILED` means this machine does not trust the server's certificate, which a network that inspects HTTPS traffic can cause.
 - **Exit 1, "catalog unavailable":** the server is up but cannot read the catalog. The SDK never reports that as an empty list.
+- **Exit 1, "server error <code>":** the server answered with its own error code, for example `RateLimited`.
 
 ## 4. Use it from your own code
 
