@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_controller.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
+import 'package:puls3_flutter/src/hire/hire_gateway.dart';
 import 'package:puls3_flutter/src/state/wallet_controller.dart';
 
 import '../screens/hire_sheet_test.dart';
@@ -52,6 +53,30 @@ void main() {
     expect(gateway.requestIds.first, isNot(gateway.requestIds.last));
     expect(gateway.hireCount, 2);
     expect(controller.hireId, 4);
+    expect(controller.step, HireStep.done);
+  });
+
+  test('an ended session is forgotten and the retry signs in again', () async {
+    final gateway = ScriptedHireGateway()..failCreate = const HireNotSignedIn();
+    final controller = HireFlowController(
+      agent: _agent,
+      gateway: gateway,
+      wallet: WalletController(TestWallet()),
+      store: MemoryHireFlowStore(),
+    );
+
+    await controller.run('Audit my token');
+
+    expect(controller.error, isNotNull);
+    expect(controller.step, isNot(HireStep.done));
+    expect(gateway.forgottenSessions, 1);
+
+    await controller.run('Audit my token');
+
+    // The first run signed in before createHire refused it; the retry
+    // challenges again instead of keeping the dead session.
+    expect(gateway.signIns, hasLength(2));
+    expect(controller.error, isNull);
     expect(controller.step, HireStep.done);
   });
 }

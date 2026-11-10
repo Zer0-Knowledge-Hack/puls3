@@ -32,6 +32,7 @@ class WalletController extends ChangeNotifier {
   WalletController(
     this._wallet, {
     this.connectTimeout = const Duration(minutes: 2),
+    this.onDisconnect,
   });
 
   final WalletPort _wallet;
@@ -39,6 +40,10 @@ class WalletController extends ChangeNotifier {
   /// Upper bound for the connect prompt, so a popup that is ignored,
   /// blocked or stuck never leaves a flow waiting forever. Null disables it.
   final Duration? connectTimeout;
+
+  /// Forgets the wallet's server session when the user disconnects (#261).
+  /// Null in tests and in the demo, where there is no session to drop.
+  final Future<void> Function()? onDisconnect;
 
   /// Bumped by [disconnect], so a connect that finishes afterwards is
   /// dropped instead of reconnecting behind the user's back.
@@ -135,10 +140,19 @@ class WalletController extends ChangeNotifier {
   Future<void> disconnect() async {
     _session++;
     _busy = null;
-    await _wallet.disconnect();
-    _lastError = null;
-    _signed = false;
-    notifyListeners();
+    try {
+      await _wallet.disconnect();
+    } finally {
+      // The wallet may already be gone, but the server session must not
+      // survive a sign-out on a shared browser (#261).
+      try {
+        await onDisconnect?.call();
+      } finally {
+        _lastError = null;
+        _signed = false;
+        notifyListeners();
+      }
+    }
   }
 
   /// Signs a server-prepared transaction unchanged; returns the signed XDR.
