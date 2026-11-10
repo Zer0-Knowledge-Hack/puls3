@@ -49,8 +49,9 @@ void main() {
       // The registry stores no puls3 hire id: the job is in tag2 instead.
       expect(feedback.single.hireId, isNull);
       // A page with the client, the empty page that ends the list, the last
-      // index, the one feedback and the get_job of its job.
-      expect(chain.requests, hasLength(5));
+      // index, the one feedback, the owner_of of the agent and the get_job
+      // of its job.
+      expect(chain.requests, hasLength(6));
       expect(chain.jobReads, 1);
       expect(chain.requests.map((r) => r['method']).toSet(), {
         'simulateTransaction',
