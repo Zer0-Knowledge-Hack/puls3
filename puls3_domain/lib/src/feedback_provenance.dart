@@ -88,11 +88,20 @@ final class ReferencedJob {
 ///
 /// [jobs] holds the jobs read from [escrow] by id. A referenced job that is
 /// not in it could not be read (it does not exist, or is archived).
+///
+/// [owner] is the rated agent's owner on the identity registry, or null when
+/// the reader could not learn it. A rating from the owner never counts, as
+/// the server already refuses to build one (`FeedbackFromAgentOwner`).
 final class FeedbackProvenance {
-  const FeedbackProvenance({required this.escrow, this.jobs = const {}});
+  const FeedbackProvenance({
+    required this.escrow,
+    this.jobs = const {},
+    this.owner,
+  });
 
   final StellarAddress escrow;
   final Map<int, ReferencedJob> jobs;
+  final StellarAddress? owner;
 }
 
 /// The text `feedback_hash` commits to: the job reference, the agent, the

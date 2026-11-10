@@ -118,6 +118,22 @@ void main() {
       );
     });
 
+    test('a rating from the agent owner does not count (#201)', () {
+      final owned = FeedbackProvenance(
+        escrow: _escrow,
+        jobs: _jobs,
+        owner: _alice,
+      );
+
+      expect(exclusionOf(_record(5), owned), FeedbackExclusion.fromAgentOwner);
+      expect(exclusionOf(_record(5, client: _bob), owned), isNull);
+      expect(
+        exclusionOf(_record(9), owned),
+        FeedbackExclusion.outOfScale,
+        reason: 'the score is checked first',
+      );
+    });
+
     test('checks the score before the job', () {
       expect(
         exclusionOf(_record(9, tag2: ''), _provenance),

@@ -23,6 +23,7 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart';
 
 import '../agent/registry_reader.dart';
+import 'agent_owner_reader.dart';
 import 'contract_reader.dart';
 import 'escrow_job.dart';
 import 'ledger_errors.dart';
@@ -34,11 +35,6 @@ import 'xdr_invoke_encoder.dart';
 
 /// Registry `UriNotSet`: the agent exists but has no metadata uri.
 const _registryUriNotSet = 2;
-
-/// Registry `AgentNotFound`: there is no agent with that id.
-const _registryAgentNotFound = 3;
-
-/// Escrow `JobNotFound`: there is no job with that id.
 
 /// Reads the Stellar chain through Soroban RPC. It never signs or submits,
 /// although the [SorobanRpcClient] it uses can submit.
@@ -60,6 +56,10 @@ final class SorobanLedger
   final StellarConfig _config;
   final ContractReader _reader;
   late final _jobs = ContractEscrowJobReader(_reader, escrow: _config.escrow);
+  late final _owners = ContractAgentOwnerReader(
+    _reader,
+    identityRegistry: _config.identityRegistry,
+  );
 
   Future<Object?> _read(
     StellarAddress contract,
@@ -78,15 +78,7 @@ final class SorobanLedger
   /// Registry `owner_of`: who registered [agent], or `null` when there is no
   /// such agent.
   @override
-  Future<StellarAddress?> ownerOf(AgentId agent) async {
-    final value = await _read(
-      _config.identityRegistry,
-      'owner_of',
-      [ScArg.u32(agent.value)],
-      absentErrors: const {_registryAgentNotFound},
-    );
-    return value == null ? null : readAddress(value);
-  }
+  Future<StellarAddress?> ownerOf(AgentId agent) => _owners.ownerOf(agent);
 
   /// Registry `agent_uri`, or `null` when the agent has no uri.
   Future<String?> agentUri(AgentId id) async {

@@ -1,5 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart' show ReputationRegistry;
 
+import '../ledger/agent_owner_reader.dart';
 import '../ledger/contract_reader.dart';
 import '../ledger/escrow_job.dart';
 import '../ledger/soroban_reputation_registry.dart';
@@ -31,5 +32,9 @@ ReputationRegistry reputationRegistryFor(
           registry: registry,
           escrow: config.escrow,
           jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
+          owners: ContractAgentOwnerReader(
+            reader,
+            identityRegistry: config.identityRegistry,
+          ),
         );
 }

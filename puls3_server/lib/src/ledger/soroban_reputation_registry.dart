@@ -23,8 +23,8 @@ const jobReadConcurrency = 8;
 ///
 /// What it reads, per agent: `get_clients_paginated` for the clients,
 /// `get_last_index` for how many feedbacks each one gave, `read_feedback`
-/// for each record, then the escrow's `get_job` once for each job those
-/// records reference (#201).
+/// for each record, the identity registry's `owner_of` for the agent, then
+/// the escrow's `get_job` once for each job those records reference (#201).
 ///
 /// [recordsOf] returns every record the registry lists, raw. [feedbacksOf]
 /// is exactly `countedFeedback` of those records and of the jobs read from
@@ -45,14 +45,17 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     required StellarAddress registry,
     required StellarAddress escrow,
     required EscrowJobReader jobs,
+    required AgentOwnerReader owners,
   }) : _registry = registry,
        _escrow = escrow,
-       _jobs = jobs;
+       _jobs = jobs,
+       _owners = owners;
 
   final ContractReader _reader;
   final StellarAddress _registry;
   final StellarAddress _escrow;
   final EscrowJobReader _jobs;
+  final AgentOwnerReader _owners;
 
   /// Jobs read in a final state (`Completed`, `Rejected`, `Expired`). The
   /// escrow never changes them again, so they are not read twice, and a job
@@ -93,9 +96,24 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     final (:records, :clientPages) = await _recordsOf(agent);
     return (
       records: records,
-      provenance: await provenanceOf(records),
+      provenance: await provenanceOf(
+        records,
+        owner: records.isEmpty ? null : await _ownerOf(agent),
+      ),
       clientPages: clientPages,
     );
+  }
+
+  /// The owner of [agent], or null when the identity registry has no such
+  /// agent or its entry is archived: then no record is excluded as the
+  /// owner's. Any other failure is a [LedgerException].
+  Future<StellarAddress?> _ownerOf(AgentId agent) async {
+    try {
+      return await _owners.ownerOf(agent);
+    } on LedgerUnavailable catch (e) {
+      if (e.archived) return null;
+      rethrow;
+    }
   }
 
   /// The jobs [records] reference on [escrow], each read once with
@@ -106,9 +124,12 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   /// so the domain reports that one record as `jobUnreadable` and every other
   /// record still counts. Any other failure (the node, the network) is a
   /// [LedgerException] for the whole read, as for the registry reads.
+  ///
+  /// [owner] is the rated agent's owner, whose ratings do not count.
   Future<FeedbackProvenance> provenanceOf(
-    Iterable<FeedbackRecord> records,
-  ) async {
+    Iterable<FeedbackRecord> records, {
+    StellarAddress? owner,
+  }) async {
     final jobs = <int, ReferencedJob>{};
     final toRead = <int>[];
     for (final id in referencedJobIds(records, _escrow)) {
@@ -136,7 +157,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
         }
       }
     }
-    return FeedbackProvenance(escrow: _escrow, jobs: jobs);
+    return FeedbackProvenance(escrow: _escrow, jobs: jobs, owner: owner);
   }
 
   /// Job [id], or null when the escrow has no such job or its entry is

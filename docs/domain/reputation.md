@@ -123,14 +123,15 @@ not count only for one of these reasons, and no other rule exists
 | `revoked` | Its submitter revoked it (`is_revoked`) |
 | `notWholeScore` | `value_decimals` is not 0 |
 | `outOfScale` | The value is outside 1 to 5 |
+| `fromAgentOwner` | The record's client is the agent's owner on the identity registry (`owner_of`); no rule when the owner cannot be read |
 | `noJobReference` | `tag2` is not a paid-job reference `puls3:job:v1:<escrow>:<job id>` (#201) |
 | `otherEscrow` | The reference names an escrow other than the configured one |
-| `jobUnreadable` | The escrow's `get_job` has no such job (or it cannot be loaded) |
+| `jobUnreadable` | The escrow's `get_job` has no such job, or its entry is archived. It excludes only that record; a node failure fails the whole read |
 | `jobMismatch` | The job's `client` is not the record's client, or its `agent_id` is not the rated agent |
 | `jobNotCompleted` | The job is not `Completed` (not paid and settled, or refunded) |
 | `jobAlreadyRated` | An earlier record already counts for the same job |
 
-The last six tie each rating to a paid hire (#201). `Completed` is reachable
+`fromAgentOwner` applies on chain the rule the server already enforces when it builds `give_feedback`. It does not see a second wallet of the owner: that case is Sybil resistance (#200). The last six tie each rating to a paid hire (#201). `Completed` is reachable
 only through `Funded` and `Submitted` and is terminal, so it proves that the
 client paid the full budget and the provider was paid. The escrow address
 comes from the reader's configuration, never from the record. A rating written

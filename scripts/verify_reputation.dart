@@ -23,6 +23,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_server/src/ledger/agent_owner_reader.dart';
 import 'package:puls3_server/src/ledger/contract_reader.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
@@ -63,6 +64,10 @@ Future<void> main(List<String> args) async {
       registry: registryAddress,
       escrow: config.escrow,
       jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
+      owners: ContractAgentOwnerReader(
+        reader,
+        identityRegistry: config.identityRegistry,
+      ),
     );
 
     final (:records, :provenance, :clientPages) = await registry.readRecords(

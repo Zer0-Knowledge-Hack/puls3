@@ -80,6 +80,10 @@ enum FeedbackExclusion {
   /// A whole value outside [lowestFeedbackScore]..[highestFeedbackScore].
   outOfScale,
 
+  /// The record's client is the rated agent's owner: an owner does not rate
+  /// their own agent, from the app or straight on the contract.
+  fromAgentOwner,
+
   /// `tag2` holds no [PaidJobReference]: nothing ties the rating to a job.
   noJobReference,
 
@@ -128,6 +132,9 @@ FeedbackExclusion? exclusionOf(
 ) {
   final score = _scoreExclusionOf(record);
   if (score != null) return score;
+  if (record.client == provenance.owner) {
+    return FeedbackExclusion.fromAgentOwner;
+  }
   final reference = record.jobReference;
   if (reference == null) return FeedbackExclusion.noJobReference;
   if (reference.escrow != provenance.escrow) {

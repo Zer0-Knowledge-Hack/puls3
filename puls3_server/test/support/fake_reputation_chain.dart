@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
+import 'package:puls3_server/src/ledger/agent_owner_reader.dart';
 import 'package:puls3_server/src/ledger/contract_reader.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
@@ -56,6 +57,13 @@ final class FakeReputationChain {
   /// The escrow's jobs by id. A referenced id that is not here answers
   /// `JobNotFound`.
   final jobs = <int, StoredJob>{};
+
+  /// The identity registry `owner_of` reads go to.
+  static final identityRegistry = StellarConfig.testnet.identityRegistry;
+
+  /// Agent owners by agent id. An agent that is not here answers
+  /// `AgentNotFound`, so no record is excluded as its owner's.
+  final owners = <int, StellarAddress>{};
 
   /// Job ids whose entry is archived: their `get_job` answers a
   /// `restorePreamble`, as a job past its TTL does.
@@ -136,6 +144,10 @@ final class FakeReputationChain {
       registry: registry,
       escrow: escrow,
       jobs: ContractEscrowJobReader(reader, escrow: escrow),
+      owners: ContractAgentOwnerReader(
+        reader,
+        identityRegistry: identityRegistry,
+      ),
     );
   }
 
@@ -193,6 +205,12 @@ final class FakeReputationChain {
       ...state.keys,
       for (var id = 0; id < _unseededAgents; id++) id,
     }) {
+      final owner = owners[agent];
+      answers[_envelope('owner_of', [
+        ScArg.u32(agent),
+      ], contract: identityRegistry)] = owner == null
+          ? {'error': 'HostError: Error(Contract, #3)\n'}
+          : value({'address': owner.value});
       final byClient = state[agent] ?? const {};
       final clients = byClient.keys.toList();
       // Every page up to and including the first empty one.

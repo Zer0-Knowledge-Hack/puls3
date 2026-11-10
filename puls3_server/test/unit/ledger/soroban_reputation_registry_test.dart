@@ -217,8 +217,9 @@ void main() {
 
       test('a failing job read throws, never a silent exclusion', () async {
         final chain = FakeReputationChain()..addPaid(7, _alice, _stored(5));
-        // The two client pages, the last index and the record answer.
-        chain.failAfterRequests = 4;
+        // The two client pages, the last index, the record and the owner
+        // answer; the job read fails.
+        chain.failAfterRequests = 5;
 
         await expectLater(
           chain.adapter.feedbacksOf(AgentId(7)),
@@ -277,6 +278,31 @@ void main() {
           (await adapter.feedbacksOf(AgentId(7))).map((f) => f.score),
           [5],
         );
+      });
+
+      test('a rating from the agent owner does not count', () async {
+        // Paid, completed and for the owner's own client address: the
+        // contract accepts it, the reader does not count it.
+        final chain = FakeReputationChain()..owners[7] = _bob;
+        chain.addPaid(7, _alice, _stored(4));
+        chain.addPaid(7, _bob, _stored(5));
+
+        final read = await chain.adapter.readRecords(AgentId(7));
+
+        expect(read.provenance.owner, _bob);
+        expect(exclusionsOf(read.records, read.provenance), [
+          null,
+          FeedbackExclusion.fromAgentOwner,
+        ]);
+      });
+
+      test('an unknown owner excludes nothing', () async {
+        final chain = FakeReputationChain()..addPaid(7, _bob, _stored(5));
+
+        final read = await chain.adapter.readRecords(AgentId(7));
+
+        expect(read.provenance.owner, isNull);
+        expect(countedFeedback(read.records, read.provenance), hasLength(1));
       });
 
       test('reads more jobs than one batch, each once', () async {
