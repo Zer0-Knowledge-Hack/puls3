@@ -69,7 +69,8 @@ top spot, while the established agent is barely moved from its real mean.
 
 ## On-chain vs. off-chain
 
-Consistent with ADR-0002 (#6) and ADR-0005 D5:
+Consistent with ADR-0002 (#6) and ADR-0005 D5. [ADR-0008](../adr/0008-reputation-formula-off-chain.md)
+(#203) records why the formula is not computed on chain:
 
 - **On-chain — the Reputation Registry (#14, ERC-8004 drop-in).** Stores the
   individual, verifiable **feedback records**: the agent id, the client, the
