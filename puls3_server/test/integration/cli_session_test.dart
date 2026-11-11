@@ -59,13 +59,8 @@ void main() {
 
     group('own wallet only', () {
       test('every call needs a login', () async {
-        Matcher unauthorized() => throwsA(
-          isA<NotAuthorizedException>().having(
-            (e) => e.reason,
-            'reason',
-            AuthenticationFailureReason.unauthenticated,
-          ),
-        );
+        Matcher unauthorized() =>
+            throwsA(isA<ServerpodUnauthenticatedException>());
         await expectLater(
           endpoints.cliSession.create(sessionBuilder),
           unauthorized(),
@@ -89,12 +84,16 @@ void main() {
         final end = client.indexOf('\n}\n', start);
         final cliSession = client.substring(start, end);
 
-        expect(cliSession, contains('create()'));
-        expect(cliSession, contains('list()'));
+        // What each call sends: the argument map of callServerEndpoint.
+        final sent = {
+          for (final m in RegExp(
+            r"'cliSession',\s*'(\w+)',\s*\{([^}]*)\}",
+          ).allMatches(cliSession))
+            m.group(1)!: m.group(2)!.trim(),
+        };
+
+        expect(sent, {'create': '', 'list': '', 'revoke': "'id': id"});
         expect(cliSession, contains('revoke(String id)'));
-        for (final name in ['wallet', 'authUserId', 'userId', 'consumer']) {
-          expect(cliSession, isNot(contains(name)), reason: name);
-        }
       });
 
       test('the session is for the caller', () async {
@@ -224,7 +223,7 @@ void main() {
         expect(sessions.single.id, grant.id);
         expect(sessions.single.expiresAt, grant.expiresAt);
         expect(
-          sessions.single.toJson().keys,
+          sessions.single.toJson().keys.where((k) => !k.startsWith('__')),
           unorderedEquals(['id', 'createdAt', 'lastUsedAt', 'expiresAt']),
         );
       });
