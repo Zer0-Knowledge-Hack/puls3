@@ -33,9 +33,11 @@ HireDetail _detail(
   String? errorCode,
   String? feedbackReference,
   ChainSubmission? feedbackSubmission,
+  int? feedbackScore,
 }) => HireDetail(
   hire: _hire(3).copyWith(feedbackReference: feedbackReference),
   feedbackSubmission: feedbackSubmission,
+  feedbackScore: feedbackScore,
   agent: AgentSummary(
     id: 'agt-003',
     registryId: 9,
@@ -205,11 +207,13 @@ void main() {
           'confirmed',
           feedbackReference: _feedbackHash,
           feedbackSubmission: _feedback('submitted'),
+          feedbackScore: 4,
         ),
       ).getHire(3, _consumer);
       expect(rated.feedbackTransaction, _feedbackHash);
       expect(rated.feedbackState, 'submitted');
       expect(rated.feedbackExplorerUrl, endsWith('/tx/$_feedbackHash'));
+      expect(rated.feedbackScore, 4);
       expect(rated.feedbackPending, isTrue);
 
       // A failed rating clears the reference: the hire can be rated again.
@@ -221,6 +225,7 @@ void main() {
       ).getHire(3, _consumer);
       expect(failed.feedbackTransaction, isNull);
       expect(failed.feedbackState, 'failed');
+      expect(failed.feedbackScore, isNull);
       expect(failed.feedbackExplorerUrl, isNull);
       expect(failed.feedbackPending, isFalse);
       expect(failed.feedbackFailed, isTrue);

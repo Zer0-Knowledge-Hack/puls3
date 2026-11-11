@@ -6,6 +6,7 @@ import '../generated/protocol.dart';
 import '../ledger/escrow_job.dart';
 import '../ledger/ledger_errors.dart';
 import '../runtime/hire_run_store.dart';
+import 'escrow_preparation_store.dart';
 import 'hire_lifecycle_store.dart';
 
 /// Reads one hire for its consumer: `HireEndpoint.getHire` (api.md, F5-5,
@@ -17,17 +18,20 @@ final class HireQueryService {
     required HireRunStore runs,
     required ChainSubmissionStore submissions,
     required Future<AgentSummary?> Function(int registryId) agents,
+    EscrowPreparationStore? preparations,
     EscrowJobReader? jobs,
   }) : _hires = hires,
        _runs = runs,
        _submissions = submissions,
        _agents = agents,
+       _preparations = preparations,
        _jobs = jobs;
 
   final HireLifecycleStore _hires;
   final HireRunStore _runs;
   final ChainSubmissionStore _submissions;
   final Future<AgentSummary?> Function(int registryId) _agents;
+  final EscrowPreparationStore? _preparations;
   final EscrowJobReader? _jobs;
 
   /// The hire [hireId] as [wallet], its consumer, sees it: escrow status,
@@ -50,6 +54,7 @@ final class HireQueryService {
       submissions.where((s) => s.purpose != SubmissionPurpose.giveFeedback),
     );
     final feedback = _feedbackOf(submissions);
+    final feedbackScore = await _feedbackScore(feedback);
     // Run progress is only shown while the hire is funded (api.md, "Hire
     // escrow states"); later states come from the escrow.
     final showsRun = hire.status == HireStatus.funded;
@@ -76,7 +81,23 @@ final class HireQueryService {
       approvalDeadline: await _approvalDeadline(hire.status, jobId),
       escrowSubmission: escrow?.toProtocol(),
       feedbackSubmission: feedback?.toProtocol(),
+      feedbackScore: feedbackScore,
     );
+  }
+
+  /// The score a reloaded S06 shows (#242). It is the one stored with the
+  /// non-failed `giveFeedback` preparation. A failed rating has no score.
+  Future<int?> _feedbackScore(StoredSubmission? feedback) async {
+    final preparations = _preparations;
+    final preparationId = feedback?.preparationId;
+    if (preparations == null ||
+        feedback == null ||
+        _failed(feedback) ||
+        preparationId == null) {
+      return null;
+    }
+    final preparation = await preparations.findByPreparationId(preparationId);
+    return preparation?.feedbackScore;
   }
 
   /// Whether a hire in [status] shows the agent's output (#204, audit E-1).

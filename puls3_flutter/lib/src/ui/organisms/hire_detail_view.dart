@@ -66,8 +66,8 @@ class HireDetailView extends StatelessWidget {
   /// Opens the `give_feedback` transaction on StellarExpert.
   final VoidCallback? onOpenFeedback;
 
-  /// The score sent from this screen. The server keeps only the rating's
-  /// transaction, so a reload shows that it was rated without the score.
+  /// The score sent from this screen before the next poll. The server also
+  /// returns the stored score (`hire.feedbackScore`), which wins on a reload.
   final int? ratedScore;
   final bool isDemo;
 
@@ -286,7 +286,9 @@ class HireDetailView extends StatelessWidget {
   List<Widget> _rating(BuildContext context) {
     final l10n = context.l10n;
     final rated = hire.feedbackTransaction != null;
-    final score = ratedScore;
+    // The server's stored score survives a reload; the local one only fills
+    // the gap until the next getHire.
+    final score = hire.feedbackScore ?? ratedScore;
     return [
       if (hire.feedbackFailed) ...[
         const SizedBox(height: Puls3Spacing.lg),
