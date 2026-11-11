@@ -14,7 +14,21 @@ Future<void> main() async {
     return;
   }
 
-  final sdk = Puls3Sdk.connect(Uri.parse(apiUrl.trim()));
+  final Puls3Sdk sdk;
+  try {
+    sdk = Puls3Sdk.connect(Uri.parse(apiUrl.trim()));
+  } on FormatException {
+    stderr.writeln('PULS3_API_URL is not a URL: $apiUrl');
+    exitCode = 64;
+    return;
+  } on ArgumentError {
+    stderr.writeln(
+      'PULS3_API_URL must be an absolute http or https URL with no query or '
+      'fragment: $apiUrl',
+    );
+    exitCode = 64;
+    return;
+  }
   try {
     final agents = await sdk.listAgents();
     stdout.writeln('${agents.length} agents');
@@ -28,9 +42,18 @@ Future<void> main() async {
   } on AgentCatalogUnavailable catch (e) {
     stderr.writeln('catalog unavailable: ${e.message}');
     exitCode = 1;
+  } on Puls3ApiException catch (e) {
+    // The server answered with its own error code, for example RateLimited.
+    stderr.writeln('server error ${e.code}: ${e.message ?? ''}');
+    exitCode = 1;
   } on ServerpodClientException catch (e) {
     // The server was not reached, timed out or answered with an HTTP error.
     stderr.writeln('cannot reach $apiUrl: ${e.message}');
+    exitCode = 1;
+  } on IOException catch (e) {
+    // Below the client: a TLS handshake the machine refuses (for example a
+    // certificate it does not trust) or a socket error.
+    stderr.writeln('cannot reach $apiUrl: $e');
     exitCode = 1;
   } finally {
     sdk.close();
