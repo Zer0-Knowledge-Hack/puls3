@@ -1,17 +1,31 @@
 BEGIN;
 
 --
--- ACTION ALTER TABLE
+-- ACTION CREATE TABLE
 --
-ALTER TABLE "escrow_preparation" ADD COLUMN "feedbackScore" bigint;
+CREATE TABLE "builder_credential" (
+    "id" bigserial PRIMARY KEY,
+    "owner" text NOT NULL,
+    "provider" text NOT NULL,
+    "accountId" text,
+    "ciphertext" text NOT NULL,
+    "nonce" text NOT NULL,
+    "mac" text NOT NULL,
+    "keyVersion" bigint NOT NULL,
+    "updatedAt" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "builder_credential_owner_provider_idx" ON "builder_credential" USING btree ("owner", "provider");
+
 
 --
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261109220416749-feedback-score', now())
+    VALUES ('puls3', '20261107055052324', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261109220416749-feedback-score', "timestamp" = now();
+    DO UPDATE SET "version" = '20261107055052324', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

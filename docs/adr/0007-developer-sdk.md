@@ -4,7 +4,7 @@
 - **Date:** 2026-11-05
 - **Issue:** #222 (week 2 of the developer platform)
 - **Clients of this package:** the `puls3` CLI (#224), the MCP server (#226)
-- **Guides:** SDK quickstart (#223), CLI reference (#225), MCP setup (#227)
+- **Guides:** SDK quickstart (#223), CLI reference (#225), [MCP setup](../mcp/setup.md) (#227)
 - **Related:** [API contract](../architecture/api.md) · [ADR-0001](0001-system-architecture.md) · [secrets](../infra/secrets.md)
 
 ## Context
@@ -73,4 +73,4 @@ Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API
 - The CLI and the MCP server cannot drift from the server: they use the same operations and the same errors.
 - Nothing in the SDK can move funds. A prepared envelope still has to be signed in a wallet.
 - Changing a server endpoint changes the SDK in the same PR, or the SDK's tests against the generated client fail to compile.
-- The quickstart (#223) and the CLI and MCP guides document the session variables once Open decision 1 is settled.
+- The [quickstart](../sdk/quickstart.md) (#223) and the CLI and MCP guides document the session variables once Open decision 1 is settled.

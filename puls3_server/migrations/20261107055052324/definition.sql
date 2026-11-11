@@ -70,6 +70,24 @@ CREATE UNIQUE INDEX "agent_wallet_idempotency_idx" ON "agent_wallet" USING btree
 CREATE INDEX "agent_wallet_owner_idx" ON "agent_wallet" USING btree ("owner");
 
 --
+-- Class BuilderCredentialRecord as table builder_credential
+--
+CREATE TABLE "builder_credential" (
+    "id" bigserial PRIMARY KEY,
+    "owner" text NOT NULL,
+    "provider" text NOT NULL,
+    "accountId" text,
+    "ciphertext" text NOT NULL,
+    "nonce" text NOT NULL,
+    "mac" text NOT NULL,
+    "keyVersion" bigint NOT NULL,
+    "updatedAt" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "builder_credential_owner_provider_idx" ON "builder_credential" USING btree ("owner", "provider");
+
+--
 -- Class CatalogIndexState as table catalog_index_state
 --
 CREATE TABLE "catalog_index_state" (
@@ -124,7 +142,6 @@ CREATE TABLE "escrow_preparation" (
     "validUntil" timestamp without time zone NOT NULL,
     "jobExpiredAt" bigint,
     "rejectReason" text,
-    "feedbackScore" bigint,
     "createdAt" timestamp without time zone NOT NULL,
     "supersededAt" timestamp without time zone,
     "submittedAt" timestamp without time zone
@@ -1035,9 +1052,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261109220416749-feedback-score', now())
+    VALUES ('puls3', '20261107055052324', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261109220416749-feedback-score', "timestamp" = now();
+    DO UPDATE SET "version" = '20261107055052324', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod
