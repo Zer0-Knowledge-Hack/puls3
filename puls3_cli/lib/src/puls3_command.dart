@@ -11,6 +11,10 @@ typedef SdkConnector = Puls3Sdk Function(Uri apiUrl);
 /// The environment variable read when `--api` is not given.
 const apiUrlVariable = 'PULS3_API_URL';
 
+/// The environment variable read when `hire get` has no `--wallet`: the
+/// public address of the session wallet. It is not a secret.
+const walletVariable = 'PULS3_WALLET';
+
 /// The exit codes of `puls3`. `docs/cli/reference.md` lists them.
 abstract final class ExitCodes {
   /// The command succeeded.
@@ -27,13 +31,19 @@ abstract final class ExitCodes {
 
   /// The server could not be reached, or the catalog is down.
   static const unavailable = 69;
+
+  /// A hire or Studio command has no wallet session, or the server refused
+  /// the one it has (expired or revoked).
+  static const noSession = 77;
 }
 
 /// Runs `puls3` with [arguments] and returns the exit code.
 ///
 /// Success writes to [out]. Every failure writes one `error: <code>: ...`
 /// line to [err], plus the usage for a usage error, and nothing to [out].
-/// The command never signs or submits a transaction.
+/// The command never signs or submits a transaction: `hire prepare-complete`
+/// and `hire prepare-reject` print the unsigned envelope for the wallet to
+/// sign.
 Future<int> runPuls3(
   List<String> arguments, {
   required SdkConnector connect,
@@ -49,35 +59,33 @@ Future<int> runPuls3(
     return _usageError(err, parser, e.message);
   }
 
-  final catalog = args.command;
-  final action = catalog?.command;
-  final help = [args, catalog, action].any((r) => r?.flag('help') ?? false);
+  final group = args.command;
+  final action = group?.command;
+  final help = [args, group, action].any((r) => r?.flag('help') ?? false);
   if (help) {
     out.writeln(_usage(parser));
     return ExitCodes.ok;
   }
-  if (catalog == null) {
-    return _usageError(err, parser, 'Missing command.');
+  if (group == null) {
+    return _usageError(
+      err,
+      parser,
+      args.rest.isEmpty ? 'Missing command.' : 'Unknown command.',
+    );
   }
   if (action == null) {
-    return _usageError(err, parser, 'Missing catalog command.');
+    return _usageError(
+      err,
+      parser,
+      group.rest.isEmpty
+          ? 'Missing ${group.name} command.'
+          : 'Unknown ${group.name} command.',
+    );
   }
 
-  final String? id;
-  switch (action.name) {
-    case 'list':
-      if (action.rest.isNotEmpty) {
-        return _usageError(err, parser, '`catalog list` takes no argument.');
-      }
-      id = null;
-    case 'get':
-      if (action.rest.length != 1 || action.rest.single.trim().isEmpty) {
-        return _usageError(err, parser, '`catalog get` takes one agent id.');
-      }
-      id = action.rest.single.trim();
-    default:
-      return _usageError(err, parser, 'Unknown command.');
-  }
+  final parsed = _callOf(group.name ?? '', action, environment);
+  if (parsed is _Invalid) return _usageError(err, parser, parsed.message);
+  final call = parsed as _Call;
 
   final apiText = (args.option('api') ?? environment[apiUrlVariable] ?? '')
       .trim();
@@ -103,23 +111,26 @@ Future<int> runPuls3(
 
   final json = args.flag('json');
   try {
-    if (id == null) {
-      _printList(out, await sdk.listAgents(), json: json);
-      return ExitCodes.ok;
-    }
-    final agent = await sdk.getAgent(id);
-    if (agent == null) {
-      err.writeln('error: NotFound: no agent with id $id');
-      return ExitCodes.notFound;
-    }
-    _printAgent(out, agent, json: json);
-    return ExitCodes.ok;
+    return await call.run(sdk, out, err, json);
+  } on SessionRequired catch (e) {
+    err.writeln(
+      'error: SessionRequired: ${e.operation} needs a wallet session. '
+      'Copy a CLI session from the app (#259).',
+    );
+    return ExitCodes.noSession;
   } on Puls3ApiException catch (e) {
     err.writeln('error: ${e.code}: ${e.message}');
     return ExitCodes.serverError;
   } on AgentCatalogUnavailable catch (e) {
     err.writeln('error: AgentCatalogUnavailable: ${e.message}');
     return ExitCodes.unavailable;
+  } on ServerpodClientUnauthorized {
+    // The server refused the session: expired, revoked, or never valid.
+    err.writeln(
+      'error: Unauthorized: the server refused the wallet session. '
+      'Copy a new CLI session from the app.',
+    );
+    return ExitCodes.noSession;
   } on ServerpodClientException catch (e) {
     // Not reached, timed out, or an HTTP error before any endpoint answered.
     err.writeln('error: Unreachable: $apiText: ${e.message}');
@@ -133,6 +144,137 @@ Future<int> runPuls3(
   } finally {
     sdk.close();
   }
+}
+
+/// What runs once the SDK is open: it writes the result and returns the exit
+/// code.
+typedef _Run =
+    Future<int> Function(
+      Puls3Sdk sdk,
+      StringSink out,
+      StringSink err,
+      bool json,
+    );
+
+/// A checked command line: a usage error, or the call to make.
+sealed class _Parsed {}
+
+final class _Invalid extends _Parsed {
+  _Invalid(this.message);
+
+  final String message;
+}
+
+final class _Call extends _Parsed {
+  _Call(this.run);
+
+  final _Run run;
+}
+
+/// Checks the arguments of `<group> <action>` before anything is opened, so
+/// a usage error never reaches the server.
+_Parsed _callOf(
+  String group,
+  ArgResults action,
+  Map<String, String> environment,
+) {
+  final rest = action.rest;
+  switch ((group, action.name)) {
+    case ('catalog', 'list'):
+      if (rest.isNotEmpty) {
+        return _Invalid('`catalog list` takes no argument.');
+      }
+      return _Call((sdk, out, err, json) async {
+        _printList(out, await sdk.listAgents(), json: json);
+        return ExitCodes.ok;
+      });
+
+    case ('catalog', 'get'):
+      if (rest.length != 1 || rest.single.trim().isEmpty) {
+        return _Invalid('`catalog get` takes one agent id.');
+      }
+      final id = rest.single.trim();
+      return _Call((sdk, out, err, json) async {
+        final agent = await sdk.getAgent(id);
+        if (agent == null) {
+          err.writeln('error: NotFound: no agent with id $id');
+          return ExitCodes.notFound;
+        }
+        _printAgent(out, agent, json: json);
+        return ExitCodes.ok;
+      });
+
+    case ('hire', 'get'):
+      final getId = _positiveId(rest);
+      if (getId == null) {
+        return _Invalid('`hire get` takes one hire id, 1 or more.');
+      }
+      final wallet =
+          (action.option('wallet') ?? environment[walletVariable] ?? '').trim();
+      if (wallet.isEmpty) {
+        return _Invalid(
+          '`hire get` needs the session wallet: pass --wallet or set '
+          '$walletVariable.',
+        );
+      }
+      return _Call((sdk, out, err, json) async {
+        _printHire(out, await sdk.getHire(getId, wallet), json: json);
+        return ExitCodes.ok;
+      });
+
+    case ('hire', 'prepare-complete'):
+      final completeId = _positiveId(rest);
+      if (completeId == null) {
+        return _Invalid('`hire prepare-complete` takes one hire id, 1 or more.');
+      }
+      return _Call((sdk, out, err, json) async {
+        _printPrepared(out, await sdk.prepareComplete(completeId), json: json);
+        return ExitCodes.ok;
+      });
+
+    case ('hire', 'prepare-reject'):
+      final rejectId = _positiveId(rest);
+      if (rejectId == null) {
+        return _Invalid('`hire prepare-reject` takes one hire id, 1 or more.');
+      }
+      final reason = (action.option('reason') ?? '').trim();
+      if (reason.isEmpty) {
+        return _Invalid('`hire prepare-reject` needs --reason <text>.');
+      }
+      return _Call((sdk, out, err, json) async {
+        _printPrepared(
+          out,
+          await sdk.prepareReject(rejectId, reason),
+          json: json,
+        );
+        return ExitCodes.ok;
+      });
+
+    case ('studio', 'test-run'):
+      if (rest.isNotEmpty) {
+        return _Invalid('`studio test-run` takes only --draft and --input.');
+      }
+      final draftId = _positiveId([action.option('draft') ?? '']);
+      if (draftId == null) {
+        return _Invalid('`studio test-run` needs --draft <id>, 1 or more.');
+      }
+      final input = action.option('input') ?? '';
+      if (input.trim().isEmpty) {
+        return _Invalid('`studio test-run` needs --input <text>.');
+      }
+      return _Call((sdk, out, err, json) async {
+        _printTestRun(out, await sdk.testRun(draftId, input), json: json);
+        return ExitCodes.ok;
+      });
+  }
+  return _Invalid('Unknown command.');
+}
+
+/// The single argument of [rest] as an id of 1 or more, or null.
+int? _positiveId(List<String> rest) {
+  if (rest.length != 1) return null;
+  final id = int.tryParse(rest.single.trim());
+  return id != null && id >= 1 ? id : null;
 }
 
 ArgParser _parser() {
@@ -155,6 +297,36 @@ ArgParser _parser() {
       withHelp()
         ..addCommand('list', withHelp())
         ..addCommand('get', withHelp()),
+    )
+    ..addCommand(
+      'hire',
+      withHelp()
+        ..addCommand(
+          'get',
+          withHelp()..addOption(
+            'wallet',
+            valueHelp: 'G...',
+            help: 'The session wallet. Defaults to \$$walletVariable.',
+          ),
+        )
+        ..addCommand('prepare-complete', withHelp())
+        ..addCommand(
+          'prepare-reject',
+          withHelp()..addOption(
+            'reason',
+            valueHelp: 'text',
+            help: 'Why the result is rejected.',
+          ),
+        ),
+    )
+    ..addCommand(
+      'studio',
+      withHelp()..addCommand(
+        'test-run',
+        withHelp()
+          ..addOption('draft', valueHelp: 'id', help: 'The saved draft.')
+          ..addOption('input', valueHelp: 'text', help: 'The test input.'),
+      ),
     );
 }
 
@@ -163,15 +335,23 @@ String _usage(ArgParser parser) =>
 Usage: puls3 [--api <url>] [--json] <command>
 
 Commands:
-  catalog list        Every agent in the catalog.
-  catalog get <id>    One agent by its metadata id, for example agt-001.
+  catalog list                        Every agent in the catalog.
+  catalog get <id>                    One agent by its metadata id.
+  hire get <id> [--wallet <G...>]     One of the session wallet's hires.
+  hire prepare-complete <id>          The unsigned complete of a hire.
+  hire prepare-reject <id> --reason <text>
+                                      The unsigned reject of a hire.
+  studio test-run --draft <id> --input <text>
+                                      Runs a saved draft once.
 
 Options:
 ${parser.usage}
 
-puls3 reads; it never signs or submits a transaction. Hire and Studio
-commands wait for the session decision in docs/adr/0007-developer-sdk.md.
-Exit codes: 0 ok, 1 server error, 3 not found, 64 usage, 69 unavailable.''';
+puls3 never signs or submits a transaction: the prepare commands print the
+unsigned envelope for the wallet to sign. Hire and Studio commands need a
+wallet session from the app (#259).
+Exit codes: 0 ok, 1 server error, 3 not found, 64 usage, 69 unavailable,
+77 no session.''';
 
 int _usageError(StringSink err, ArgParser parser, String message) {
   err
@@ -234,6 +414,108 @@ Map<String, Object?> _toJson(AgentSummary agent) => {
   'rating': agent.rating,
   'paidHireCount': agent.paidHireCount,
 };
+
+void _printHire(StringSink out, HireDetail detail, {required bool json}) {
+  if (json) {
+    out.writeln(jsonEncode(_hireJson(detail)));
+    return;
+  }
+  final hire = detail.hire;
+  out
+    ..writeln('hire ${hire.id}  ${_status(detail)}')
+    ..writeln('agent        ${detail.agent.id}  ${detail.agent.name}')
+    ..writeln('price        ${formatUsdc(hire.price)} USDC')
+    ..writeln('job id       ${detail.jobId ?? '-'}')
+    ..writeln('expires      ${_time(detail.expiresAt)}')
+    ..writeln('approve by   ${_time(detail.approvalDeadline)}')
+    ..writeln('payment      ${detail.paymentExplorerUrl ?? '-'}');
+  final reason = detail.rejectReason;
+  if (reason != null) out.writeln('rejected     $reason');
+  out
+    ..writeln()
+    ..writeln('input')
+    ..writeln(detail.input);
+  final result = detail.result;
+  if (result != null) {
+    out
+      ..writeln()
+      ..writeln('result')
+      ..writeln(result);
+  }
+}
+
+/// The hire status as the API names it; a hire with no job yet is `open`.
+String _status(HireDetail detail) => detail.hire.status ?? 'open';
+
+/// The fields `--json` prints for a hire.
+Map<String, Object?> _hireJson(HireDetail detail) => {
+  'id': detail.hire.id,
+  'status': _status(detail),
+  'agentId': detail.agent.id,
+  'agentName': detail.agent.name,
+  'consumer': detail.hire.consumer,
+  'priceUsdcStroops': detail.hire.price,
+  'jobId': detail.jobId,
+  'expiresAt': _isoOrNull(detail.expiresAt),
+  'approvalDeadline': _isoOrNull(detail.approvalDeadline),
+  'input': detail.input,
+  'result': detail.result,
+  'rejectReason': detail.rejectReason,
+  'paymentExplorerUrl': detail.paymentExplorerUrl,
+};
+
+void _printPrepared(
+  StringSink out,
+  PreparedTransaction prepared, {
+  required bool json,
+}) {
+  if (json) {
+    out.writeln(jsonEncode(_preparedJson(prepared)));
+    return;
+  }
+  out
+    ..writeln('preparation  ${prepared.preparationId}')
+    ..writeln('purpose      ${prepared.purpose}')
+    ..writeln('signer       ${prepared.signer}')
+    ..writeln('network      ${prepared.networkPassphrase}')
+    ..writeln('expires      ${_time(prepared.expiresAt)}')
+    ..writeln()
+    ..writeln('unsigned transaction (not signed, not submitted):')
+    ..writeln(prepared.unsignedTransactionXdr ?? '-');
+}
+
+/// The fields `--json` prints for a prepared transaction.
+Map<String, Object?> _preparedJson(PreparedTransaction prepared) => {
+  'preparationId': prepared.preparationId,
+  'purpose': prepared.purpose,
+  'signer': prepared.signer,
+  'networkPassphrase': prepared.networkPassphrase,
+  'unsignedTransactionXdr': prepared.unsignedTransactionXdr,
+  'expiresAt': _isoOrNull(prepared.expiresAt),
+};
+
+void _printTestRun(StringSink out, TestRunResult run, {required bool json}) {
+  if (json) {
+    out.writeln(
+      jsonEncode({
+        'output': run.output,
+        'remainingDailyRuns': run.remainingDailyRuns,
+      }),
+    );
+    return;
+  }
+  final left = run.remainingDailyRuns == 1
+      ? '1 test run left today'
+      : '${run.remainingDailyRuns} test runs left today';
+  out
+    ..writeln(run.output)
+    ..writeln()
+    ..writeln(left);
+}
+
+String _time(DateTime? time) => _isoOrNull(time) ?? '-';
+
+String? _isoOrNull(DateTime? time) => time?.toUtc().toIso8601String();
 
 /// The message of a TLS or socket failure, with the OS reason when there is
 /// one (for example `CERTIFICATE_VERIFY_FAILED: self signed certificate`).

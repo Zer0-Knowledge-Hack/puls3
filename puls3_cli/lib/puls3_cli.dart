@@ -3,4 +3,4 @@
 library;
 
 export 'src/puls3_command.dart'
-    show ExitCodes, SdkConnector, apiUrlVariable, runPuls3;
+    show ExitCodes, SdkConnector, apiUrlVariable, runPuls3, walletVariable;
