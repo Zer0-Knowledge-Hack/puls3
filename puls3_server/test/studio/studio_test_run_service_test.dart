@@ -122,7 +122,7 @@ void main() {
 
       await expectLater(
         () => box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi'),
-        throwsA(isA<StudioRuntimeUnavailable>()),
+        throwsA(isA<StudioCredentialMissing>()),
       );
       expect(box.tasks, isEmpty);
 
@@ -135,6 +135,75 @@ void main() {
       expect(result.remainingDailyRuns, studioDailyTestRuns - 1);
     },
   );
+
+  test(
+    'an unusable credential is CredentialInvalid, not a missing one',
+    () async {
+      final box = harness();
+
+      for (final credential in const [
+        BuilderProviderCredential(
+          provider: 'workers-ai',
+          secret: '   ',
+          accountId: 'builder-account',
+        ),
+        BuilderProviderCredential(
+          provider: 'workers-ai',
+          secret: 'builder-token',
+          accountId: '   ',
+        ),
+        BuilderProviderCredential(
+          provider: 'workers-ai',
+          secret: 'builder-token',
+        ),
+      ]) {
+        await expectLater(
+          () => box.runs.saveCredential(
+            owner: wallet(owner),
+            credential: credential,
+          ),
+          throwsA(isA<StudioCredentialInvalid>()),
+          reason: '${credential.provider} ${credential.accountId}',
+        );
+      }
+    },
+  );
+
+  test('an unknown provider is ProviderUnsupported, not a bad token', () async {
+    final box = harness();
+
+    await expectLater(
+      () => box.runs.saveCredential(
+        owner: wallet(owner),
+        credential: const BuilderProviderCredential(
+          provider: 'unknown',
+          secret: 'builder-token',
+        ),
+      ),
+      throwsA(isA<StudioProviderUnsupported>()),
+    );
+  });
+
+  test('saved secrets and account ids are trimmed', () async {
+    final credentials = MemoryBuilderCredentialStore();
+    final box = harness(credentials: credentials);
+
+    await box.runs.saveCredential(
+      owner: wallet(owner),
+      credential: const BuilderProviderCredential(
+        provider: 'workers-ai',
+        secret: '  builder-token  ',
+        accountId: '  builder-account  ',
+      ),
+    );
+
+    final stored = await credentials.find(
+      owner: owner,
+      provider: 'workers-ai',
+    );
+    expect(stored?.secret, 'builder-token');
+    expect(stored?.accountId, 'builder-account');
+  });
 
   test('another wallet gets no prompt and no run', () async {
     final box = harness();
