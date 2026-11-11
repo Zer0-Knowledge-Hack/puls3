@@ -239,15 +239,30 @@ For contract work and E2E tests, [docs/testing/local-environment.md](docs/testin
 
 ### Quality gates
 
+Melos runs the same checks across the workspace (#254). Use the pinned Flutter
+toolchain from above. On Windows, run `melos` from Git Bash or WSL: the scripts
+are POSIX shell and fail from cmd.exe or PowerShell.
+
+```bash
+dart pub global activate melos 8.10.1
+melos bs                     # links the workspace packages
+
+melos run analyze            # dart/flutter analyze --fatal-infos
+melos run test:unit          # domain + server units + app widgets, no services
+melos run test:integration   # Serverpod tests; needs postgres_test and redis_test
+melos run test:e2e           # needs the local sandbox in docs/testing/local-environment.md
+```
+
+The underlying per-package commands:
+
 ```bash
 # Domain (pure Dart)
 cd puls3_domain
 dart analyze --fatal-infos && dart test
 
-# Server (uses the test database on 9090 and the test Redis on 9091)
+# Server (unit set; the `test/integration` directory needs the services on 9090/9091)
 cd ../puls3_server
-docker compose up -d postgres_test redis_test
-dart analyze --fatal-infos && dart test test/unit test/hire test/ledger
+dart analyze --fatal-infos && dart test $(ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$')
 
 # App
 cd ../puls3_flutter
