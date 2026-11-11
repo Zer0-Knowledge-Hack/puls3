@@ -75,17 +75,21 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
 
     final stored = await repo.insertFailed(
       purpose: SubmissionPurpose.submit,
-      transactionHash: _txA,
-      errorCode: SubmissionOutcomeCode.escrowCallFailed,
+      errorCode: SubmissionOutcomeCode.submitSimulationRejected,
       hireId: 7,
     );
 
     expect(stored.state, SubmissionState.failed);
-    expect(stored.errorCode, SubmissionOutcomeCode.escrowCallFailed);
+    expect(
+      stored.errorCode,
+      SubmissionOutcomeCode.submitSimulationRejected,
+    );
     expect(stored.purpose, SubmissionPurpose.submit);
     expect(stored.hireId, 7);
     expect(stored.preparationId, isNull);
     expect(stored.signedEnvelopeXdr, isEmpty);
+    expect(stored.transactionHash, isEmpty);
+    expect(stored.toProtocol().transaction, isNull);
   });
 
   test('findByPreparation returns the stored record or null', () async {

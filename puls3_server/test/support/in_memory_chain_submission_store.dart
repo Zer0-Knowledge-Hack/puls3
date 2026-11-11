@@ -59,7 +59,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   @override
   Future<StoredSubmission> insertFailed({
     required SubmissionPurpose purpose,
-    required String transactionHash,
+    String? transactionHash,
     required String errorCode,
     int? hireId,
     String? explorerUrl,
@@ -67,7 +67,8 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   }) async {
     checkPreparation(purpose, null);
     checkOutcomeCode(errorCode);
-    if (_rows.values.any((r) => r.transactionHash == transactionHash)) {
+    if (transactionHash != null &&
+        _rows.values.any((r) => r.transactionHash == transactionHash)) {
       throw const ChainSubmissionConflict(ChainSubmissionIndex.transaction);
     }
     final now = _now().toUtc();
@@ -75,7 +76,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
       id: _nextId++,
       preparationId: null,
       purpose: purpose,
-      transactionHash: transactionHash,
+      transactionHash: transactionHash ?? '',
       state: SubmissionState.failed,
       errorCode: errorCode,
       explorerUrl: explorerUrl,

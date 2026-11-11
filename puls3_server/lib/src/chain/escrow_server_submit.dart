@@ -141,7 +141,22 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
         inclusionFee: inclusionFee,
         validUntil: until.millisecondsSinceEpoch ~/ 1000,
       );
-      prepared = _codec.build(spec, await _accounts.simulate(spec));
+      prepared = _codec.build(spec, await _accounts.simulateRaw(spec));
+    } on LedgerContractError catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Simulation for ${purpose.wireName} of hire $hireId was rejected with '
+        'contract error #${e.code}',
+      );
+      await _recordSimulationFailure(hireId, purpose);
+      return;
+    } on LedgerSimulationError catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Simulation for ${purpose.wireName} of hire $hireId failed: $e',
+      );
+      await _recordSimulationFailure(hireId, purpose);
+      return;
     } on LedgerException catch (e) {
       _log(
         ChainLogLevel.warning,
@@ -213,6 +228,27 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
       _log(
         ChainLogLevel.warning,
         'Sending submission ${record.id} failed: $e; it stays submitted',
+      );
+    }
+  }
+
+  /// Counts one simulation failure against the bounded attempts. No
+  /// envelope exists, so the row has no transaction.
+  Future<void> _recordSimulationFailure(
+    int hireId,
+    SubmissionPurpose purpose,
+  ) async {
+    try {
+      await _submissions.insertFailed(
+        purpose: purpose,
+        errorCode: SubmissionOutcomeCode.simulationFailed,
+        hireId: hireId,
+      );
+    } on ChainSubmissionConflict catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Hire $hireId already recorded this ${purpose.wireName} simulation '
+        'failure (${e.index.name})',
       );
     }
   }

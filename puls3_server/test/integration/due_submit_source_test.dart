@@ -164,12 +164,32 @@ void main() {
           hireId,
           SubmissionPurpose.submit,
           SubmissionState.failed,
-          errorCode: SubmissionOutcomeCode.escrowCallFailed,
+          errorCode: SubmissionOutcomeCode.submitSimulationRejected,
         );
 
         final due = await ServerpodDueSubmitSource(session).list();
 
         expect(due, isEmpty);
+      },
+    );
+
+    test(
+      'an unreadable-row EscrowCallFailed is still 1 of 3 attempts',
+      () async {
+        final session = sessionBuilder.build();
+        await custody(session);
+        final hireId = await succeeded(session);
+        await relay(
+          session,
+          hireId,
+          SubmissionPurpose.submit,
+          SubmissionState.failed,
+          errorCode: SubmissionOutcomeCode.escrowCallFailed,
+        );
+
+        final due = await ServerpodDueSubmitSource(session).list();
+
+        expect(due.map((d) => d.hireId), [hireId]);
       },
     );
 

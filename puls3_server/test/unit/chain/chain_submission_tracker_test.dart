@@ -83,7 +83,7 @@ final class _FlakyStore implements ChainSubmissionStore {
   @override
   Future<StoredSubmission> insertFailed({
     required SubmissionPurpose purpose,
-    required String transactionHash,
+    String? transactionHash,
     required String errorCode,
     int? hireId,
     String? explorerUrl,

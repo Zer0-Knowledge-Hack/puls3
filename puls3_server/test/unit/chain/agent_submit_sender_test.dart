@@ -37,6 +37,7 @@ DueSubmit _due({int hireId = 4, int jobId = 12}) => DueSubmit(
 
 final class _Accounts implements ChainAccounts {
   Object? failure;
+  Object? simulationFailure;
   var sequence = 8;
   final specs = <EnvelopeSpec>[];
 
@@ -50,10 +51,13 @@ final class _Accounts implements ChainAccounts {
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
     specs.add(spec);
-    final failure = this.failure;
+    final failure = simulationFailure ?? this.failure;
     if (failure != null) throw failure;
     return const SimulationData(transactionData: 'AAAA', minResourceFee: 50);
   }
+
+  @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
 
   @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async => null;
@@ -195,30 +199,67 @@ void main() {
     expect(sent, isEmpty);
   });
 
-  test('a deterministic simulation rejection is stored as terminal', () async {
-    accounts.failure = const LedgerContractError(106, 'SubmitTooLate');
+  test(
+    'an expired / too-late submit is terminal and has no transaction',
+    () async {
+      for (final code in [9, 106]) {
+        store = InMemoryChainSubmissionStore();
+        accounts.simulationFailure = LedgerContractError(code, 'terminal');
+        await sender().send(_due());
+
+        expect(codec.built, isEmpty);
+        expect(sent, isEmpty);
+        final record = store.all.single;
+        expect(record.purpose, SubmissionPurpose.submit);
+        expect(record.state, SubmissionState.failed);
+        expect(
+          record.errorCode,
+          SubmissionOutcomeCode.submitSimulationRejected,
+        );
+        expect(record.hireId, 4);
+        expect(record.transactionHash, isEmpty);
+        expect(record.toProtocol().transaction, isNull);
+      }
+    },
+  );
+
+  test('a non-permanent contract rejection counts toward the bound', () async {
+    accounts.simulationFailure = const LedgerContractError(2, 'InvalidState');
+
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      await sender().send(_due());
+    }
+
+    expect(sent, isEmpty);
+    expect(store.all, hasLength(maxEscrowCallAttempts));
+    expect(
+      store.all.map((row) => row.errorCode),
+      everyElement(
+        SubmissionOutcomeCode.simulationFailed,
+      ),
+    );
+    await sender().send(_due());
+    expect(store.all, hasLength(maxEscrowCallAttempts));
+  });
+
+  test('a non-contract simulation failure counts toward the bound', () async {
+    accounts.simulationFailure = const LedgerSimulationError('auth failure');
 
     await sender().send(_due());
 
-    expect(codec.built, isEmpty);
-    expect(sent, isEmpty);
-    final record = store.all.single;
-    expect(record.purpose, SubmissionPurpose.submit);
-    expect(record.state, SubmissionState.failed);
-    expect(record.errorCode, SubmissionOutcomeCode.escrowCallFailed);
-    expect(record.hireId, 4);
-    expect(record.transactionHash, hasLength(64));
+    expect(store.all.single.errorCode, SubmissionOutcomeCode.simulationFailed);
+    expect(store.all.single.transactionHash, isEmpty);
   });
 
   test('a network simulation failure is not stored and is retried', () async {
-    accounts.failure = const LedgerUnavailable('rpc down');
+    accounts.simulationFailure = const LedgerUnavailable('rpc down');
 
     await sender().send(_due());
 
     expect(store.all, isEmpty);
     expect(codec.built, isEmpty);
 
-    accounts.failure = null;
+    accounts.simulationFailure = null;
     await sender().send(_due());
 
     expect(store.all.single.state, SubmissionState.submitted);

@@ -81,7 +81,7 @@ final class _RacingStore implements ChainSubmissionStore {
   @override
   Future<StoredSubmission> insertFailed({
     required SubmissionPurpose purpose,
-    required String transactionHash,
+    String? transactionHash,
     required String errorCode,
     int? hireId,
     String? explorerUrl,
@@ -736,7 +736,7 @@ void main() {
         );
         final record = detail.escrowSubmission!;
         final chain = FakeSubmissionLedger();
-        chain.lookups[record.transaction] = const TransactionLookup(
+        chain.lookups[record.transaction!] = const TransactionLookup(
           status: TransactionStatus.success,
         );
         final effects = FakeEscrowEffects();

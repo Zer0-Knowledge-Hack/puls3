@@ -68,7 +68,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   @override
   Future<StoredSubmission> insertFailed({
     required SubmissionPurpose purpose,
-    required String transactionHash,
+    String? transactionHash,
     required String errorCode,
     int? hireId,
     String? explorerUrl,
@@ -270,7 +270,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       id: row.id!,
       preparationId: row.preparationId,
       purpose: purpose,
-      transactionHash: row.transaction,
+      transactionHash: row.transaction ?? '',
       state: state,
       errorCode: row.errorCode,
       explorerUrl: row.explorerUrl,

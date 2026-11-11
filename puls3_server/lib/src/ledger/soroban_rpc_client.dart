@@ -148,9 +148,9 @@ final class SorobanRpcClient {
   /// base64 XDR: the Soroban data, minimum resource fee and authorization
   /// entries the relay splices into the envelope it prepares.
   ///
-  /// A contract failure is a [LedgerContractError]; archived state that needs
-  /// a restore, any other simulation error and an answer without the data
-  /// are a [LedgerUnavailable].
+  /// A contract failure is a [LedgerContractError]; a non-contract simulation
+  /// failure is a [LedgerSimulationError]; archived state that needs a
+  /// restore and an answer without the data are a [LedgerUnavailable].
   Future<SimulationData> simulateTransactionBase64(String envelope) async {
     const method = 'simulateTransaction';
     final result = await _call(method, {
@@ -166,7 +166,7 @@ final class SorobanRpcClient {
     if (error is String && error.isNotEmpty) {
       final code = contractErrorCode(error);
       throw code == null
-          ? const LedgerUnavailable('$method failed')
+          ? const LedgerSimulationError('$method failed')
           : LedgerContractError(code, '$method failed with #$code');
     }
     final transactionData = result['transactionData'];

@@ -32,7 +32,9 @@ final class StoredSubmission {
   final String? preparationId;
   final SubmissionPurpose purpose;
 
-  /// 64-character hex hash of [signedEnvelopeXdr].
+  /// 64-character hex hash of [signedEnvelopeXdr]; empty for a failed
+  /// simulation that never produced an envelope. [toProtocol] exposes that
+  /// as null.
   final String transactionHash;
   final SubmissionState state;
 
@@ -65,7 +67,7 @@ final class StoredSubmission {
     id: id,
     preparationId: preparationId,
     purpose: purpose.wireName,
-    transaction: transactionHash,
+    transaction: transactionHash.isEmpty ? null : transactionHash,
     state: state.wireName,
     errorCode: errorCode,
     explorerUrl: explorerUrl,
@@ -118,14 +120,15 @@ abstract interface class ChainSubmissionStore {
     Transaction? transaction,
   });
 
-  /// Persists a terminal failed record that never had an envelope, for a
-  /// server-side simulation the contract rejected deterministically (#262).
-  ///
-  /// Throws [ChainSubmissionConflict] when [transactionHash] already has a
-  /// record. [errorCode] must be one of [SubmissionOutcomeCode.all].
+  /// Persists a failed record that never had an envelope, for a server-side
+  /// simulation rejection (#262). [transactionHash] stays null: no
+  /// transaction exists, so `getHire` and explorer links never see a fake
+  /// hash. When [transactionHash] is set, a duplicate is a
+  /// [ChainSubmissionConflict]. [errorCode] must be one of
+  /// [SubmissionOutcomeCode.all].
   Future<StoredSubmission> insertFailed({
     required SubmissionPurpose purpose,
-    required String transactionHash,
+    String? transactionHash,
     required String errorCode,
     int? hireId,
     String? explorerUrl,
