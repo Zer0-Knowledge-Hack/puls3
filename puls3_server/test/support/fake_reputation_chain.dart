@@ -65,6 +65,10 @@ final class FakeReputationChain {
   /// `AgentNotFound`, so no record is excluded as its owner's.
   final owners = <int, StellarAddress>{};
 
+  /// Agent ids whose `owner_of` answers a `restorePreamble`, as an archived
+  /// agent entry (or registry instance) does.
+  final archivedOwners = <int>{};
+
   /// Job ids whose entry is archived: their `get_job` answers a
   /// `restorePreamble`, as a job past its TTL does.
   final archivedJobs = <int>{};
@@ -208,7 +212,9 @@ final class FakeReputationChain {
       final owner = owners[agent];
       answers[_envelope('owner_of', [
         ScArg.u32(agent),
-      ], contract: identityRegistry)] = owner == null
+      ], contract: identityRegistry)] = archivedOwners.contains(agent)
+          ? {'restorePreamble': <String, Object?>{}}
+          : owner == null
           ? {'error': 'HostError: Error(Contract, #3)\n'}
           : value({'address': owner.value});
       final byClient = state[agent] ?? const {};

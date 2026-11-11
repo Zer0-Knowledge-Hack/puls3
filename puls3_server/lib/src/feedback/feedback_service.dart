@@ -97,8 +97,10 @@ final class FeedbackService {
         feedback: feedback,
         jobId: hire.jobId!,
       );
-    } on ArgumentError {
-      // A job id outside what a `PaidJobReference` can name (#201).
+    } on RangeError {
+      // A job id outside what a `PaidJobReference` can name (#201). An
+      // escrow that is not a contract is a configuration error and is not
+      // caught here.
       throw _api('ChainDataUnavailable', {'reason': 'jobId'});
     }
     return _relay.prepareFeedback(wallet, hire.id, call);

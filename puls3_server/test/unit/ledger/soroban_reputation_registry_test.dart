@@ -1,6 +1,12 @@
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
+import 'package:puls3_server/src/ledger/contract_reader.dart';
+import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
+import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
+import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
 import '../../support/fake_reputation_chain.dart';
@@ -32,31 +38,110 @@ StoredFeedback _stored(
   tag2: tag2,
 );
 
+/// Answers `get_job` per id: a job, null (no such job) or an error. Counts
+/// how many reads run at once.
+final class _ScriptedJobs implements EscrowJobReader {
+  _ScriptedJobs(this.answers);
+
+  final Map<int, Object?> answers;
+  var inFlight = 0;
+  var maxInFlight = 0;
+
+  @override
+  Future<EscrowJob?> escrowJob(int jobId) async {
+    inFlight++;
+    if (inFlight > maxInFlight) maxInFlight = inFlight;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      final answer = answers[jobId];
+      if (answer is Exception) throw answer;
+      return answer as EscrowJob?;
+    } finally {
+      inFlight--;
+    }
+  }
+}
+
+final class _NoOwners implements AgentOwnerReader {
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async => null;
+}
+
+EscrowJob _escrowJob(StellarAddress client) => EscrowJob(
+  client: client,
+  provider: client,
+  evaluator: client,
+  agentId: AgentId(7),
+  token: client,
+  budget: BigInt.from(5000000),
+  feeBps: 0,
+  expiredAt: 0,
+  description: '',
+  state: EscrowJobState.completed,
+  submittedAt: 0,
+  approvalDeadline: 0,
+  deliverable: null,
+);
+
+/// A registry over [jobs]; the registry reads are not used by provenanceOf.
+SorobanReputationRegistry _overJobs(EscrowJobReader jobs) =>
+    SorobanReputationRegistry(
+      ContractReader(
+        SorobanRpcClient(
+          httpClient: MockClient((_) async => http.Response('', 503)),
+          url: StellarConfig.testnet.rpcUrl,
+          timeout: const Duration(seconds: 1),
+        ),
+        source: StellarConfig.testnet.simulationSource,
+      ),
+      registry: StellarConfig.testnet.escrow,
+      escrow: FakeReputationChain.defaultEscrow,
+      jobs: jobs,
+      owners: _NoOwners(),
+    );
+
+/// A record of agent 7 by Alice for job [id] on the trusted escrow.
+FeedbackRecord _paidRecord(int id) => FeedbackRecord(
+  agentId: AgentId(7),
+  client: _alice,
+  index: id,
+  value: BigInt.from(5),
+  valueDecimals: 0,
+  isRevoked: false,
+  tag2: PaidJobReference(
+    escrow: FakeReputationChain.defaultEscrow,
+    jobId: id,
+  ).text,
+);
+
 void main() {
   group('SorobanReputationRegistry', () {
     group('shared contract', () {
       reputationRegistryContract(ChainReputationRegistryRig.new);
     });
 
-    test('reads the clients, their last index, each feedback and its job', () async {
-      final chain = FakeReputationChain()..addPaid(7, _alice, _stored(4));
+    test(
+      'reads the clients, their last index, each feedback and its job',
+      () async {
+        final chain = FakeReputationChain()..addPaid(7, _alice, _stored(4));
 
-      final feedback = await chain.adapter.feedbacksOf(AgentId(7));
+        final feedback = await chain.adapter.feedbacksOf(AgentId(7));
 
-      expect(feedback.single.score, 4);
-      expect(feedback.single.client, _alice);
-      expect(feedback.single.agentId, AgentId(7));
-      // The registry stores no puls3 hire id: the job is in tag2 instead.
-      expect(feedback.single.hireId, isNull);
-      // A page with the client, the empty page that ends the list, the last
-      // index, the one feedback, the owner_of of the agent and the get_job
-      // of its job.
-      expect(chain.requests, hasLength(6));
-      expect(chain.jobReads, 1);
-      expect(chain.requests.map((r) => r['method']).toSet(), {
-        'simulateTransaction',
-      });
-    });
+        expect(feedback.single.score, 4);
+        expect(feedback.single.client, _alice);
+        expect(feedback.single.agentId, AgentId(7));
+        // The registry stores no puls3 hire id: the job is in tag2 instead.
+        expect(feedback.single.hireId, isNull);
+        // A page with the client, the empty page that ends the list, the last
+        // index, the one feedback, the owner_of of the agent and the get_job
+        // of its job.
+        expect(chain.requests, hasLength(6));
+        expect(chain.jobReads, 1);
+        expect(chain.requests.map((r) => r['method']).toSet(), {
+          'simulateTransaction',
+        });
+      },
+    );
 
     test('reads every page of clients', () async {
       final chain = FakeReputationChain();
@@ -297,6 +382,20 @@ void main() {
         ]);
       });
 
+      test('an owner that cannot be read fails the read, closed', () async {
+        // Archived agent entry or registry instance: the owner rule must not
+        // turn itself off. FeedbackService fails closed the same way.
+        final chain = FakeReputationChain()
+          ..owners[7] = _bob
+          ..archivedOwners.add(7)
+          ..addPaid(7, _bob, _stored(5));
+
+        await expectLater(
+          chain.adapter.feedbacksOf(AgentId(7)),
+          throwsA(isA<LedgerUnavailable>()),
+        );
+      });
+
       test('an unknown owner excludes nothing', () async {
         final chain = FakeReputationChain()..addPaid(7, _bob, _stored(5));
 
@@ -304,6 +403,59 @@ void main() {
 
         expect(read.provenance.owner, isNull);
         expect(countedFeedback(read.records, read.provenance), hasLength(1));
+      });
+
+      test('a network failure in a mixed batch fails the whole read', () async {
+        final jobs = _ScriptedJobs({
+          1: _escrowJob(_alice),
+          2: const LedgerUnavailable('restore', archived: true),
+          3: const LedgerUnavailable('node down'),
+          4: _escrowJob(_alice),
+        });
+
+        await expectLater(
+          _overJobs(
+            jobs,
+          ).provenanceOf([for (var i = 1; i <= 4; i++) _paidRecord(i)]),
+          throwsA(
+            isA<LedgerUnavailable>().having(
+              (e) => e.archived,
+              'archived',
+              false,
+            ),
+          ),
+        );
+      });
+
+      test(
+        'archived and missing jobs in a batch only drop their records',
+        () async {
+          final jobs = _ScriptedJobs({
+            1: _escrowJob(_alice),
+            2: const LedgerUnavailable('restore', archived: true),
+            3: null,
+          });
+
+          final provenance = await _overJobs(
+            jobs,
+          ).provenanceOf([for (var i = 1; i <= 3; i++) _paidRecord(i)]);
+
+          expect(provenance.jobs.keys, [1]);
+        },
+      );
+
+      test('never more than $jobReadConcurrency job reads at once', () async {
+        const count = jobReadConcurrency * 3 + 1;
+        final jobs = _ScriptedJobs({
+          for (var i = 1; i <= count; i++) i: _escrowJob(_alice),
+        });
+
+        final provenance = await _overJobs(
+          jobs,
+        ).provenanceOf([for (var i = 1; i <= count; i++) _paidRecord(i)]);
+
+        expect(provenance.jobs, hasLength(count));
+        expect(jobs.maxInFlight, jobReadConcurrency);
       });
 
       test('reads more jobs than one batch, each once', () async {

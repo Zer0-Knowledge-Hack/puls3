@@ -105,16 +105,10 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   }
 
   /// The owner of [agent], or null when the identity registry has no such
-  /// agent or its entry is archived: then no record is excluded as the
-  /// owner's. Any other failure is a [LedgerException].
-  Future<StellarAddress?> _ownerOf(AgentId agent) async {
-    try {
-      return await _owners.ownerOf(agent);
-    } on LedgerUnavailable catch (e) {
-      if (e.archived) return null;
-      rethrow;
-    }
-  }
+  /// agent: then no record is excluded as the owner's. An owner that cannot
+  /// be read, archived entry included, is a [LedgerException] for the whole
+  /// read: the owner rule fails closed, as `FeedbackService` does.
+  Future<StellarAddress?> _ownerOf(AgentId agent) => _owners.ownerOf(agent);
 
   /// The jobs [records] reference on [escrow], each read once with
   /// `get_job`, [jobReadConcurrency] at a time. A job in a final state is

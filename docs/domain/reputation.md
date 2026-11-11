@@ -124,7 +124,7 @@ not count only for one of these reasons, and no other rule exists
 | `revoked` | Its submitter revoked it (`is_revoked`) |
 | `notWholeScore` | `value_decimals` is not 0 |
 | `outOfScale` | The value is outside 1 to 5 |
-| `fromAgentOwner` | The record's client is the agent's owner on the identity registry (`owner_of`); no rule when the owner cannot be read |
+| `fromAgentOwner` | The record's client is the agent's owner on the identity registry (`owner_of`). An agent the registry does not have has no owner; an owner that cannot be read (archived entry included) fails the whole read, never opens the rule |
 | `noJobReference` | `tag2` is not a paid-job reference `puls3:job:v1:<escrow>:<job id>` (#201) |
 | `otherEscrow` | The reference names an escrow other than the configured one |
 | `jobUnreadable` | The escrow's `get_job` has no such job, or its entry is archived. It excludes only that record; a node failure fails the whole read |
