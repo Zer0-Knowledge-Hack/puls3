@@ -21,7 +21,8 @@
 # Hire and escrow: InvalidHireId, HireNotFound, HireNotOwned, AgentInactive,
 #   InvalidHire, InvalidHireTransition, IdempotencyKeyReused,
 #   PersistenceUnavailable, PaymentAlreadySubmitted, InvalidRejectReason,
-#   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed, OutcomeUnknown
+#   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed, SimulationFailed,
+#   SubmitSimulationRejected, OutcomeUnknown
 # Feedback: HireNotCompleted, HireAlreadyRated, InvalidFeedback,
 #   FeedbackFromAgentOwner
 exception: Puls3ApiException

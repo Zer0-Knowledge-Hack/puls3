@@ -199,6 +199,9 @@ final class _Accounts implements ChainAccounts {
   }
 
   @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
+
+  @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async => null;
 }
 

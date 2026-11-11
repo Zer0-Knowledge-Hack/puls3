@@ -37,74 +37,80 @@ void main() {
 
   setUp(() => rig = _Rig());
 
-  test('prepareDeploy returns an unsigned register_full for the owner', () async {
-    final draftId = await rig.saveDraft();
+  test(
+    'prepareDeploy returns an unsigned register_full for the owner',
+    () async {
+      final draftId = await rig.saveDraft();
 
-    final row = await rig.service.prepareDeploy(
-      owner: rig.owner,
-      draftId: draftId,
-    );
+      final row = await rig.service.prepareDeploy(
+        owner: rig.owner,
+        draftId: draftId,
+      );
 
-    expect(row.state, 'awaitingRegistrationSignature');
-    expect(row.agentWallet, _agent);
-    expect(row.unsignedEnvelopeXdr, isNotEmpty);
-    expect(row.registrationHash, hasLength(64));
-    expect(row.registrationUri, startsWith('https://puls3.test/registry/'));
-    final built = rig.codec.built.single.spec;
-    expect(built.function, 'register_full');
-    expect(built.source, rig.owner);
-    expect(built.contract, StellarConfig.testnet.identityRegistry);
-    expect(
-      encodeInvokeHostFunction(
-        contract: built.contract,
-        function: built.function,
-        args: built.args,
-      ),
-      encodeInvokeHostFunction(
-        contract: StellarConfig.testnet.identityRegistry,
-        function: 'register_full',
-        args: registerFullArgs(
-          caller: rig.owner,
-          agentUri: row.registrationUri,
-          manifestHash: manifestHash(rig.manifest),
-          manifest: rig.validated,
-          catalogId: 'studio-$draftId',
+      expect(row.state, 'awaitingRegistrationSignature');
+      expect(row.agentWallet, _agent);
+      expect(row.unsignedEnvelopeXdr, isNotEmpty);
+      expect(row.registrationHash, hasLength(64));
+      expect(row.registrationUri, startsWith('https://puls3.test/registry/'));
+      final built = rig.codec.built.single.spec;
+      expect(built.function, 'register_full');
+      expect(built.source, rig.owner);
+      expect(built.contract, StellarConfig.testnet.identityRegistry);
+      expect(
+        encodeInvokeHostFunction(
+          contract: built.contract,
+          function: built.function,
+          args: built.args,
         ),
-      ),
-    );
-    expect(rig.sent, isEmpty);
-  });
+        encodeInvokeHostFunction(
+          contract: StellarConfig.testnet.identityRegistry,
+          function: 'register_full',
+          args: registerFullArgs(
+            caller: rig.owner,
+            agentUri: row.registrationUri,
+            manifestHash: manifestHash(rig.manifest),
+            manifest: rig.validated,
+            catalogId: 'studio-$draftId',
+          ),
+        ),
+      );
+      expect(rig.sent, isEmpty);
+    },
+  );
 
-  test('submitRegistration keeps the hash and waits for the agent id', () async {
-    final draftId = await rig.saveDraft();
-    final prepared = await rig.service.prepareDeploy(
-      owner: rig.owner,
-      draftId: draftId,
-    );
-    rig.transactions.next = const ChainTx(ChainTxStatus.pending);
+  test(
+    'submitRegistration keeps the hash and waits for the agent id',
+    () async {
+      final draftId = await rig.saveDraft();
+      final prepared = await rig.service.prepareDeploy(
+        owner: rig.owner,
+        draftId: draftId,
+      );
+      rig.transactions.next = const ChainTx(ChainTxStatus.pending);
 
-    final submitted = await rig.service.submitRegistration(
-      owner: rig.owner,
-      draftId: draftId,
-      preparationId: prepared.preparationId!,
-      signedTransactionXdr: FakeEnvelopeCodec.sign(
-        prepared.unsignedEnvelopeXdr!,
-      ),
-    );
+      final submitted = await rig.service.submitRegistration(
+        owner: rig.owner,
+        draftId: draftId,
+        preparationId: prepared.preparationId!,
+        signedTransactionXdr: FakeEnvelopeCodec.sign(
+          prepared.unsignedEnvelopeXdr!,
+        ),
+      );
 
-    expect(submitted.state, 'registrationSubmitted');
-    expect(submitted.registrationHash, prepared.registrationHash);
-    expect(rig.sent, hasLength(1));
-    expect(rig.sentHashes, [prepared.registrationHash]);
+      expect(submitted.state, 'registrationSubmitted');
+      expect(submitted.registrationHash, prepared.registrationHash);
+      expect(rig.sent, hasLength(1));
+      expect(rig.sentHashes, [prepared.registrationHash]);
 
-    rig.transactions.next = const ChainTx(ChainTxStatus.success, agentId: 42);
-    final confirmed = await rig.service.getDeploySession(
-      owner: rig.owner,
-      draftId: draftId,
-    );
-    expect(confirmed.state, 'awaitingWalletAuthorization');
-    expect(confirmed.registryAgentId, 42);
-  });
+      rig.transactions.next = const ChainTx(ChainTxStatus.success, agentId: 42);
+      final confirmed = await rig.service.getDeploySession(
+        owner: rig.owner,
+        draftId: draftId,
+      );
+      expect(confirmed.state, 'awaitingWalletAuthorization');
+      expect(confirmed.registryAgentId, 42);
+    },
+  );
 
   test('prepareWalletAuthorization returns the builder auth entry', () async {
     final draftId = await rig.registered();
@@ -160,44 +166,47 @@ void main() {
     expect(rig.sent, hasLength(1));
   });
 
-  test('a confirmed wallet publishes without the prompt and activates it', () async {
-    final draftId = await rig.registered();
-    final entry = _addressEntry(rig.owner);
-    rig.accounts.simulation = SimulationData(
-      transactionData: base64Encode(const [1, 2, 3, 4]),
-      minResourceFee: 50,
-      auth: [entry],
-    );
-    final prepared = await rig.service.prepareWalletAuthorization(
-      owner: rig.owner,
-      draftId: draftId,
-    );
-    rig.transactions.next = const ChainTx(ChainTxStatus.success);
+  test(
+    'a confirmed wallet publishes without the prompt and activates it',
+    () async {
+      final draftId = await rig.registered();
+      final entry = _addressEntry(rig.owner);
+      rig.accounts.simulation = SimulationData(
+        transactionData: base64Encode(const [1, 2, 3, 4]),
+        minResourceFee: 50,
+        auth: [entry],
+      );
+      final prepared = await rig.service.prepareWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+      );
+      rig.transactions.next = const ChainTx(ChainTxStatus.success);
 
-    final row = await rig.service.submitWalletAuthorization(
-      owner: rig.owner,
-      draftId: draftId,
-      preparationId: prepared.preparationId!,
-      signedAuthorizationEntryXdr: _signedAddressEntry(rig.owner),
-    );
+      final row = await rig.service.submitWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+        preparationId: prepared.preparationId!,
+        signedAuthorizationEntryXdr: _signedAddressEntry(rig.owner),
+      );
 
-    expect(row.state, 'active');
-    final document = jsonEncode(registrationDocument(rig.validated));
-    expect(document.contains(rig.validated.systemPrompt), isFalse);
-    expect(document, contains('https://puls3.org'));
-    final source = StudioRunManifestSource(
-      lookup: (agentId, version) async {
-        final found = await rig.versions.find(agentId, version);
-        if (found == null) return null;
-        return (manifestJson: found.manifestJson, owner: found.owner);
-      },
-      fallback: _MissingManifests(),
-    );
-    final run = await source.find(42, 1);
-    expect(run, isA<OwnedRunManifest>());
-    expect(run!.systemPrompt, rig.validated.systemPrompt);
-    expect((run as OwnedRunManifest).owner, _owner);
-  });
+      expect(row.state, 'active');
+      final document = jsonEncode(registrationDocument(rig.validated));
+      expect(document.contains(rig.validated.systemPrompt), isFalse);
+      expect(document, contains('https://puls3.org'));
+      final source = StudioRunManifestSource(
+        lookup: (agentId, version) async {
+          final found = await rig.versions.find(agentId, version);
+          if (found == null) return null;
+          return (manifestJson: found.manifestJson, owner: found.owner);
+        },
+        fallback: _MissingManifests(),
+      );
+      final run = await source.find(42, 1);
+      expect(run, isA<OwnedRunManifest>());
+      expect(run!.systemPrompt, rig.validated.systemPrompt);
+      expect((run as OwnedRunManifest).owner, _owner);
+    },
+  );
 
   test('a new version keeps the agent and the previous snapshot', () async {
     final draftId = await rig.active();
@@ -424,13 +433,18 @@ final class _Rig {
 
   Future<int> registered() async {
     final draftId = await saveDraft();
-    final prepared = await service.prepareDeploy(owner: owner, draftId: draftId);
+    final prepared = await service.prepareDeploy(
+      owner: owner,
+      draftId: draftId,
+    );
     transactions.next = const ChainTx(ChainTxStatus.success, agentId: 42);
     await service.submitRegistration(
       owner: owner,
       draftId: draftId,
       preparationId: prepared.preparationId!,
-      signedTransactionXdr: FakeEnvelopeCodec.sign(prepared.unsignedEnvelopeXdr!),
+      signedTransactionXdr: FakeEnvelopeCodec.sign(
+        prepared.unsignedEnvelopeXdr!,
+      ),
     );
     transactions.next = const ChainTx(ChainTxStatus.pending);
     return draftId;
@@ -490,6 +504,9 @@ final class _Accounts implements ChainAccounts {
   }
 
   @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
+
+  @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async =>
       const AccountAuthority(masterWeight: 1, mediumThreshold: 0, signers: {});
 }
@@ -519,8 +536,7 @@ final class _Sender implements SubmissionLedger {
   final List<String> sentHashes;
 
   @override
-  Future<TransactionLookup> lookup(String hash) =>
-      throw UnimplementedError();
+  Future<TransactionLookup> lookup(String hash) => throw UnimplementedError();
 
   @override
   Future<SendTransactionResult> resend(
@@ -550,6 +566,8 @@ final class _Funder implements AccountFunder {
 
 final class _Signer implements AgentEnvelopeSigner {
   @override
-  Future<String> sign(PreparedEnvelope envelope, StellarAddress address) async =>
-      'signed';
+  Future<String> sign(
+    PreparedEnvelope envelope,
+    StellarAddress address,
+  ) async => 'signed';
 }

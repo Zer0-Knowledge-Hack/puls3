@@ -211,7 +211,7 @@ final class StudioDeployService {
       inclusionFee: _inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _accounts.simulate(spec);
+    final simulation = await _simulate(spec);
     final index = addressAuthIndex(simulation.auth);
     if (index == null) throw _chain();
     final AuthEntryView entry;
@@ -356,7 +356,7 @@ final class StudioDeployService {
       inclusionFee: _inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _accounts.simulate(spec);
+    final simulation = await _simulate(spec);
     final PreparedEnvelope envelope;
     try {
       envelope = _codec.build(spec, simulation);
@@ -408,7 +408,7 @@ final class StudioDeployService {
       inclusionFee: _inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _accounts.simulate(spec);
+    final simulation = await _simulate(spec);
     final PreparedEnvelope envelope;
     try {
       envelope = _codec.build(spec, simulation);
@@ -453,7 +453,7 @@ final class StudioDeployService {
       inclusionFee: _inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _accounts.simulate(spec);
+    final simulation = await _simulate(spec);
     final PreparedEnvelope envelope;
     try {
       envelope = _codec.build(spec, simulation);
@@ -689,6 +689,17 @@ final class StudioDeployService {
 
   DateTime _expiry(int unixSeconds) =>
       DateTime.fromMillisecondsSinceEpoch(unixSeconds * 1000, isUtc: true);
+
+  /// A wallet-signed prepare reports a rejected simulation as
+  /// `ChainUnavailable`; only the server-signed submit sender acts on a
+  /// deterministic contract code (#262).
+  Future<SimulationData> _simulate(EnvelopeSpec spec) async {
+    try {
+      return await _accounts.simulate(spec);
+    } on LedgerException {
+      throw _chain();
+    }
+  }
 
   static Puls3ApiException _api(String code, [Map<String, String>? details]) =>
       Puls3ApiException(code: code, details: details);

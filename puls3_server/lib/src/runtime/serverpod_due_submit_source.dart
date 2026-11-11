@@ -85,8 +85,8 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
   }
 
   /// Hires of [hireIds] that will never take a `submit`: one of
-  /// [settlementPurposes] confirmed, or [maxEscrowCallAttempts] failed
-  /// `submit`s.
+  /// [settlementPurposes] confirmed, [maxEscrowCallAttempts] failed
+  /// `submit`s, or a `SubmitSimulationRejected` terminal rejection.
   Future<Set<int>> _closedHires(Set<int> hireIds) async {
     final rows = await ChainSubmission.db.find(
       _session,
@@ -107,7 +107,14 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
       if (row.state == SubmissionState.confirmed.wireName) {
         closed.add(hireId);
       } else if (row.purpose == SubmissionPurpose.submit.wireName) {
-        failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        // Only an expired / too-late submit is terminal immediately. Other
+        // failures (including unreadable rows and non-permanent simulation
+        // rejections) count toward the normal attempt bound (#262).
+        if (row.errorCode == SubmissionOutcomeCode.submitSimulationRejected) {
+          closed.add(hireId);
+        } else {
+          failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        }
       }
     }
     for (final MapEntry(key: hireId, value: failed) in failedSubmits.entries) {

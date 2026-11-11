@@ -66,6 +66,49 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<StoredSubmission> insertFailed({
+    required SubmissionPurpose purpose,
+    String? transactionHash,
+    required String errorCode,
+    int? hireId,
+    String? explorerUrl,
+    Transaction? transaction,
+  }) async {
+    checkPreparation(purpose, null);
+    checkOutcomeCode(errorCode);
+    final now = _now().toUtc();
+    try {
+      final row = await ChainSubmission.db.insertRow(
+        _session,
+        ChainSubmission(
+          purpose: purpose.wireName,
+          transaction: transactionHash,
+          state: SubmissionState.failed.wireName,
+          errorCode: errorCode,
+          explorerUrl: explorerUrl,
+          updatedAt: now,
+          hireId: hireId,
+          // No envelope was built. The record is failed from the start, so
+          // the tracker never lists or sends it.
+          signedEnvelopeXdr: '',
+          validUntil: now,
+          sendAttempts: 0,
+          createdAt: now,
+          lastCheckedAt: now,
+        ),
+        transaction: transaction,
+      );
+      return _stored(row);
+    } on DatabaseQueryException catch (e) {
+      final index = _conflictIndexes[e.constraintName];
+      if (e.code == _uniqueViolation && index != null) {
+        throw ChainSubmissionConflict(index);
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Future<StoredSubmission?> findByPreparation(String preparationId) async {
     final row = await ChainSubmission.db.findFirstRow(
       _session,
@@ -227,7 +270,7 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       id: row.id!,
       preparationId: row.preparationId,
       purpose: purpose,
-      transactionHash: row.transaction,
+      transactionHash: row.transaction ?? '',
       state: state,
       errorCode: row.errorCode,
       explorerUrl: row.explorerUrl,

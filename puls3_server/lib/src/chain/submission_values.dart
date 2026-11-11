@@ -64,6 +64,14 @@ abstract final class SubmissionOutcomeCode {
   static const jobEvidenceUnavailable = 'JobEvidenceUnavailable';
   static const escrowCallFailed = 'EscrowCallFailed';
 
+  /// A simulation failure that counts toward the bounded attempts but is
+  /// not permanent (for example `InvalidState` from a lagging node).
+  static const simulationFailed = 'SimulationFailed';
+
+  /// A simulation rejected with a contract code that can never change for
+  /// this job (expired / too late); the hire is closed immediately.
+  static const submitSimulationRejected = 'SubmitSimulationRejected';
+
   /// The transaction can no longer be looked up and nothing else proves
   /// whether it landed. The hire stays blocked until someone resolves it.
   static const outcomeUnknown = 'OutcomeUnknown';
@@ -75,6 +83,8 @@ abstract final class SubmissionOutcomeCode {
     jobMismatch,
     jobEvidenceUnavailable,
     escrowCallFailed,
+    simulationFailed,
+    submitSimulationRejected,
     outcomeUnknown,
   };
 

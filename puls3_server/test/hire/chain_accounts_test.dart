@@ -12,6 +12,7 @@ import 'package:puls3_server/src/generated/protocol.dart'
     show Puls3ApiException;
 import 'package:puls3_server/src/hire/chain_accounts.dart';
 import 'package:puls3_server/src/ledger/envelope_codec.dart';
+import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
 import 'package:test/test.dart';
@@ -163,7 +164,7 @@ void main() {
       expect((node.requests[0]['params']! as Map)['xdrFormat'], 'base64');
     });
 
-    test('a simulation the contract rejects is ChainUnavailable (P3)', () {
+    test('a rejected simulation is ChainUnavailable for wallet prepares', () {
       final node = _node({
         'simulateTransaction': _fixture(
           'simulate_fund_job_3_error_base64.json',
@@ -171,6 +172,21 @@ void main() {
       });
 
       expect(node.accounts.simulate(_spec()), _chainUnavailable);
+    });
+
+    test('simulateRaw keeps the contract code for server senders', () {
+      final node = _node({
+        'simulateTransaction': _fixture(
+          'simulate_fund_job_3_error_base64.json',
+        ),
+      });
+
+      expect(
+        node.accounts.simulateRaw(_spec()),
+        throwsA(
+          isA<LedgerContractError>().having((e) => e.code, 'code', 2),
+        ),
+      );
     });
 
     test('an unreachable node is ChainUnavailable', () {

@@ -57,6 +57,43 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<StoredSubmission> insertFailed({
+    required SubmissionPurpose purpose,
+    String? transactionHash,
+    required String errorCode,
+    int? hireId,
+    String? explorerUrl,
+    Transaction? transaction,
+  }) async {
+    checkPreparation(purpose, null);
+    checkOutcomeCode(errorCode);
+    if (transactionHash != null &&
+        _rows.values.any((r) => r.transactionHash == transactionHash)) {
+      throw const ChainSubmissionConflict(ChainSubmissionIndex.transaction);
+    }
+    final now = _now().toUtc();
+    final stored = StoredSubmission(
+      id: _nextId++,
+      preparationId: null,
+      purpose: purpose,
+      transactionHash: transactionHash ?? '',
+      state: SubmissionState.failed,
+      errorCode: errorCode,
+      explorerUrl: explorerUrl,
+      hireId: hireId,
+      signedEnvelopeXdr: '',
+      validUntil: now,
+      lastSentAt: null,
+      sendAttempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      lastCheckedAt: now,
+    );
+    _rows[stored.id] = stored;
+    return stored;
+  }
+
+  @override
   Future<StoredSubmission?> findByPreparation(String preparationId) async {
     for (final row in _rows.values) {
       if (row.preparationId == preparationId) return row;

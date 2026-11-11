@@ -35,6 +35,7 @@ final _now = DateTime.utc(2026, 10, 13, 12);
 
 final class _Accounts implements ChainAccounts {
   Object? failure;
+  Object? simulationFailure;
   var sequence = 8;
   final specs = <EnvelopeSpec>[];
 
@@ -48,10 +49,13 @@ final class _Accounts implements ChainAccounts {
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
     specs.add(spec);
-    final failure = this.failure;
+    final failure = simulationFailure ?? this.failure;
     if (failure != null) throw failure;
     return const SimulationData(transactionData: 'AAAA', minResourceFee: 50);
   }
+
+  @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
 
   @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async => null;
@@ -327,6 +331,28 @@ void main() {
 
     expect(store.all, isEmpty);
     expect(sent, isEmpty);
+  });
+
+  test('a simulation rejection counts toward the bound', () async {
+    accounts.simulationFailure = const LedgerContractError(2, 'InvalidState');
+
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      await sender().send(
+        hireId: 4,
+        jobId: 3,
+        call: EscrowServerCall.release,
+      );
+    }
+
+    expect(sent, isEmpty);
+    expect(codec.built, isEmpty);
+    expect(store.all, hasLength(maxEscrowCallAttempts));
+    expect(
+      store.all.map((row) => row.errorCode),
+      everyElement(SubmissionOutcomeCode.simulationFailed),
+    );
+    await sender().send(hireId: 4, jobId: 3, call: EscrowServerCall.release);
+    expect(store.all, hasLength(maxEscrowCallAttempts));
   });
 
   test('three failed attempts stop a fourth envelope', () async {
