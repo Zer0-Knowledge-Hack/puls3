@@ -1,0 +1,23 @@
+name: puls3_mcp
+description: A stdio MCP server for puls3, a client of puls3_sdk. Its tools read and prepare; none signs, funds or submits a transaction.
+publish_to: none
+
+environment:
+  sdk: '^3.12.2'
+
+resolution: workspace
+
+executables:
+  puls3_mcp:
+
+dependencies:
+  dart_mcp: ^0.5.2
+  puls3_sdk:
+    path: ../puls3_sdk
+
+dev_dependencies:
+  puls3_client:
+    path: ../puls3_client
+  stream_channel: ^2.1.4
+  lints: '>=3.0.0 <7.0.0'
+  test: ^1.25.5

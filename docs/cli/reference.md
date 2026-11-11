@@ -85,7 +85,7 @@ A result goes to stdout. A failure writes one `error: <code>: <message>` line to
 | Exit | Code on stderr | When |
 |---|---|---|
 | 0 | none | Success, or `--help`. |
-| 1 | the server's code, for example `RateLimited` | The server answered with an error (`Puls3ApiException`). |
+| 1 | the server's `Puls3ApiException` code | The server answered with an error of its own. The catalog calls raise none today (an outage is `AgentCatalogUnavailable`, exit 69), so this is for the codes the API contract adds later. |
 | 3 | `NotFound` | `catalog get` with an id the catalog does not have. |
 | 64 | `Usage` | Unknown command, missing or extra argument, no server URL, or a URL that is not absolute `http`/`https`. Nothing is sent. |
 | 69 | `Unreachable` | The server did not answer in 20 seconds, or the connection failed (DNS, TLS, socket). |
