@@ -263,5 +263,35 @@ void main() {
       await gateway(session).forgetSession();
       expect(stored, isNull);
     });
+
+    // The hire detail screen: getHire answers 401 (the client's one refresh
+    // failed, and serverpod_auth_core_client leaves the stored auth in
+    // place), the screen shows "Sign in", and its button calls
+    // ensureSignedIn. That must ask the wallet for a new challenge.
+    test('a 401 after a failed refresh makes the next sign-in challenge '
+        'again', () async {
+      final detailGateway = ServerHireGateway(
+        createHire: (_, _, _, _) => throw UnimplementedError(),
+        prepareCreateJob: (_) => throw UnimplementedError(),
+        prepareFund: (_) => throw UnimplementedError(),
+        prepareComplete: (_) => throw UnimplementedError(),
+        prepareReject: (_, _) => throw UnimplementedError(),
+        submitEscrowCall: (_, _, _) => throw UnimplementedError(),
+        getHire: (_, _) async => throw ServerpodClientUnauthorized(),
+        prepareFeedback: (_, _, _) => throw UnimplementedError(),
+        submitFeedback: (_, _, _) => throw UnimplementedError(),
+        session: session,
+      );
+      await detailGateway.ensureSignedIn(_alice, sign);
+      expect(server.created, [_alice]);
+
+      await expectLater(
+        detailGateway.getHire(3, _alice),
+        throwsA(isA<HireNotSignedIn>()),
+      );
+      await detailGateway.ensureSignedIn(_alice, sign);
+
+      expect(server.created, [_alice, _alice]);
+    });
   });
 }
