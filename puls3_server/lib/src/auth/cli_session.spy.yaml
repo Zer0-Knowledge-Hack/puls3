@@ -1,0 +1,12 @@
+### One CLI session of the signed-in wallet (#259). It never carries a secret.
+class: CliSession
+fields:
+  ### The session's refresh token id, used to revoke it.
+  id: String
+  ### When the app created it.
+  createdAt: DateTime
+  ### The last time a program refreshed it.
+  lastUsedAt: DateTime
+  ### When it stops refreshing, however often it is used: createdAt plus the
+  ### CLI lifetime.
+  expiresAt: DateTime

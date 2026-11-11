@@ -13,6 +13,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:puls3_server/src/generated/agent/agent_summary.dart'
     as _ih3rdrku;
+import 'package:puls3_server/src/generated/auth/cli_session.dart' as _i0cajwtn;
 import 'package:puls3_server/src/generated/studio/studio_draft.dart'
     as _i3089e9p;
 import 'package:serverpod/protocol.dart' as _isp;
@@ -26,6 +27,8 @@ import 'agent/agent_record.dart' as _ia7sdlqn;
 import 'agent/agent_summary.dart' as _ipe500bk;
 import 'agent/agent_wallet.dart' as _ickya0iq;
 import 'agent/catalog_index_state.dart' as _ixu8n9dt;
+import 'auth/cli_session.dart' as _iu0b4rj2;
+import 'auth/cli_session_grant.dart' as _i4vjaol5;
 import 'auth/wallet_account.dart' as _izqstcym;
 import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'auth/wallet_challenge_record.dart' as _i1hfx2wv;
@@ -64,6 +67,8 @@ export 'agent/agent_record.dart';
 export 'agent/agent_summary.dart';
 export 'agent/agent_wallet.dart';
 export 'agent/catalog_index_state.dart';
+export 'auth/cli_session.dart';
+export 'auth/cli_session_grant.dart';
 export 'auth/wallet_account.dart';
 export 'auth/wallet_challenge.dart';
 export 'auth/wallet_challenge_record.dart';
@@ -1536,6 +1541,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ixu8n9dt.CatalogIndexState) {
       return _ixu8n9dt.CatalogIndexState.fromJson(data) as T;
     }
+    if (t == _iu0b4rj2.CliSession) {
+      return _iu0b4rj2.CliSession.fromJson(data) as T;
+    }
+    if (t == _i4vjaol5.CliSessionGrant) {
+      return _i4vjaol5.CliSessionGrant.fromJson(data) as T;
+    }
     if (t == _izqstcym.WalletAccount) {
       return _izqstcym.WalletAccount.fromJson(data) as T;
     }
@@ -1652,6 +1663,13 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ixu8n9dt.CatalogIndexState?>()) {
       return (data != null ? _ixu8n9dt.CatalogIndexState.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_iu0b4rj2.CliSession?>()) {
+      return (data != null ? _iu0b4rj2.CliSession.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_i4vjaol5.CliSessionGrant?>()) {
+      return (data != null ? _i4vjaol5.CliSessionGrant.fromJson(data) : null)
           as T;
     }
     if (t == _is.getType<_izqstcym.WalletAccount?>()) {
@@ -1822,6 +1840,12 @@ class Protocol extends _is.DatabaseSerializationManager {
               .toList()
           as T;
     }
+    if (t == List<_i0cajwtn.CliSession>) {
+      return (data as List)
+              .map((e) => deserialize<_i0cajwtn.CliSession>(e))
+              .toList()
+          as T;
+    }
     if (t == List<_i3089e9p.StudioDraft>) {
       return (data as List)
               .map((e) => deserialize<_i3089e9p.StudioDraft>(e))
@@ -1847,6 +1871,8 @@ class Protocol extends _is.DatabaseSerializationManager {
       _ipe500bk.AgentSummary => 'AgentSummary',
       _ickya0iq.AgentWallet => 'AgentWallet',
       _ixu8n9dt.CatalogIndexState => 'CatalogIndexState',
+      _iu0b4rj2.CliSession => 'CliSession',
+      _i4vjaol5.CliSessionGrant => 'CliSessionGrant',
       _izqstcym.WalletAccount => 'WalletAccount',
       _idvb5xlo.WalletChallenge => 'WalletChallenge',
       _i1hfx2wv.WalletChallengeRecord => 'WalletChallengeRecord',
@@ -1904,6 +1930,10 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'AgentWallet';
       case _ixu8n9dt.CatalogIndexState():
         return 'CatalogIndexState';
+      case _iu0b4rj2.CliSession():
+        return 'CliSession';
+      case _i4vjaol5.CliSessionGrant():
+        return 'CliSessionGrant';
       case _izqstcym.WalletAccount():
         return 'WalletAccount';
       case _idvb5xlo.WalletChallenge():
@@ -2010,6 +2040,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'CatalogIndexState') {
       return deserialize<_ixu8n9dt.CatalogIndexState>(data['data']);
+    }
+    if (dataClassName == 'CliSession') {
+      return deserialize<_iu0b4rj2.CliSession>(data['data']);
+    }
+    if (dataClassName == 'CliSessionGrant') {
+      return deserialize<_i4vjaol5.CliSessionGrant>(data['data']);
     }
     if (dataClassName == 'WalletAccount') {
       return deserialize<_izqstcym.WalletAccount>(data['data']);

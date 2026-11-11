@@ -21,6 +21,7 @@ class WalletPanel extends StatelessWidget {
     this.isOnTestnet = true,
     this.error,
     this.onInstall,
+    this.onCopyCliSession,
   });
 
   final WalletStatus status;
@@ -34,6 +35,9 @@ class WalletPanel extends StatelessWidget {
   /// Opens the wallet's install page; null when there is none.
   final VoidCallback? onInstall;
 
+  /// Creates a session for the puls3 CLI (#259); null hides the action.
+  final VoidCallback? onCopyCliSession;
+
   @override
   Widget build(BuildContext context) {
     final address = this.address;
@@ -45,6 +49,7 @@ class WalletPanel extends StatelessWidget {
         isOnTestnet: isOnTestnet,
         signed: status == WalletStatus.signed,
         onDisconnect: onDisconnect,
+        onCopyCliSession: onCopyCliSession,
       ),
       WalletStatus.connecting => _Connecting(walletName: walletName),
       WalletStatus.signing => _Signing(walletName: walletName),
@@ -227,6 +232,7 @@ class _Connected extends StatelessWidget {
     required this.isOnTestnet,
     required this.onDisconnect,
     this.signed = false,
+    this.onCopyCliSession,
   });
 
   final String address;
@@ -234,6 +240,7 @@ class _Connected extends StatelessWidget {
   final bool isOnTestnet;
   final bool signed;
   final VoidCallback onDisconnect;
+  final VoidCallback? onCopyCliSession;
 
   @override
   Widget build(BuildContext context) {
@@ -290,6 +297,17 @@ class _Connected extends StatelessWidget {
           ),
         ),
         const SizedBox(height: Puls3Spacing.md),
+        if (onCopyCliSession case final copy?) ...[
+          PrimaryButton(
+            key: const ValueKey('wallet-copy-cli-session'),
+            label: 'Copy session for CLI',
+            icon: Icons.terminal_rounded,
+            variant: PrimaryButtonVariant.outline,
+            expand: true,
+            onPressed: copy,
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+        ],
         PrimaryButton(
           label: 'Disconnect',
           icon: Icons.logout_rounded,

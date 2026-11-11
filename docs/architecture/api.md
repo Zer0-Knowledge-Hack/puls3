@@ -39,6 +39,9 @@ Programs other than the app use this contract through the Dart SDK `puls3_sdk`, 
 |---|---|---|---|---|---|
 | `WalletAuthEndpoint` (`walletAuth`) | `createChallenge` | `wallet: String` | `WalletChallenge` | No | `InvalidStellarAddress`, `ChallengeRateLimited`, `AuthenticationUnavailable` |
 | `WalletAuthEndpoint` (`walletAuth`) | `verifyChallenge` | `challengeId: String`, `wallet: String`, `signedChallengeXdr: String` | `AuthSuccess` | No | `InvalidStellarAddress`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
+| `CliSessionEndpoint` (`cliSession`) | `create` | none | `CliSessionGrant` (`id`, `refreshToken`, `expiresAt`) | Yes | none (401 without a session). A CLI session of the caller's own wallet (#259): a separate refresh token, absolute 72 h lifetime; a sixth revokes the oldest |
+| `CliSessionEndpoint` (`cliSession`) | `list` | none | `List<CliSession>` (`id`, `createdAt`, `lastUsedAt`, `expiresAt`; no secret) | Yes | none |
+| `CliSessionEndpoint` (`cliSession`) | `revoke` | `id: String` | `bool` | Yes | none. `false` for an id that is not one of the caller's CLI sessions, including the app's own |
 | `ConfigEndpoint` | `getNetworkConfig` | — | `NetworkConfig` | No | `ConfigurationUnavailable` |
 | `AgentEndpoint` | `list` | — | `List<AgentSummary>` | No | `AgentCatalogUnavailable` (typed exception, see [Agent catalog](#agent-catalog)) |
 | `AgentEndpoint` | `get` | `id: String` (metadata id, for example `agt-001`) | `AgentSummary?` (`null` for an unknown id) | No | `AgentCatalogUnavailable` (typed exception) |
