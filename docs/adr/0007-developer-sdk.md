@@ -1,6 +1,6 @@
 # ADR-0007: Developer SDK (`puls3_sdk`)
 
-- **Status:** Proposed. The catalog part is implemented (#229); the session decision ([Open decision 1](#open-decisions)) and the session-bound operations are [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259).
+- **Status:** Accepted. The catalog part is implemented (#229). The session is option A′, decided on #222 and implemented in [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259) ([D5](#d5-wallet-sessions-for-programs-a)).
 - **Date:** 2026-11-05
 - **Issue:** #222 (week 2 of the developer platform)
 - **Clients of this package:** the `puls3` CLI (#224), the MCP server (#226)
@@ -53,9 +53,25 @@ Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API
 
 `puls3_cli` and `puls3_mcp` depend on `puls3_sdk` and call only its public API. They do not construct `puls3_client` themselves and they do not shell out to each other.
 
+### D5. Wallet sessions for programs (A′)
+
+A program without the app uses a **separate CLI session** of the same wallet (option A′ below, decided on #222). Three conditions hold it to the same risk as the app's session or less:
+
+1. **Own wallet only.** `CliSessionEndpoint` requires login and issues, lists and revokes sessions for the caller's authenticated user only. No call takes an argument that names a wallet or a user.
+2. **Revocable on its own.** A CLI session is its own refresh-token row (method `cli`; the app's is `wallet`). Revoking it leaves the app signed in, and signing the app out leaves it working. A wallet keeps at most 5 CLI sessions; creating a sixth revokes the oldest.
+3. **Shorter, absolute lifetime: 72 hours.** The core's 14-day refresh lifetime is an idle timeout that each refresh extends. `JwtRefreshEndpoint` refuses and deletes a `cli` refresh token whose `createdAt` is 72 hours old or more, however recently it was refreshed. App sessions keep the core's rules.
+
+How it is used:
+- The app's wallet sheet has **Copy session for CLI**. It shows the refresh token once, with a warning that it is a bearer secret, and never stores or logs it.
+- The developer sets `PULS3_REFRESH_TOKEN` once. The SDK's `CliSession` stores the rotated tokens in a user-only file (mode 0600). By default the file is `~/.config/puls3/session.json`, or `%APPDATA%\puls3\session.json` on Windows; `PULS3_SESSION_FILE` moves it.
+- `CliSession` refreshes from that file, one refresh at a time. A reused refresh token makes the core revoke the session, so two refreshes must never run in parallel.
+- A refused refresh deletes the file. A newly copied token replaces the saved session.
+
+Nothing in this signs a transaction. A stolen CLI token reaches only that wallet's hires and drafts for at most 72 hours. It can prepare, but never sign, every `prepare*`.
+
 ## Open decisions
 
-1. **How a program without the app gets a wallet session.** `HireEndpoint`, `StudioEndpoint` and `FeedbackEndpoint` require login. The only way to log in is the SEP-10 challenge, which the wallet signs (`WalletAuthEndpoint.createChallenge` / `verifyChallenge`). So every row marked "Session" above needs a session, and D1 says the SDK does not sign.
+1. **How a program without the app gets a wallet session.** *Decided: A′, see [D5](#d5-wallet-sessions-for-programs-a).* `HireEndpoint`, `StudioEndpoint` and `FeedbackEndpoint` require login. The only way to log in is the SEP-10 challenge, which the wallet signs (`WalletAuthEndpoint.createChallenge` / `verifyChallenge`). So every row marked "Session" above needs a session, and D1 says the SDK does not sign.
 
    **Token rotation rules out the simplest option.** The server uses the `serverpod_auth_core_server` 4.0.4 defaults (`JwtConfigFromPasswords()`, nothing overridden): an access token lives **10 minutes**, a refresh token **14 days**, and **every refresh rotates the refresh token**. The old one then fails with `RefreshTokenInvalidSecretException` (`jwt_config.dart`, `jwt.dart`). Found on #222 (Pericena).
 
@@ -66,11 +82,12 @@ Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API
    | B. Sign only the login challenge | The CLI and the MCP server read a wallet key file (never an argument) and sign the SEP-10 challenge, and nothing else. | No rotation problem, but it puts a wallet key on the developer's machine, and the rule becomes "signs only the login challenge". |
    | C. Catalog only | Ship `listAgents` / `getAgent` with no session; the session rows wait. | No new secret at all, but the CLI and MCP milestones lose most of their commands. The fallback if A′ cannot take a server change in time. |
 
-   Asked on #222; the operations and the session provider are #259. Until it is decided, the package ships the catalog only.
+   Asked on #222 and decided there: A′. The server endpoint, the lifetime, the app action and the SDK session provider are #259; the session-bound operations and the CLI commands follow (#224).
 
 ## Consequences
 
 - The CLI and the MCP server cannot drift from the server: they use the same operations and the same errors.
 - Nothing in the SDK can move funds. A prepared envelope still has to be signed in a wallet.
 - Changing a server endpoint changes the SDK in the same PR, or the SDK's tests against the generated client fail to compile.
-- The [quickstart](../sdk/quickstart.md) (#223) and the CLI and MCP guides document the session variables once Open decision 1 is settled.
+- The [quickstart](../sdk/quickstart.md) (#223) and the CLI and MCP guides document `PULS3_REFRESH_TOKEN` and `PULS3_SESSION_FILE` as the session-bound commands land.
+- A developer copies a new session from the app every 72 hours at most. That is the price of a short absolute lifetime.

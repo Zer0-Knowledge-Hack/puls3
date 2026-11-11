@@ -15,6 +15,9 @@ import 'dart:async' as _ida;
 import 'dart:io' as _idi;
 import 'package:puls3_server/src/generated/agent/agent_summary.dart'
     as _ih3rdrku;
+import 'package:puls3_server/src/generated/auth/cli_session.dart' as _i0cajwtn;
+import 'package:puls3_server/src/generated/auth/cli_session_grant.dart'
+    as _i3139o6o;
 import 'package:puls3_server/src/generated/auth/wallet_challenge.dart'
     as _ievkkkll;
 import 'package:puls3_server/src/generated/create_hire_result.dart'
@@ -174,6 +177,8 @@ void withServerpod(
 class TestEndpoints {
   late final _AgentEndpoint agent;
 
+  late final _CliSessionEndpoint cliSession;
+
   late final _JwtRefreshEndpoint jwtRefresh;
 
   late final _WalletAuthEndpoint walletAuth;
@@ -197,6 +202,10 @@ class _InternalTestEndpoints extends TestEndpoints
     _is.EndpointDispatch endpoints,
   ) {
     agent = _AgentEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    cliSession = _CliSessionEndpoint(
       endpoints,
       serializationManager,
     );
@@ -295,6 +304,108 @@ class _AgentEndpoint {
                   _localCallContext.arguments,
                 )
                 as _ida.Future<_ih3rdrku.AgentSummary?>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _CliSessionEndpoint {
+  _CliSessionEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _is.EndpointDispatch _endpointDispatch;
+
+  final _is.SerializationManager _serializationManager;
+
+  _ida.Future<_i3139o6o.CliSessionGrant> create(
+    _ist.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'cliSession',
+            method: 'create',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'cliSession',
+          methodName: 'create',
+          parameters: _ist.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i3139o6o.CliSessionGrant>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<List<_i0cajwtn.CliSession>> list(
+    _ist.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'cliSession',
+            method: 'list',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'cliSession',
+          methodName: 'list',
+          parameters: _ist.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<List<_i0cajwtn.CliSession>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<bool> revoke(
+    _ist.TestSessionBuilder sessionBuilder,
+    String id,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'cliSession',
+            method: 'revoke',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'cliSession',
+          methodName: 'revoke',
+          parameters: _ist.testObjectToJson({'id': id}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<bool>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

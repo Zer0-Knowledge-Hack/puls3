@@ -13,6 +13,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:puls3_client/src/protocol/agent/agent_summary.dart'
     as _i78wn19p;
+import 'package:puls3_client/src/protocol/auth/cli_session.dart' as _ioc4diwu;
 import 'package:puls3_client/src/protocol/studio/studio_draft.dart'
     as _ixd6q1kd;
 import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
@@ -22,6 +23,8 @@ import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
 import 'agent/agent_catalog_unavailable.dart' as _it6c3ckv;
 import 'agent/agent_summary.dart' as _ipe500bk;
+import 'auth/cli_session.dart' as _iu0b4rj2;
+import 'auth/cli_session_grant.dart' as _i4vjaol5;
 import 'auth/wallet_challenge.dart' as _idvb5xlo;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'create_hire_result.dart' as _i4si20vg;
@@ -47,6 +50,8 @@ import 'studio/studio_draft.dart' as _iakoztug;
 import 'studio/test_run_result.dart' as _if6sgnfl;
 export 'agent/agent_catalog_unavailable.dart';
 export 'agent/agent_summary.dart';
+export 'auth/cli_session.dart';
+export 'auth/cli_session_grant.dart';
 export 'auth/wallet_challenge.dart';
 export 'chain/chain_submission.dart';
 export 'create_hire_result.dart';
@@ -111,6 +116,12 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _ipe500bk.AgentSummary) {
       return _ipe500bk.AgentSummary.fromJson(data) as T;
+    }
+    if (t == _iu0b4rj2.CliSession) {
+      return _iu0b4rj2.CliSession.fromJson(data) as T;
+    }
+    if (t == _i4vjaol5.CliSessionGrant) {
+      return _i4vjaol5.CliSessionGrant.fromJson(data) as T;
     }
     if (t == _idvb5xlo.WalletChallenge) {
       return _idvb5xlo.WalletChallenge.fromJson(data) as T;
@@ -189,6 +200,13 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _isc.getType<_ipe500bk.AgentSummary?>()) {
       return (data != null ? _ipe500bk.AgentSummary.fromJson(data) : null) as T;
+    }
+    if (t == _isc.getType<_iu0b4rj2.CliSession?>()) {
+      return (data != null ? _iu0b4rj2.CliSession.fromJson(data) : null) as T;
+    }
+    if (t == _isc.getType<_i4vjaol5.CliSessionGrant?>()) {
+      return (data != null ? _i4vjaol5.CliSessionGrant.fromJson(data) : null)
+          as T;
     }
     if (t == _isc.getType<_idvb5xlo.WalletChallenge?>()) {
       return (data != null ? _idvb5xlo.WalletChallenge.fromJson(data) : null)
@@ -313,6 +331,12 @@ class Protocol extends _isc.SerializationManager {
               .toList()
           as T;
     }
+    if (t == List<_ioc4diwu.CliSession>) {
+      return (data as List)
+              .map((e) => deserialize<_ioc4diwu.CliSession>(e))
+              .toList()
+          as T;
+    }
     if (t == List<_ixd6q1kd.StudioDraft>) {
       return (data as List)
               .map((e) => deserialize<_ixd6q1kd.StudioDraft>(e))
@@ -332,6 +356,8 @@ class Protocol extends _isc.SerializationManager {
     return switch (type) {
       _it6c3ckv.AgentCatalogUnavailable => 'AgentCatalogUnavailable',
       _ipe500bk.AgentSummary => 'AgentSummary',
+      _iu0b4rj2.CliSession => 'CliSession',
+      _i4vjaol5.CliSessionGrant => 'CliSessionGrant',
       _idvb5xlo.WalletChallenge => 'WalletChallenge',
       _iz6hnyrm.ChainSubmission => 'ChainSubmission',
       _i4si20vg.CreateHireResult => 'CreateHireResult',
@@ -373,6 +399,10 @@ class Protocol extends _isc.SerializationManager {
         return 'AgentCatalogUnavailable';
       case _ipe500bk.AgentSummary():
         return 'AgentSummary';
+      case _iu0b4rj2.CliSession():
+        return 'CliSession';
+      case _i4vjaol5.CliSessionGrant():
+        return 'CliSessionGrant';
       case _idvb5xlo.WalletChallenge():
         return 'WalletChallenge';
       case _iz6hnyrm.ChainSubmission():
@@ -446,6 +476,12 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'AgentSummary') {
       return deserialize<_ipe500bk.AgentSummary>(data['data']);
+    }
+    if (dataClassName == 'CliSession') {
+      return deserialize<_iu0b4rj2.CliSession>(data['data']);
+    }
+    if (dataClassName == 'CliSessionGrant') {
+      return deserialize<_i4vjaol5.CliSessionGrant>(data['data']);
     }
     if (dataClassName == 'WalletChallenge') {
       return deserialize<_idvb5xlo.WalletChallenge>(data['data']);

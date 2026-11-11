@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../cli/cli_session_issuer.dart';
 import '../deploy/deploy_gateway.dart';
 import '../hire/hire_flow_store.dart';
 import '../hire/hire_gateway.dart';
@@ -21,6 +22,7 @@ class AppScope extends InheritedWidget {
     required this.hireFlowStore,
     required this.locale,
     required super.child,
+    this.cliSessions,
   });
 
   final AgentCatalog catalog;
@@ -37,6 +39,10 @@ class AppScope extends InheritedWidget {
   /// Active UI language. Changing it rebuilds [MaterialApp].
   final LocaleController locale;
 
+  /// Issues sessions for the puls3 CLI (#259); null when the app has no
+  /// server session (demo builds), which hides the action.
+  final CliSessionIssuer? cliSessions;
+
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
     assert(scope != null, 'AppScope not found in the widget tree.');
@@ -51,5 +57,6 @@ class AppScope extends InheritedWidget {
       studioGateway != oldWidget.studioGateway ||
       hireGateway != oldWidget.hireGateway ||
       hireFlowStore != oldWidget.hireFlowStore ||
-      locale != oldWidget.locale;
+      locale != oldWidget.locale ||
+      cliSessions != oldWidget.cliSessions;
 }
