@@ -8,6 +8,7 @@ workspace:
   - puls3_domain
   - puls3_client
   - puls3_sdk
+  - puls3_cli
   - puls3_mcp
   - puls3_server
   - puls3_flutter

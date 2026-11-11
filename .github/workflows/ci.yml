@@ -45,7 +45,7 @@ jobs:
                 docker=true ;;
               puls3_client/*)
                 server=true; app=true; sdk=true ;;
-              puls3_sdk/*|puls3_mcp/*)
+              puls3_sdk/*|puls3_cli/*|puls3_mcp/*)
                 sdk=true ;;
               puls3_flutter/*)
                 app=true ;;
@@ -94,6 +94,8 @@ jobs:
           restore-keys: ${{ runner.os }}-pub-
       - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_sdk
+        run: dart analyze --fatal-infos && dart test
+      - working-directory: puls3_cli
         run: dart analyze --fatal-infos && dart test
       - working-directory: puls3_mcp
         run: dart analyze --fatal-infos && dart test
