@@ -43,7 +43,8 @@ Future<void> main() async {
     stderr.writeln('catalog unavailable: ${e.message}');
     exitCode = 1;
   } on Puls3ApiException catch (e) {
-    // The server answered with its own error code, for example RateLimited.
+    // The server answered with a Puls3ApiException code of its own. The
+    // catalog calls raise none today; a future one must not crash this.
     stderr.writeln('server error ${e.code}: ${e.message ?? ''}');
     exitCode = 1;
   } on ServerpodClientException catch (e) {
