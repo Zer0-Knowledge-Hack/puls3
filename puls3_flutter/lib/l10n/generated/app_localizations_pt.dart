@@ -1028,7 +1028,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get playgroundCredentialInvalid =>
-      'Essa credencial do provedor não é válida. Verifique o token e o id da conta.';
+      'Essa credencial do provedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este provedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
@@ -2369,7 +2373,11 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get playgroundCredentialInvalid =>
-      'Essa credencial do provedor não é válida. Verifique o token e o id da conta.';
+      'Essa credencial do provedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este provedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
@@ -3713,7 +3721,11 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get playgroundCredentialInvalid =>
-      'Essa credencial do fornecedor não é válida. Verifique o token e o id da conta.';
+      'Essa credencial do fornecedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este fornecedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';

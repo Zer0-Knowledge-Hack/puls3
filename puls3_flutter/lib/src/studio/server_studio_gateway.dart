@@ -173,6 +173,7 @@ class ServerStudioGateway implements StudioGateway {
         ),
         'CredentialMissing' => const StudioCredentialMissing(),
         'CredentialInvalid' => const StudioCredentialInvalid(),
+        'ProviderUnsupported' => const StudioProviderUnsupported(),
         'RuntimeUnavailable' => const StudioUnavailable(
           'The Studio service is unavailable. Try again later.',
         ),

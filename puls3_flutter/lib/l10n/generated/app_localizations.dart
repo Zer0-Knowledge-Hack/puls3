@@ -1899,8 +1899,14 @@ abstract class AppLocalizations {
   /// No description provided for @playgroundCredentialInvalid.
   ///
   /// In en, this message translates to:
-  /// **'That provider credential is not valid. Check the token and account id.'**
+  /// **'That provider credential is not valid. Check the credential details.'**
   String get playgroundCredentialInvalid;
+
+  /// No description provided for @playgroundProviderUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider is not supported. Pick another model.'**
+  String get playgroundProviderUnsupported;
 
   /// No description provided for @playgroundAccountId.
   ///

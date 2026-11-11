@@ -1035,7 +1035,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get playgroundCredentialInvalid =>
-      'Esa credencial del proveedor no es válida. Revisa el token y el id de cuenta.';
+      'Esa credencial del proveedor no es válida. Revisa los datos de la credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este proveedor no es compatible. Elige otro modelo.';
 
   @override
   String get playgroundAccountId => 'Id de cuenta de Cloudflare';

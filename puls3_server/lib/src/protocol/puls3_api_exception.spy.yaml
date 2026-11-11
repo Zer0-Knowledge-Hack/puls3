@@ -11,7 +11,7 @@
 #   InvalidAgentId, AgentNotFound, ChainDataUnavailable
 # Studio and deploy: InvalidManifest, DraftNotFound, DraftNotOwned,
 #   DraftVersionConflict, InputTooLong, TestQuotaExceeded, CredentialMissing,
-#   CredentialInvalid, RuntimeUnavailable,
+#   CredentialInvalid, ProviderUnsupported, RuntimeUnavailable,
 #   AgentExecutionFailed, AgentWalletCreationFailed, AgentWalletUnavailable,
 #   RegistrationNotConfirmed, RegistrationUriConflict,
 #   InvalidAuthorizationEntry, AuthorizationExpired, PublicationFailed

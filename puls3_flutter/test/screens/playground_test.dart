@@ -363,12 +363,43 @@ void main() {
     expect(find.byKey(const Key('playground-error')), findsOneWidget);
     expect(
       find.text(
-        'That provider credential is not valid. Check the token and account id.',
+        'That provider credential is not valid. Check the credential details.',
       ),
       findsOneWidget,
     );
     expect(find.byKey(const Key('playground-credential')), findsOneWidget);
     expect(find.byKey(const Key('playground-account')), findsOneWidget);
+  });
+
+  testWidgets('an unsupported provider stays on screen', (tester) async {
+    await pumpLive(
+      tester,
+      serverGateway(
+        saveProviderCredential: (provider, secret, accountId) async =>
+            throw api.Puls3ApiException(code: 'ProviderUnsupported'),
+      ),
+    );
+    await type(tester, 'hello');
+    await tester.enterText(
+      find.byKey(const Key('playground-credential')),
+      'builder-token',
+    );
+    await tester.enterText(
+      find.byKey(const Key('playground-account')),
+      'builder-account',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('playground-run')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('playground-error')), findsOneWidget);
+    expect(
+      find.text('This provider is not supported. Pick another model.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('playground-credential')), findsOneWidget);
   });
 
   testWidgets('the server quota stays on screen and disables Run', (

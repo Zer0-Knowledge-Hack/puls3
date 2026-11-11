@@ -46,7 +46,7 @@ Programs other than the app use this contract through the Dart SDK `puls3_sdk`, 
 | `StudioEndpoint` | `getDraft` | `draftId: int` | `StudioDraft` | Yes | `DraftNotFound`, `DraftNotOwned` |
 | `StudioEndpoint` | `listDrafts` | — | `List<StudioDraft>` | Yes | |
 | `StudioEndpoint` | `testRun` | `draftId: int`, `input: String` | `TestRunResult` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `CredentialMissing`, `RuntimeUnavailable`, `AgentExecutionFailed` |
-| `StudioEndpoint` | `saveProviderCredential` | `provider: String`, `secret: String`, `accountId: String?` | — | Yes | `CredentialInvalid`, `RuntimeUnavailable` |
+| `StudioEndpoint` | `saveProviderCredential` | `provider: String`, `secret: String`, `accountId: String?` | — | Yes | `CredentialInvalid`, `ProviderUnsupported`, `RuntimeUnavailable` |
 | `StudioEndpoint` | `prepareDeploy` | `draftId: int`, `builder: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidStellarAddress`, `WalletMismatch`, `InvalidManifest`, `AgentWalletCreationFailed`, `SubmissionInProgress`, `ChainUnavailable` |
 | `StudioEndpoint` | `submitRegistration` | `draftId: int`, `preparationId: String`, `signedTransactionXdr: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature` |
 | `StudioEndpoint` | `getDeploySession` | `draftId: int` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned` |
@@ -251,7 +251,7 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Session and shared | `WalletMismatch`, `InternalError` |
 | Authentication | `InvalidStellarAddress`, `ChallengeRateLimited`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
 | Configuration and catalog | `ConfigurationUnavailable`, `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, `ChainDataUnavailable` |
-| Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `CredentialMissing`, `CredentialInvalid`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
+| Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `CredentialMissing`, `CredentialInvalid`, `ProviderUnsupported`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
 | Relay and chain | `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `TransactionFailed`, `ChainUnavailable` |
 | Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed`, `OutcomeUnknown` |
 | Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback`, `FeedbackFromAgentOwner` |

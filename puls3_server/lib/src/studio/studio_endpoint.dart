@@ -263,6 +263,8 @@ class StudioEndpoint extends Endpoint {
       );
     } on StudioCredentialInvalid {
       throw Puls3ApiException(code: 'CredentialInvalid');
+    } on StudioProviderUnsupported {
+      throw Puls3ApiException(code: 'ProviderUnsupported');
     } on StudioRuntimeUnavailable {
       throw Puls3ApiException(code: 'RuntimeUnavailable');
     }

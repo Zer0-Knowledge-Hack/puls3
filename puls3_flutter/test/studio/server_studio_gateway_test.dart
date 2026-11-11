@@ -176,6 +176,15 @@ void main() {
       throwsA(isA<StudioCredentialInvalid>()),
     );
 
+    final unsupported = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'ProviderUnsupported'),
+    );
+    expect(
+      () => unsupported.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioProviderUnsupported>()),
+    );
+
     final unavailable = gateway(
       testRun: (draftId, input) async =>
           throw api.Puls3ApiException(code: 'RuntimeUnavailable'),

@@ -188,8 +188,14 @@ final class StudioCredentialMissing extends StudioGatewayException {
 }
 
 /// The credential the builder tried to save was refused (`CredentialInvalid`):
-/// an unknown provider, an empty secret, or Workers AI without an account id.
+/// an empty secret or Workers AI without an account id.
 final class StudioCredentialInvalid extends StudioGatewayException {
   const StudioCredentialInvalid()
     : super('This provider credential is not valid. Check it and try again.');
+}
+
+/// The provider in the credential is not served (`ProviderUnsupported`).
+final class StudioProviderUnsupported extends StudioGatewayException {
+  const StudioProviderUnsupported()
+    : super('This provider is not supported. Pick another model.');
 }

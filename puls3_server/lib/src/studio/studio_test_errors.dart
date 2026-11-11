@@ -17,13 +17,22 @@ final class StudioCredentialMissing implements Exception {
   String toString() => 'StudioCredentialMissing';
 }
 
-/// The credential the builder tried to save is not usable (unknown provider,
-/// empty secret, or Workers AI without an account id).
+/// The credential the builder tried to save is not usable: an empty secret
+/// or Workers AI without an account id.
 final class StudioCredentialInvalid implements Exception {
   const StudioCredentialInvalid();
 
   @override
   String toString() => 'StudioCredentialInvalid';
+}
+
+/// The provider in a credential is not one this server serves. This is a
+/// model-choice error, not a bad token.
+final class StudioProviderUnsupported implements Exception {
+  const StudioProviderUnsupported();
+
+  @override
+  String toString() => 'StudioProviderUnsupported';
 }
 
 /// The Studio runtime, or its credential store, is unavailable: for example

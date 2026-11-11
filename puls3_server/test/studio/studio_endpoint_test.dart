@@ -374,6 +374,31 @@ void main() {
     );
   });
 
+  test('an unknown provider is ProviderUnsupported', () async {
+    StudioEndpoint.testRuns = (_) => StudioTestRunService(
+      drafts: StudioDraftService(store),
+      quota: MemoryTestRunQuota(),
+      credentials: MemoryBuilderCredentialStore(),
+      policy: studioServerModelPolicy,
+      run: (task, credential) async => 'no',
+    );
+    await expectLater(
+      () => endpoint.saveProviderCredential(
+        session,
+        'unknown-provider',
+        'builder-token',
+        null,
+      ),
+      throwsA(
+        isA<Puls3ApiException>().having(
+          (e) => e.code,
+          'code',
+          'ProviderUnsupported',
+        ),
+      ),
+    );
+  });
+
   group('builder credential store (#235)', () {
     test('saveProviderCredential and testRun use the endpoint store', () async {
       final saved = await StudioDraftService(store).save(
