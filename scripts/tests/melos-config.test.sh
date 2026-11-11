@@ -38,17 +38,29 @@ done
 
 # Slice the test:unit block and keep it away from integration.
 unit_block="$(awk '/"test:unit":/{flag=1} /"test:integration":/{flag=0} flag' "$PUBSPEC")"
-for needle in "dart test test/unit" "test/agent" "test/feedback" "test/hire" "test/ledger" "test/protocol" "test/spike" "test/studio" "flutter test"; do
+for needle in "ls -d test/*/" "integration|e2e|support|fixtures" "puls3_sdk" "puls3_mcp" "flutter test"; do
   if printf '%s' "$unit_block" | grep -qF -- "$needle"; then
     ok "test:unit runs $needle"
   else
     bad "test:unit runs $needle" "missing"
   fi
 done
-if printf '%s' "$unit_block" | grep -q "test/integration"; then
-  bad "test:unit avoids integration tests" "test/integration found"
-else
-  ok "test:unit avoids integration tests"
+# The server lane runs every test folder but the excluded ones, so a new
+# folder is never skipped silently.
+server_lane="$(printf '%s' "$unit_block" | grep 'puls3_server)' | sed -E 's/^[[:space:]]*puls3_server\) //; s/ ;;$//')"
+if [ -d "$REPO_ROOT/puls3_server/test" ]; then
+  expected="$(cd "$REPO_ROOT/puls3_server" && ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$' | tr '\n' ' ')"
+  actual="$(cd "$REPO_ROOT/puls3_server" && eval "dart() { shift; printf '%s ' \"\$@\"; }; $server_lane")"
+  if [ -n "$actual" ] && [ "$actual" = "$expected" ]; then
+    ok "test:unit runs every server test folder but the excluded ones"
+  else
+    bad "test:unit runs every server test folder but the excluded ones" "got: $actual"
+  fi
+  case " $actual " in
+    *" test/integration/ "*|*" test/e2e/ "*)
+      bad "test:unit avoids integration and e2e tests" "found in: $actual" ;;
+    *) ok "test:unit avoids integration and e2e tests" ;;
+  esac
 fi
 
 integration_block="$(awk '/"test:integration":/{flag=1} /"test:e2e":/{flag=0} flag' "$PUBSPEC")"

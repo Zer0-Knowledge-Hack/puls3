@@ -240,7 +240,8 @@ For contract work and E2E tests, [docs/testing/local-environment.md](docs/testin
 ### Quality gates
 
 Melos runs the same checks across the workspace (#254). Use the pinned Flutter
-toolchain from above.
+toolchain from above. On Windows, run `melos` from Git Bash or WSL: the scripts
+are POSIX shell and fail from cmd.exe or PowerShell.
 
 ```bash
 dart pub global activate melos 8.10.1
@@ -261,7 +262,7 @@ dart analyze --fatal-infos && dart test
 
 # Server (unit set; the `test/integration` directory needs the services on 9090/9091)
 cd ../puls3_server
-dart analyze --fatal-infos && dart test test/unit test/agent test/feedback test/hire test/ledger test/protocol test/spike test/studio
+dart analyze --fatal-infos && dart test $(ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$')
 
 # App
 cd ../puls3_flutter

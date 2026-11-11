@@ -71,6 +71,10 @@ melos --version
 If `melos` is not found, add `$HOME/.pub-cache/bin` (or
 `%LOCALAPPDATA%\Pub\Cache\bin` on Windows) to your `PATH`.
 
+On Windows, run `melos` from **Git Bash** (it ships with Git for Windows) or
+WSL. Melos runs scripts with `cmd.exe` there, and the scripts are POSIX shell
+(`case ... esac`, `if [ ... ]`), so they fail from cmd.exe or PowerShell.
+
 ### 1.4 Docker
 
 Install Docker Desktop (<https://www.docker.com/products/docker-desktop>) and make sure it is running: `docker --version`.
@@ -135,7 +139,7 @@ Always commit the generated code. CI and reviewers check that `serverpod generat
 
 ### 2.5 Checks to run before opening a PR
 
-Unified commands (Melos 8):
+Unified commands (Melos 8; on Windows, from Git Bash or WSL):
 
 ```bash
 melos bs
@@ -155,7 +159,7 @@ cd puls3_domain && dart analyze --fatal-infos && dart test
 
 # Server (the unit set avoids services; test/integration needs them)
 cd puls3_server && dart analyze --fatal-infos &&
-  dart test test/unit test/agent test/feedback test/hire test/ledger test/protocol test/spike test/studio
+  dart test $(ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$')
 serverpod generate && git diff --exit-code -- ../puls3_server ../puls3_client
 
 # App

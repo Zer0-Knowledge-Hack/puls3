@@ -18,6 +18,8 @@ dev_dependencies:
 
 # Melos 8 reads its configuration from this file, not from a separate
 # melos.yaml. Install it with `dart pub global activate melos` (#254).
+# The scripts are POSIX shell: on Windows, run melos from Git Bash or WSL
+# (from cmd.exe or PowerShell the `case` and `if [ ]` bodies fail).
 melos:
   repository: https://github.com/Zer0-Knowledge-Hack/puls3
   scripts:
@@ -35,8 +37,10 @@ melos:
       exec:
         command: |
           case "$MELOS_PACKAGE_NAME" in
-            puls3_domain) dart test ;;
-            puls3_server) dart test test/unit test/agent test/feedback test/hire test/ledger test/protocol test/spike test/studio ;;
+            puls3_domain|puls3_sdk|puls3_mcp) dart test ;;
+            # Every test folder except the ones that need services or hold
+            # helpers, so a new folder is picked up without editing this.
+            puls3_server) dart test $(ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$') ;;
             puls3_flutter) flutter test ;;
             *) ;;
           esac
