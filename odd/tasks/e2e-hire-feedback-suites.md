@@ -16,13 +16,13 @@ Branch: feat/255-e2e-hire-feedback-suites · Delivery: ask-on-risk · Runner: `d
 - Assumption A2: the local registry has no agents, so the suite registers one (register_full + set_agent_wallet) with an ephemeral key.
 
 ## Tasks
-- T1 (S1,S5) dart_test.yaml e2e tag + default exclusion — inline — pending
-- T2 (S2,S4,S7) shared support + hire relay suite — inline — pending
-- T3 (S3,S8) feedback suite — inline — pending
-- T4 (S6) run against sandbox, README docs — inline — pending
+- T1 (S1,S5) dart_test.yaml e2e tag + default exclusion — inline — done
+- T2 (S2,S4,S7) shared support + hire relay suite — inline — done
+- T3 (S3,S8) feedback suite — inline — done
+- T4 (S6) run against sandbox, README docs — inline — done
 
 ## Log
 L1 (2026-11-13): "Implementa la #255 con odd y gentle ai"
 L2 (2026-11-13): `exclude_tags` in config ORs with CLI `-x` and still applies under `-t e2e` ("include: e2e, exclude: e2e"), so S1+S6 literally cannot both hold. Used tag `skip` + preset `e2e` instead.
 L3: Prerequisites found missing for #253: server codecs rejected the standalone passphrase (StellarNetwork.fromPassphrase) -> networkIdOf(); setup script never deployed the native SAC and did not wait for Friendbot.
-L4: Verified: `dart test -P e2e test/e2e` 2/2 pass; DB-free suites 1101 pass. Not verified: plain `dart test` incl. integration (C: full, Docker Desktop down).
+L4: Verified after Docker recovered: plain `dart test -j 4` = 1259 pass, 2 skipped (the e2e suites), integration included; `dart test -P e2e test/e2e` = 2/2 pass against the rebuilt sandbox.
