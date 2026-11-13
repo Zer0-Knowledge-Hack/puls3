@@ -8,6 +8,7 @@ import 'sep10_codec.dart';
 import 'stellar_envelope_codec.dart';
 import 'strkey.dart';
 import 'envelope_codec.dart';
+import 'network_id.dart';
 
 export 'sep10_codec.dart';
 
@@ -23,11 +24,11 @@ final class StellarSep10Codec implements Sep10Codec {
     required this.webAuthDomain,
     required String networkPassphrase,
   }) : _server = stellar.StellarPrivateKey.fromBase32(signingKey),
-       _network = stellar.StellarNetwork.fromPassphrase(networkPassphrase),
+       _networkId = networkIdOf(networkPassphrase),
        _envelopes = StellarEnvelopeCodec.forPassphrase(networkPassphrase);
 
   final stellar.StellarPrivateKey _server;
-  final stellar.StellarNetwork _network;
+  final List<int> _networkId;
   final StellarEnvelopeCodec _envelopes;
 
   /// `<homeDomain> auth` is the first operation's name.
@@ -73,7 +74,7 @@ final class StellarSep10Codec implements Sep10Codec {
     );
     final hash = Uint8List.fromList(
       stellar.TransactionSignaturePayload(
-        networkId: _network.passphraseHash,
+        networkId: _networkId,
         taggedTransaction: tx,
       ).txHash(),
     );

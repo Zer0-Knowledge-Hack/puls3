@@ -5,6 +5,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 import 'package:stellar_dart/stellar_dart.dart' as stellar;
 
 import 'envelope_codec.dart';
+import 'network_id.dart';
 import 'strkey.dart';
 import 'xdr_invoke_encoder.dart';
 
@@ -27,14 +28,17 @@ const _maxUint32 = 0xffffffff;
 /// reads envelopes back, hashes them and verifies signatures.
 final class StellarEnvelopeCodec
     implements EnvelopeCodec, AddressAuthAssembler {
-  StellarEnvelopeCodec(this._network);
+  StellarEnvelopeCodec(stellar.StellarNetwork network)
+    : _networkId = network.passphraseHash;
+
+  StellarEnvelopeCodec._(this._networkId);
 
   /// A codec for the network with [passphrase]: Stellar's public, test or
-  /// future network. Any other passphrase throws.
+  /// future network, or a local standalone one.
   factory StellarEnvelopeCodec.forPassphrase(String passphrase) =>
-      StellarEnvelopeCodec(stellar.StellarNetwork.fromPassphrase(passphrase));
+      StellarEnvelopeCodec._(networkIdOf(passphrase));
 
-  final stellar.StellarNetwork _network;
+  final List<int> _networkId;
 
   @override
   PreparedEnvelope build(EnvelopeSpec spec, SimulationData sim) {
@@ -223,7 +227,7 @@ final class StellarEnvelopeCodec
   Uint8List _hashOf(stellar.TransactionV1Envelope envelope) =>
       Uint8List.fromList(
         stellar.TransactionSignaturePayload(
-          networkId: _network.passphraseHash,
+          networkId: _networkId,
           taggedTransaction: envelope.tx,
         ).txHash(),
       );

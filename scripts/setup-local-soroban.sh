@@ -93,10 +93,18 @@ if [ -z "$ADMIN" ]; then
   exit 1
 fi
 
+# Friendbot starts a little after the RPC reports healthy, so retry. A refusal
+# that persists is fine on a re-run: the account was funded the first time.
 echo "Funding $ADMIN from the local Friendbot..."
-if ! curl -fsS "$FRIENDBOT_URL?addr=$ADMIN" >/dev/null 2>&1; then
-  # Local Friendbot refuses an account it already funded; that is fine on a
-  # re-run, and every later call still works because the account exists.
+funded=0
+for _ in $(seq 1 30); do
+  if curl -fsS "$FRIENDBOT_URL?addr=$ADMIN" >/dev/null 2>&1; then
+    funded=1
+    break
+  fi
+  sleep 2
+done
+if [ "$funded" != 1 ]; then
   echo "note: Friendbot did not fund $ADMIN (already funded or Friendbot not ready)." >&2
 fi
 
@@ -165,6 +173,13 @@ SAC_ID="$(stellar contract id asset --asset native --network "$NETWORK" | tr -d 
 if [ -z "$SAC_ID" ]; then
   echo "error: could not derive the native SAC id." >&2
   exit 1
+fi
+
+# The id is only derived above: a fresh network has no native SAC instance, so
+# `fund` cannot move XLM until it is deployed. Deploying twice is harmless.
+echo "Deploying the native SAC..."
+if ! stellar contract asset deploy   --asset native   --source-account "$IDENTITY"   --network "$NETWORK" >/dev/null 2>&1; then
+  echo "note: native SAC deploy did not succeed (already deployed?)." >&2
 fi
 
 echo "Allow-listing the native SAC on the escrow..."
