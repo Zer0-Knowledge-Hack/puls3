@@ -1,2 +1,17 @@
 tags:
   integration: {}
+  # Needs the local Soroban sandbox (#253). Skipped by a plain `dart test`;
+  # run it with `dart test -P e2e`.
+  e2e:
+    timeout: 10m
+    skip: "needs the local Soroban sandbox; run `dart test -P e2e`"
+
+presets:
+  e2e:
+    include_tags: e2e
+    # The suites share one registry and one chain: agent ids come from its
+    # counter, so they run one file at a time.
+    concurrency: 1
+    tags:
+      e2e:
+        skip: false

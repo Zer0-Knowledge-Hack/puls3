@@ -183,6 +183,27 @@ bound to the session and never trusts an address the caller sends. Tests
 inject a fake with `HireEndpoint.sessionWallet`. `InputTooLong` has no
 documented limit, so the hire `input` length is not checked.
 
+### Automated E2E suites on the local sandbox (#255)
+
+`test/e2e/` holds the hire relay (F1, F5) and settlement and feedback
+(F6, F7) flows as Dart tests tagged `e2e`. They run against the local Soroban
+sandbox (#253), with throwaway accounts funded by its Friendbot, a real wallet
+sign-in, the real chain tracker and the test PostgreSQL. A plain `dart test`
+skips them.
+
+```bash
+docker compose -f puls3_server/docker-compose.yaml up -d postgres_test soroban_standalone
+bash scripts/setup-local-soroban.sh
+cd puls3_server
+dart test -P e2e
+```
+
+Use `-P e2e` (not `-t e2e`): the preset lifts the skip and selects the tag,
+and runs the files one at a time because they share one registry. The suites
+read the contract ids from `.env.local-soroban`, refuse any network but the
+local standalone one, and print no secret. The consumer completes the job
+instead of waiting for the release: the local approval window is a day.
+
 ### End-to-end proof on testnet
 
 `tool/e2e_relay_testnet.dart` creates and funds a hire on **testnet** using
