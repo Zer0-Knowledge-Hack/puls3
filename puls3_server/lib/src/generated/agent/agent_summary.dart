@@ -27,8 +27,10 @@ abstract class AgentSummary
     this.model,
     double? rating,
     int? paidHireCount,
+    bool? hireable,
   }) : rating = rating ?? 4.0,
-       paidHireCount = paidHireCount ?? 0;
+       paidHireCount = paidHireCount ?? 0,
+       hireable = hireable ?? false;
 
   factory AgentSummary({
     required String id,
@@ -41,6 +43,7 @@ abstract class AgentSummary
     String? model,
     double? rating,
     int? paidHireCount,
+    bool? hireable,
   }) = _AgentSummaryImpl;
 
   factory AgentSummary.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -57,6 +60,9 @@ abstract class AgentSummary
       model: jsonSerialization['model'] as String?,
       rating: (jsonSerialization['rating'] as num?)?.toDouble(),
       paidHireCount: jsonSerialization['paidHireCount'] as int?,
+      hireable: jsonSerialization['hireable'] == null
+          ? null
+          : _is.BoolJsonExtension.fromJson(jsonSerialization['hireable']),
     );
   }
 
@@ -93,6 +99,13 @@ abstract class AgentSummary
   /// function counted.
   int paidHireCount;
 
+  /// Whether the server can deliver a hire of this agent: its payment wallet
+  /// has a custodied wallet, so the server can sign the escrow `submit`.
+  /// `createHire` refuses an agent that is not hireable with
+  /// `AgentCannotDeliver`. The default keeps summaries built without custody
+  /// knowledge from claiming an agent can be served.
+  bool hireable;
+
   /// Returns a shallow copy of this [AgentSummary]
   /// with some or all fields replaced by the given arguments.
   @_is.useResult
@@ -107,6 +120,7 @@ abstract class AgentSummary
     String? model,
     double? rating,
     int? paidHireCount,
+    bool? hireable,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -122,6 +136,7 @@ abstract class AgentSummary
       if (model != null) 'model': model,
       'rating': rating,
       'paidHireCount': paidHireCount,
+      'hireable': hireable,
     };
   }
 
@@ -139,6 +154,7 @@ abstract class AgentSummary
       if (model != null) 'model': model,
       'rating': rating,
       'paidHireCount': paidHireCount,
+      'hireable': hireable,
     };
   }
 
@@ -162,6 +178,7 @@ class _AgentSummaryImpl extends AgentSummary {
     String? model,
     double? rating,
     int? paidHireCount,
+    bool? hireable,
   }) : super._(
          id: id,
          registryId: registryId,
@@ -173,6 +190,7 @@ class _AgentSummaryImpl extends AgentSummary {
          model: model,
          rating: rating,
          paidHireCount: paidHireCount,
+         hireable: hireable,
        );
 
   /// Returns a shallow copy of this [AgentSummary]
@@ -190,6 +208,7 @@ class _AgentSummaryImpl extends AgentSummary {
     Object? model = _Undefined,
     double? rating,
     int? paidHireCount,
+    bool? hireable,
   }) {
     return AgentSummary(
       id: id ?? this.id,
@@ -202,6 +221,7 @@ class _AgentSummaryImpl extends AgentSummary {
       model: model is String? ? model : this.model,
       rating: rating ?? this.rating,
       paidHireCount: paidHireCount ?? this.paidHireCount,
+      hireable: hireable ?? this.hireable,
     );
   }
 }

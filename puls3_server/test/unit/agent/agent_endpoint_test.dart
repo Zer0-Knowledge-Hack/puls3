@@ -116,6 +116,7 @@ void main() {
         'model',
         'rating',
         'paidHireCount',
+        'hireable',
       },
     );
   });
@@ -125,5 +126,6 @@ void main() {
 
     expect(json['rating'], 4.0);
     expect(json['paidHireCount'], 0);
+    expect(json['hireable'], isFalse);
   });
 }

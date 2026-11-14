@@ -1194,6 +1194,12 @@ abstract class AppLocalizations {
   /// **'Hire is disabled until the agent loads.'**
   String get agentHireDisabled;
 
+  /// No description provided for @agentCannotBeHired.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent cannot be hired yet.'**
+  String get agentCannotBeHired;
+
   /// No description provided for @agentStaleTitle.
   ///
   /// In en, this message translates to:

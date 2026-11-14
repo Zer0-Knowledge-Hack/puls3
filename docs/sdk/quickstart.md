@@ -100,7 +100,7 @@ Future<void> main() async {
 | `getAgent(id)` | one `AgentSummary`, or null for an unknown id. A blank id throws `ArgumentError` without calling the server | `AgentEndpoint.get` |
 | `formatUsdc(stroops)` | a price as text, from integer stroops (7 decimals) | none |
 
-An `AgentSummary` has `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `wallet`, `model`, `rating` and `paidHireCount`. Prices are integer stroops: format them with `formatUsdc`, and do not divide them as a `double`.
+An `AgentSummary` has `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `wallet`, `model`, `rating`, `paidHireCount` and `hireable`. Prices are integer stroops: format them with `formatUsdc`, and do not divide them as a `double`. `hireable` is false when the server cannot deliver a hire of the agent (its payment wallet is not custodied); the server refuses such a hire with `AgentCannotDeliver`.
 
 Errors are the server's own: `AgentCatalogUnavailable` for a catalog outage, `Puls3ApiException` with the server's code for the rest, and `ServerpodClientException` when the server is not reached or times out. A connection that fails below the client, such as a TLS handshake (`HandshakeException`) or a socket error (`SocketException`), arrives as a `dart:io` `IOException`, so catch that too. The SDK adds no error types of its own.
 

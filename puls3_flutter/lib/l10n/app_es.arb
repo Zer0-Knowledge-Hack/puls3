@@ -187,6 +187,7 @@
   "agentBackToMarketplace": "Volver al Marketplace",
   "agentChecking": "Comprobando el agente en el servidor…",
   "agentHireDisabled": "Contratar está deshabilitado hasta que cargue el agente.",
+  "agentCannotBeHired": "Este agente todavía no se puede contratar.",
   "agentStaleTitle": "Mostrando los últimos datos conocidos",
   "agentStaleMessage": "El servidor de puls3 no respondió, así que no se pudo confirmar este agente.",
   "agentPaidOnStellar": "Se paga en USDC en Stellar. Se liquida en unos 5 segundos.",

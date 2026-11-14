@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/src/data/agent_repository.dart';
+import 'package:puls3_flutter/src/domain/agent.dart';
 
 import '../helpers.dart';
 
@@ -15,6 +17,34 @@ void main() {
   testWidgets('Unknown agent shows not found', (tester) async {
     await pumpApp(tester, location: '/agent/nope');
     expect(find.text('Agent not found'), findsOneWidget);
+  });
+
+  testWidgets('a non-hireable agent disables Hire with the reason', (
+    tester,
+  ) async {
+    const agent = Agent(
+      id: 'agt-001',
+      name: 'Ledger Scout',
+      description: 'Monitors Stellar accounts.',
+      skills: ['On-chain analytics'],
+      priceUsdcStroops: 5000000,
+      rating: 4.9,
+      stellarAddress:
+          'GCDSVE4MGRNDOWEP7HX7HGMECBFAZPDI2J5PDGWDLOLLLIUIXFFSQFXZ',
+      model: 'Claude Sonnet',
+      registryId: 7,
+      hireable: false,
+    );
+    await pumpApp(
+      tester,
+      location: '/agent/agt-001',
+      repository: const InMemoryAgentRepository([agent]),
+    );
+
+    expect(find.text('This agent cannot be hired yet.'), findsOneWidget);
+    await tester.tap(find.text('Hire'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Confirm & sign'), findsNothing);
   });
 
   testWidgets('Hire flow ends in the demo result without claiming a payment', (

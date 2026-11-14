@@ -240,6 +240,32 @@ void main() {
 
   group('ServerHireGateway', () {
     test(
+      'an agent whose payee is not custodied is HireAgentCannotDeliver',
+      () async {
+        final gateway = _gateway(
+          createHire: (_, _, _, _) async =>
+              throw Puls3ApiException(code: 'AgentCannotDeliver'),
+        );
+
+        await expectLater(
+          gateway.createHire(
+            agentId: 9,
+            consumer: _consumer,
+            input: 'Audit this',
+            requestId: 'req-1',
+          ),
+          throwsA(
+            isA<HireAgentCannotDeliver>().having(
+              (e) => e.message,
+              'message',
+              'This agent cannot be hired yet.',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'createHire passes the request through and returns the create_job',
       () async {
         final calls = <List<Object>>[];

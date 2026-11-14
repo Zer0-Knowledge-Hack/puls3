@@ -228,6 +228,7 @@
   "agentBackToMarketplace": "Back to Marketplace",
   "agentChecking": "Checking the agent on the server…",
   "agentHireDisabled": "Hire is disabled until the agent loads.",
+  "agentCannotBeHired": "This agent cannot be hired yet.",
   "agentStaleTitle": "Showing the last known data",
   "agentStaleMessage": "The puls3 server did not respond, so this agent could not be confirmed.",
   "agentPaidOnStellar": "Paid in USDC on Stellar. Settles in about 5 seconds.",

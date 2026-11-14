@@ -12,6 +12,8 @@ import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'agent_catalog_service.dart';
 import 'catalog_reader.dart';
+import 'custodied_wallets.dart';
+import 'hireable_catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
 import 'reputation_catalog_reader.dart';
 import 'serverpod_agent_index_repository.dart';
@@ -125,12 +127,15 @@ CatalogReader buildAgentCatalogReader(
           httpClient ?? (_sharedHttpClient ??= http.Client()),
         );
   return ReputationCatalogReader(
-    inner: IndexedAgentCatalogService(
-      index: ServerpodAgentIndexRepository(
-        session,
-        network: config.networkPassphrase,
+    inner: HireableCatalogReader(
+      inner: IndexedAgentCatalogService(
+        index: ServerpodAgentIndexRepository(
+          session,
+          network: config.networkPassphrase,
+        ),
+        fallback: fallback,
       ),
-      fallback: fallback,
+      custody: custodyOn(session),
     ),
     cache: _reputation(config),
   );

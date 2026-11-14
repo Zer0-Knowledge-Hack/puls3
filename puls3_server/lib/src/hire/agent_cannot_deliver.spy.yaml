@@ -1,0 +1,7 @@
+### The agent's payment wallet is not custodied by the server, so the server
+### cannot sign the escrow `submit` that closes a hire of it. Raised before any
+### hire, preparation or envelope is stored and mapped to the `AgentCannotDeliver`
+### code.
+exception: AgentCannotDeliver
+fields:
+  agentId: int
