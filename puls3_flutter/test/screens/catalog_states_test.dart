@@ -72,6 +72,7 @@ AgentSummary _summary(
   priceUsdcStroops: 5000000,
   wallet: 'GCDSVE4MGRNDOWEP7HX7HGMECBFAZPDI2J5PDGWDLOLLLIUIXFFSQFXZ',
   model: 'Claude Sonnet',
+  hireable: true,
 );
 
 Finder _key(String key) => find.byKey(ValueKey(key));

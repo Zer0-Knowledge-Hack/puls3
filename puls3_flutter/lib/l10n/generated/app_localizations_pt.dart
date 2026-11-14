@@ -624,6 +624,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Contratar fica desabilitado até o agente carregar.';
 
   @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
+
+  @override
   String get agentStaleTitle => 'Mostrando os últimos dados conhecidos';
 
   @override
@@ -1959,6 +1963,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get agentHireDisabled =>
       'Contratar fica desabilitado até o agente carregar.';
+
+  @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
 
   @override
   String get agentStaleTitle => 'Mostrando os últimos dados conhecidos';
@@ -3297,6 +3305,10 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get agentHireDisabled =>
       'Contratar fica indisponível até o agente carregar.';
+
+  @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
 
   @override
   String get agentStaleTitle => 'A mostrar os últimos dados conhecidos';

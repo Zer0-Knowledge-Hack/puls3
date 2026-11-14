@@ -33,3 +33,10 @@ fields:
   ### How many paid hires rated the agent: the feedback entries the #11
   ### function counted.
   paidHireCount: int, default=0
+
+  ### Whether the server can deliver a hire of this agent: its payment wallet
+  ### has a custodied wallet, so the server can sign the escrow `submit`.
+  ### `createHire` refuses an agent that is not hireable with
+  ### `AgentCannotDeliver`. The default keeps summaries built without custody
+  ### knowledge from claiming an agent can be served.
+  hireable: bool, default=false

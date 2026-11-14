@@ -148,16 +148,18 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
 
   Widget _view(Agent agent) {
     final status = _status;
+    final hireable = agent.hireable;
     return AgentDetailView(
       key: ValueKey('detail-$status'),
       agent: agent,
       onBack: _back,
-      onHire: status == _DetailStatus.ready
+      onHire: status == _DetailStatus.ready && hireable
           ? () => showHireSheet(context, agent)
           : null,
       hireNote: switch (status) {
         _DetailStatus.loading => context.l10n.agentChecking,
         _DetailStatus.error => context.l10n.agentHireDisabled,
+        _ when !hireable => context.l10n.agentCannotBeHired,
         _ => null,
       },
       onOpenExplorer: () => unawaited(

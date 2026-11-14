@@ -50,6 +50,7 @@ void main() {
           relay: on.service,
           registry: on.ledger,
           catalog: AgentCatalogService(on.ledger),
+          custody: on.custodyOf,
           config: HireRelayConfig(environment),
           now: () => on.clock,
         );
@@ -347,6 +348,23 @@ void main() {
           throwsA(isA<AgentUnavailable>().having((e) => e.agentId, 'id', 7)),
         );
         expect(rig.hires.all, isEmpty);
+      },
+    );
+
+    test(
+      'AgentCannotDeliver when the agent wallet is not custodied',
+      () async {
+        rig.custodied.remove(agentWallet);
+
+        await expectLater(
+          create(service),
+          throwsA(
+            isA<AgentCannotDeliver>().having((e) => e.agentId, 'id', 7),
+          ),
+        );
+        expect(rig.hires.all, isEmpty);
+        expect(rig.preparations.all, isEmpty);
+        expect(rig.codec.built, isEmpty);
       },
     );
 

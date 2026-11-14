@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../agent/agent_catalog_service.dart';
+import '../agent/custodied_wallets.dart';
 import '../agent/registry_reader.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
@@ -23,6 +24,7 @@ class HireService {
     required this.relay,
     required this.registry,
     required this.catalog,
+    required this.custody,
     required this.config,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
@@ -32,6 +34,9 @@ class HireService {
   final EscrowRelayService relay;
   final RegistryReader registry;
   final AgentCatalogService catalog;
+
+  /// The one custody rule: which payment wallets the server can sign for.
+  final CustodyLookup custody;
   final HireRelayConfig config;
   final DateTime Function() _now;
 
@@ -44,6 +49,10 @@ class HireService {
   /// and its preparation are stored in one transaction, so a failed
   /// preparation leaves no hire behind. The caller has already checked that
   /// [consumer] is the session wallet.
+  ///
+  /// An agent whose payment wallet is not custodied is refused with
+  /// [AgentCannotDeliver] before anything is stored: the server could never
+  /// sign its `submit`, so the payment would sit in the escrow until expiry.
   Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
@@ -82,6 +91,12 @@ class HireService {
     final agentWallet = agent?.wallet;
     if (agent == null || agentWallet == null) {
       throw AgentUnavailable(agentId: agentId);
+    }
+    final custodied = await custody({agentWallet});
+    if (!custodied.contains(agentWallet)) {
+      // The server would never send this agent's `submit`, so the escrow would
+      // hold the consumer's payment until the job expires (#276).
+      throw AgentCannotDeliver(agentId: agentId);
     }
 
     final Uint8List? rawManifest;

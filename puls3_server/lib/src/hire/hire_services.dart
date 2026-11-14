@@ -5,6 +5,7 @@ import 'package:serverpod/serverpod.dart';
 
 import '../agent/agent_catalog_service.dart';
 import '../agent/agent_catalog_wiring.dart' show catalogConsoleLog;
+import '../agent/custodied_wallets.dart';
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
 import '../feedback/feedback_service.dart';
@@ -126,6 +127,7 @@ final class HireWiring {
         relay: relay,
         registry: ledger,
         catalog: catalog,
+        custody: custodyOn(session),
         config: config,
       ),
       relay: relay,

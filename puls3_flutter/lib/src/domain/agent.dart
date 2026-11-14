@@ -13,6 +13,7 @@ class Agent {
     required this.stellarAddress,
     required this.model,
     this.registryId,
+    this.hireable = true,
   });
 
   factory Agent.fromJson(Map<String, dynamic> json) => Agent(
@@ -24,6 +25,7 @@ class Agent {
     rating: (json['rating'] as num).toDouble(),
     stellarAddress: json['stellarAddress'] as String,
     model: json['model'] as String,
+    hireable: json['hireable'] as bool? ?? true,
   );
 
   final String id;
@@ -40,6 +42,11 @@ class Agent {
   /// The agent's integer id in the on-chain Identity Registry, when the
   /// agent comes from the chain. Null for the bundled demo catalog.
   final int? registryId;
+
+  /// Whether the server can deliver a hire of this agent: its payment wallet
+  /// is custodied, so the server can sign the escrow `submit`. False disables
+  /// Hire, because the payment would sit in the escrow until it expires.
+  final bool hireable;
 
   String get topSkill => skills.isEmpty ? 'Generalist' : skills.first;
 }
