@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:puls3_client/puls3_client.dart' as api;
 import 'package:puls3_domain/puls3_domain.dart';
 
+import '../data/typed_api_error.dart';
 import '../hire/wallet_session.dart';
 import '../wallet/wallet_port.dart';
 import 'studio_gateway.dart';
@@ -155,7 +156,10 @@ class ServerStudioGateway implements StudioGateway {
       rethrow;
     } on TimeoutException {
       throw const StudioUnavailable('The puls3 server did not answer.');
-    } on api.ServerpodClientException {
+    } on api.ServerpodClientException catch (e) {
+      // The browser client cannot decode a typed error with `details`.
+      final typed = typedApiError(e);
+      if (typed != null) throw _map(typed);
       throw const StudioUnavailable('The puls3 server did not answer.');
     }
   }
@@ -171,7 +175,12 @@ class ServerStudioGateway implements StudioGateway {
         'TestQuotaExceeded' => StudioTestQuotaExceeded(
           resetsAt: DateTime.tryParse(error.details?['resetsAt'] ?? ''),
         ),
-        'RuntimeUnavailable' => const StudioCredentialMissing(),
+        'CredentialMissing' => const StudioCredentialMissing(),
+        'CredentialInvalid' => const StudioCredentialInvalid(),
+        'ProviderUnsupported' => const StudioProviderUnsupported(),
+        'RuntimeUnavailable' => const StudioUnavailable(
+          'The Studio service is unavailable. Try again later.',
+        ),
         'AgentExecutionFailed' => StudioRunFailed(
           error.details?['reason'] ?? 'The agent run failed.',
         ),

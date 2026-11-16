@@ -130,6 +130,28 @@ void main() {
     expect(result.remainingDailyRuns, 19);
   });
 
+  test(
+    'a quota error the browser client could not decode keeps its time',
+    () async {
+      final quota = gateway(
+        testRun: (draftId, input) async => throw api.ServerpodClientBadRequest(
+          '{"className":"Puls3ApiException","data":{"code":"TestQuotaExceeded",'
+          '"details":{"resetsAt":"2026-10-15T00:00:00.000Z"}}}',
+        ),
+      );
+      await expectLater(
+        quota.testRun(1, _prompt, owner: 'G'),
+        throwsA(
+          isA<StudioTestQuotaExceeded>().having(
+            (e) => e.resetsAt,
+            'resetsAt',
+            DateTime.utc(2026, 10, 15),
+          ),
+        ),
+      );
+    },
+  );
+
   test('test run errors keep the prompt out of the message', () async {
     final quota = gateway(
       testRun: (draftId, input) async => throw api.Puls3ApiException(
@@ -160,11 +182,38 @@ void main() {
 
     final missing = gateway(
       testRun: (draftId, input) async =>
-          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+          throw api.Puls3ApiException(code: 'CredentialMissing'),
     );
     expect(
       () => missing.testRun(1, 'Hi', owner: 'G'),
       throwsA(isA<StudioCredentialMissing>()),
+    );
+
+    final invalid = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'CredentialInvalid'),
+    );
+    expect(
+      () => invalid.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioCredentialInvalid>()),
+    );
+
+    final unsupported = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'ProviderUnsupported'),
+    );
+    expect(
+      () => unsupported.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioProviderUnsupported>()),
+    );
+
+    final unavailable = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+    );
+    expect(
+      () => unavailable.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioUnavailable>()),
     );
 
     final long = gateway(
@@ -187,7 +236,7 @@ void main() {
         provider = nextProvider;
         secret = nextSecret;
         accountId = nextAccount;
-        throw api.Puls3ApiException(code: 'RuntimeUnavailable');
+        throw api.Puls3ApiException(code: 'CredentialInvalid');
       },
     );
     try {
@@ -197,13 +246,27 @@ void main() {
         accountId: 'builder-account',
         owner: 'G',
       );
-      fail('expected StudioCredentialMissing');
-    } on StudioCredentialMissing catch (e) {
+      fail('expected StudioCredentialInvalid');
+    } on StudioCredentialInvalid catch (e) {
       expect(provider, 'workers-ai');
       expect(secret, token);
       expect(accountId, 'builder-account');
       expect('$e', isNot(contains(token)));
     }
+
+    final unavailable = gateway(
+      saveProviderCredential: (nextProvider, nextSecret, nextAccount) async =>
+          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+    );
+    expect(
+      () => unavailable.saveProviderCredential(
+        provider: 'workers-ai',
+        secret: token,
+        accountId: 'builder-account',
+        owner: 'G',
+      ),
+      throwsA(isA<StudioUnavailable>()),
+    );
   });
 }
 

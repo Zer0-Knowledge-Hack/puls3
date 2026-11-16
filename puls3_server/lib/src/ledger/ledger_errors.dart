@@ -15,7 +15,12 @@ sealed class LedgerException implements Exception {
 /// The chain could not be read: transport failure, non-2xx status, timeout,
 /// JSON-RPC error, malformed response, or archived state that needs a restore.
 final class LedgerUnavailable extends LedgerException {
-  const LedgerUnavailable(super.message);
+  const LedgerUnavailable(super.message, {this.archived = false});
+
+  /// The read needs archived state restored (`restorePreamble`): the chain
+  /// answered, but the entry is in the archive, not live. A caller that can
+  /// treat one entry as unreadable checks this instead of failing whole.
+  final bool archived;
 }
 
 /// The contract rejected the call with an error code the adapter does not
@@ -25,6 +30,14 @@ final class LedgerContractError extends LedgerException {
 
   /// The `Error(Contract, #code)` number.
   final int code;
+}
+
+/// The node answered and the simulation failed for a reason that is not a
+/// contract `Error(Contract, #N)`: an auth failure, a Wasm trap, a budget
+/// failure, or another deterministic host error. Unlike
+/// [LedgerUnavailable], repeating the same simulation gives the same answer.
+final class LedgerSimulationError extends LedgerException {
+  const LedgerSimulationError(super.message);
 }
 
 /// The node answered and refused the request itself: a JSON-RPC

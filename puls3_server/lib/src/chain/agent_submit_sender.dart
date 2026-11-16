@@ -20,6 +20,12 @@ import 'submission_values.dart';
 Uint8List deliverableHash(String output) =>
     Uint8List.fromList(sha256.convert(utf8.encode(output)).bytes);
 
+/// Escrow codes a `submit` can never recover from: `JobExpired` (9) and
+/// `SubmitTooLate` (106). Every other contract code may be transient (a
+/// lagging node, a previous outcome that landed, an admin change), so it is
+/// counted toward [maxEscrowCallAttempts] instead of closing immediately.
+const _terminalSubmitCodes = {9, 106};
+
 /// Succeeded funded hires whose agent run is stored and not yet submitted.
 abstract interface class DueSubmitSource {
   /// Up to [limit] hires, oldest run first.
@@ -123,8 +129,13 @@ final class AgentSubmitSender {
           (row) =>
               row.purpose == purpose && row.state == SubmissionState.failed,
         )
-        .length;
-    if (failed >= maxEscrowCallAttempts) return;
+        .toList();
+    if (failed.any(
+      (row) => row.errorCode == SubmissionOutcomeCode.submitSimulationRejected,
+    )) {
+      return;
+    }
+    if (failed.length >= maxEscrowCallAttempts) return;
 
     final until = _now().toUtc().add(Duration(seconds: validitySeconds));
     final PreparedEnvelope prepared;
@@ -143,7 +154,35 @@ final class AgentSubmitSender {
         inclusionFee: inclusionFee,
         validUntil: until.millisecondsSinceEpoch ~/ 1000,
       );
-      prepared = _codec.build(spec, await _accounts.simulate(spec));
+      prepared = _codec.build(spec, await _accounts.simulateRaw(spec));
+    } on LedgerContractError catch (e) {
+      // Only an expired / too-late job is permanent. The rest may be a
+      // lagging node or an admin change, so count one bounded attempt.
+      final terminal = _terminalSubmitCodes.contains(e.code);
+      _log(
+        ChainLogLevel.warning,
+        'Submit simulation for hire ${due.hireId} was rejected with '
+        'contract error #${e.code}${terminal ? '; terminal' : ''}',
+      );
+      await _recordSimulationFailure(
+        due,
+        terminal
+            ? SubmissionOutcomeCode.submitSimulationRejected
+            : SubmissionOutcomeCode.simulationFailed,
+      );
+      return;
+    } on LedgerSimulationError catch (e) {
+      // Auth, Wasm or budget failures do not change on a retry either, but
+      // they are not reasons to close the hire forever: count one attempt.
+      _log(
+        ChainLogLevel.warning,
+        'Submit simulation for hire ${due.hireId} failed: $e',
+      );
+      await _recordSimulationFailure(
+        due,
+        SubmissionOutcomeCode.simulationFailed,
+      );
+      return;
     } on LedgerException catch (e) {
       _log(
         ChainLogLevel.warning,
@@ -194,7 +233,7 @@ final class AgentSubmitSender {
     }
 
     final rejected = escrowCallFailureCode(
-      priorFailures: failed,
+      priorFailures: failed.length,
       code: SubmissionOutcomeCode.submissionRejected,
     );
     try {
@@ -224,6 +263,25 @@ final class AgentSubmitSender {
       _log(
         ChainLogLevel.warning,
         'Sending submission ${record.id} failed: $e; it stays submitted',
+      );
+    }
+  }
+
+  /// Stores a failed `submit` for a simulation rejection (#262). No envelope
+  /// exists, so the row has no transaction; [errorCode] says whether it was
+  /// terminal or counts toward the attempt bound.
+  Future<void> _recordSimulationFailure(DueSubmit due, String errorCode) async {
+    try {
+      await _submissions.insertFailed(
+        purpose: SubmissionPurpose.submit,
+        errorCode: errorCode,
+        hireId: due.hireId,
+      );
+    } on ChainSubmissionConflict catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Hire ${due.hireId} already recorded this submit simulation failure '
+        '(${e.index.name})',
       );
     }
   }

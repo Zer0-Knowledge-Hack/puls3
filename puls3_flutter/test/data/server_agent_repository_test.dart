@@ -11,6 +11,7 @@ AgentSummary summary({
   String? model = 'gpt-x',
   List<String> skills = const ['on-chain-analytics', 'monitoring'],
   double? rating,
+  bool hireable = true,
 }) => AgentSummary(
   id: id,
   registryId: 1,
@@ -21,6 +22,7 @@ AgentSummary summary({
   wallet: wallet,
   model: model,
   rating: rating,
+  hireable: hireable,
 );
 
 void main() {
@@ -63,6 +65,15 @@ void main() {
       // The summary carries no explicit rating: the server's empty-input
       // value (4.0, #11) comes through, not an invented 0.0.
       expect(agent.rating, 4.0);
+      expect(agent.hireable, isTrue);
+    });
+
+    test('maps a non-hireable agent from the server', () async {
+      final repository = ServerAgentRepository(
+        () async => [summary(hireable: false)],
+      );
+
+      expect((await repository.fetchAgents()).single.hireable, isFalse);
     });
 
     test('maps the rating the server computed', () async {

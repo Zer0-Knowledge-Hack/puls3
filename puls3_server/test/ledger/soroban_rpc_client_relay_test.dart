@@ -217,13 +217,13 @@ void main() {
       },
     );
 
-    test('derived: an error without a contract code is unavailable', () {
+    test('derived: an error without a contract code is a simulation error', () {
       final response = _fixture('simulate_fund_job_3_error_base64.json');
       _result(response)['error'] = 'HostError: Error(WasmVm, InvalidAction)';
 
       expect(
         _answering(response).simulateTransactionBase64('AAAA'),
-        throwsA(isA<LedgerUnavailable>()),
+        throwsA(isA<LedgerSimulationError>()),
       );
     });
 

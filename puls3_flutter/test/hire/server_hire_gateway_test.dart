@@ -33,9 +33,11 @@ HireDetail _detail(
   String? errorCode,
   String? feedbackReference,
   ChainSubmission? feedbackSubmission,
+  int? feedbackScore,
 }) => HireDetail(
   hire: _hire(3).copyWith(feedbackReference: feedbackReference),
   feedbackSubmission: feedbackSubmission,
+  feedbackScore: feedbackScore,
   agent: AgentSummary(
     id: 'agt-003',
     registryId: 9,
@@ -205,11 +207,13 @@ void main() {
           'confirmed',
           feedbackReference: _feedbackHash,
           feedbackSubmission: _feedback('submitted'),
+          feedbackScore: 4,
         ),
       ).getHire(3, _consumer);
       expect(rated.feedbackTransaction, _feedbackHash);
       expect(rated.feedbackState, 'submitted');
       expect(rated.feedbackExplorerUrl, endsWith('/tx/$_feedbackHash'));
+      expect(rated.feedbackScore, 4);
       expect(rated.feedbackPending, isTrue);
 
       // A failed rating clears the reference: the hire can be rated again.
@@ -221,6 +225,7 @@ void main() {
       ).getHire(3, _consumer);
       expect(failed.feedbackTransaction, isNull);
       expect(failed.feedbackState, 'failed');
+      expect(failed.feedbackScore, isNull);
       expect(failed.feedbackExplorerUrl, isNull);
       expect(failed.feedbackPending, isFalse);
       expect(failed.feedbackFailed, isTrue);
@@ -239,6 +244,32 @@ void main() {
   });
 
   group('ServerHireGateway', () {
+    test(
+      'an agent whose payee is not custodied is HireAgentCannotDeliver',
+      () async {
+        final gateway = _gateway(
+          createHire: (_, _, _, _) async =>
+              throw Puls3ApiException(code: 'AgentCannotDeliver'),
+        );
+
+        await expectLater(
+          gateway.createHire(
+            agentId: 9,
+            consumer: _consumer,
+            input: 'Audit this',
+            requestId: 'req-1',
+          ),
+          throwsA(
+            isA<HireAgentCannotDeliver>().having(
+              (e) => e.message,
+              'message',
+              'This agent cannot be hired yet.',
+            ),
+          ),
+        );
+      },
+    );
+
     test(
       'createHire passes the request through and returns the create_job',
       () async {
@@ -294,6 +325,47 @@ void main() {
           requestId: 'r',
         ),
         throwsA(isA<HireNotSignedIn>()),
+      );
+    });
+
+    test(
+      'a typed error the browser client could not decode is still mapped',
+      () async {
+        // dart2js cannot decode `details`, so the client throws a plain bad
+        // request carrying the body. The job is not open yet: keep polling.
+        var calls = 0;
+        final gateway = _gateway(
+          prepareFund: (_) async {
+            calls++;
+            if (calls == 1) {
+              throw ServerpodClientBadRequest(
+                '{"className":"Puls3ApiException","data":{"__className__":'
+                '"Puls3ApiException","code":"InvalidHireTransition",'
+                '"details":{"purpose":"fund"}}}',
+              );
+            }
+            return _prepared('fund');
+          },
+        );
+        final preparation = await gateway.prepareFund(3);
+        expect(calls, 2);
+        expect(preparation.purpose, 'fund');
+      },
+    );
+
+    test('a bad request that is not a typed error is a server error', () async {
+      final gateway = _gateway(
+        createHire: (_, _, _, _) async =>
+            throw ServerpodClientBadRequest('<html>nope</html>'),
+      );
+      await expectLater(
+        gateway.createHire(
+          agentId: 9,
+          consumer: _consumer,
+          input: 'x',
+          requestId: 'r',
+        ),
+        throwsA(isA<HireBackendUnavailable>()),
       );
     });
 

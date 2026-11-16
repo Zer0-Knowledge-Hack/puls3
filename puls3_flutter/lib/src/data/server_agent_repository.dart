@@ -74,6 +74,7 @@ class ServerAgentRepository implements AgentRepository {
       stellarAddress: wallet,
       model: model == null || model.isEmpty ? 'Unspecified' : model,
       registryId: s.registryId,
+      hireable: s.hireable,
     );
   }
 }
