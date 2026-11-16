@@ -36,6 +36,7 @@ import 'feedback/feedback_eligibility.dart' as _i640bgq8;
 import 'greetings/greeting.dart' as _izw8z7ou;
 import 'health/backend_health.dart' as _ikpil6ki;
 import 'hire.dart' as _ibbrviw7;
+import 'hire/agent_cannot_deliver.dart' as _ialkjq09;
 import 'hire/agent_unavailable.dart' as _i3db3d86;
 import 'hire/escrow_preparation.dart' as _ir9uo1i9;
 import 'hire/hire.dart' as _ikb6z54u;
@@ -74,6 +75,7 @@ export 'feedback/feedback_eligibility.dart';
 export 'greetings/greeting.dart';
 export 'health/backend_health.dart';
 export 'hire.dart';
+export 'hire/agent_cannot_deliver.dart';
 export 'hire/agent_unavailable.dart';
 export 'hire/escrow_preparation.dart';
 export 'hire/hire.dart';
@@ -1566,6 +1568,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ibbrviw7.Hire) {
       return _ibbrviw7.Hire.fromJson(data) as T;
     }
+    if (t == _ialkjq09.AgentCannotDeliver) {
+      return _ialkjq09.AgentCannotDeliver.fromJson(data) as T;
+    }
     if (t == _i3db3d86.AgentUnavailable) {
       return _i3db3d86.AgentUnavailable.fromJson(data) as T;
     }
@@ -1695,6 +1700,10 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_ibbrviw7.Hire?>()) {
       return (data != null ? _ibbrviw7.Hire.fromJson(data) : null) as T;
+    }
+    if (t == _is.getType<_ialkjq09.AgentCannotDeliver?>()) {
+      return (data != null ? _ialkjq09.AgentCannotDeliver.fromJson(data) : null)
+          as T;
     }
     if (t == _is.getType<_i3db3d86.AgentUnavailable?>()) {
       return (data != null ? _i3db3d86.AgentUnavailable.fromJson(data) : null)
@@ -1857,6 +1866,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _izw8z7ou.Greeting => 'Greeting',
       _ikpil6ki.BackendHealth => 'BackendHealth',
       _ibbrviw7.Hire => 'Hire',
+      _ialkjq09.AgentCannotDeliver => 'AgentCannotDeliver',
       _i3db3d86.AgentUnavailable => 'AgentUnavailable',
       _ir9uo1i9.EscrowPreparation => 'EscrowPreparation',
       _ikb6z54u.HireRecord => 'HireRecord',
@@ -1924,6 +1934,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'BackendHealth';
       case _ibbrviw7.Hire():
         return 'Hire';
+      case _ialkjq09.AgentCannotDeliver():
+        return 'AgentCannotDeliver';
       case _i3db3d86.AgentUnavailable():
         return 'AgentUnavailable';
       case _ir9uo1i9.EscrowPreparation():
@@ -2040,6 +2052,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'Hire') {
       return deserialize<_ibbrviw7.Hire>(data['data']);
+    }
+    if (dataClassName == 'AgentCannotDeliver') {
+      return deserialize<_ialkjq09.AgentCannotDeliver>(data['data']);
     }
     if (dataClassName == 'AgentUnavailable') {
       return deserialize<_i3db3d86.AgentUnavailable>(data['data']);

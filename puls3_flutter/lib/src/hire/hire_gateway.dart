@@ -332,6 +332,13 @@ final class HireAgentUnavailable extends HireGatewayException {
   const HireAgentUnavailable(super.message);
 }
 
+/// The agent's payment wallet is not custodied by the server
+/// (`AgentCannotDeliver`), so the server could never sign the escrow `submit`
+/// that closes the hire. It refuses before any payment is prepared.
+final class HireAgentCannotDeliver extends HireGatewayException {
+  const HireAgentCannotDeliver() : super('This agent cannot be hired yet.');
+}
+
 /// The server refused the request as invalid. Retrying it unchanged fails
 /// again.
 final class HireRejected extends HireGatewayException {
