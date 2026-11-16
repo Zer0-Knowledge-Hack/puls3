@@ -609,6 +609,102 @@ fn submitter_auth_is_required_without_mock_all_auths() {
     assert_eq!(rep.get_last_index(&agent_id, &reviewer), 1);
 }
 
+// #201: puls3 writes the paid-job reference in `tag2` and `feedback_uri`, and
+// a commitment in `feedback_hash`. The contract is unchanged; these tests lock
+// the behavior readers rely on: `tag2` is stored and read back verbatim, and
+// `NewFeedback` carries the URI and the hash exactly as given.
+
+const JOB_REFERENCE: &str =
+    "puls3:job:v1:CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2:8";
+
+#[test]
+fn a_job_reference_in_tag2_is_stored_and_read_back_verbatim() {
+    let ctx = setup();
+    let client = Address::generate(&ctx.env);
+    let reference = ctx.s(JOB_REFERENCE);
+
+    ctx.rep().give_feedback(
+        &client,
+        &ctx.agent_id,
+        &4,
+        &0,
+        &ctx.s(""),
+        &reference,
+        &ctx.s(""),
+        &reference,
+        &ctx.hash(9),
+    );
+
+    let stored = ctx.rep().read_feedback(&ctx.agent_id, &client, &1);
+    assert_eq!(stored.tag2, reference);
+    assert_eq!(stored.tag1, ctx.s(""));
+    assert_eq!(stored.value, 4);
+    assert_eq!(stored.value_decimals, 0);
+}
+
+#[test]
+fn new_feedback_carries_the_job_reference_uri_and_hash_unchanged() {
+    use soroban_sdk::Event as _;
+
+    let ctx = setup();
+    let client = Address::generate(&ctx.env);
+    let reference = ctx.s(JOB_REFERENCE);
+
+    ctx.rep().give_feedback(
+        &client,
+        &ctx.agent_id,
+        &4,
+        &0,
+        &ctx.s(""),
+        &reference,
+        &ctx.s(""),
+        &reference,
+        &ctx.hash(9),
+    );
+
+    assert_eq!(
+        ctx.env.events().all().filter_by_contract(&ctx.rep_id),
+        [NewFeedback {
+            agent_id: ctx.agent_id,
+            client_address: client,
+            tag1: ctx.s(""),
+            feedback_index: 1,
+            value: 4,
+            value_decimals: 0,
+            tag2: reference.clone(),
+            endpoint: ctx.s(""),
+            feedback_uri: reference,
+            feedback_hash: ctx.hash(9),
+        }
+        .to_xdr(&ctx.env, &ctx.rep_id)]
+    );
+}
+
+#[test]
+fn the_contract_still_accepts_a_rating_with_no_job_reference() {
+    // The paid-hire rule is applied by readers (ADR-0005 D5, #201): the
+    // contract stays drop-in and stores a rating without a reference, which
+    // puls3's reader then does not count.
+    let ctx = setup();
+    let client = Address::generate(&ctx.env);
+
+    ctx.rep().give_feedback(
+        &client,
+        &ctx.agent_id,
+        &5,
+        &0,
+        &ctx.s(""),
+        &ctx.s(""),
+        &ctx.s(""),
+        &ctx.s(""),
+        &ctx.hash(0),
+    );
+
+    let stored = ctx.rep().read_feedback(&ctx.agent_id, &client, &1);
+    assert_eq!(stored.tag2, ctx.s(""));
+    assert_eq!(stored.value, 5);
+}
+
 // --- #199: one poisoned feedback must not make get_summary fail ---
 
 /// 1e30, the value of the audit's proof of concept.

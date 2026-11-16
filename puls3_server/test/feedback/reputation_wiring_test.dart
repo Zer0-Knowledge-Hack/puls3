@@ -44,9 +44,15 @@ void main() {
         client: _client,
         agent: AgentId(7),
         feedback: _feedback(),
+        jobId: 3,
       );
       expect(call.contract, StellarConfig.testnet.identityRegistry);
       expect(call.function, 'give_feedback');
+      // The reference names the configured escrow (#201).
+      expect(
+        (calls as SorobanReputationCalls).escrow,
+        StellarConfig.testnet.escrow,
+      );
     });
 
     test('stays unwired, failing closed, while the registry is unset', () {
@@ -58,6 +64,7 @@ void main() {
           client: _client,
           agent: AgentId(7),
           feedback: _feedback(),
+          jobId: 3,
         ),
         throwsA(isA<HireConfigurationMissing>()),
       );
@@ -70,6 +77,14 @@ void main() {
         reputationRegistryFor(_configured, _reader(_configured)),
         isA<SorobanReputationRegistry>(),
       );
+    });
+
+    test('checks ratings against the configured escrow (#201)', () {
+      final registry =
+          reputationRegistryFor(_configured, _reader(_configured))
+              as SorobanReputationRegistry;
+
+      expect(registry.escrow, _configured.escrow);
     });
 
     test('has no feedback to read while the registry is unset', () async {

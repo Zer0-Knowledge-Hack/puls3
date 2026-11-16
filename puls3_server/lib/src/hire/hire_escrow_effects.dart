@@ -284,14 +284,5 @@ FundedJob _fundedJob(int jobId, EscrowJob job, {bool landed = false}) =>
       agentId: job.agentId,
       budget: job.budget,
       expiredAt: job.expiredAt,
-      state: landed
-          ? JobState.funded
-          : switch (job.state) {
-              EscrowJobState.open => JobState.open,
-              EscrowJobState.funded => JobState.funded,
-              EscrowJobState.submitted => JobState.submitted,
-              EscrowJobState.completed => JobState.completed,
-              EscrowJobState.rejected => JobState.rejected,
-              EscrowJobState.expired => JobState.expired,
-            },
+      state: landed ? JobState.funded : job.state.domain,
     );
