@@ -212,8 +212,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the rating transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl,
     );
@@ -241,8 +247,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl ?? detail.paymentExplorerUrl,
     );
@@ -283,6 +295,7 @@ class ServerHireGateway implements HireGateway {
       feedbackTransaction: hire.feedbackReference,
       feedbackState: feedback?.state,
       feedbackErrorCode: feedback?.errorCode,
+      feedbackScore: detail.feedbackScore,
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,
@@ -362,6 +375,7 @@ class ServerHireGateway implements HireGateway {
       'AgentNotFound' || 'AgentInactive' => const HireAgentUnavailable(
         'This agent is not accepting hires.',
       ),
+      'AgentCannotDeliver' => const HireAgentCannotDeliver(),
       'PreparationExpired' => const HirePreparationExpired(),
       'PaymentAlreadySubmitted' => const HirePaymentAlreadySubmitted(),
       'ChainUnavailable' when fund && reason == 'simulationFailed' =>

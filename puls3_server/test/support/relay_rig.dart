@@ -77,6 +77,15 @@ final class RelayRig {
     newPreparationId: () => 'prep-${++_serial}',
   );
 
+  /// The payees the rig treats as custodied. It starts with the seed agent's
+  /// wallet, so hires of agent 7 can be delivered.
+  final custodied = <String>{agentWallet};
+
+  /// The one custody rule, faked for the rig: only [custodied] addresses can
+  /// receive a hire.
+  Future<Set<String>> custodyOf(Set<String> addresses) async =>
+      addresses.where(custodied.contains).toSet();
+
   /// The service clock; tests assign to move time.
   DateTime clock = DateTime.utc(2026, 10, 7, 12);
 

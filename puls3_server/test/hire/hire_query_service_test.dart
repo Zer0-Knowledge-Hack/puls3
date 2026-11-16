@@ -1,5 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/chain/submission_values.dart';
+import 'package:puls3_server/src/feedback/reputation_calls.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart' show HireRow;
 import 'package:puls3_server/src/hire/hire_query_service.dart';
@@ -8,6 +9,7 @@ import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
 import 'package:test/test.dart';
 
+import '../support/fake_envelope_codec.dart';
 import '../support/in_memory_hire_run_store.dart';
 import '../support/relay_rig.dart';
 
@@ -32,6 +34,7 @@ void main() {
     hires: rig.hires,
     runs: runs,
     submissions: rig.submissions,
+    preparations: rig.preparations,
     agents: (id) => agents(id),
     jobs: jobs,
   );
@@ -288,6 +291,54 @@ void main() {
 
       expect(detail.escrowSubmission?.transaction, fund.transactionHash);
       expect(detail.escrowSubmission?.purpose, 'fund');
+    });
+
+    Future<void> rate(int hireId, int score) async {
+      final prepared = await rig.service.prepareFeedback(
+        rig.wallet,
+        hireId,
+        ContractCall(
+          contract: StellarAddress.parse(
+            'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
+          ),
+          function: 'give_feedback',
+          args: const [],
+        ),
+        feedbackScore: score,
+      );
+      await rig.service.submitEscrowCall(
+        rig.wallet,
+        hireId,
+        prepared.preparationId,
+        FakeEnvelopeCodec.sign(prepared.unsignedTransactionXdr!),
+      );
+    }
+
+    test('a confirmed rating keeps its score after a reload', () async {
+      final hire = await completed();
+      await rate(hire.id, 4);
+      final submission = (await rig.submissions.listByHire(hire.id)).single;
+      await rig.submissions.markConfirmed(submission.id);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.feedbackScore, 4);
+      expect(detail.feedbackSubmission?.state, 'confirmed');
+    });
+
+    test('a failed rating returns no score', () async {
+      final hire = await completed();
+      await rate(hire.id, 2);
+      final submission = (await rig.submissions.listByHire(hire.id)).single;
+      await rig.submissions.markFailed(
+        submission.id,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.feedbackScore, isNull);
+      expect(detail.feedbackSubmission?.state, 'failed');
     });
   });
 

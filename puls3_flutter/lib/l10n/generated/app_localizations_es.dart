@@ -627,6 +627,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Contratar está deshabilitado hasta que cargue el agente.';
 
   @override
+  String get agentCannotBeHired => 'Este agente todavía no se puede contratar.';
+
+  @override
   String get agentStaleTitle => 'Mostrando los últimos datos conocidos';
 
   @override
@@ -1032,6 +1035,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get playgroundCredentialMissing =>
       'Guarda tu credencial del proveedor y vuelve a ejecutar el borrador.';
+
+  @override
+  String get playgroundCredentialInvalid =>
+      'Esa credencial del proveedor no es válida. Revisa los datos de la credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este proveedor no es compatible. Elige otro modelo.';
 
   @override
   String get playgroundAccountId => 'Id de cuenta de Cloudflare';

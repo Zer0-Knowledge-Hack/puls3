@@ -608,6 +608,9 @@ final class _Chain implements ChainAccounts {
   var down = false;
 
   @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
+
+  @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async {
     if (down) throw chainUnavailable();
     return authority;

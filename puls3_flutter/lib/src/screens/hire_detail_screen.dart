@@ -65,7 +65,8 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   bool _approving = false;
   bool _rejecting = false;
 
-  /// The score sent from S10 in this visit (the server does not return it).
+  /// The score sent from S10 in this visit, before the next poll returns the
+  /// one stored by the server (#242).
   int? _ratedScore;
   Timer? _poll;
   WalletController? _wallet;
