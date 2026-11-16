@@ -126,7 +126,7 @@ final class _Run {
 }
 
 /// Runs `puls3` on fakes. [hire] and [studio] stand for a session: without
-/// them the SDK has none, as the binary has until #259.
+/// them the SDK has no session, as when PULS3_REFRESH_TOKEN was never set.
 Future<_Run> _puls3(
   List<String> arguments, {
   _FakeCatalog? catalog,
@@ -685,6 +685,41 @@ void main() {
   });
 
   group('session', () {
+    test('an asynchronous connector works like a synchronous one', () async {
+      final out = StringBuffer();
+      final code = await runPuls3(
+        [..._api, 'catalog', 'list'],
+        connect: (url) async => Puls3Sdk.withApi(catalog: _FakeCatalog()),
+        environment: const {},
+        out: out,
+        err: StringBuffer(),
+      );
+      expect(code, ExitCodes.ok);
+      expect(out.toString().trim(), '0 agents');
+    });
+
+    test('a session file that cannot be used exits 74', () async {
+      final out = StringBuffer();
+      final err = StringBuffer();
+      final code = await runPuls3(
+        [..._api, 'hire', 'prepare-complete', '12'],
+        connect: (url) async => throw const FileSystemException(
+          'Could not make the session file private',
+          '/home/u/.config/puls3/session.json.tmp',
+        ),
+        environment: const {},
+        out: out,
+        err: err,
+      );
+      expect(code, ExitCodes.sessionFile);
+      expect(out.toString(), isEmpty);
+      expect(
+        err.toString().trim(),
+        'error: SessionFile: Could not make the session file private: '
+        '/home/u/.config/puls3/session.json.tmp',
+      );
+    });
+
     for (final arguments in [
       ['hire', 'get', '12', '--wallet', _wallet],
       ['hire', 'prepare-complete', '12'],
@@ -696,7 +731,7 @@ void main() {
         expect(run.code, ExitCodes.noSession);
         expect(run.out, isEmpty);
         expect(run.err, startsWith('error: SessionRequired: '));
-        expect(run.err, contains('#259'));
+        expect(run.err, contains('PULS3_REFRESH_TOKEN'));
       });
     }
 

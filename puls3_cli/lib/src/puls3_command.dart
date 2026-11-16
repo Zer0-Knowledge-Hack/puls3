@@ -1,12 +1,23 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show IOException, OSError, SocketException, TlsException;
+import 'dart:io'
+    show
+        FileSystemException,
+        IOException,
+        OSError,
+        SocketException,
+        TlsException;
 
 import 'package:args/args.dart';
 import 'package:puls3_sdk/puls3_sdk.dart';
 
 /// Opens an SDK on the server at an API URL. The binary passes
 /// [Puls3Sdk.connect]; tests pass a fake.
-typedef SdkConnector = Puls3Sdk Function(Uri apiUrl);
+///
+/// It may be asynchronous: the binary opens the wallet session file first.
+/// A [FileSystemException] from it (the session file cannot be read or
+/// written) exits [ExitCodes.sessionFile].
+typedef SdkConnector = FutureOr<Puls3Sdk> Function(Uri apiUrl);
 
 /// The environment variable read when `--api` is not given.
 const apiUrlVariable = 'PULS3_API_URL';
@@ -35,6 +46,10 @@ abstract final class ExitCodes {
   /// A hire or Studio command has no wallet session, or the server refused
   /// the one it has (expired or revoked).
   static const noSession = 77;
+
+  /// The wallet session file (`PULS3_SESSION_FILE`) could not be read or
+  /// written.
+  static const sessionFile = 74;
 }
 
 /// Runs `puls3` with [arguments] and returns the exit code.
@@ -150,7 +165,10 @@ Future<int> _run(
   }
   final Puls3Sdk sdk;
   try {
-    sdk = connect(Uri.parse(apiText));
+    sdk = await connect(Uri.parse(apiText));
+  } on FileSystemException catch (e) {
+    err.writeln('error: SessionFile: ${e.message}: ${e.path ?? '-'}');
+    return ExitCodes.sessionFile;
   } on FormatException {
     return _usageError(err, parser, 'The API URL is not a URL: $apiText');
   } on ArgumentError {
@@ -167,7 +185,7 @@ Future<int> _run(
   } on SessionRequired catch (e) {
     err.writeln(
       'error: SessionRequired: ${e.operation} needs a wallet session. '
-      'Copy a CLI session from the app (#259).',
+      'Copy a session for the CLI from the app and set $refreshTokenVariable.',
     );
     return ExitCodes.noSession;
   } on Puls3ApiException catch (e) {
@@ -401,9 +419,13 @@ ${parser.usage}
 
 puls3 never signs or submits a transaction: the prepare commands print the
 unsigned envelope for the wallet to sign. Hire and Studio commands need a
-wallet session from the app (#259).
+wallet session from the app.
 Exit codes: 0 ok, 1 server error, 3 not found, 64 usage, 69 unavailable,
-77 no session.''';
+74 session file, 77 no session.
+
+Hire and Studio commands use the wallet session in \$PULS3_SESSION_FILE
+(default ~/.config/puls3/session.json), seeded once from
+\$PULS3_REFRESH_TOKEN: copy it from the app's wallet sheet.''';
 
 int _usageError(StringSink err, ArgParser parser, String message) {
   err

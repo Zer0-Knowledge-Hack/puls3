@@ -4,7 +4,21 @@
 
 **It never signs or submits a transaction.** The catalog commands need nothing. The hire and Studio commands act for a wallet, so they need that wallet's session; `hire prepare-complete` and `hire prepare-reject` print the unsigned envelope for the wallet to sign, and stop there. To sign, deploy an agent, or approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
 
-> **Session status.** A program gets its session from the app ("Copy session for CLI", option A′ in ADR-0007), which [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259) delivers. Until it lands, the binary has no session, and every hire and Studio command exits 77 with `SessionRequired` before sending anything. The commands, their output and their errors below are final and tested; only the session source is missing.
+## Wallet session
+
+Hire and Studio commands act for your wallet, so they need a session of it. The CLI never asks for a wallet key; it uses a separate **CLI session** that the app gives you (ADR-0007, option A′):
+
+1. Open [puls3.org](https://puls3.org/), connect your wallet and open the wallet sheet.
+2. Choose **Copy session for CLI**. The app shows a refresh token once, valid for 72 hours.
+3. Set it in your shell, never as an argument:
+
+   ```bash
+   export PULS3_REFRESH_TOKEN='<the token>'
+   ```
+
+The first command saves the session in a file only you can read (mode 0600) and keeps the rotated tokens there. Later commands, and the MCP server, use that file; `PULS3_REFRESH_TOKEN` is read again only when you copy a new session. After 72 hours, or after you revoke it in the app, commands exit 77: copy a new session. A revocation takes up to 10 minutes to stop a token already in use.
+
+Without a session the catalog commands still work, and hire and Studio commands exit 77 (`SessionRequired`) before sending anything.
 
 ## Run it
 
@@ -140,7 +154,8 @@ $ puls3 studio test-run --draft 3 --input "Summarise: ..."
 |---|---|---|
 | `PULS3_API_URL` | every command, when `--api` is not given | no |
 | `PULS3_WALLET` | `hire get`, when `--wallet` is not given | no, it is a public address |
-| the CLI session (#259) | hire and Studio commands | **yes**: a bearer secret. Never an argument, never in the repository (`docs/infra/secrets.md`) |
+| `PULS3_REFRESH_TOKEN` | hire and Studio commands: seeds the session once | **yes**: a bearer secret for 72 hours. Never an argument, never in the repository (`docs/infra/secrets.md`) |
+| `PULS3_SESSION_FILE` | where the rotated session is kept. Default `~/.config/puls3/session.json` (`$XDG_CONFIG_HOME/puls3/session.json` when set), `%APPDATA%\puls3\session.json` on Windows | the file is: mode 0600, plus a `.lock` beside it that holds no secret |
 
 ## Output and exit codes
 
@@ -156,6 +171,7 @@ Text that comes from the server or an agent (names, descriptions, inputs, result
 | 64 | `Usage` | Unknown command, missing or extra argument, no server URL, or a URL that is not absolute `http`/`https`. Nothing is sent. |
 | 69 | `Unreachable` | The server did not answer in 20 seconds, or the connection failed (DNS, TLS, socket). |
 | 69 | `AgentCatalogUnavailable` | The server is up but cannot read the catalog. It is never shown as an empty list. |
+| 74 | `SessionFile` | The session file cannot be read or written (for example its directory is not writable). |
 | 77 | `SessionRequired` | A hire or Studio command with no wallet session. Nothing is sent. |
 | 77 | `Unauthorized` | The server refused the session: expired, revoked, or not valid. |
 
