@@ -1,0 +1,11 @@
+### A new CLI session (#259). The refresh token is a bearer secret: the app
+### shows it once and never stores or logs it.
+class: CliSessionGrant
+fields:
+  ### The session id, for listing and revoking it.
+  id: String
+  ### The refresh token a program seeds its session with
+  ### (PULS3_REFRESH_TOKEN).
+  refreshToken: String
+  ### When it stops refreshing: the CLI lifetime is absolute.
+  expiresAt: DateTime

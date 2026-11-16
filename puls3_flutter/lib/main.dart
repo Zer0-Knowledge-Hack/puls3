@@ -5,6 +5,7 @@ import 'package:puls3_client/puls3_client.dart';
 import 'package:serverpod_auth_idp_flutter/serverpod_auth_idp_flutter.dart';
 
 import 'src/app.dart';
+import 'src/cli/cli_session_issuer.dart';
 import 'src/data/agent_repository.dart';
 import 'src/data/app_config.dart';
 import 'src/data/server_agent_repository.dart';
@@ -105,6 +106,20 @@ StudioGateway? _createStudioGateway(
   ),
 };
 
+/// Sessions for the puls3 CLI (#259) need the server session, so only a
+/// build with a server hire or Studio backend offers them.
+CliSessionIssuer? _createCliSessions(
+  Client client,
+  WalletPort wallet,
+  WalletSession session,
+) => _hireKind == 'server' || _studioKind == 'server'
+    ? ServerCliSessionIssuer(
+        create: client.cliSession.create,
+        session: session,
+        wallet: wallet,
+      )
+    : null;
+
 /// The same switch as Studio. `server` signs `register_full` and
 /// `set_agent_wallet` for real; `demo` keeps the labelled stand-in.
 DeployGateway? _createDeployGateway(
@@ -154,6 +169,7 @@ Future<void> main() async {
       hireGateway: _createHireGateway(client, session),
       studioGateway: _createStudioGateway(client, wallet, session),
       deployGateway: _createDeployGateway(client, wallet, session),
+      cliSessions: _createCliSessions(client, wallet, session),
     ),
   );
 }

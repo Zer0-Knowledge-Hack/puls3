@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../cli/cli_session_dialog.dart';
 import '../state/app_scope.dart';
 import '../theme/breakpoints.dart';
 import '../theme/puls3_theme.dart';
@@ -28,7 +29,9 @@ class WalletSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wallet = AppScope.of(context).wallet;
+    final scope = AppScope.of(context);
+    final wallet = scope.wallet;
+    final cliSessions = scope.cliSessions;
     final narrow =
         MediaQuery.sizeOf(context).width < Puls3Breakpoints.narrowGutter;
     final gutter = narrow ? Puls3Spacing.md : Puls3Spacing.lg;
@@ -41,6 +44,7 @@ class WalletSheet extends StatelessWidget {
             listenable: wallet,
             builder: (context, _) {
               final installUrl = wallet.installUrl;
+              final address = wallet.address;
               return WalletPanel(
                 status: wallet.status,
                 walletName: wallet.walletName,
@@ -49,6 +53,14 @@ class WalletSheet extends StatelessWidget {
                 error: wallet.lastError,
                 onConnect: () => unawaited(wallet.tryConnect()),
                 onDisconnect: () => unawaited(wallet.disconnect()),
+                onCopyCliSession: cliSessions == null || address == null
+                    ? null
+                    : () => unawaited(
+                        showCliSessionDialog(
+                          context,
+                          issue: () => cliSessions.issue(address),
+                        ),
+                      ),
                 onInstall: installUrl == null
                     ? null
                     : () => unawaited(

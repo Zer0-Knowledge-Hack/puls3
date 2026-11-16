@@ -18,6 +18,7 @@ import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
 import 'package:serverpod_auth_idp_server/serverpod_auth_idp_server.dart'
     as _iais;
 import '../agent/agent_endpoint.dart' as _i6aufbii;
+import '../auth/cli_session_endpoint.dart' as _iyj5kp90;
 import '../auth/jwt_refresh_endpoint.dart' as _inwq3ztq;
 import '../auth/wallet_auth_endpoint.dart' as _i3i6b0lz;
 import '../feedback/feedback_endpoint.dart' as _i3n4p88h;
@@ -34,6 +35,12 @@ class Endpoints extends _is.EndpointDispatch {
         ..initialize(
           server,
           'agent',
+          null,
+        ),
+      'cliSession': _iyj5kp90.CliSessionEndpoint()
+        ..initialize(
+          server,
+          'cliSession',
           null,
         ),
       'jwtRefresh': _inwq3ztq.JwtRefreshEndpoint()
@@ -110,6 +117,54 @@ class Endpoints extends _is.EndpointDispatch {
                 session,
                 params['id'],
               ),
+        ),
+      },
+    );
+    connectors['cliSession'] = _is.EndpointConnector(
+      name: 'cliSession',
+      endpoint: endpoints['cliSession']!,
+      methodConnectors: {
+        'create': _is.MethodConnector(
+          name: 'create',
+          params: {},
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['cliSession'] as _iyj5kp90.CliSessionEndpoint)
+                      .create(session),
+        ),
+        'list': _is.MethodConnector(
+          name: 'list',
+          params: {},
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['cliSession'] as _iyj5kp90.CliSessionEndpoint)
+                      .list(session),
+        ),
+        'revoke': _is.MethodConnector(
+          name: 'revoke',
+          params: {
+            'id': _is.ParameterDescription(
+              name: 'id',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['cliSession'] as _iyj5kp90.CliSessionEndpoint)
+                      .revoke(
+                        session,
+                        params['id'],
+                      ),
         ),
       },
     );
