@@ -20,6 +20,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 | --- | --- | --- |
 | Flutter (includes Dart) | **3.44.4** (Dart 3.12.2) | Everything |
 | Serverpod CLI | **4.0.4** | Backend code generation |
+| Melos | **8.10.1** | Unified workspace analyze/test commands |
 | Docker Desktop | Latest | Local Postgres + Redis for the backend |
 | Git | Latest | Everything |
 | GitHub CLI (`gh`) | Latest | Optional, for PRs from the terminal |
@@ -57,7 +58,24 @@ If `serverpod` is not found, add the pub cache `bin` folder to your `PATH`:
 The CLI version must match the pinned Serverpod packages. A different major or
 patch can produce a generated-code diff that CI rejects.
 
-### 1.3 Docker
+### 1.3 Melos
+
+Melos 8 reads its configuration from the `melos:` section of the root
+`pubspec.yaml`; there is no separate `melos.yaml`.
+
+```bash
+dart pub global activate melos 8.10.1
+melos --version
+```
+
+If `melos` is not found, add `$HOME/.pub-cache/bin` (or
+`%LOCALAPPDATA%\Pub\Cache\bin` on Windows) to your `PATH`.
+
+On Windows, run `melos` from **Git Bash** (it ships with Git for Windows) or
+WSL. Melos runs scripts with `cmd.exe` there, and the scripts are POSIX shell
+(`case ... esac`, `if [ ... ]`), so they fail from cmd.exe or PowerShell.
+
+### 1.4 Docker
 
 Install Docker Desktop (<https://www.docker.com/products/docker-desktop>) and make sure it is running: `docker --version`.
 
@@ -73,6 +91,7 @@ The canonical step-by-step path (fresh clone → server and app against testnet)
 git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
 cd puls3
 flutter pub get        # installs the whole workspace (server, client, app)
+# or: melos bs         # same pub workspace, plus Melos bootstrap/IDE files
 ```
 
 The repo is a **Dart pub workspace**. The root `pubspec.yaml` groups `puls3_server`, `puls3_client`, and `puls3_flutter`, so one `pub get` covers all three.
@@ -120,12 +139,27 @@ Always commit the generated code. CI and reviewers check that `serverpod generat
 
 ### 2.5 Checks to run before opening a PR
 
+Unified commands (Melos 8; on Windows, from Git Bash or WSL):
+
+```bash
+melos bs
+melos run analyze
+melos run test:unit
+# With postgres_test and redis_test running:
+melos run test:integration
+# With the local sandbox from docs/testing/local-environment.md:
+melos run test:e2e
+```
+
+The per-package detail:
+
 ```bash
 # Domain
 cd puls3_domain && dart analyze --fatal-infos && dart test
 
-# Server (requires the test services from `docker compose up -d`)
-cd puls3_server && dart analyze --fatal-infos && dart test
+# Server (the unit set avoids services; test/integration needs them)
+cd puls3_server && dart analyze --fatal-infos &&
+  dart test $(ls -d test/*/ | grep -vE '/(integration|e2e|support|fixtures)/$')
 serverpod generate && git diff --exit-code -- ../puls3_server ../puls3_client
 
 # App
