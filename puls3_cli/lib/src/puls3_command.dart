@@ -44,7 +44,59 @@ abstract final class ExitCodes {
 /// The command never signs or submits a transaction: `hire prepare-complete`
 /// and `hire prepare-reject` print the unsigned envelope for the wallet to
 /// sign.
+///
+/// Text from the server or an agent (names, descriptions, inputs, results,
+/// reasons, error messages) is untrusted: every line written loses its
+/// terminal control and bidi characters first ([printable]), so it cannot
+/// move the cursor, clear the screen or disguise itself. `--json` output
+/// still carries control characters, escaped by JSON; bidi overrides, which
+/// JSON does not escape, are dropped there too.
 Future<int> runPuls3(
+  List<String> arguments, {
+  required SdkConnector connect,
+  required Map<String, String> environment,
+  required StringSink out,
+  required StringSink err,
+}) => _run(
+  arguments,
+  connect: connect,
+  environment: environment,
+  out: _PrintableSink(out),
+  err: _PrintableSink(err),
+);
+
+/// [text] without terminal control characters (C0 except tab and newline,
+/// DEL, C1, which includes the escape that starts ANSI sequences) and without
+/// bidirectional overrides (U+202A to U+202E, U+2066 to U+2069).
+String printable(String text) => text.replaceAll(_unprintable, '');
+
+final _unprintable = RegExp(
+  '[\u0000-\u0008\u000B-\u001F\u007F-\u009F'
+  '\u202A-\u202E\u2066-\u2069]',
+);
+
+/// A [StringSink] that writes [printable] text to another one.
+final class _PrintableSink implements StringSink {
+  _PrintableSink(this._sink);
+
+  final StringSink _sink;
+
+  @override
+  void write(Object? object) => _sink.write(printable('$object'));
+
+  @override
+  void writeAll(Iterable<dynamic> objects, [String separator = '']) =>
+      _sink.write(printable(objects.join(separator)));
+
+  @override
+  void writeCharCode(int charCode) =>
+      _sink.write(printable(String.fromCharCode(charCode)));
+
+  @override
+  void writeln([Object? object = '']) => _sink.writeln(printable('$object'));
+}
+
+Future<int> _run(
   List<String> arguments, {
   required SdkConnector connect,
   required Map<String, String> environment,

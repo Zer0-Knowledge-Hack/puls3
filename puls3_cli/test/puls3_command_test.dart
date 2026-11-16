@@ -57,9 +57,10 @@ PreparedTransaction _prepared(String purpose) => PreparedTransaction(
 
 /// The session-bound hire calls, recorded. It never signs or submits.
 final class _FakeHire implements HireApi {
-  _FakeHire({this.error});
+  _FakeHire({this.error, this.result = 'a summary'});
 
   final Object? error;
+  final String result;
   final calls = <String>[];
 
   @override
@@ -77,7 +78,7 @@ final class _FakeHire implements HireApi {
       ),
       agent: _agent('agt-001', 7),
       input: 'summarise this',
-      result: 'a summary',
+      result: result,
       jobId: 34,
       approvalDeadline: DateTime.utc(2026, 11, 12),
     );
@@ -483,6 +484,65 @@ void main() {
         expect(run.connectedTo, isEmpty);
       });
     }
+  });
+
+  group('untrusted text', () {
+    // ESC[2J clears the screen, ESC]8 opens a hyperlink, U+202E reverses
+    // the text that follows, BEL rings.
+    const hostile = 'ok\x1b[2J\x1b]8;;https://evil.test\x07click\u202Eesrever\x00';
+
+    test('plain output drops control and bidi characters', () async {
+      final run = await _puls3([
+        ..._api,
+        'hire',
+        'get',
+        '12',
+        '--wallet',
+        _wallet,
+      ], hire: _FakeHire(result: hostile), studio: _FakeStudio());
+
+      expect(run.code, ExitCodes.ok);
+      expect(run.out, contains('ok[2J]8;;https://evil.testclickesrever'));
+      for (final c in ['\x1b', '\x07', '\x00', '\u202E']) {
+        expect(run.out.contains(c), isFalse, reason: c.codeUnits.toString());
+      }
+    });
+
+    test('--json escapes control characters and drops bidi ones', () async {
+      final run = await _puls3([
+        ..._api,
+        '--json',
+        'hire',
+        'get',
+        '12',
+        '--wallet',
+        _wallet,
+      ], hire: _FakeHire(result: hostile), studio: _FakeStudio());
+
+      expect(run.out.contains('\x1b'), isFalse);
+      // JSON escapes the control characters, so the data keeps them. JSON
+      // does not escape a bidi override, so it is dropped as on screen.
+      expect(
+        (jsonDecode(run.out) as Map)['result'],
+        hostile.replaceAll('\u202E', ''),
+      );
+    });
+
+    test('a server error message is cleaned too', () async {
+      final run = await _puls3(
+        [..._api, 'hire', 'prepare-complete', '12'],
+        hire: _FakeHire(
+          error: Puls3ApiException(code: 'HireNotOwned', message: 'no\x1b[31m'),
+        ),
+        studio: _FakeStudio(),
+      );
+
+      expect(run.err.trim(), 'error: HireNotOwned: no[31m');
+    });
+
+    test('printable keeps tabs, newlines and ordinary text', () {
+      expect(printable('a\tb\nc é 字'), 'a\tb\nc é 字');
+    });
   });
 
   group('hire prepare-complete and prepare-reject', () {

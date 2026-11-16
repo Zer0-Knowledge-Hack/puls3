@@ -146,6 +146,8 @@ $ puls3 studio test-run --draft 3 --input "Summarise: ..."
 
 A result goes to stdout. A failure writes one `error: <code>: <message>` line to stderr, plus the usage for a usage error, and nothing to stdout.
 
+Text that comes from the server or an agent (names, descriptions, inputs, results, reasons, error messages) is printed without terminal control characters or bidirectional overrides, so it cannot move the cursor, clear the screen or disguise itself. `--json` keeps control characters, escaped by JSON.
+
 | Exit | Code on stderr | When |
 |---|---|---|
 | 0 | none | Success, or `--help`. |

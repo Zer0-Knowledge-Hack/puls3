@@ -111,8 +111,8 @@ void main() {
       expect(hire.calls, ['complete 12']);
     });
 
-    test('prepareReject passes the reason', () async {
-      final prepared = await sdk.prepareReject(12, 'wrong language');
+    test('prepareReject passes the reason, trimmed like the wallet', () async {
+      final prepared = await sdk.prepareReject(12, '  wrong language \n');
       expect(prepared.purpose, 'reject');
       expect(hire.calls, ['reject 12 wrong language']);
     });

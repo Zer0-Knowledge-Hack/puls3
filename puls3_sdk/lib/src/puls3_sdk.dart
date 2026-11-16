@@ -104,7 +104,7 @@ final class Puls3Sdk {
     if (reason.trim().isEmpty) {
       throw ArgumentError.value(reason, 'reason', 'must not be blank');
     }
-    return _hireApi('prepareReject').prepareReject(hireId, reason);
+    return _hireApi('prepareReject').prepareReject(hireId, reason.trim());
   }
 
   /// Runs the session wallet's saved draft [draftId] once on [input], with
