@@ -406,6 +406,33 @@ dart test -t e2e --run-skipped -j 1
 - The suites play the wallets through the `SessionWallet` seam: the real
   wallet sign-in (`WalletAuthEndpoint`) is covered by
   `test/integration/wallet_session_hire_test.dart`.
+- After re-running `scripts/setup-local-soroban.sh` the contracts are new and
+  job ids restart, so hires left in `puls3_test` by earlier runs can collide
+  with the new jobs (`JobMismatch`). Reset that database
+  (`docker compose -f puls3_server/docker-compose.yaml down -v postgres_test`).
+
+### Browser E2E of the hire flow
+
+`puls3_flutter/integration_test/hire_flow_e2e_test.dart` drives the Flutter web
+app in headless Chrome against the real server and the same sandbox: market,
+agent page, `HireSheet`, the wallet signing `create_job` and `fund`, and the
+confirmation. Flutter 3.44 does not run web integration tests with
+`flutter test -d chrome`; the supported route is `flutter drive` with
+chromedriver.
+
+```bash
+# Besides the sandbox above: chromedriver matching your Chrome
+# (https://googlechromelabs.github.io/chrome-for-testing/).
+CHROMEDRIVER=/path/to/chromedriver bash scripts/e2e-flutter-local.sh
+```
+
+The script seeds an agent and a funded consumer wallet
+(`puls3_server/tool/e2e_seed_local.dart`), starts the server on a database of
+its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. Every key is
+ephemeral and lives in a temp directory the script removes. The wallet is
+`AutomatedKeyWallet`, a test fixture next to the test. The USDC balance check
+(Horizon on testnet) is stood in for, because the sandbox pays in its native
+token.
 
 ## Regenerate Serverpod code
 

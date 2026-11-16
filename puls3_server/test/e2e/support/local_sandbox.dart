@@ -270,6 +270,10 @@ final class E2eAccount {
   final stellar.StellarPrivateKey _key;
   final StellarAddress address;
 
+  /// The secret seed (`S…`). Only for handing an ephemeral sandbox key to a
+  /// process that signs for it; it is never logged.
+  String get secretSeed => _key.toBase32();
+
   /// [unsigned] carrying this account's signature over its transaction hash.
   /// Only the empty signature list at the end of the envelope is replaced, so
   /// the transaction body the server prepared is signed unchanged.
