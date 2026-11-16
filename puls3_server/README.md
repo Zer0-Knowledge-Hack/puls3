@@ -380,6 +380,33 @@ The integration tests use Serverpod's generated test tools and the test
 PostgreSQL/Redis services started by the Compose command above (ports 9090 and
 9091).
 
+### End-to-end suites on the local sandbox
+
+`test/e2e/` runs the hire lifecycle (F1, F5, F6, F7) on the real server stack
+against the local Stellar network of the sandbox (#253). The suites register
+their own agent, create ephemeral accounts and fund them from the local
+Friendbot, so they need no secret and never reach a public network. A plain
+`dart test` reports them as skipped.
+
+```bash
+docker compose -f puls3_server/docker-compose.yaml up -d soroban_standalone postgres_test redis_test
+bash scripts/setup-local-soroban.sh        # deploys the contracts, writes .env.local-soroban
+cd puls3_server
+dart test -t e2e --run-skipped -j 1
+```
+
+- `-j 1` runs the files one after the other: they share the test database.
+- `--run-skipped` is needed because the tag is skipped by default, which is how
+  a plain `dart test` leaves them out (`dart_test.yaml`).
+- `hire_relay_e2e_test.dart`: create, tamper check, relay `create_job`,
+  idempotent resubmit, `fund`, with the database rows and the escrow job state.
+- `feedback_e2e_test.dart`: the agent `submit` through the production
+  `AgentSubmitSender`, consumer `complete`, `give_feedback`, and the catalog
+  counting the rating.
+- The suites play the wallets through the `SessionWallet` seam: the real
+  wallet sign-in (`WalletAuthEndpoint`) is covered by
+  `test/integration/wallet_session_hire_test.dart`.
+
 ## Regenerate Serverpod code
 
 After changing an endpoint or a `*.spy.yaml` model, regenerate the server,
