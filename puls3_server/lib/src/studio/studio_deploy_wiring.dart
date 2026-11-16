@@ -48,11 +48,20 @@ Uri _registrationBase(Session session, Map<String, String> env) {
 final class StudioDeployWiring {
   StudioDeployWiring._(this._build, this.networkPassphrase);
 
-  factory StudioDeployWiring.fromEnvironment([Map<String, String>? env]) {
+  /// [custodyPassword] is the Serverpod password
+  /// [agentWalletSecretKeyPassword]; when it is null or blank the custody key
+  /// comes from `PULS3_AGENT_WALLET_SECRET_KEY` in [env].
+  factory StudioDeployWiring.fromEnvironment({
+    Map<String, String>? env,
+    String? custodyPassword,
+  }) {
     final environment = env ?? Platform.environment;
     final stellar = StellarConfig.fromEnvironment(environment);
     final relay = HireRelayConfig(environment);
-    final custody = WalletCustodyConfig.fromEnvironment(environment);
+    final custody = WalletCustodyConfig.fromEnvironment(
+      environment,
+      password: custodyPassword,
+    );
     final cipher = AesGcmSecretCipher(
       keys: {custody.keyVersion: custody.secretKey},
       writeKeyVersion: custody.keyVersion,

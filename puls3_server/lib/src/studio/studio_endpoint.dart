@@ -47,8 +47,9 @@ class StudioEndpoint extends Endpoint {
   /// the custody key. Test runs and every hire of a Studio agent read this
   /// store, never the team provider token.
   ///
-  /// Throws [StudioRuntimeUnavailable] when `PULS3_AGENT_WALLET_SECRET_KEY`
-  /// is missing or invalid: no credential is stored in plain text or in
+  /// Throws [StudioRuntimeUnavailable] when the custody key (the password
+  /// `agentWalletSecretKey`, or `PULS3_AGENT_WALLET_SECRET_KEY`) is missing or
+  /// invalid: no credential is stored in plain text or in
   /// memory instead.
   static BuilderCredentialStore credentialsOn(Session session) {
     final override = _credentialStores;
@@ -59,10 +60,27 @@ class StudioEndpoint extends Endpoint {
     );
   }
 
+  /// The Serverpod password that holds the custody key, or null when it is
+  /// unset or no Serverpod is running (unit tests): then
+  /// `PULS3_AGENT_WALLET_SECRET_KEY` is used.
+  static String? _custodyPassword() {
+    try {
+      return Serverpod.instance.getPassword(agentWalletSecretKeyPassword);
+    } on StateError {
+      return null;
+    }
+  }
+
+  static StudioDeployWiring _deployWiringFromEnvironment() =>
+      StudioDeployWiring.fromEnvironment(custodyPassword: _custodyPassword());
+
   static SecretCipher _cipherFromEnvironment() {
     final WalletCustodyConfig custody;
     try {
-      custody = WalletCustodyConfig.fromEnvironment(Platform.environment);
+      custody = WalletCustodyConfig.fromEnvironment(
+        Platform.environment,
+        password: _custodyPassword(),
+      );
     } on AgentWalletCustodyUnavailable {
       throw const StudioRuntimeUnavailable();
     } on ArgumentError {
@@ -133,7 +151,7 @@ class StudioEndpoint extends Endpoint {
     final builder = _deploys;
     if (builder != null) return builder(session);
     try {
-      return (_deployWiring ??= StudioDeployWiring.fromEnvironment()).serviceOn(
+      return (_deployWiring ??= _deployWiringFromEnvironment()).serviceOn(
         session,
       );
     } on AgentWalletCustodyUnavailable {
@@ -362,8 +380,7 @@ class StudioEndpoint extends Endpoint {
   String _deploysOnNetwork() {
     final builder = _deploys;
     if (builder != null) return StellarConfig.testnet.networkPassphrase;
-    return (_deployWiring ??= StudioDeployWiring.fromEnvironment())
-        .networkPassphrase;
+    return (_deployWiring ??= _deployWiringFromEnvironment()).networkPassphrase;
   }
 
   void _requireBuilder(domain.StellarAddress wallet, String builder) {

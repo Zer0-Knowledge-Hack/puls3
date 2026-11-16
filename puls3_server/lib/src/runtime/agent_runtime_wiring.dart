@@ -212,7 +212,13 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     batchSize: _batchSize,
   );
   final backfill = MissedRunBackfill(log: log);
-  final submit = _submitWiringOrNull(env, rpc, stellar, log);
+  final submit = _submitWiringOrNull(
+    env,
+    rpc,
+    stellar,
+    log,
+    custodyPassword: pod.getPassword(agentWalletSecretKeyPassword),
+  );
   final loop = TrackerLoop(
     interval: loopConfig.interval,
     passTimeout: config.timeout * _batchSize + const Duration(minutes: 1),
@@ -257,10 +263,14 @@ _SubmitWiring? _submitWiringOrNull(
   Map<String, String> env,
   SorobanRpcClient rpc,
   StellarConfig stellar,
-  ChainLog log,
-) {
+  ChainLog log, {
+  String? custodyPassword,
+}) {
   try {
-    final custody = WalletCustodyConfig.fromEnvironment(env);
+    final custody = WalletCustodyConfig.fromEnvironment(
+      env,
+      password: custodyPassword,
+    );
     final fees = HireRelayConfig(env);
     return _SubmitWiring(
       cipher: AesGcmSecretCipher(
