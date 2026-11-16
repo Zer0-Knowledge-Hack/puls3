@@ -2,16 +2,57 @@ import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart';
 
+import 'contract_reader.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
+import 'xdr_invoke_encoder.dart' show ScArg;
 
 /// The state of an escrow job, in the order of the contract's `JobState`.
 enum EscrowJobState { open, funded, submitted, completed, rejected, expired }
 
-/// Reads escrow jobs. Implemented by `SorobanLedger`.
+/// The domain's name for this escrow state.
+extension EscrowJobStateDomain on EscrowJobState {
+  JobState get domain => switch (this) {
+    EscrowJobState.open => JobState.open,
+    EscrowJobState.funded => JobState.funded,
+    EscrowJobState.submitted => JobState.submitted,
+    EscrowJobState.completed => JobState.completed,
+    EscrowJobState.rejected => JobState.rejected,
+    EscrowJobState.expired => JobState.expired,
+  };
+}
+
+/// Reads escrow jobs. Implemented by [ContractEscrowJobReader] (which
+/// `SorobanLedger` uses).
 abstract interface class EscrowJobReader {
   /// Escrow `get_job`, or `null` when the job does not exist.
   Future<EscrowJob?> escrowJob(int jobId);
+}
+
+/// Escrow `JobNotFound`: no job has this id.
+const escrowJobNotFound = 1;
+
+/// [EscrowJobReader] over a [ContractReader] for the escrow at [escrow]:
+/// the one `get_job` read.
+///
+/// An archived job is a [LedgerUnavailable] with `archived` set, any other
+/// failure a [LedgerException].
+final class ContractEscrowJobReader implements EscrowJobReader {
+  ContractEscrowJobReader(this._reader, {required this.escrow});
+
+  final ContractReader _reader;
+  final StellarAddress escrow;
+
+  @override
+  Future<EscrowJob?> escrowJob(int jobId) async {
+    final value = await _reader.read(
+      escrow,
+      'get_job',
+      [ScArg.u64(jobId)],
+      absentErrors: const {escrowJobNotFound},
+    );
+    return value == null ? null : readOptional(value, decodeEscrowJob);
+  }
 }
 
 /// Reads the escrow's own expiry view. Implemented by `SorobanLedger`.

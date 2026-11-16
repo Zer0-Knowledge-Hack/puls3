@@ -223,6 +223,11 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
+      # Audit P-1 (#206): fail on a RustSec advisory in Cargo.lock.
+      - name: Audit dependencies (RustSec)
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit
       - run: cargo test
       - run: stellar contract build
 

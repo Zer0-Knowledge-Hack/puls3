@@ -95,6 +95,20 @@ void main() {
       expect(owners.reads, 0);
     });
 
+    test('a completed hire with no escrow job is not eligible', () async {
+      // The rating names the hire's job (#201): without one, prepare would
+      // refuse, so eligibility says so too, before the owner is read.
+      final hire = await rig.hire();
+      rig.hires.statusOverride[hire.id] = HireStatus.completed;
+      owners.failure = const LedgerUnavailable('down');
+
+      final result = await service.eligibility(_wallet, hire.id);
+
+      expect(result.eligible, isFalse);
+      expect(result.reason, 'HireNotCompleted');
+      expect(owners.reads, 0);
+    });
+
     test('hire lookup errors are thrown, not reported', () async {
       await expectLater(
         service.eligibility(_wallet, 0),
@@ -132,6 +146,10 @@ void main() {
       expect(calls.built.single.feedback.score, 4);
       expect(calls.built.single.feedback.comment, 'Great');
       expect(calls.built.single.client, _wallet);
+      // The call names the hire's escrow job, so the rating is checkable
+      // on chain (#201).
+      expect(calls.built.single.jobId, hire.jobId);
+      expect(hire.jobId, isNotNull);
       expect(rig.codec.built.single.spec.contract, fakeReputationRegistry);
     });
 
@@ -141,6 +159,29 @@ void main() {
       await expectLater(
         service.prepare(_wallet, hire.id, 4, ''),
         throwsA(api('HireNotCompleted', details: {'status': 'submitted'})),
+      );
+      expect(rig.codec.built, isEmpty);
+    });
+
+    test('a completed hire with no escrow job is HireNotCompleted', () async {
+      final hire = await rig.hire();
+      rig.hires.statusOverride[hire.id] = HireStatus.completed;
+
+      await expectLater(
+        service.prepare(_wallet, hire.id, 4, ''),
+        throwsA(api('HireNotCompleted', details: {'status': 'completed'})),
+      );
+      expect(calls.built, isEmpty);
+      expect(owners.reads, 0);
+    });
+
+    test('a job id the reference cannot name is a catalogued error', () async {
+      final hire = await rig.hire(status: HireStatus.completed);
+      calls.failure = RangeError('jobId');
+
+      await expectLater(
+        service.prepare(_wallet, hire.id, 4, ''),
+        throwsA(api('ChainDataUnavailable', details: {'reason': 'jobId'})),
       );
       expect(rig.codec.built, isEmpty);
     });
