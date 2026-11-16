@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:puls3_client/puls3_client.dart' as api;
 
+import '../data/typed_api_error.dart';
 import '../domain/agent_draft.dart';
 import '../hire/wallet_session.dart';
 import '../wallet/wallet_port.dart';
@@ -235,7 +236,10 @@ class ServerDeployGateway implements DeployGateway {
       rethrow;
     } on TimeoutException {
       throw const DeployConnectionError('The server did not answer.');
-    } on api.ServerpodClientException {
+    } on api.ServerpodClientException catch (e) {
+      // The browser client cannot decode a typed error with `details`.
+      final typed = typedApiError(e);
+      if (typed != null) throw _map(typed);
       throw const DeployConnectionError('The server did not answer.');
     }
   }
