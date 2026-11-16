@@ -617,6 +617,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agentHireDisabled => 'Hire is disabled until the agent loads.';
 
   @override
+  String get agentCannotBeHired => 'This agent cannot be hired yet.';
+
+  @override
   String get agentStaleTitle => 'Showing the last known data';
 
   @override

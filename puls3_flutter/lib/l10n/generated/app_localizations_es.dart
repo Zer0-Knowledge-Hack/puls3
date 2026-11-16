@@ -627,6 +627,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Contratar está deshabilitado hasta que cargue el agente.';
 
   @override
+  String get agentCannotBeHired => 'Este agente todavía no se puede contratar.';
+
+  @override
   String get agentStaleTitle => 'Mostrando los últimos datos conocidos';
 
   @override

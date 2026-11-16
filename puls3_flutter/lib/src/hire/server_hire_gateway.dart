@@ -371,6 +371,7 @@ class ServerHireGateway implements HireGateway {
       'AgentNotFound' || 'AgentInactive' => const HireAgentUnavailable(
         'This agent is not accepting hires.',
       ),
+      'AgentCannotDeliver' => const HireAgentCannotDeliver(),
       'PreparationExpired' => const HirePreparationExpired(),
       'PaymentAlreadySubmitted' => const HirePaymentAlreadySubmitted(),
       'ChainUnavailable' when fund && reason == 'simulationFailed' =>
