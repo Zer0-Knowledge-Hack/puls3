@@ -624,6 +624,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Contratar fica desabilitado até o agente carregar.';
 
   @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
+
+  @override
   String get agentStaleTitle => 'Mostrando os últimos dados conhecidos';
 
   @override
@@ -1025,6 +1029,14 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get playgroundCredentialMissing =>
       'Guarde a credencial do provedor e execute o rascunho de novo.';
+
+  @override
+  String get playgroundCredentialInvalid =>
+      'Essa credencial do provedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este provedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
@@ -1961,6 +1973,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Contratar fica desabilitado até o agente carregar.';
 
   @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
+
+  @override
   String get agentStaleTitle => 'Mostrando os últimos dados conhecidos';
 
   @override
@@ -2362,6 +2378,14 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get playgroundCredentialMissing =>
       'Salve a credencial do provedor e execute o rascunho de novo.';
+
+  @override
+  String get playgroundCredentialInvalid =>
+      'Essa credencial do provedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este provedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';
@@ -3299,6 +3323,10 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
       'Contratar fica indisponível até o agente carregar.';
 
   @override
+  String get agentCannotBeHired =>
+      'Ainda não é possível contratar este agente.';
+
+  @override
   String get agentStaleTitle => 'A mostrar os últimos dados conhecidos';
 
   @override
@@ -3702,6 +3730,14 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get playgroundCredentialMissing =>
       'Guarde a credencial do fornecedor e volte a executar o rascunho.';
+
+  @override
+  String get playgroundCredentialInvalid =>
+      'Essa credencial do fornecedor não é válida. Verifique os dados da credencial.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'Este fornecedor não é compatível. Escolha outro modelo.';
 
   @override
   String get playgroundAccountId => 'Id da conta Cloudflare';

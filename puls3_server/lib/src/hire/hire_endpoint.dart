@@ -78,6 +78,11 @@ class HireEndpoint extends Endpoint {
       );
     } on AgentUnavailable {
       throw Puls3ApiException(code: 'AgentNotFound');
+    } on AgentCannotDeliver {
+      throw Puls3ApiException(
+        code: 'AgentCannotDeliver',
+        message: 'This agent cannot be hired yet.',
+      );
     } on HireRequestInvalid catch (e) {
       throw Puls3ApiException(code: 'InvalidHire', message: e.message);
     } on HireLedgerUnavailable {

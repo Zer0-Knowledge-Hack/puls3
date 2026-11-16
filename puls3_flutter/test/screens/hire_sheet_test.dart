@@ -673,6 +673,22 @@ void main() {
       expect(gateway.hireCount, 1);
     });
 
+    testWidgets('an agent the server cannot deliver shows the same reason', (
+      tester,
+    ) async {
+      final gateway = ScriptedHireGateway()
+        ..failCreate = const HireAgentCannotDeliver();
+      await pumpSheet(
+        tester,
+        wallet: TestWallet(initialAddress: 'GUSER123'),
+        gateway: gateway,
+      );
+
+      await confirm(tester);
+      expect(find.text('This agent cannot be hired yet.'), findsOneWidget);
+      expect(gateway.hireCount, 0);
+    });
+
     testWidgets('an agent that is not on chain cannot be hired for real', (
       tester,
     ) async {

@@ -183,7 +183,7 @@ Every screen sits in the app shell: the top bar (logo, wallet chip) and, on phon
 |---|---|---|
 | Loading | **Running…** with the input locked, and a note that the run stops at the runtime timeout. | [1440](wireframes/S11-playground-loading-1440.png) · [390](wireframes/S11-playground-loading-390.png) |
 | Empty | The input box with its counter (`0 / inputMaxChars`), **Run** disabled until there is text, and "Test runs are free and limited per day". | [1440](wireframes/S11-playground-empty-1440.png) · [390](wireframes/S11-playground-empty-390.png) |
-| Error | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed` / `RuntimeUnavailable`: the safe reason in an `ErrorBanner` with **Try again**. Over `inputMaxChars`: inline error under the input. | [1440](wireframes/S11-playground-error-1440.png) · [390](wireframes/S11-playground-error-390.png) |
+| Error | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed` / `RuntimeUnavailable`: the safe reason in an `ErrorBanner` with **Try again**. `CredentialMissing`: save a credential. `CredentialInvalid`: check the credential details. `ProviderUnsupported`: pick another model. Over `inputMaxChars`: inline error under the input. | [1440](wireframes/S11-playground-error-1440.png) · [390](wireframes/S11-playground-error-390.png) |
 | Success | The output (text, or Markdown when `outputType` is `markdown`), labelled "Test run: not paid, nothing on chain", with **Copy** and "N runs left today". | [1440](wireframes/S11-playground-1440.png) · [390](wireframes/S11-playground-390.png) |
 
 **Actions:** **Run** → `testRun`. **Try again**. **Copy** output. **Close** (phone) → S07. **Deploy** → S08 (F4).

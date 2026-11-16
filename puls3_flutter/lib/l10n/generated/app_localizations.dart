@@ -1194,6 +1194,12 @@ abstract class AppLocalizations {
   /// **'Hire is disabled until the agent loads.'**
   String get agentHireDisabled;
 
+  /// No description provided for @agentCannotBeHired.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent cannot be hired yet.'**
+  String get agentCannotBeHired;
+
   /// No description provided for @agentStaleTitle.
   ///
   /// In en, this message translates to:
@@ -1895,6 +1901,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save your provider credential, then run the draft again.'**
   String get playgroundCredentialMissing;
+
+  /// No description provided for @playgroundCredentialInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'That provider credential is not valid. Check the credential details.'**
+  String get playgroundCredentialInvalid;
+
+  /// No description provided for @playgroundProviderUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider is not supported. Pick another model.'**
+  String get playgroundProviderUnsupported;
 
   /// No description provided for @playgroundAccountId.
   ///

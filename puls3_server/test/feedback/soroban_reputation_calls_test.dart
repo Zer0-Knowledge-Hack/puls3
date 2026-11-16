@@ -11,6 +11,10 @@ import 'package:test/test.dart';
 import '../support/fake_feedback_ports.dart';
 
 final _client = StellarConfig.testnet.simulationSource;
+final _escrow = StellarConfig.testnet.escrow;
+
+/// The escrow job of the hire being rated.
+const _jobId = 8;
 
 Feedback _feedback({int score = 5, String comment = ''}) => Feedback(
   hireId: HireId(8),
@@ -27,16 +31,32 @@ Uint8List _xdr(ContractCall call) => encodeInvokeHostFunction(
   args: call.args,
 );
 
+Uint8List _hex(String hex) => Uint8List.fromList([
+  for (var i = 0; i < hex.length; i += 2)
+    int.parse(hex.substring(i, i + 2), radix: 16),
+]);
+
 void main() {
   group('SorobanReputationCalls.giveFeedback', () {
-    final calls = SorobanReputationCalls(registry: fakeReputationRegistry);
+    final calls = SorobanReputationCalls(
+      registry: fakeReputationRegistry,
+      escrow: _escrow,
+    );
+
+    ContractCall build({
+      StellarAddress? client,
+      int score = 5,
+      String comment = '',
+      int jobId = _jobId,
+    }) => calls.giveFeedback(
+      client: client ?? _client,
+      agent: AgentId(7),
+      feedback: _feedback(score: score, comment: comment),
+      jobId: jobId,
+    );
 
     test('targets the Reputation Registry `give_feedback`', () {
-      final call = calls.giveFeedback(
-        client: _client,
-        agent: AgentId(7),
-        feedback: _feedback(),
-      );
+      final call = build();
 
       expect(call.contract, fakeReputationRegistry);
       expect(call.function, 'give_feedback');
@@ -46,11 +66,9 @@ void main() {
       // give_feedback(caller: Address, agent_id: u32, value: i128,
       //   value_decimals: u32, tag1: String, tag2: String, endpoint: String,
       //   feedback_uri: String, feedback_hash: BytesN<32>)
-      final call = calls.giveFeedback(
-        client: _client,
-        agent: AgentId(7),
-        feedback: _feedback(score: 4),
-      );
+      final call = build(score: 4);
+      const reference =
+          'puls3:job:v1:CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2:8';
 
       expect(call.args, hasLength(9));
       expect(
@@ -65,26 +83,52 @@ void main() {
               const ScArg.i128(4),
               const ScArg.u32(0),
               const ScArg.string(''),
+              const ScArg.string(reference),
               const ScArg.string(''),
-              const ScArg.string(''),
-              const ScArg.string(''),
-              ScArg.bytes32(Uint8List(32)),
+              const ScArg.string(reference),
+              // SHA-256 of feedbackCommitment(job 8, agent 7, client, 4),
+              // computed independently of the code under test.
+              ScArg.bytes32(
+                _hex(
+                  '3f157e2851d9abe3598437695029fe79'
+                  'e273eb62337ba21ac8a94d6836523fb0',
+                ),
+              ),
             ],
           ),
         ),
       );
     });
 
-    test('the score is the value with no decimals, for every score', () {
-      for (final score in [1, 2, 3, 4, 5]) {
-        final call = calls.giveFeedback(
-          client: _client,
-          agent: AgentId(7),
-          feedback: _feedback(score: score),
-        );
+    test('tag2 and feedback_uri carry the job reference (#201)', () {
+      final reference = PaidJobReference(escrow: _escrow, jobId: _jobId).text;
+      final withReference = build();
 
+      expect(
+        _xdr(withReference),
+        isNot(_xdr(build(jobId: _jobId + 1))),
+        reason: 'another job is another call',
+      );
+      expect(
+        PaidJobReference.tryParse(reference),
+        PaidJobReference(escrow: _escrow, jobId: _jobId),
+      );
+    });
+
+    test('the score is the value with no decimals, for every score', () {
+      final reference = PaidJobReference(escrow: _escrow, jobId: _jobId);
+      for (final score in [1, 2, 3, 4, 5]) {
+        final call = build(score: score);
+
+        expect(call.args, hasLength(9));
         expect(
-          _xdr(call),
+          _xdr(
+            ContractCall(
+              contract: call.contract,
+              function: call.function,
+              args: call.args.sublist(0, 8),
+            ),
+          ),
           _xdr(
             ContractCall(
               contract: fakeReputationRegistry,
@@ -95,10 +139,9 @@ void main() {
                 ScArg.i128(score),
                 const ScArg.u32(0),
                 const ScArg.string(''),
+                ScArg.string(reference.text),
                 const ScArg.string(''),
-                const ScArg.string(''),
-                const ScArg.string(''),
-                ScArg.bytes32(Uint8List(32)),
+                ScArg.string(reference.text),
               ],
             ),
           ),
@@ -107,41 +150,18 @@ void main() {
       }
     });
 
-    test('the caller is the client, not the feedback of another wallet', () {
-      final other = StellarConfig.testnet.escrow;
-      final call = calls.giveFeedback(
-        client: other,
-        agent: AgentId(7),
-        feedback: _feedback(),
-      );
+    test('the hash binds the score: two scores are two hashes', () {
+      expect(_xdr(build(score: 4)), isNot(_xdr(build(score: 5))));
+    });
 
-      expect(
-        _xdr(call),
-        isNot(
-          _xdr(
-            calls.giveFeedback(
-              client: _client,
-              agent: AgentId(7),
-              feedback: _feedback(),
-            ),
-          ),
-        ),
-      );
+    test('the caller is the client, not the feedback of another wallet', () {
+      final other = StellarConfig.testnet.usdcSac;
+
+      expect(_xdr(build(client: other)), isNot(_xdr(build())));
     });
 
     test('the comment is not an argument: the contract stores no text', () {
-      final plain = calls.giveFeedback(
-        client: _client,
-        agent: AgentId(7),
-        feedback: _feedback(),
-      );
-      final withComment = calls.giveFeedback(
-        client: _client,
-        agent: AgentId(7),
-        feedback: _feedback(comment: 'Fast and accurate'),
-      );
-
-      expect(_xdr(withComment), _xdr(plain));
+      expect(_xdr(build(comment: 'Fast and accurate')), _xdr(build()));
     });
   });
 
@@ -152,6 +172,7 @@ void main() {
           client: _client,
           agent: AgentId(7),
           feedback: _feedback(),
+          jobId: _jobId,
         ),
         throwsA(isA<HireConfigurationMissing>()),
       );

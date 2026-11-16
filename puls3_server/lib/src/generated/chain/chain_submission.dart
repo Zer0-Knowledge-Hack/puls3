@@ -22,7 +22,7 @@ abstract class ChainSubmission
     this.id,
     this.preparationId,
     required this.purpose,
-    required this.transaction,
+    this.transaction,
     required this.state,
     this.errorCode,
     this.explorerUrl,
@@ -40,7 +40,7 @@ abstract class ChainSubmission
     int? id,
     String? preparationId,
     required String purpose,
-    required String transaction,
+    String? transaction,
     required String state,
     String? errorCode,
     String? explorerUrl,
@@ -59,7 +59,7 @@ abstract class ChainSubmission
       id: jsonSerialization['id'] as int?,
       preparationId: jsonSerialization['preparationId'] as String?,
       purpose: jsonSerialization['purpose'] as String,
-      transaction: jsonSerialization['transaction'] as String,
+      transaction: jsonSerialization['transaction'] as String?,
       state: jsonSerialization['state'] as String,
       errorCode: jsonSerialization['errorCode'] as String?,
       explorerUrl: jsonSerialization['explorerUrl'] as String?,
@@ -103,8 +103,9 @@ abstract class ChainSubmission
   String purpose;
 
   /// Domain TransactionHash of the one envelope this record ever sends,
-  /// persisted before it is submitted.
-  String transaction;
+  /// persisted before it is submitted. Null when a simulation rejected the
+  /// call before an envelope existed (a server-signed attempt).
+  String? transaction;
 
   /// One of submitted, confirmed, failed.
   String state;
@@ -167,7 +168,7 @@ abstract class ChainSubmission
       if (id != null) 'id': id,
       if (preparationId != null) 'preparationId': preparationId,
       'purpose': purpose,
-      'transaction': transaction,
+      if (transaction != null) 'transaction': transaction,
       'state': state,
       if (errorCode != null) 'errorCode': errorCode,
       if (explorerUrl != null) 'explorerUrl': explorerUrl,
@@ -189,7 +190,7 @@ abstract class ChainSubmission
       if (id != null) 'id': id,
       if (preparationId != null) 'preparationId': preparationId,
       'purpose': purpose,
-      'transaction': transaction,
+      if (transaction != null) 'transaction': transaction,
       'state': state,
       if (errorCode != null) 'errorCode': errorCode,
       if (explorerUrl != null) 'explorerUrl': explorerUrl,
@@ -232,7 +233,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
     int? id,
     String? preparationId,
     required String purpose,
-    required String transaction,
+    String? transaction,
     required String state,
     String? errorCode,
     String? explorerUrl,
@@ -270,7 +271,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
     Object? id = _Undefined,
     Object? preparationId = _Undefined,
     String? purpose,
-    String? transaction,
+    Object? transaction = _Undefined,
     String? state,
     Object? errorCode = _Undefined,
     Object? explorerUrl = _Undefined,
@@ -289,7 +290,7 @@ class _ChainSubmissionImpl extends ChainSubmission {
           ? preparationId
           : this.preparationId,
       purpose: purpose ?? this.purpose,
-      transaction: transaction ?? this.transaction,
+      transaction: transaction is String? ? transaction : this.transaction,
       state: state ?? this.state,
       errorCode: errorCode is String? ? errorCode : this.errorCode,
       explorerUrl: explorerUrl is String? ? explorerUrl : this.explorerUrl,
@@ -323,7 +324,7 @@ class ChainSubmissionUpdateTable extends _is.UpdateTable<ChainSubmissionTable> {
     value,
   );
 
-  _is.ColumnValue<String, String> transaction(String value) => _is.ColumnValue(
+  _is.ColumnValue<String, String> transaction(String? value) => _is.ColumnValue(
     table.transaction,
     value,
   );
@@ -465,7 +466,8 @@ class ChainSubmissionTable extends _is.Table<int?> {
   late final _is.ColumnString purpose;
 
   /// Domain TransactionHash of the one envelope this record ever sends,
-  /// persisted before it is submitted.
+  /// persisted before it is submitted. Null when a simulation rejected the
+  /// call before an envelope existed (a server-signed attempt).
   late final _is.ColumnString transaction;
 
   /// One of submitted, confirmed, failed.

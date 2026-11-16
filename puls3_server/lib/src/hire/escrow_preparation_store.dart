@@ -15,6 +15,7 @@ final class NewPreparation {
     required this.validUntil,
     this.jobExpiredAt,
     this.rejectReason,
+    this.feedbackScore,
   });
 
   /// Opaque id the client echoes back on submit.
@@ -42,6 +43,9 @@ final class NewPreparation {
 
   /// Reject reason baked into a `reject` envelope.
   final String? rejectReason;
+
+  /// Score of a `giveFeedback` preparation (#242).
+  final int? feedbackScore;
 }
 
 /// A persisted `escrow_preparation` row with a typed purpose.
@@ -58,6 +62,7 @@ final class StoredPreparation {
     required this.validUntil,
     required this.jobExpiredAt,
     required this.rejectReason,
+    this.feedbackScore,
     required this.createdAt,
     required this.supersededAt,
     required this.submittedAt,
@@ -74,6 +79,9 @@ final class StoredPreparation {
   final DateTime validUntil;
   final int? jobExpiredAt;
   final String? rejectReason;
+
+  /// Score of a `giveFeedback` preparation (#242).
+  final int? feedbackScore;
   final DateTime createdAt;
 
   /// Set when a newer preparation replaced this one.

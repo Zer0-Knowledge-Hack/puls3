@@ -1,0 +1,15 @@
+# cargo-audit configuration for the Soroban workspace (audit P-1, #206).
+# Every ignore needs a reason and a way out. Remove it once the way out lands.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2026-0387: crypto-bigint 0.5.5, timing variability in operations
+  # meant to be constant-time. It reaches this workspace only through
+  # soroban-env-host 28 (k256 / p256 -> elliptic-curve 0.13), the native host
+  # that `cargo test` and the SDK testutils run. It is not in the contracts
+  # we deploy: `cargo tree -i crypto-bigint@0.5.5 -e normal --target
+  # wasm32v1-none` prints nothing. The patched release (>= 0.7.6) needs
+  # elliptic-curve 0.14, which only a soroban-env-host / soroban-sdk upgrade
+  # can bring. Way out: drop this line when soroban-sdk moves to it.
+  "RUSTSEC-2026-0387",
+]
