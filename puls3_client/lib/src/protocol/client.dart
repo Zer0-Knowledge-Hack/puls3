@@ -94,7 +94,12 @@ class EndpointCliSession extends _isc.EndpointRef {
   String get name => 'cliSession';
 
   /// Creates a CLI session for the caller. If the caller already has
-  /// [maxCliSessions], the oldest is revoked first.
+  /// [maxCliSessions] live ones, the oldest is revoked first.
+  ///
+  /// Only the app's own wallet session may call it: a CLI session, or an
+  /// access token whose session was revoked, gets `CliSessionNotAllowed`.
+  /// Otherwise a CLI session could mint the next one before its 72 hours
+  /// end, and never expire.
   ///
   /// The refresh token in the result is a bearer secret: show it once, do
   /// not store or log it.
@@ -105,7 +110,8 @@ class EndpointCliSession extends _isc.EndpointRef {
         {},
       );
 
-  /// The caller's CLI sessions, oldest first. No secret is returned.
+  /// The caller's live CLI sessions, oldest first. No secret is returned.
+  /// A session past its lifetime is not listed (it is deleted).
   _ida.Future<List<_ioc4diwu.CliSession>> list() =>
       caller.callServerEndpoint<List<_ioc4diwu.CliSession>>(
         'cliSession',

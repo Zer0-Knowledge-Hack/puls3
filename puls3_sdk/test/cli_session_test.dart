@@ -163,6 +163,56 @@ void main() {
     expect(saved()['refreshToken'], 'seed-token');
   });
 
+  group('two programs on one session file', () {
+    test('never present a token the other already rotated', () async {
+      // The CLI and the MCP server, both started with the same seed.
+      final cli = (await load(seed: 'seed-token'))!;
+      final mcp = (await load(seed: 'seed-token'))!;
+
+      await cli.authHeaderValue; // seed-token -> refresh-1
+      // The MCP server's copy still holds seed-token. It must take
+      // refresh-1 from the file instead of reusing seed-token.
+      expect(await mcp.authHeaderValue, 'Bearer access-1');
+
+      await mcp.refreshAuthKey(force: true); // refresh-1 -> refresh-2
+      // The CLI finds refresh-2 in the file, with a valid access token, and
+      // takes it without asking the server.
+      expect(
+        await cli.refreshAuthKey(force: true),
+        RefreshAuthKeyResult.success,
+      );
+      expect(await cli.authHeaderValue, 'Bearer access-2');
+
+      // No token was ever presented twice.
+      expect(server.shown, ['seed-token', 'refresh-1']);
+      expect(saved()['refreshToken'], 'refresh-2');
+    });
+
+    test('a session the other found refused is over here too', () async {
+      final cli = (await load(seed: 'seed-token'))!;
+      final mcp = (await load(seed: 'seed-token'))!;
+      server.error = _Refused();
+      await cli.refreshAuthKey(force: true);
+
+      expect(
+        await mcp.refreshAuthKey(force: true),
+        RefreshAuthKeyResult.failedUnauthorized,
+      );
+      expect(mcp.isUsable, isFalse);
+      expect(server.shown, ['seed-token']);
+    });
+
+    test('concurrent refreshes from both are serialized', () async {
+      final cli = (await load(seed: 'seed-token'))!;
+      final mcp = (await load(seed: 'seed-token'))!;
+
+      await Future.wait([cli.authHeaderValue, mcp.authHeaderValue]);
+
+      // One refresh: the second program found the rotated token waiting.
+      expect(server.shown, ['seed-token']);
+    });
+  });
+
   test('a damaged file is no session, not a crash', () async {
     file.writeAsStringSync('not json');
     expect(await load(), isNull);

@@ -15,6 +15,10 @@ class JwtRefreshEndpoint extends RefreshJwtTokensEndpoint {
   /// the system clock.
   static DateTime Function()? debugNow;
 
+  /// Replaces how the refresh cookie is read, for tests (the test harness
+  /// cannot send one). `null` restores the request's cookie.
+  static String? Function(Session session)? debugCookie;
+
   /// Creates a new token pair for [refreshToken] and rotates it: the old one
   /// stops working.
   ///
@@ -32,12 +36,15 @@ class JwtRefreshEndpoint extends RefreshJwtTokensEndpoint {
     Session session, {
     String? refreshToken,
   }) async {
-    // A CLI program sends the token in the body; only the app's web build
-    // uses the refresh cookie, and it never holds a CLI session.
-    if (refreshToken != null) {
+    // The token the core will use: the argument, or else the refresh cookie.
+    // The lifetime applies whichever way a CLI token arrives.
+    final token =
+        refreshToken ??
+        (debugCookie?.call(session) ?? session.readWebAuthRefreshCookie());
+    if (token != null) {
       await refuseExpiredCliSession(
         session,
-        refreshToken,
+        token,
         jwt: jwt,
         now: debugNow?.call() ?? DateTime.now().toUtc(),
       );

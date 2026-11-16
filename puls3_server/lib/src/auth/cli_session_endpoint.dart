@@ -3,6 +3,7 @@ import 'package:serverpod_auth_idp_server/core.dart';
 
 import '../generated/protocol.dart';
 import 'cli_session_policy.dart';
+import 'wallet_idp.dart';
 
 /// CLI sessions for the signed-in wallet (#259, ADR-0007 option A′).
 ///
@@ -22,13 +23,25 @@ class CliSessionEndpoint extends Endpoint {
 
   Jwt get _jwt => AuthServices.getTokenManager<JwtTokenManager>().jwt;
 
+  /// Replaces the clock that decides which CLI sessions have ended, for
+  /// tests. `null` restores the system clock.
+  static DateTime Function()? debugNow;
+
+  DateTime get _now => debugNow?.call() ?? DateTime.now().toUtc();
+
   /// Creates a CLI session for the caller. If the caller already has
-  /// [maxCliSessions], the oldest is revoked first.
+  /// [maxCliSessions] live ones, the oldest is revoked first.
+  ///
+  /// Only the app's own wallet session may call it: a CLI session, or an
+  /// access token whose session was revoked, gets `CliSessionNotAllowed`.
+  /// Otherwise a CLI session could mint the next one before its 72 hours
+  /// end, and never expire.
   ///
   /// The refresh token in the result is a bearer secret: show it once, do
   /// not store or log it.
   Future<CliSessionGrant> create(Session session) async {
     final user = _caller(session);
+    await _requireWalletSession(session, user);
     final existing = await _cliTokens(session, user);
     // Room for the new one: keep the newest maxCliSessions - 1.
     final excess = existing.length - (maxCliSessions - 1);
@@ -53,7 +66,8 @@ class CliSessionEndpoint extends Endpoint {
     );
   }
 
-  /// The caller's CLI sessions, oldest first. No secret is returned.
+  /// The caller's live CLI sessions, oldest first. No secret is returned.
+  /// A session past its lifetime is not listed (it is deleted).
   Future<List<CliSession>> list(Session session) async => [
     for (final token in await _cliTokens(session, _caller(session)))
       CliSession(
@@ -77,14 +91,48 @@ class CliSessionEndpoint extends Endpoint {
     return false;
   }
 
-  /// The caller's CLI refresh tokens, oldest first.
+  /// The caller's live CLI refresh tokens, oldest first. Those past
+  /// [cliSessionLifetime] are deleted on the way: they can no longer
+  /// refresh, so they are neither listed nor counted toward
+  /// [maxCliSessions].
   Future<List<JwtTokenInfo>> _cliTokens(Session session, UuidValue user) async {
     final tokens = await _jwt.listJwtTokens(
       session,
       authUserId: user,
       method: cliSessionMethod,
     );
-    return tokens..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final now = _now;
+    final live = <JwtTokenInfo>[];
+    for (final token in tokens) {
+      if (isCliSessionExpired(token.createdAt, now)) {
+        await _jwt.revokeRefreshToken(session, refreshTokenId: token.id);
+      } else {
+        live.add(token);
+      }
+    }
+    return live..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
+  /// Throws `CliSessionNotAllowed` unless the calling access token belongs
+  /// to a live wallet sign-in session (method [WalletIdp.methodName]) of
+  /// [user].
+  static Future<void> _requireWalletSession(
+    Session session,
+    UuidValue user,
+  ) async {
+    final authId = session.authenticated?.authId;
+    UuidValue? id;
+    try {
+      id = authId == null ? null : UuidValue.withValidation(authId);
+    } on FormatException {
+      id = null;
+    }
+    final row = id == null ? null : await RefreshToken.db.findById(session, id);
+    if (row == null ||
+        row.method != WalletIdp.methodName ||
+        row.authUserId != user) {
+      throw Puls3ApiException(code: 'CliSessionNotAllowed');
+    }
   }
 
   static UuidValue _caller(Session session) {

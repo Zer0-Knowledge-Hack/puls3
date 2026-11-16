@@ -39,7 +39,7 @@ Programs other than the app use this contract through the Dart SDK `puls3_sdk`, 
 |---|---|---|---|---|---|
 | `WalletAuthEndpoint` (`walletAuth`) | `createChallenge` | `wallet: String` | `WalletChallenge` | No | `InvalidStellarAddress`, `ChallengeRateLimited`, `AuthenticationUnavailable` |
 | `WalletAuthEndpoint` (`walletAuth`) | `verifyChallenge` | `challengeId: String`, `wallet: String`, `signedChallengeXdr: String` | `AuthSuccess` | No | `InvalidStellarAddress`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
-| `CliSessionEndpoint` (`cliSession`) | `create` | none | `CliSessionGrant` (`id`, `refreshToken`, `expiresAt`) | Yes | none (401 without a session). A CLI session of the caller's own wallet (#259): a separate refresh token, absolute 72 h lifetime; a sixth revokes the oldest |
+| `CliSessionEndpoint` (`cliSession`) | `create` | none | `CliSessionGrant` (`id`, `refreshToken`, `expiresAt`) | Yes | `CliSessionNotAllowed` when the caller is not the app's wallet session (a CLI session cannot create another). A CLI session of the caller's own wallet (#259): a separate refresh token, absolute 72 h lifetime; a sixth live one revokes the oldest |
 | `CliSessionEndpoint` (`cliSession`) | `list` | none | `List<CliSession>` (`id`, `createdAt`, `lastUsedAt`, `expiresAt`; no secret) | Yes | none |
 | `CliSessionEndpoint` (`cliSession`) | `revoke` | `id: String` | `bool` | Yes | none. `false` for an id that is not one of the caller's CLI sessions, including the app's own |
 | `ConfigEndpoint` | `getNetworkConfig` | — | `NetworkConfig` | No | `ConfigurationUnavailable` |
@@ -252,7 +252,7 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Group | Codes |
 |---|---|
 | Session and shared | `WalletMismatch`, `InternalError` |
-| Authentication | `InvalidStellarAddress`, `ChallengeRateLimited`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
+| Authentication | `InvalidStellarAddress`, `ChallengeRateLimited`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable`, `CliSessionNotAllowed` |
 | Configuration and catalog | `ConfigurationUnavailable`, `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, `ChainDataUnavailable` |
 | Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
 | Relay and chain | `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `TransactionFailed`, `ChainUnavailable` |

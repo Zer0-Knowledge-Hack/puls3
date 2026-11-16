@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -60,6 +61,11 @@ String? defaultSessionFile(Map<String, String> environment) {
 /// only the user can read (mode 0600) and survives restarts. The session
 /// stops refreshing 72 hours after the app created it; then copy a new one.
 ///
+/// Several programs can share one session file (the CLI and the MCP server
+/// do): a lock on `<file>.lock` makes each refresh read the newest token,
+/// so none of them presents a token another already rotated, which the
+/// server would treat as reuse and revoke.
+///
 /// Pass it as the client's `authKeyProvider` (the SDK's `session`). It
 /// never signs or submits a transaction, and no token appears in a
 /// `toString`, an error or a log.
@@ -110,17 +116,17 @@ final class CliSession implements RefresherClientAuthKeyProvider {
     DateTime Function()? now,
   }) async {
     final clock = now ?? () => DateTime.now().toUtc();
-    final saved = await _read(file);
     final seeded = seed?.trim() ?? '';
-    final _Stored state;
-    if (seeded.isNotEmpty && seeded != saved?.seed) {
-      state = _Stored(seed: seeded, refreshToken: seeded);
-      await _write(file, state);
-    } else if (saved != null) {
-      state = saved;
-    } else {
-      return null;
-    }
+    final state = await _locked(file, () async {
+      final saved = await _read(file);
+      if (seeded.isNotEmpty && seeded != saved?.seed) {
+        final fresh = _Stored(seed: seeded, refreshToken: seeded);
+        await _write(file, fresh);
+        return fresh;
+      }
+      return saved;
+    });
+    if (state == null) return null;
     return CliSession._(file, refresh, clock, state);
   }
 
@@ -160,37 +166,87 @@ final class CliSession implements RefresherClientAuthKeyProvider {
     return next.whenComplete(() => _pending = null);
   }
 
+  bool get _accessValid {
+    final expiresAt = _state.accessTokenExpiresAt;
+    return _state.accessToken != null &&
+        expiresAt != null &&
+        _now().add(_margin).isBefore(expiresAt);
+  }
+
   Future<RefreshAuthKeyResult> _refreshOnce({required bool force}) async {
     if (!isUsable) return RefreshAuthKeyResult.failedUnauthorized;
-    final expiresAt = _state.accessTokenExpiresAt;
-    if (!force &&
-        _state.accessToken != null &&
-        expiresAt != null &&
-        _now().add(_margin).isBefore(expiresAt)) {
-      return RefreshAuthKeyResult.skipped;
-    }
-    final RefreshedTokens tokens;
-    try {
-      tokens = await _refresh(_state.refreshToken);
-    } on SerializableException {
-      // Expired, revoked, reused or unknown: this session is over.
-      _state = _Stored(seed: _state.seed, refreshToken: '');
-      if (await _file.exists()) await _file.delete();
-      return RefreshAuthKeyResult.failedUnauthorized;
-    } on ServerpodClientException {
-      return RefreshAuthKeyResult.failedOther;
-    } on IOException {
-      return RefreshAuthKeyResult.failedOther;
-    }
-    _state = _Stored(
-      seed: _state.seed,
-      refreshToken: tokens.refreshToken,
-      accessToken: tokens.accessToken,
-      accessTokenExpiresAt: tokens.accessTokenExpiresAt?.toUtc(),
-    );
-    await _write(_file, _state);
-    return RefreshAuthKeyResult.success;
+    if (!force && _accessValid) return RefreshAuthKeyResult.skipped;
+    // Another program (the CLI and the MCP server share the file) may have
+    // rotated the token since this one read it. The file lock makes
+    // read, refresh and write one step across processes, so no two of them
+    // ever present the same refresh token.
+    return _locked(_file, () async {
+      final saved = await _read(_file);
+      if (saved == null) {
+        // Another program found the session refused and removed the file.
+        _state = _Stored(seed: _state.seed, refreshToken: '');
+        return RefreshAuthKeyResult.failedUnauthorized;
+      }
+      if (saved.refreshToken != _state.refreshToken) {
+        // Rotated elsewhere: take the newer tokens. Its access token is
+        // usually still valid, so no refresh is needed.
+        _state = saved;
+        if (_accessValid) return RefreshAuthKeyResult.success;
+      } else if (!force && _accessValid) {
+        return RefreshAuthKeyResult.skipped;
+      }
+      final RefreshedTokens tokens;
+      try {
+        tokens = await _refresh(_state.refreshToken);
+      } on SerializableException {
+        // Expired, revoked, reused or unknown: this session is over.
+        _state = _Stored(seed: _state.seed, refreshToken: '');
+        if (await _file.exists()) await _file.delete();
+        return RefreshAuthKeyResult.failedUnauthorized;
+      } on ServerpodClientException {
+        return RefreshAuthKeyResult.failedOther;
+      } on IOException {
+        return RefreshAuthKeyResult.failedOther;
+      }
+      _state = _Stored(
+        seed: _state.seed,
+        refreshToken: tokens.refreshToken,
+        accessToken: tokens.accessToken,
+        accessTokenExpiresAt: tokens.accessTokenExpiresAt?.toUtc(),
+      );
+      await _write(_file, _state);
+      return RefreshAuthKeyResult.success;
+    });
   }
+
+  /// Runs [body] holding an exclusive lock on `<file>.lock`, shared by every
+  /// program that uses the same session file. The lock file holds no
+  /// secret.
+  static Future<T> _locked<T>(File file, Future<T> Function() body) async {
+    // File locks are held per process, so two sessions in this process are
+    // also queued per path in memory.
+    final path = file.absolute.path;
+    final previous = _inProcess[path];
+    final done = Completer<void>();
+    _inProcess[path] = done;
+    try {
+      if (previous != null) await previous.future;
+      await file.parent.create(recursive: true);
+      final lock = await File('$path.lock').open(mode: FileMode.append);
+      try {
+        await lock.lock(FileLock.blockingExclusive);
+        return await body();
+      } finally {
+        await lock.close();
+      }
+    } finally {
+      done.complete();
+      if (identical(_inProcess[path], done)) _inProcess.remove(path);
+    }
+  }
+
+  /// The last queued holder of each session file's lock in this process.
+  static final _inProcess = <String, Completer<void>>{};
 
   @override
   String toString() => 'CliSession(${_file.path})';

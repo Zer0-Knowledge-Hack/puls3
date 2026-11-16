@@ -57,14 +57,14 @@ Arguments the SDK can reject locally, such as a blank agent id or a non-HTTP API
 
 A program without the app uses a **separate CLI session** of the same wallet (option A′ below, decided on #222). Three conditions hold it to the same risk as the app's session or less:
 
-1. **Own wallet only.** `CliSessionEndpoint` requires login and issues, lists and revokes sessions for the caller's authenticated user only. No call takes an argument that names a wallet or a user.
-2. **Revocable on its own.** A CLI session is its own refresh-token row (method `cli`; the app's is `wallet`). Revoking it leaves the app signed in, and signing the app out leaves it working. A wallet keeps at most 5 CLI sessions; creating a sixth revokes the oldest.
-3. **Shorter, absolute lifetime: 72 hours.** The core's 14-day refresh lifetime is an idle timeout that each refresh extends. `JwtRefreshEndpoint` refuses and deletes a `cli` refresh token whose `createdAt` is 72 hours old or more, however recently it was refreshed. App sessions keep the core's rules.
+1. **Own wallet only.** `CliSessionEndpoint` requires login and issues, lists and revokes sessions for the caller's authenticated user only. No call takes an argument that names a wallet or a user. Only the app's wallet sign-in session may create one (`CliSessionNotAllowed` otherwise), so a CLI session cannot mint the next one and outlive its 72 hours.
+2. **Revocable on its own.** A CLI session is its own refresh-token row (method `cli`; the app's is `wallet`). Revoking it leaves the app signed in, and signing the app out leaves it working. A wallet keeps at most 5 live CLI sessions; creating a sixth revokes the oldest, and an ended one is neither listed nor counted. A revocation stops refreshes at once, but an access token already issued keeps working until it expires, up to 10 minutes.
+3. **Shorter, absolute lifetime: 72 hours.** The core's 14-day refresh lifetime is an idle timeout that each refresh extends. `JwtRefreshEndpoint` refuses and deletes a `cli` refresh token whose `createdAt` is 72 hours old or more, however recently it was refreshed, whether it arrives in the body or as the refresh cookie. App sessions keep the core's rules.
 
 How it is used:
 - The app's wallet sheet has **Copy session for CLI**. It shows the refresh token once, with a warning that it is a bearer secret, and never stores or logs it.
 - The developer sets `PULS3_REFRESH_TOKEN` once. The SDK's `CliSession` stores the rotated tokens in a user-only file (mode 0600). By default the file is `~/.config/puls3/session.json`, or `%APPDATA%\puls3\session.json` on Windows; `PULS3_SESSION_FILE` moves it.
-- `CliSession` refreshes from that file, one refresh at a time. A reused refresh token makes the core revoke the session, so two refreshes must never run in parallel.
+- `CliSession` refreshes from that file, one refresh at a time, holding a lock on `<file>.lock` and re-reading the file first. The CLI and the MCP server can share one file: a reused refresh token makes the core revoke the session, so no program may present a token another already rotated.
 - A refused refresh deletes the file. A newly copied token replaces the saved session.
 
 Nothing in this signs a transaction. A stolen CLI token reaches only that wallet's hires and drafts for at most 72 hours. It can prepare, but never sign, every `prepare*`.

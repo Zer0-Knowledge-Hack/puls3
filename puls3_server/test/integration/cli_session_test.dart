@@ -3,9 +3,12 @@ library;
 
 import 'dart:io';
 
+import 'package:puls3_server/src/auth/cli_session_endpoint.dart';
 import 'package:puls3_server/src/auth/cli_session_policy.dart';
 import 'package:puls3_server/src/auth/jwt_refresh_endpoint.dart';
 import 'package:puls3_server/src/auth/wallet_idp.dart';
+import 'package:puls3_server/src/generated/protocol.dart'
+    show Puls3ApiException;
 import 'package:serverpod/serverpod.dart';
 import 'package:serverpod_auth_idp_server/core.dart';
 import 'package:test/test.dart';
@@ -20,10 +23,14 @@ void main() {
       AuthServices.set(tokenManagerBuilders: [JwtConfigFromPasswords()]);
       jwt = AuthServices.getTokenManager<JwtTokenManager>().jwt;
       JwtRefreshEndpoint.debugNow = null;
+      JwtRefreshEndpoint.debugCookie = null;
+      CliSessionEndpoint.debugNow = null;
     });
 
     tearDown(() async {
       JwtRefreshEndpoint.debugNow = null;
+      JwtRefreshEndpoint.debugCookie = null;
+      CliSessionEndpoint.debugNow = null;
       final session = sessionBuilder.build();
       for (final user in await AuthUser.db.find(session)) {
         await AuthUser.db.deleteWhere(
@@ -33,19 +40,39 @@ void main() {
       }
     });
 
-    /// A signed-in wallet user: its id and a session builder acting as it.
-    Future<(UuidValue, TestSessionBuilder)> signedIn() async {
-      final user = await const AuthUsers().create(sessionBuilder.build());
-      return (
-        user.id,
-        sessionBuilder.copyWith(
-          authentication: AuthenticationOverride.authenticationInfo(
-            user.id.toString(),
-            {},
-          ),
+    /// A session builder that calls as the holder of [accessToken], with
+    /// the real auth id (the id of the session's refresh token).
+    Future<TestSessionBuilder> actingAs(String accessToken) async {
+      final info = await AuthServices.getTokenManager<JwtTokenManager>()
+          .validateToken(sessionBuilder.build(), accessToken);
+      return sessionBuilder.copyWith(
+        authentication: AuthenticationOverride.authenticationInfo(
+          info!.userIdentifier,
+          info.scopes,
+          authId: info.authId,
         ),
       );
     }
+
+    /// A wallet user signed in on the app: its id and a session builder
+    /// calling with the app's wallet session.
+    Future<(UuidValue, TestSessionBuilder)> signedIn() async {
+      final user = await const AuthUsers().create(sessionBuilder.build());
+      final app = await jwt.createTokens(
+        sessionBuilder.build(),
+        authUserId: user.id,
+        method: WalletIdp.methodName,
+      );
+      return (user.id, await actingAs(app.token));
+    }
+
+    Matcher notAllowed() => throwsA(
+      isA<Puls3ApiException>().having(
+        (e) => e.code,
+        'code',
+        'CliSessionNotAllowed',
+      ),
+    );
 
     /// The app's own session for [user], as wallet sign-in issues it.
     Future<String> appSession(UuidValue user) async => (await jwt.createTokens(
@@ -108,6 +135,41 @@ void main() {
         expect(row!.authUserId, user);
         expect(row.method, cliSessionMethod);
         expect((await refresh(grant.refreshToken)).authUserId, user);
+      });
+
+      test('a CLI session cannot create another CLI session', () async {
+        // Otherwise it renews itself every 71 hours and never ends.
+        final (_, app) = await signedIn();
+        final grant = await endpoints.cliSession.create(app);
+        final cli = await actingAs((await refresh(grant.refreshToken)).token);
+
+        await expectLater(endpoints.cliSession.create(cli), notAllowed());
+        expect(await endpoints.cliSession.list(app), hasLength(1));
+      });
+
+      test('an access token of a revoked app session cannot create one', () async {
+        final (_, app) = await signedIn();
+        final appSessionId = UuidValue.withValidation(
+          app.build().authenticated!.authId,
+        );
+        await jwt.revokeRefreshToken(
+          sessionBuilder.build(),
+          refreshTokenId: appSessionId,
+        );
+
+        await expectLater(endpoints.cliSession.create(app), notAllowed());
+      });
+
+      test('a login with no session row cannot create one', () async {
+        final user = await const AuthUsers().create(sessionBuilder.build());
+        final noSession = sessionBuilder.copyWith(
+          authentication: AuthenticationOverride.authenticationInfo(
+            user.id.toString(),
+            {},
+          ),
+        );
+
+        await expectLater(endpoints.cliSession.create(noSession), notAllowed());
       });
 
       test('another wallet cannot list or revoke it', () async {
@@ -201,6 +263,25 @@ void main() {
         );
       });
 
+      test('a CLI token sent as the refresh cookie gets the same limit', () async {
+        final (_, caller) = await signedIn();
+        final grant = await endpoints.cliSession.create(caller);
+
+        JwtRefreshEndpoint.debugCookie = (_) => grant.refreshToken;
+        JwtRefreshEndpoint.debugNow = () => grant.expiresAt;
+        await expectLater(
+          endpoints.jwtRefresh.refreshAccessToken(sessionBuilder),
+          throwsA(isA<RefreshTokenExpiredException>()),
+        );
+        expect(
+          await RefreshToken.db.findById(
+            sessionBuilder.build(),
+            UuidValue.withValidation(grant.id),
+          ),
+          isNull,
+        );
+      });
+
       test('an app session of the same age still refreshes', () async {
         final (user, caller) = await signedIn();
         final app = await appSession(user);
@@ -225,6 +306,33 @@ void main() {
         expect(
           sessions.single.toJson().keys.where((k) => !k.startsWith('__')),
           unorderedEquals(['id', 'createdAt', 'lastUsedAt', 'expiresAt']),
+        );
+      });
+
+      test('an ended session is neither listed nor counted', () async {
+        final (_, caller) = await signedIn();
+        final ended = await endpoints.cliSession.create(caller);
+
+        // 72 hours later it can no longer refresh.
+        CliSessionEndpoint.debugNow = () => ended.expiresAt;
+        expect(await endpoints.cliSession.list(caller), isEmpty);
+        expect(
+          await RefreshToken.db.findById(
+            sessionBuilder.build(),
+            UuidValue.withValidation(ended.id),
+          ),
+          isNull,
+        );
+
+        // A full set of live ones fits without revoking a live one.
+        CliSessionEndpoint.debugNow = null;
+        final live = [
+          for (var i = 0; i < maxCliSessions; i++)
+            await endpoints.cliSession.create(caller),
+        ];
+        expect(
+          [for (final s in await endpoints.cliSession.list(caller)) s.id],
+          [for (final g in live) g.id],
         );
       });
 

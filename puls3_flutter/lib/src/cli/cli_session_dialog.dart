@@ -128,7 +128,8 @@ class _Grant extends StatelessWidget {
         const SizedBox(height: Puls3Spacing.sm),
         const Text(
           'Then, in your terminal: export PULS3_REFRESH_TOKEN=<token>. Your '
-          'app session is not affected.',
+          'app session is not affected. Revoking this session stops it within '
+          '10 minutes.',
           style: TextStyle(fontSize: 12),
         ),
       ],
