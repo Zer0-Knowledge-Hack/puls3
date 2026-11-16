@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'cli/cli_session_issuer.dart';
 import 'data/agent_repository.dart';
 import 'deploy/deploy_gateway.dart';
 import 'deploy/fake_deploy_gateway.dart';
@@ -90,6 +91,7 @@ class Puls3App extends StatefulWidget {
     this.studioGateway,
     this.hireGateway,
     this.hireFlowStore,
+    this.cliSessions,
     this.onWalletDisconnect,
     this.localeStore,
     this.locale,
@@ -118,6 +120,9 @@ class Puls3App extends StatefulWidget {
 
   /// Where unfinished hires are kept: the browser's storage by default.
   final HireFlowStore? hireFlowStore;
+
+  /// Issues sessions for the puls3 CLI (#259). Null hides the action.
+  final CliSessionIssuer? cliSessions;
 
   /// Drops the wallet's server session when the wallet is disconnected
   /// (#261). `main.dart` passes the same [WalletSession] the gateways use.
@@ -182,6 +187,7 @@ class _Puls3AppState extends State<Puls3App> {
         deployGateway: _deployGateway,
         studioGateway: _studioGateway,
         hireGateway: _hireGateway,
+        cliSessions: widget.cliSessions,
         hireFlowStore: _hireFlowStore,
         locale: _locale,
         child: MaterialApp.router(

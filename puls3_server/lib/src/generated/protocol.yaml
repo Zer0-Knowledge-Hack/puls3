@@ -1,6 +1,10 @@
 agent:
   - list:
   - get:
+cliSession:
+  - create:
+  - list:
+  - revoke:
 jwtRefresh:
   - refreshAccessToken:
 walletAuth:
