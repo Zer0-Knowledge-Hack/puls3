@@ -211,8 +211,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the rating transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl,
     );
@@ -240,8 +246,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl ?? detail.paymentExplorerUrl,
     );

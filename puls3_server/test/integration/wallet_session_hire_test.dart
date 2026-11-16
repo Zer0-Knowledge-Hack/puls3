@@ -559,6 +559,9 @@ Matcher _code(String code) => isA<Puls3ApiException>().having(
 
 final class _Chain implements ChainAccounts {
   @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
+
+  @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async =>
       const AccountAuthority(masterWeight: 1, mediumThreshold: 1, signers: {});
 
