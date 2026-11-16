@@ -180,9 +180,22 @@ final class StudioUnavailable extends StudioGatewayException {
 }
 
 /// The builder has no usable provider credential for the draft's model
-/// (`RuntimeUnavailable` from the credential check). Saving a credential in
-/// the playground and retrying is safe.
+/// (`CredentialMissing`). Saving a credential in the playground and retrying
+/// is safe.
 final class StudioCredentialMissing extends StudioGatewayException {
   const StudioCredentialMissing()
     : super('Save a valid provider credential, then run the draft again.');
+}
+
+/// The credential the builder tried to save was refused (`CredentialInvalid`):
+/// an empty secret or Workers AI without an account id.
+final class StudioCredentialInvalid extends StudioGatewayException {
+  const StudioCredentialInvalid()
+    : super('This provider credential is not valid. Check it and try again.');
+}
+
+/// The provider in the credential is not served (`ProviderUnsupported`).
+final class StudioProviderUnsupported extends StudioGatewayException {
+  const StudioProviderUnsupported()
+    : super('This provider is not supported. Pick another model.');
 }

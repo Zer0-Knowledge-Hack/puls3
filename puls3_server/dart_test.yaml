@@ -1,2 +1,7 @@
 tags:
   integration: {}
+  # End-to-end suites against the local Stellar sandbox (#253, #255). A plain
+  # `dart test` reports them as skipped; run them with
+  # `dart test -t e2e --run-skipped` once the sandbox is up.
+  e2e:
+    skip: "needs the local sandbox: dart test -t e2e --run-skipped"

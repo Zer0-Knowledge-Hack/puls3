@@ -33,6 +33,7 @@ abstract class HireDetail
     this.rejectReason,
     this.escrowSubmission,
     this.feedbackSubmission,
+    this.feedbackScore,
     this.paymentExplorerUrl,
   });
 
@@ -48,6 +49,7 @@ abstract class HireDetail
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
+    int? feedbackScore,
     String? paymentExplorerUrl,
   }) = _HireDetailImpl;
 
@@ -86,6 +88,7 @@ abstract class HireDetail
           : _i7k47pdw.Protocol().deserialize<_iz6hnyrm.ChainSubmission>(
               jsonSerialization['feedbackSubmission'],
             ),
+      feedbackScore: jsonSerialization['feedbackScore'] as int?,
       paymentExplorerUrl: jsonSerialization['paymentExplorerUrl'] as String?,
     );
   }
@@ -117,6 +120,10 @@ abstract class HireDetail
 
   _iz6hnyrm.ChainSubmission? feedbackSubmission;
 
+  /// The score of a relayed giveFeedback, so a reload shows its stars (#242).
+  /// Null when the rating failed or was never prepared.
+  int? feedbackScore;
+
   String? paymentExplorerUrl;
 
   /// Returns a shallow copy of this [HireDetail]
@@ -134,6 +141,7 @@ abstract class HireDetail
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
+    int? feedbackScore,
     String? paymentExplorerUrl,
   });
   @override
@@ -154,6 +162,7 @@ abstract class HireDetail
         'escrowSubmission': escrowSubmission?.toJson(),
       if (feedbackSubmission != null)
         'feedbackSubmission': feedbackSubmission?.toJson(),
+      if (feedbackScore != null) 'feedbackScore': feedbackScore,
       if (paymentExplorerUrl != null) 'paymentExplorerUrl': paymentExplorerUrl,
     };
   }
@@ -176,6 +185,7 @@ abstract class HireDetail
         'escrowSubmission': escrowSubmission?.toJsonForProtocol(),
       if (feedbackSubmission != null)
         'feedbackSubmission': feedbackSubmission?.toJsonForProtocol(),
+      if (feedbackScore != null) 'feedbackScore': feedbackScore,
       if (paymentExplorerUrl != null) 'paymentExplorerUrl': paymentExplorerUrl,
     };
   }
@@ -201,6 +211,7 @@ class _HireDetailImpl extends HireDetail {
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
+    int? feedbackScore,
     String? paymentExplorerUrl,
   }) : super._(
          hire: hire,
@@ -214,6 +225,7 @@ class _HireDetailImpl extends HireDetail {
          rejectReason: rejectReason,
          escrowSubmission: escrowSubmission,
          feedbackSubmission: feedbackSubmission,
+         feedbackScore: feedbackScore,
          paymentExplorerUrl: paymentExplorerUrl,
        );
 
@@ -233,6 +245,7 @@ class _HireDetailImpl extends HireDetail {
     Object? rejectReason = _Undefined,
     Object? escrowSubmission = _Undefined,
     Object? feedbackSubmission = _Undefined,
+    Object? feedbackScore = _Undefined,
     Object? paymentExplorerUrl = _Undefined,
   }) {
     return HireDetail(
@@ -255,6 +268,7 @@ class _HireDetailImpl extends HireDetail {
       feedbackSubmission: feedbackSubmission is _iz6hnyrm.ChainSubmission?
           ? feedbackSubmission
           : this.feedbackSubmission?.copyWith(),
+      feedbackScore: feedbackScore is int? ? feedbackScore : this.feedbackScore,
       paymentExplorerUrl: paymentExplorerUrl is String?
           ? paymentExplorerUrl
           : this.paymentExplorerUrl,

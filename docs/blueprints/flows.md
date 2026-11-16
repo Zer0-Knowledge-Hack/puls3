@@ -275,7 +275,7 @@ flowchart TD
   E --> F{"Result"}
   F -- "Output" --> G["Output shown, with the runs left today"]
   F -- "TestQuotaExceeded" --> H["Today's runs are used: when they reset"]
-  F -- "AgentExecutionFailed or RuntimeUnavailable" --> I["Reason shown, Try again"]
+  F -- "AgentExecutionFailed, CredentialInvalid, ProviderUnsupported or RuntimeUnavailable" --> I["Reason shown, Try again"]
   G --> J["Edit the draft and run again, or Deploy (F4)"]
 ```
 
@@ -283,7 +283,7 @@ flowchart TD
 |---|---|---|---|---|
 | 1 | `S07-studio` | Taps **Test run** | Opens `S11-playground` beside the preview (desktop) or as a sheet (phone). **Test run** is enabled only for a valid, saved draft | Unsaved changes: F8 step 3 runs first |
 | 2 | `S11-playground` | Types a sample input | Counts characters against the draft's `inputMaxChars` | Over the limit: inline error, **Run** disabled. The server checks it again (`InputTooLong`) |
-| 3 | `S11-playground` | Taps **Run** | `StudioEndpoint.testRun(draftId, input)` runs the draft once under the runtime timeout. Shows **Running…** | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed`: the safe reason (for example `timeout`), **Try again**. `RuntimeUnavailable`: "The test runner is unavailable", **Try again** |
+| 3 | `S11-playground` | Taps **Run** | Saves the provider credential, then `StudioEndpoint.testRun(draftId, input)` runs the draft once under the runtime timeout. Shows **Running…** | `TestQuotaExceeded`: "You used today's test runs" and when they reset, **Run** disabled. `AgentExecutionFailed`: the safe reason (for example `timeout`), **Try again**. `CredentialMissing`: save a credential, **Try again**. `CredentialInvalid`: check the credential details. `ProviderUnsupported`: pick another model. `RuntimeUnavailable`: the Studio/test runner is unavailable, **Try again** |
 | 4 | `S11-playground` | — | Shows `TestRunResult.output` (as text or Markdown, from the draft's `outputType`) and `remainingDailyRuns`. Labelled "Test run: not paid, nothing on chain" | — |
 | 5 | `S07-studio` | Edits the draft and runs again, or taps **Deploy** | Back to step 1, or F4 | — |
 

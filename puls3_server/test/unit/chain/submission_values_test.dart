@@ -93,6 +93,11 @@ void main() {
         'JobEvidenceUnavailable',
       );
       expect(SubmissionOutcomeCode.escrowCallFailed, 'EscrowCallFailed');
+      expect(SubmissionOutcomeCode.simulationFailed, 'SimulationFailed');
+      expect(
+        SubmissionOutcomeCode.submitSimulationRejected,
+        'SubmitSimulationRejected',
+      );
       expect(SubmissionOutcomeCode.outcomeUnknown, 'OutcomeUnknown');
     });
 
@@ -104,9 +109,11 @@ void main() {
         'JobMismatch',
         'JobEvidenceUnavailable',
         'EscrowCallFailed',
+        'SimulationFailed',
+        'SubmitSimulationRejected',
         'OutcomeUnknown',
       });
-      expect(SubmissionOutcomeCode.all, hasLength(7));
+      expect(SubmissionOutcomeCode.all, hasLength(9));
     });
 
     test('isKnown accepts only catalog codes', () {

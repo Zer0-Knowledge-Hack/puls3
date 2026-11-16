@@ -18,4 +18,7 @@ fields:
   ### The hire's latest escrow submission, any purpose.
   escrowSubmission: ChainSubmission?
   feedbackSubmission: ChainSubmission?
+  ### The score of a relayed giveFeedback, so a reload shows its stars (#242).
+  ### Null when the rating failed or was never prepared.
+  feedbackScore: int?
   paymentExplorerUrl: String?

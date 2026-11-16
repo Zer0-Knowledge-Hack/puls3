@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:puls3_client/puls3_client.dart';
 
+import '../data/typed_api_error.dart';
 import 'hire_gateway.dart';
 import 'wallet_funds.dart';
 import 'wallet_session.dart';
@@ -211,8 +212,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the rating transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl,
     );
@@ -240,8 +247,14 @@ class ServerHireGateway implements HireGateway {
     if (submission.state == 'failed') {
       throw _outcome(submission.errorCode);
     }
+    final transaction = submission.transaction;
+    if (transaction == null) {
+      throw const HireBackendUnavailable(
+        'The server did not report the transaction.',
+      );
+    }
     return EscrowSubmission(
-      transactionHash: submission.transaction,
+      transactionHash: transaction,
       state: submission.state,
       explorerUrl: submission.explorerUrl ?? detail.paymentExplorerUrl,
     );
@@ -282,6 +295,7 @@ class ServerHireGateway implements HireGateway {
       feedbackTransaction: hire.feedbackReference,
       feedbackState: feedback?.state,
       feedbackErrorCode: feedback?.errorCode,
+      feedbackScore: detail.feedbackScore,
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,
@@ -318,7 +332,10 @@ class ServerHireGateway implements HireGateway {
       // challenge instead of reporting an unreachable server (#261).
       await _session?.forget();
       throw const HireNotSignedIn();
-    } on ServerpodClientException {
+    } on ServerpodClientException catch (e) {
+      // The browser client cannot decode a typed error with `details`.
+      final typed = typedApiError(e);
+      if (typed != null) throw _map(typed, fund: fund, feedback: feedback);
       throw const HireBackendUnavailable('The puls3 server did not answer.');
     }
   }
@@ -358,6 +375,7 @@ class ServerHireGateway implements HireGateway {
       'AgentNotFound' || 'AgentInactive' => const HireAgentUnavailable(
         'This agent is not accepting hires.',
       ),
+      'AgentCannotDeliver' => const HireAgentCannotDeliver(),
       'PreparationExpired' => const HirePreparationExpired(),
       'PaymentAlreadySubmitted' => const HirePaymentAlreadySubmitted(),
       'ChainUnavailable' when fund && reason == 'simulationFailed' =>

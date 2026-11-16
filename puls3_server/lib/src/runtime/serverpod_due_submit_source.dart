@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../agent/custodied_wallets.dart';
 import '../chain/agent_submit_sender.dart';
 import '../chain/escrow_deadline.dart';
 import '../chain/submission_values.dart';
@@ -53,7 +54,10 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
         ))
           payment.hireId: payment.payee,
       };
-      final custodied = await _custodied(payees.values.toSet());
+      final custodied = await custodiedAddresses(
+        _session,
+        payees.values.toSet(),
+      );
 
       for (final run in runs) {
         final result = run.result;
@@ -85,8 +89,8 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
   }
 
   /// Hires of [hireIds] that will never take a `submit`: one of
-  /// [settlementPurposes] confirmed, or [maxEscrowCallAttempts] failed
-  /// `submit`s.
+  /// [settlementPurposes] confirmed, [maxEscrowCallAttempts] failed
+  /// `submit`s, or a `SubmitSimulationRejected` terminal rejection.
   Future<Set<int>> _closedHires(Set<int> hireIds) async {
     final rows = await ChainSubmission.db.find(
       _session,
@@ -107,23 +111,19 @@ final class ServerpodDueSubmitSource implements DueSubmitSource {
       if (row.state == SubmissionState.confirmed.wireName) {
         closed.add(hireId);
       } else if (row.purpose == SubmissionPurpose.submit.wireName) {
-        failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        // Only an expired / too-late submit is terminal immediately. Other
+        // failures (including unreadable rows and non-permanent simulation
+        // rejections) count toward the normal attempt bound (#262).
+        if (row.errorCode == SubmissionOutcomeCode.submitSimulationRejected) {
+          closed.add(hireId);
+        } else {
+          failedSubmits.update(hireId, (n) => n + 1, ifAbsent: () => 1);
+        }
       }
     }
     for (final MapEntry(key: hireId, value: failed) in failedSubmits.entries) {
       if (failed >= maxEscrowCallAttempts) closed.add(hireId);
     }
     return closed;
-  }
-
-  /// The addresses of [payees] that have a custodied agent wallet, so the
-  /// server can sign their `submit`.
-  Future<Set<String>> _custodied(Set<String> payees) async {
-    if (payees.isEmpty) return const {};
-    final wallets = await AgentWallet.db.find(
-      _session,
-      where: (t) => t.address.inSet(payees),
-    );
-    return {for (final wallet in wallets) wallet.address};
   }
 }

@@ -45,7 +45,7 @@ jobs:
                 docker=true ;;
               puls3_client/*)
                 server=true; app=true; sdk=true ;;
-              puls3_sdk/*|puls3_mcp/*)
+              puls3_sdk/*|puls3_cli/*|puls3_mcp/*)
                 sdk=true ;;
               puls3_flutter/*)
                 app=true ;;
@@ -94,6 +94,8 @@ jobs:
           restore-keys: ${{ runner.os }}-pub-
       - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_sdk
+        run: dart analyze --fatal-infos && dart test
+      - working-directory: puls3_cli
         run: dart analyze --fatal-infos && dart test
       - working-directory: puls3_mcp
         run: dart analyze --fatal-infos && dart test
@@ -223,6 +225,11 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
+      # Audit P-1 (#206): fail on a RustSec advisory in Cargo.lock.
+      - name: Audit dependencies (RustSec)
+        run: |
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit
       - run: cargo test
       - run: stellar contract build
 

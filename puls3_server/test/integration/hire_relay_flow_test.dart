@@ -83,6 +83,7 @@ final class _Stack {
       relay: relay,
       registry: ledger,
       catalog: AgentCatalogService(ledger),
+      custody: (addresses) async => addresses.toSet(),
       config: const HireRelayConfig(_env),
       now: () => _at,
     );

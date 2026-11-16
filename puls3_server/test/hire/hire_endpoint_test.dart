@@ -82,6 +82,7 @@ void main() {
           relay: rig.service,
           registry: rig.ledger,
           catalog: AgentCatalogService(rig.ledger),
+          custody: rig.custodyOf,
           config: HireRelayConfig(relayEnvironment()),
           now: () => rig.clock,
         ),
@@ -90,6 +91,7 @@ void main() {
           hires: rig.hires,
           runs: InMemoryHireRunStore(),
           submissions: rig.submissions,
+          preparations: rig.preparations,
           agents: (registryId) async => AgentSummary(
             id: 'agt-001',
             registryId: registryId,
@@ -297,6 +299,20 @@ void main() {
     });
 
     test(
+      'an agent paying a non-custodied wallet is AgentCannotDeliver',
+      () async {
+        rig.custodied.remove(agentWallet);
+
+        await expectLater(
+          endpoint.createHire(session, 7, alice, 'hi', 'req-1'),
+          throwsA(api('AgentCannotDeliver')),
+        );
+        expect(rig.hires.all, isEmpty);
+        expect(rig.preparations.all, isEmpty);
+      },
+    );
+
+    test(
       'prepareCreateJob for an agent without a wallet is AgentNotFound',
       () async {
         final hire = (await rig.hire()).id;
@@ -348,6 +364,7 @@ void main() {
             relay: rig.service,
             registry: rig.ledger,
             catalog: AgentCatalogService(rig.ledger),
+            custody: rig.custodyOf,
             config: const HireRelayConfig({}),
             now: () => rig.clock,
           ),

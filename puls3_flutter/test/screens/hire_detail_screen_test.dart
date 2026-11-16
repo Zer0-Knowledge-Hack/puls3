@@ -16,6 +16,7 @@ import 'package:puls3_flutter/src/state/agent_catalog.dart';
 import 'package:puls3_flutter/src/state/app_scope.dart';
 import 'package:puls3_flutter/src/state/wallet_controller.dart';
 import 'package:puls3_flutter/src/theme/puls3_theme.dart';
+import 'package:puls3_flutter/src/ui/molecules/score_picker.dart';
 import 'package:puls3_flutter/src/wallet/wallet_port.dart';
 
 import '../helpers.dart';
@@ -46,6 +47,7 @@ HireProgress _hire({
   String? feedbackTransaction,
   String? feedbackState,
   String? feedbackErrorCode,
+  int? feedbackScore,
 }) => HireProgress(
   hireId: 3,
   agentName: 'Support Relay',
@@ -64,6 +66,7 @@ HireProgress _hire({
   feedbackTransaction: feedbackTransaction,
   feedbackState: feedbackState,
   feedbackErrorCode: feedbackErrorCode,
+  feedbackScore: feedbackScore,
 );
 
 /// Answers `getHire` from a script: each read takes the next answer, and
@@ -795,6 +798,29 @@ void main() {
         );
         await tester.pumpWidget(const SizedBox());
       }
+    });
+
+    testWidgets('a reloaded rated hire shows the score from the server', (
+      tester,
+    ) async {
+      await _pumpDetail(
+        tester,
+        gateway: _ProgressGateway([
+          _hire(
+            status: 'completed',
+            result: 'done',
+            feedbackTransaction: _feedbackHash,
+            feedbackState: 'confirmed',
+            feedbackScore: 4,
+          ),
+        ]),
+      );
+
+      final score = tester.widget<ScorePicker>(
+        find.byKey(const ValueKey('hire-detail-score')),
+      );
+      expect(score.score, 4);
+      expect(find.text('Rating saved'), findsOneWidget);
     });
 
     testWidgets('pick a score, comment, sign: S06 shows the rating once the '
