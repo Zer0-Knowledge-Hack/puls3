@@ -36,6 +36,10 @@ cargo test
 
 A single crate: `cargo test -p <name>`.
 
+## Audit
+
+`cargo audit --deny warnings` checks `Cargo.lock` against RustSec. CI runs it in its own workflow (`.github/workflows/contracts-audit.yml`), on contracts changes and weekly, outside the required `gate`. Ignores live in `.cargo/audit.toml` with a reason and a way out. The `contracts` job fails if `crypto-bigint 0.5.5` enters the wasm graph, which would invalidate the RUSTSEC-2026-0387 ignore.
+
 ## Deploy and invoke
 
 On testnet, after a successful build:

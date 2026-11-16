@@ -225,11 +225,18 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
-      # Audit P-1 (#206): fail on a RustSec advisory in Cargo.lock.
-      - name: Audit dependencies (RustSec)
+      # The RustSec audit lives in contracts-audit.yml (#281), so a new advisory
+      # never hides the results below. This check is deterministic: the
+      # crypto-bigint ignore in .cargo/audit.toml only holds while the wasm
+      # graph stays free of it.
+      - name: Keep crypto-bigint out of the wasm graph
         run: |
-          cargo install cargo-audit --version 0.23.0 --locked
-          cargo audit
+          out="$(cargo tree -i crypto-bigint@0.5.5 -e normal --target wasm32v1-none 2>/dev/null || true)"
+          if [[ -n "$out" ]]; then
+            echo "$out" >&2
+            echo "crypto-bigint 0.5.5 reached the wasm graph: the RUSTSEC-2026-0387 ignore no longer holds." >&2
+            exit 1
+          fi
       - run: cargo test
       - run: stellar contract build
 

@@ -10,6 +10,7 @@ ignore = [
   # we deploy: `cargo tree -i crypto-bigint@0.5.5 -e normal --target
   # wasm32v1-none` prints nothing. The patched release (>= 0.7.6) needs
   # elliptic-curve 0.14, which only a soroban-env-host / soroban-sdk upgrade
-  # can bring. Way out: drop this line when soroban-sdk moves to it.
+  # can bring. Way out: drop this line when soroban-sdk moves to it. CI keeps
+  # the wasm-graph claim true (`contracts` job, #281).
   "RUSTSEC-2026-0387",
 ]
