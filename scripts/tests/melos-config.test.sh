@@ -76,6 +76,13 @@ if printf '%s' "$e2e_block" | grep -qF "test/e2e"; then
 else
   bad "test:e2e targets the e2e suite" "missing"
 fi
+# The e2e tag is skipped in puls3_server/dart_test.yaml, so without these
+# flags `dart test` reports every e2e test as skipped and still exits 0.
+if printf '%s' "$e2e_block" | grep -qF -- "-t e2e --run-skipped"; then
+  ok "test:e2e runs the skipped e2e tag"
+else
+  bad "test:e2e runs the skipped e2e tag" "missing -t e2e --run-skipped"
+fi
 if printf '%s' "$e2e_block" | grep -qF "#255"; then
   ok "test:e2e explains the #255 dependency"
 else
