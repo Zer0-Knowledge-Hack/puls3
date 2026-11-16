@@ -59,12 +59,10 @@ melos:
       description: E2E suites against the local Soroban sandbox (#253/#255).
       exec:
         command: |
+          # The e2e tag is skipped by a plain `dart test` (dart_test.yaml), and
+          # both suites share the test database, so they run one at a time.
           if [ "$MELOS_PACKAGE_NAME" = puls3_server ]; then
-            if [ -d test/e2e ]; then
-              exec dart test test/e2e
-            else
-              echo "No puls3_server/test/e2e yet (see #255)."
-            fi
+            exec dart test -t e2e --run-skipped -j 1 test/e2e
           fi
         concurrency: 1
 
