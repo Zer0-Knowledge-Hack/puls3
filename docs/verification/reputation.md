@@ -24,7 +24,16 @@ backend could tell.
 | `puls3_server/test/unit/ledger/soroban_reputation_registry_test.dart` | `recordsOf()` returns every listed record (including revoked, unreadable and off-scale ones); `feedbacksOf()` equals `countedFeedback(recordsOf())`; every client page is read; equal scores from one client all count; an empty agent; a failure in the middle of a read throws instead of returning part of the records |
 | `docs/domain/reputation.md` | New section "Verifying Agent Reputation" |
 
-The four reasons a record does not count:
+**Amended by #201:** a record also needs a paid job. puls3 now writes the
+hire's escrow job in `tag2` and `feedback_uri` (`puls3:job:v1:<escrow>:<job
+id>`) and a commitment in `feedback_hash`, and the reader counts a record only
+when the configured escrow's `get_job` says that job is `Completed` for the same
+client and agent, once per job. The full list of reasons is in
+[`docs/domain/reputation.md`](../domain/reputation.md); the evidence below
+predates #201 (its record has no job reference, so it no longer counts). See
+[`docs/security/issue-201/`](../security/issue-201/README.md).
+
+The four reasons a record did not count before #201:
 
 | Reason | When |
 |---|---|

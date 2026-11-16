@@ -135,6 +135,7 @@ class HireProgress {
     this.feedbackTransaction,
     this.feedbackState,
     this.feedbackErrorCode,
+    this.feedbackScore,
     this.feedbackExplorerUrl,
   });
 
@@ -189,6 +190,11 @@ class HireProgress {
   /// Why the latest `give_feedback` failed (`ChainSubmission.errorCode`),
   /// when [feedbackState] is `failed`.
   final String? feedbackErrorCode;
+
+  /// The score of the relayed `give_feedback` (#242): set after a reload
+  /// from the score kept with its preparation; null when the rating failed
+  /// or was never prepared.
+  final int? feedbackScore;
 
   /// StellarExpert link of [feedbackTransaction], when the server built one.
   final String? feedbackExplorerUrl;
@@ -330,6 +336,13 @@ final class HireSignInFailed extends HireGatewayException {
 /// The agent cannot be hired (unknown on chain or inactive).
 final class HireAgentUnavailable extends HireGatewayException {
   const HireAgentUnavailable(super.message);
+}
+
+/// The agent's payment wallet is not custodied by the server
+/// (`AgentCannotDeliver`), so the server could never sign the escrow `submit`
+/// that closes the hire. It refuses before any payment is prepared.
+final class HireAgentCannotDeliver extends HireGatewayException {
+  const HireAgentCannotDeliver() : super('This agent cannot be hired yet.');
 }
 
 /// The server refused the request as invalid. Retrying it unchanged fails

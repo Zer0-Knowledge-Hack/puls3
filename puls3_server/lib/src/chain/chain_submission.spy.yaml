@@ -13,8 +13,9 @@ fields:
   ### (server-signed).
   purpose: String
   ### Domain TransactionHash of the one envelope this record ever sends,
-  ### persisted before it is submitted.
-  transaction: String
+  ### persisted before it is submitted. Null when a simulation rejected the
+  ### call before an envelope existed (a server-signed attempt).
+  transaction: String?
   ### One of submitted, confirmed, failed.
   state: String
   ### Puls3ApiException code when state is failed, for example JobMismatch.

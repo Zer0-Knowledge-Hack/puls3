@@ -56,6 +56,7 @@ void main() {
           relay: rig.service,
           registry: rig.ledger,
           catalog: AgentCatalogService(rig.ledger),
+          custody: rig.custodyOf,
           config: HireRelayConfig(relayEnvironment()),
           now: () => rig.clock,
         ),
