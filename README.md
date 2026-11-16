@@ -251,7 +251,7 @@ dart pub global activate melos 8.10.1
 melos bs                     # links the workspace packages
 
 melos run analyze            # dart/flutter analyze --fatal-infos
-melos run test:unit          # domain + server units + app widgets, no services
+melos run test:unit          # domain, sdk, mcp, cli + server units + app widgets, no services
 melos run test:integration   # Serverpod tests; needs postgres_test and redis_test
 melos run test:e2e           # needs the local sandbox in docs/testing/local-environment.md
 ```
