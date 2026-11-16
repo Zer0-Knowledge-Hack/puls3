@@ -297,6 +297,47 @@ void main() {
       );
     });
 
+    test(
+      'a typed error the browser client could not decode is still mapped',
+      () async {
+        // dart2js cannot decode `details`, so the client throws a plain bad
+        // request carrying the body. The job is not open yet: keep polling.
+        var calls = 0;
+        final gateway = _gateway(
+          prepareFund: (_) async {
+            calls++;
+            if (calls == 1) {
+              throw ServerpodClientBadRequest(
+                '{"className":"Puls3ApiException","data":{"__className__":'
+                '"Puls3ApiException","code":"InvalidHireTransition",'
+                '"details":{"purpose":"fund"}}}',
+              );
+            }
+            return _prepared('fund');
+          },
+        );
+        final preparation = await gateway.prepareFund(3);
+        expect(calls, 2);
+        expect(preparation.purpose, 'fund');
+      },
+    );
+
+    test('a bad request that is not a typed error is a server error', () async {
+      final gateway = _gateway(
+        createHire: (_, _, _, _) async =>
+            throw ServerpodClientBadRequest('<html>nope</html>'),
+      );
+      await expectLater(
+        gateway.createHire(
+          agentId: 9,
+          consumer: _consumer,
+          input: 'x',
+          requestId: 'r',
+        ),
+        throwsA(isA<HireBackendUnavailable>()),
+      );
+    });
+
     test('a network failure is still a retryable server error', () async {
       final gateway = _gateway(
         createHire: (_, _, _, _) async =>
