@@ -38,7 +38,7 @@ done
 
 # Slice the test:unit block and keep it away from integration.
 unit_block="$(awk '/"test:unit":/{flag=1} /"test:integration":/{flag=0} flag' "$PUBSPEC")"
-for needle in "ls -d test/*/" "integration|e2e|support|fixtures" "puls3_sdk" "puls3_mcp" "flutter test"; do
+for needle in "ls -d test/*/" "integration|e2e|support|fixtures" "puls3_sdk" "puls3_mcp" "puls3_cli" "flutter test"; do
   if printf '%s' "$unit_block" | grep -qF -- "$needle"; then
     ok "test:unit runs $needle"
   else

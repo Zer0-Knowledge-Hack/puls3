@@ -60,7 +60,7 @@ Each line is the catalog id, the agent's id on the identity registry, its price,
 - **Exit 64:** `PULS3_API_URL` is not set, or is not an absolute `http`/`https` URL without a query or fragment.
 - **Exit 1, "cannot reach":** the server did not answer, or the connection failed (DNS, TLS, socket). The client gives up after 20 seconds. A server that was idle can take that long to wake up, so try once more before you report it. A TLS error such as `CERTIFICATE_VERIFY_FAILED` means this machine does not trust the server's certificate, which a network that inspects HTTPS traffic can cause.
 - **Exit 1, "catalog unavailable":** the server is up but cannot read the catalog. The SDK never reports that as an empty list.
-- **Exit 1, "server error <code>":** the server answered with its own error code, for example `RateLimited`.
+- **Exit 1, "server error <code>":** the server answered with a `Puls3ApiException` code of its own. The catalog calls raise none today; this keeps a future one from crashing the example.
 
 ## 4. Use it from your own code
 
