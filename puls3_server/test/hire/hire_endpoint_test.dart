@@ -91,6 +91,7 @@ void main() {
           hires: rig.hires,
           runs: InMemoryHireRunStore(),
           submissions: rig.submissions,
+          preparations: rig.preparations,
           agents: (registryId) async => AgentSummary(
             id: 'agt-001',
             registryId: registryId,

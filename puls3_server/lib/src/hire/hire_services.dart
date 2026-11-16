@@ -143,6 +143,7 @@ final class HireWiring {
         hires: repository,
         runs: ServerpodHireRunStore(session),
         submissions: submissions,
+        preparations: preparations,
         agents: agentOf,
         jobs: ledger,
       ),

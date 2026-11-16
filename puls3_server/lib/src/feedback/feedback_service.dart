@@ -103,7 +103,15 @@ final class FeedbackService {
       // caught here.
       throw _api('ChainDataUnavailable', {'reason': 'jobId'});
     }
-    return _relay.prepareFeedback(wallet, hire.id, call);
+    // Keep the score with the preparation so `getHire` can return it after a
+    // reload (#242). The registry stores it on chain, but a hire has no
+    // record index to read it back by.
+    return _relay.prepareFeedback(
+      wallet,
+      hire.id,
+      call,
+      feedbackScore: score,
+    );
   }
 
   /// Relays the signed `give_feedback` of [preparationId]. The rules are
