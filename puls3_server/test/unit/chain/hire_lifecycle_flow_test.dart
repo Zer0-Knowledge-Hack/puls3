@@ -61,6 +61,9 @@ final class _Accounts implements ChainAccounts {
       const SimulationData(transactionData: 'AAAA', minResourceFee: 50);
 
   @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) => simulate(spec);
+
+  @override
   Future<AccountAuthority?> authorityOf(StellarAddress account) async => null;
 }
 

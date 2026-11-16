@@ -107,7 +107,7 @@ CREATE TABLE "chain_submission" (
     "id" bigserial PRIMARY KEY,
     "preparationId" text,
     "purpose" text NOT NULL,
-    "transaction" text NOT NULL,
+    "transaction" text,
     "state" text NOT NULL,
     "errorCode" text,
     "explorerUrl" text,
@@ -1053,9 +1053,9 @@ ALTER TABLE ONLY "serverpod_auth_core_session"
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261111064817579-feedback-score', now())
+    VALUES ('puls3', '20261116185510658-feedback-score', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261111064817579-feedback-score', "timestamp" = now();
+    DO UPDATE SET "version" = '20261116185510658-feedback-score', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

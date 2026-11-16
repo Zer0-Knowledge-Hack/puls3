@@ -455,8 +455,8 @@
           "name": "transaction",
           "fieldName": "transaction",
           "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
+          "isNullable": true,
+          "dartType": "String?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",
@@ -714,14 +714,6 @@
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "feedbackScore",
-          "fieldName": "feedbackScore",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",

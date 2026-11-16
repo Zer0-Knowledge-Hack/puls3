@@ -9,9 +9,9 @@ ALTER TABLE "escrow_preparation" ADD COLUMN "feedbackScore" bigint;
 -- MIGRATION VERSION FOR puls3
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('puls3', '20261111064817579-feedback-score', now())
+    VALUES ('puls3', '20261116185510658-feedback-score', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20261111064817579-feedback-score', "timestamp" = now();
+    DO UPDATE SET "version" = '20261116185510658-feedback-score', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

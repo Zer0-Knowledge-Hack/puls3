@@ -473,8 +473,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         _isp.ColumnDefinition(
           name: 'transaction',
           columnType: _isp.ColumnType.text,
-          isNullable: false,
-          dartType: 'String',
+          isNullable: true,
+          dartType: 'String?',
         ),
         _isp.ColumnDefinition(
           name: 'state',

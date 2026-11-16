@@ -455,8 +455,8 @@
           "name": "transaction",
           "fieldName": "transaction",
           "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
+          "isNullable": true,
+          "dartType": "String?"
         },
         {
           "__className__": "serverpod.ColumnDefinition",
@@ -4920,7 +4920,7 @@
     {
       "__className__": "serverpod.DatabaseMigrationVersionModel",
       "module": "puls3",
-      "version": "20261111064817579-feedback-score"
+      "version": "20261116185510658-feedback-score"
     },
     {
       "__className__": "serverpod.DatabaseMigrationVersion",

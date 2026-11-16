@@ -27,6 +27,14 @@ final class LedgerContractError extends LedgerException {
   final int code;
 }
 
+/// The node answered and the simulation failed for a reason that is not a
+/// contract `Error(Contract, #N)`: an auth failure, a Wasm trap, a budget
+/// failure, or another deterministic host error. Unlike
+/// [LedgerUnavailable], repeating the same simulation gives the same answer.
+final class LedgerSimulationError extends LedgerException {
+  const LedgerSimulationError(super.message);
+}
+
 /// The node answered and refused the request itself: a JSON-RPC
 /// `invalid request` (-32600) or `invalid params` (-32602) error, for
 /// example a `sendTransaction` envelope it cannot decode. Sending the same
