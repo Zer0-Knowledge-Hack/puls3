@@ -10,7 +10,8 @@
 # Configuration and catalog: ConfigurationUnavailable, CatalogUnavailable,
 #   InvalidAgentId, AgentNotFound, ChainDataUnavailable
 # Studio and deploy: InvalidManifest, DraftNotFound, DraftNotOwned,
-#   DraftVersionConflict, InputTooLong, TestQuotaExceeded, RuntimeUnavailable,
+#   DraftVersionConflict, InputTooLong, TestQuotaExceeded, CredentialMissing,
+#   CredentialInvalid, ProviderUnsupported, RuntimeUnavailable,
 #   AgentExecutionFailed, AgentWalletCreationFailed, AgentWalletUnavailable,
 #   RegistrationNotConfirmed, RegistrationUriConflict,
 #   InvalidAuthorizationEntry, AuthorizationExpired, PublicationFailed
@@ -21,7 +22,8 @@
 # Hire and escrow: InvalidHireId, HireNotFound, HireNotOwned, AgentInactive,
 #   InvalidHire, InvalidHireTransition, IdempotencyKeyReused,
 #   PersistenceUnavailable, PaymentAlreadySubmitted, InvalidRejectReason,
-#   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed, OutcomeUnknown
+#   JobMismatch, JobEvidenceUnavailable, EscrowCallFailed, SimulationFailed,
+#   SubmitSimulationRejected, OutcomeUnknown
 # Feedback: HireNotCompleted, HireAlreadyRated, InvalidFeedback,
 #   FeedbackFromAgentOwner
 exception: Puls3ApiException

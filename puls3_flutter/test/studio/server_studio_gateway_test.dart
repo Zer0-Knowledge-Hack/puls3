@@ -160,11 +160,38 @@ void main() {
 
     final missing = gateway(
       testRun: (draftId, input) async =>
-          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+          throw api.Puls3ApiException(code: 'CredentialMissing'),
     );
     expect(
       () => missing.testRun(1, 'Hi', owner: 'G'),
       throwsA(isA<StudioCredentialMissing>()),
+    );
+
+    final invalid = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'CredentialInvalid'),
+    );
+    expect(
+      () => invalid.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioCredentialInvalid>()),
+    );
+
+    final unsupported = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'ProviderUnsupported'),
+    );
+    expect(
+      () => unsupported.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioProviderUnsupported>()),
+    );
+
+    final unavailable = gateway(
+      testRun: (draftId, input) async =>
+          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+    );
+    expect(
+      () => unavailable.testRun(1, 'Hi', owner: 'G'),
+      throwsA(isA<StudioUnavailable>()),
     );
 
     final long = gateway(
@@ -187,7 +214,7 @@ void main() {
         provider = nextProvider;
         secret = nextSecret;
         accountId = nextAccount;
-        throw api.Puls3ApiException(code: 'RuntimeUnavailable');
+        throw api.Puls3ApiException(code: 'CredentialInvalid');
       },
     );
     try {
@@ -197,13 +224,27 @@ void main() {
         accountId: 'builder-account',
         owner: 'G',
       );
-      fail('expected StudioCredentialMissing');
-    } on StudioCredentialMissing catch (e) {
+      fail('expected StudioCredentialInvalid');
+    } on StudioCredentialInvalid catch (e) {
       expect(provider, 'workers-ai');
       expect(secret, token);
       expect(accountId, 'builder-account');
       expect('$e', isNot(contains(token)));
     }
+
+    final unavailable = gateway(
+      saveProviderCredential: (nextProvider, nextSecret, nextAccount) async =>
+          throw api.Puls3ApiException(code: 'RuntimeUnavailable'),
+    );
+    expect(
+      () => unavailable.saveProviderCredential(
+        provider: 'workers-ai',
+        secret: token,
+        accountId: 'builder-account',
+        owner: 'G',
+      ),
+      throwsA(isA<StudioUnavailable>()),
+    );
   });
 }
 

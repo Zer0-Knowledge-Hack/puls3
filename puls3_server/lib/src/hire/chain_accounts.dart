@@ -31,17 +31,26 @@ final class AccountAuthority {
 /// number, the simulation of the call, and the account's signer thresholds.
 ///
 /// [sequenceOf] and [simulate] fail as `ChainUnavailable` with
-/// `details.reason = simulationFailed` (P3): a hire cannot tell a missing
-/// account, an unreachable node and a rejected simulation apart.
-/// [authorityOf] returns `null` when the account does not exist, and the same
-/// `ChainUnavailable` when the node cannot be read.
+/// `details.reason = simulationFailed` (P3): wallet-facing callers cannot
+/// tell a missing account, an unreachable node and a rejected simulation
+/// apart. The server-signed senders use [simulateRaw] to see the reason and
+/// stop retrying a permanent rejection (#262). [authorityOf] returns `null`
+/// when the account does not exist, and the same `ChainUnavailable` when the
+/// node cannot be read.
 abstract interface class ChainAccounts {
   /// The sequence number [account] has on the ledger now.
   Future<int> sequenceOf(StellarAddress account);
 
   /// Simulates the call in [spec] (its signer, sequence and fee) and returns
-  /// the data the envelope needs.
+  /// the data the envelope needs. Any [LedgerException] becomes
+  /// `ChainUnavailable`; use [simulateRaw] when the rejection matters.
   Future<SimulationData> simulate(EnvelopeSpec spec);
+
+  /// Like [simulate], but a contract or simulation rejection stays a
+  /// [LedgerContractError] or [LedgerSimulationError] so a server-signed
+  /// sender can decide whether to retry. Transport failures still become
+  /// `ChainUnavailable`.
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec);
 
   /// Signer thresholds of [account], or `null` when it is not on the ledger.
   Future<AccountAuthority?> authorityOf(StellarAddress account);
@@ -67,6 +76,27 @@ final class RpcChainAccounts implements ChainAccounts {
 
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
+    try {
+      return await _simulate(spec);
+    } on LedgerException {
+      throw chainUnavailable();
+    }
+  }
+
+  @override
+  Future<SimulationData> simulateRaw(EnvelopeSpec spec) async {
+    try {
+      return await _simulate(spec);
+    } on LedgerContractError {
+      rethrow;
+    } on LedgerSimulationError {
+      rethrow;
+    } on LedgerException {
+      throw chainUnavailable();
+    }
+  }
+
+  Future<SimulationData> _simulate(EnvelopeSpec spec) {
     final envelope = encodeInvokeEnvelope(
       source: spec.source,
       fee: spec.inclusionFee,
@@ -75,11 +105,7 @@ final class RpcChainAccounts implements ChainAccounts {
       function: spec.function,
       args: spec.args,
     );
-    try {
-      return await _rpc.simulateTransactionBase64(envelope);
-    } on LedgerException {
-      throw chainUnavailable();
-    }
+    return _rpc.simulateTransactionBase64(envelope);
   }
 
   @override

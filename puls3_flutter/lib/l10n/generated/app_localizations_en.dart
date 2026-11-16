@@ -1017,6 +1017,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Save your provider credential, then run the draft again.';
 
   @override
+  String get playgroundCredentialInvalid =>
+      'That provider credential is not valid. Check the credential details.';
+
+  @override
+  String get playgroundProviderUnsupported =>
+      'This provider is not supported. Pick another model.';
+
+  @override
   String get playgroundAccountId => 'Cloudflare account id';
 
   @override

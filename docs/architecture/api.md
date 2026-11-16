@@ -45,8 +45,8 @@ Programs other than the app use this contract through the Dart SDK `puls3_sdk`, 
 | `StudioEndpoint` | `saveDraft` | `draft: AgentManifestDraft`, `draftId: int?`, `revision: int?`, `overwrite: bool?` | `StudioDraft` | Yes | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict` |
 | `StudioEndpoint` | `getDraft` | `draftId: int` | `StudioDraft` | Yes | `DraftNotFound`, `DraftNotOwned` |
 | `StudioEndpoint` | `listDrafts` | — | `List<StudioDraft>` | Yes | |
-| `StudioEndpoint` | `testRun` | `draftId: int`, `input: String` | `TestRunResult` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed` |
-| `StudioEndpoint` | `saveProviderCredential` | `provider: String`, `secret: String`, `accountId: String?` | — | Yes | `RuntimeUnavailable` |
+| `StudioEndpoint` | `testRun` | `draftId: int`, `input: String` | `TestRunResult` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `CredentialMissing`, `RuntimeUnavailable`, `AgentExecutionFailed` |
+| `StudioEndpoint` | `saveProviderCredential` | `provider: String`, `secret: String`, `accountId: String?` | — | Yes | `CredentialInvalid`, `ProviderUnsupported`, `RuntimeUnavailable` |
 | `StudioEndpoint` | `prepareDeploy` | `draftId: int`, `builder: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `InvalidStellarAddress`, `WalletMismatch`, `InvalidManifest`, `AgentWalletCreationFailed`, `SubmissionInProgress`, `ChainUnavailable` |
 | `StudioEndpoint` | `submitRegistration` | `draftId: int`, `preparationId: String`, `signedTransactionXdr: String` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned`, `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature` |
 | `StudioEndpoint` | `getDeploySession` | `draftId: int` | `DeploySession` | Yes | `DraftNotFound`, `DraftNotOwned` |
@@ -103,7 +103,7 @@ Once a `submit…` call has accepted a submission, every later outcome is data: 
 | `setAgentWallet` | `StudioEndpoint.getDeploySession` (`DeploySession.walletAuthorization`) | `TransactionFailed`, `SubmissionRejected`, `AuthorizationExpired` |
 | `createJob`, `complete`, `reject` | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `TransactionFailed`, `SubmissionRejected`, `PreparationExpired`, `OutcomeUnknown` |
 | `fund` | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `TransactionFailed`, `JobMismatch`, `JobEvidenceUnavailable`, `SubmissionRejected`, `PreparationExpired`, `OutcomeUnknown` |
-| `submit`, `release`, `claimRefund` (server-signed) | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `EscrowCallFailed` |
+| `submit`, `release`, `claimRefund` (server-signed) | `HireEndpoint.getHire` (`HireDetail.escrowSubmission`) | `EscrowCallFailed`, `SimulationFailed`, `SubmitSimulationRejected` |
 | `giveFeedback` | `HireEndpoint.getHire` (`HireDetail.feedbackSubmission`) | `TransactionFailed`, `HireAlreadyRated`, `SubmissionRejected`, `PreparationExpired`, `OutcomeUnknown` |
 
 A superseded preparation is rejected synchronously by the `submit…` call as `PreparationExpired` (`details.reason: superseded`). It never becomes an asynchronous outcome, because a new preparation cannot be issued while a submission is `submitted`.
@@ -154,7 +154,9 @@ The server submits three escrow calls itself, tracked like relay submissions on 
 | `release` | Relay account (permissionless) | When a `submitted` job passes `approval_deadline` without an evaluation; the hire becomes `completed` |
 | `claimRefund` | Relay account (permissionless) | When a `funded` job passes `expired_at` (runtime-failure fallback, ADR-0005 D1) |
 
-A failed attempt is retried automatically with a bounded number of attempts (three failed envelopes per hire and call); the exposed record is the current attempt. The failure that uses the last attempt is stored as `failed` with `errorCode = EscrowCallFailed`, whatever caused it (`TransactionFailed`, `PreparationExpired` or `SubmissionRejected`); earlier failures keep their own code. These calls are never triggered by a read.
+A failed attempt is retried automatically with a bounded number of attempts (three failed envelopes per hire and call); the exposed record is the current attempt. The failure that uses the last attempt is stored as `failed` with `errorCode = EscrowCallFailed`, whatever caused it (`TransactionFailed`, `PreparationExpired` or `SubmissionRejected`); earlier failures keep their own code.
+
+A simulation rejection creates a failed record with no transaction: `transaction` is null because no envelope existed. A contract code that can never change for the job — `JobExpired` (9) or `SubmitTooLate` (106) — is stored as `SubmitSimulationRejected` and closes the hire after one pass. Every other contract code (for example `InvalidState`, or `JobNotFound` from a lagging node) and a non-contract simulation failure (auth, Wasm, budget) is stored as `SimulationFailed` and counts toward the three attempts. A network or RPC failure is not recorded and is retried. The registry/contract code stays in the server log. These calls are never triggered by a read.
 
 The hire status after these calls is derived on read, not stored: a confirmed `release` makes a funded hire `completed`, and a confirmed `claimRefund` makes it `expired`. A `submitted` or `failed` record leaves it `funded`. If both were ever confirmed, `release` wins.
 
@@ -251,9 +253,9 @@ Unexpected failures are logged server-side and cross the boundary only as `Inter
 | Session and shared | `WalletMismatch`, `InternalError` |
 | Authentication | `InvalidStellarAddress`, `ChallengeRateLimited`, `ChallengeNotFound`, `ChallengeExpired`, `ChallengeConsumed`, `InvalidWalletSignature`, `AuthenticationUnavailable` |
 | Configuration and catalog | `ConfigurationUnavailable`, `CatalogUnavailable`, `InvalidAgentId`, `AgentNotFound`, `ChainDataUnavailable` |
-| Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
+| Studio and deploy | `InvalidManifest`, `DraftNotFound`, `DraftNotOwned`, `DraftVersionConflict`, `InputTooLong`, `TestQuotaExceeded`, `CredentialMissing`, `CredentialInvalid`, `ProviderUnsupported`, `RuntimeUnavailable`, `AgentExecutionFailed`, `AgentWalletCreationFailed`, `AgentWalletUnavailable`, `RegistrationNotConfirmed`, `RegistrationUriConflict`, `InvalidAuthorizationEntry`, `AuthorizationExpired`, `PublicationFailed` |
 | Relay and chain | `PreparationNotFound`, `PreparationExpired`, `InvalidSignedEnvelope`, `EnvelopeMismatch`, `InvalidTransactionSignature`, `SubmissionRejected`, `SubmissionInProgress`, `TransactionFailed`, `ChainUnavailable` |
-| Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed`, `OutcomeUnknown` |
+| Hire and escrow | `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `AgentInactive`, `InvalidHire`, `InvalidHireTransition`, `IdempotencyKeyReused`, `PersistenceUnavailable`, `PaymentAlreadySubmitted`, `InvalidRejectReason`, `JobMismatch`, `JobEvidenceUnavailable`, `EscrowCallFailed`, `SimulationFailed`, `SubmitSimulationRejected`, `OutcomeUnknown` |
 | Feedback | `HireNotCompleted`, `HireAlreadyRated`, `InvalidFeedback`, `FeedbackFromAgentOwner` |
 
 `AgentEndpoint` does not use these error codes yet: it raises the typed `AgentCatalogUnavailable` and returns `null` for an unknown id, so `CatalogUnavailable` and `ChainDataUnavailable` are currently unused (see [Agent catalog](#agent-catalog)).
@@ -295,7 +297,7 @@ The core `Agent`, `Skill`, `Hire`, `Payment`, and `Feedback` drafts mirror domai
 | `StudioDraft` | `draftId`, `manifest`, `revision`, `deployState` |
 | `TestRunResult` | `output`, `remainingDailyRuns`. `TestQuotaExceeded` sets `details.resetsAt` to the UTC instant the quota resets. `AgentExecutionFailed` sets `details.reason` to a safe runtime code such as `timeout`, never the prompt or the provider body |
 | [`PreparedTransaction`](models/prepared_transaction.spy.yaml) | `preparationId`, `purpose`, `signer`, `networkPassphrase`, `unsignedTransactionXdr?`, `authorizationEntryXdr?`, `transaction?`, `signatureExpirationLedger?`, `expiresAt` |
-| [`ChainSubmission`](models/chain_submission.spy.yaml) | `preparationId?`, `purpose`, `transaction`, `state` (`submitted`, `confirmed`, `failed`), `errorCode?`, `explorerUrl?`, `updatedAt` |
+| [`ChainSubmission`](models/chain_submission.spy.yaml) | `preparationId?`, `purpose`, `transaction?` (null when a simulation rejected the call before an envelope existed), `state` (`submitted`, `confirmed`, `failed`), `errorCode?`, `explorerUrl?`, `updatedAt` |
 | `DeploySession` | `draftId`, `state`, `preparation: PreparedTransaction?`, `registration: ChainSubmission?`, `walletAuthorization: ChainSubmission?`, `agentId?`, `failureCode?`, `retryFromStep?`, `result: DeployResult?` |
 | `DeployResult` | `agent: Agent`, `registrationUri`, `explorerUrl` |
 | `CreateHireResult` | `hire: Hire`, `preparedCreateJob: PreparedTransaction?` |
