@@ -12,6 +12,11 @@ executables:
 
 dependencies:
   args: ^2.7.0
+  # Local runs call the model provider directly (`puls3 run`).
+  http: ^1.6.0
+  # Local runs parse and validate the manifest with the same rules as deploy.
+  puls3_domain:
+    path: ../puls3_domain
   puls3_sdk:
     path: ../puls3_sdk
 

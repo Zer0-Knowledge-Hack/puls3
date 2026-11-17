@@ -2,7 +2,7 @@
 
 `puls3` is the command line for the puls3 API. It is a client of [`puls3_sdk`](../../puls3_sdk/) ([ADR-0007](../adr/0007-developer-sdk.md)), so it uses the same calls and the same errors as the SDK.
 
-**It never signs or submits a transaction.** The catalog commands need nothing. The hire and Studio commands act for a wallet, so they need that wallet's session; `hire prepare-complete` and `hire prepare-reject` print the unsigned envelope for the wallet to sign, and stop there. To sign, deploy an agent, or approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
+**It never signs or submits a transaction.** The catalog commands and [`run`](run-locally.md) need no session. The hire and Studio commands act for a wallet, so they need that wallet's session; `hire prepare-complete` and `hire prepare-reject` print the unsigned envelope for the wallet to sign, and stop there. To sign, deploy an agent, or approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
 
 ## Wallet session
 
@@ -35,7 +35,7 @@ The examples below write `puls3` for `dart run bin/puls3.dart`, run from `puls3_
 
 ## Server URL
 
-Every command needs the puls3 server URL. `--api` wins over the environment variable.
+Every catalog command needs the puls3 server URL (`run` does not). `--api` wins over the environment variable.
 
 | Source | Example |
 |---|---|
@@ -148,6 +148,18 @@ $ puls3 studio test-run --draft 3 --input "Summarise: ..."
 
 `--json` prints `output` and `remainingDailyRuns`. Server codes: `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable` (for example, no provider credential saved), `AgentExecutionFailed` (exit 1).
 
+### `run --manifest <file.json> --input <text>`
+
+Runs an agent from its manifest on your machine, with your own model credential, without the puls3 server and without any transaction. The input can also come from `--input-file <path>` or stdin (`--input -`).
+
+```bash
+export CLOUDFLARE_ACCOUNT_ID=<your account id>
+export CLOUDFLARE_API_TOKEN=<your Workers AI token>
+puls3 run --manifest example/soroban_pre_audit.json --input "pub fn withdraw(...) { ... }"
+```
+
+It prints the agent's output; `--json` prints `{output, model, inputChars, outputChars, elapsedMs}`. See [Run an agent locally](run-locally.md) for the manifest, credentials, limits and its own exit codes (65 invalid manifest or input, 66 unreadable file, 78 missing credential).
+
 ## Environment
 
 | Variable | Used by | Secret |
@@ -174,6 +186,7 @@ Text that comes from the server or an agent (names, descriptions, inputs, result
 | 74 | `SessionFile` | The session file cannot be read or written (for example its directory is not writable). |
 | 77 | `SessionRequired` | A hire or Studio command with no wallet session. Nothing is sent. |
 | 77 | `Unauthorized` | The server refused the session: expired, revoked, or not valid. |
+| 1, 65, 66, 69, 78 | see [run-locally.md](run-locally.md#errors-and-exit-codes) | `run` failures: provider error, invalid manifest or input, unreadable file, unreachable provider, missing credential. |
 
 A server that was idle can take more than 20 seconds to answer the first call, so one `Unreachable` right after a pause is worth one retry.
 
