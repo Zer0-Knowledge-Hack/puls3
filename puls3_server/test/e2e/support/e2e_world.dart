@@ -20,6 +20,7 @@ import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:serverpod/serverpod.dart' show Serverpod, Session;
 
 import 'agent_custody.dart';
+import 'contract_event_log.dart';
 import 'local_sandbox.dart';
 
 /// Price of the agent every suite hires, in stroops of the sandbox token.
@@ -50,6 +51,8 @@ final class E2eWorld {
     required this.consumer,
     required this.agentAccount,
     required this.agentId,
+    required this.events,
+    required this.startLedger,
     required _SessionAs wallet,
   }) : _wallet = wallet,
        endpoint = HireEndpoint(),
@@ -68,6 +71,12 @@ final class E2eWorld {
   /// Registry id of the agent the world registered for the suites to hire.
   final int agentId;
 
+  /// Reads the contract events of this run's sandbox.
+  final ContractEventLog events;
+
+  /// The ledger before this run did anything: events from it on are the run's.
+  final int startLedger;
+
   final HireEndpoint endpoint;
   final ServerpodHireRepository hires;
   final ServerpodChainSubmissionStore submissions;
@@ -77,6 +86,14 @@ final class E2eWorld {
   /// consumer and the agent wallet from the local Friendbot.
   static Future<E2eWorld> start() async {
     final sandbox = await LocalSandbox.connect();
+    final events = ContractEventLog(
+      SorobanRpcClient(
+        httpClient: http.Client(),
+        url: Uri.parse(sandbox.rpcUrl),
+        timeout: const Duration(seconds: 30),
+      ),
+    );
+    final startLedger = await events.mark();
     final consumer = E2eAccount.random();
     await sandbox.fund(consumer.address.value);
     final agent = await sandbox.registerAgent(priceStroops: e2ePriceStroops);
@@ -120,6 +137,8 @@ final class E2eWorld {
       consumer: consumer,
       agentAccount: agent.account,
       agentId: agent.id,
+      events: events,
+      startLedger: startLedger,
       wallet: wallet,
     );
   }
