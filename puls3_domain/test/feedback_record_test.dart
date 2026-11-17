@@ -50,16 +50,26 @@ ReferencedJob _job({
   state: state,
 );
 
-/// Completed jobs: 1 to 20 for Alice, 101 to 120 for Bob, all for agent 7.
+PaidJobReference _on(StellarAddress escrow, int id) =>
+    PaidJobReference(escrow: escrow, jobId: id);
+
+/// Completed jobs of [_escrow]: 1 to 20 for Alice, 101 to 120 for Bob, all
+/// for agent 7.
 final _jobs = {
-  for (var id = 1; id <= 20; id++) id: _job(),
-  for (var id = 101; id <= 120; id++) id: _job(client: _bob),
+  for (var id = 1; id <= 20; id++) _on(_escrow, id): _job(),
+  for (var id = 101; id <= 120; id++) _on(_escrow, id): _job(client: _bob),
 };
 
-final _provenance = FeedbackProvenance(escrow: _escrow, jobs: _jobs);
+final _provenance = FeedbackProvenance(escrows: {_escrow}, jobs: _jobs);
 
-FeedbackProvenance _with(Map<int, ReferencedJob> jobs) =>
-    FeedbackProvenance(escrow: _escrow, jobs: {..._jobs, ...jobs});
+/// [_provenance] with the jobs [jobs] of [_escrow] replaced or added.
+FeedbackProvenance _with(Map<int, ReferencedJob> jobs) => FeedbackProvenance(
+  escrows: {_escrow},
+  jobs: {
+    ..._jobs,
+    for (final entry in jobs.entries) _on(_escrow, entry.key): entry.value,
+  },
+);
 
 void main() {
   group('exclusionOf: the score (#202)', () {
@@ -120,7 +130,7 @@ void main() {
 
     test('a rating from the agent owner does not count (#201)', () {
       final owned = FeedbackProvenance(
-        escrow: _escrow,
+        escrows: {_escrow},
         jobs: _jobs,
         owner: _alice,
       );
@@ -180,6 +190,59 @@ void main() {
         ),
         FeedbackExclusion.otherEscrow,
       );
+    });
+
+    group('a list of trusted escrows (#273)', () {
+      // After a rotation the reader trusts the old escrow and the new one.
+      final both = FeedbackProvenance(
+        escrows: {_escrow, _otherEscrow},
+        jobs: {
+          ..._jobs,
+          _on(_otherEscrow, 1): _job(),
+        },
+      );
+
+      test('a job on any trusted escrow counts', () {
+        expect(exclusionOf(_record(5), both), isNull);
+        expect(
+          exclusionOf(_record(5, tag2: _ref(1, escrow: _otherEscrow)), both),
+          isNull,
+        );
+      });
+
+      test('a job id is read on the escrow its reference names', () {
+        // Job 2 exists on the first escrow only: naming it on the other one
+        // is a job nobody could read, never the first escrow's job 2.
+        expect(
+          exclusionOf(_record(5, tag2: _ref(2, escrow: _otherEscrow)), both),
+          FeedbackExclusion.jobUnreadable,
+        );
+      });
+
+      test('the same job id on two escrows is two jobs, rated once each', () {
+        final records = [
+          _record(5, index: 1, tag2: _ref(1)),
+          _record(4, index: 2, tag2: _ref(1, escrow: _otherEscrow)),
+          _record(3, index: 3, tag2: _ref(1)),
+        ];
+
+        expect(exclusionsOf(records, both), [
+          null,
+          null,
+          FeedbackExclusion.jobAlreadyRated,
+        ]);
+      });
+
+      test('an escrow outside the list still does not count', () {
+        final third = StellarAddress.parse(
+          'CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4',
+        );
+
+        expect(
+          exclusionOf(_record(5, tag2: _ref(1, escrow: third)), both),
+          FeedbackExclusion.otherEscrow,
+        );
+      });
     });
 
     test('a job the escrow could not answer for does not count', () {
@@ -257,7 +320,7 @@ void main() {
     });
   });
 
-  group('referencedJobIds', () {
+  group('referencedJobs', () {
     test('lists each trusted job once, only for records that could count', () {
       final records = [
         _record(5, index: 1, tag2: _ref(3)),
@@ -270,7 +333,26 @@ void main() {
         FeedbackRecord.unreadable(agentId: AgentId(7), client: _bob, index: 1),
       ];
 
-      expect(referencedJobIds(records, _escrow), [3, 5]);
+      expect(referencedJobs(records, {_escrow}), [
+        _on(_escrow, 3),
+        _on(_escrow, 5),
+      ]);
+    });
+
+    test('names the escrow of each job when several are trusted', () {
+      final records = [
+        _record(5, index: 1, tag2: _ref(3)),
+        _record(4, index: 2, tag2: _ref(3, escrow: _otherEscrow)),
+        _record(4, index: 3, tag2: _ref(3, escrow: _otherEscrow)),
+      ];
+
+      expect(referencedJobs(records, {_escrow, _otherEscrow}), [
+        _on(_escrow, 3),
+        _on(_otherEscrow, 3),
+      ]);
+      expect(referencedJobs(records, {_otherEscrow}), [
+        _on(_otherEscrow, 3),
+      ]);
     });
   });
 

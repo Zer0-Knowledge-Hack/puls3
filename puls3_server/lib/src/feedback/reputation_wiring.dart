@@ -19,8 +19,9 @@ ReputationCalls reputationCallsFor(StellarConfig config) {
 }
 
 /// The [ReputationRegistry] of [config]: it reads the configured registry
-/// through [reader] and checks ratings against the configured escrow (#201),
-/// else it is [UnwiredReputationRegistry] and every agent has no feedback.
+/// through [reader] and checks ratings against the configured escrow and the
+/// ones it replaced (#201, #273), else it is [UnwiredReputationRegistry] and
+/// every agent has no feedback.
 ///
 /// With [facts], a job read in a final state is kept there and still counts
 /// after its entry archives (#273).
@@ -37,6 +38,11 @@ ReputationRegistry reputationRegistryFor(
           registry: registry,
           escrow: config.escrow,
           jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
+          otherEscrows: {
+            for (final previous in config.previousEscrows)
+              if (previous != config.escrow)
+                previous: ContractEscrowJobReader(reader, escrow: previous),
+          },
           facts: facts,
           owners: ContractAgentOwnerReader(
             reader,

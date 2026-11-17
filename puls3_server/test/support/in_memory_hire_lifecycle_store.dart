@@ -44,6 +44,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
     int hireId,
     int jobId, {
     required int expiredAt,
+    String? escrow,
   }) async {
     final row = _rows[hireId];
     if (row == null) throw StateError('hire $hireId does not exist');
@@ -61,6 +62,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       requestId: row.requestId,
       input: row.input,
       jobId: jobId,
+      escrow: escrow,
       paymentTransaction: row.paymentTransaction,
       status: HireStatus.open,
     );
@@ -92,6 +94,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       requestId: row.requestId,
       input: row.input,
       jobId: row.jobId,
+      escrow: row.escrow,
       paymentTransaction: row.paymentTransaction,
       status: statusOverride[row.id],
     );

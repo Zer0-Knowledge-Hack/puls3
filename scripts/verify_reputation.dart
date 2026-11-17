@@ -64,6 +64,13 @@ Future<void> main(List<String> args) async {
       registry: registryAddress,
       escrow: config.escrow,
       jobs: ContractEscrowJobReader(reader, escrow: config.escrow),
+      // The escrows the configured one replaced, as the server trusts them
+      // (#273): the script must read the same ones to recompute its score.
+      otherEscrows: {
+        for (final previous in config.previousEscrows)
+          if (previous != config.escrow)
+            previous: ContractEscrowJobReader(reader, escrow: previous),
+      },
       owners: ContractAgentOwnerReader(
         reader,
         identityRegistry: config.identityRegistry,
@@ -79,6 +86,9 @@ Future<void> main(List<String> args) async {
 
     print('registry : ${registryAddress.value}');
     print('escrow   : ${config.escrow.value}');
+    for (final previous in config.previousEscrows) {
+      print('previous : ${previous.value}');
+    }
     print('agent    : ${agent.value}');
     print(
       'pages    : $clientPages page(s) of get_clients_paginated '
@@ -183,8 +193,10 @@ Future<({double rating, int paidHireCount})?> _servedReputation(
 
 /// The job id and, when the escrow answered, its state.
 String _jobOf(PaidJobReference job, FeedbackProvenance provenance) {
-  if (job.escrow != provenance.escrow) return '${job.jobId}@other-escrow';
-  final read = provenance.jobs[job.jobId];
+  if (!provenance.escrows.contains(job.escrow)) {
+    return '${job.jobId}@other-escrow';
+  }
+  final read = provenance.jobs[job];
   return read == null ? '${job.jobId}(unread)' : '${job.jobId}(${read.state.name})';
 }
 

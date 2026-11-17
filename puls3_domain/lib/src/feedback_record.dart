@@ -137,10 +137,10 @@ FeedbackExclusion? exclusionOf(
   }
   final reference = record.jobReference;
   if (reference == null) return FeedbackExclusion.noJobReference;
-  if (reference.escrow != provenance.escrow) {
+  if (!provenance.escrows.contains(reference.escrow)) {
     return FeedbackExclusion.otherEscrow;
   }
-  final job = provenance.jobs[reference.jobId];
+  final job = provenance.jobs[reference];
   if (job == null) return FeedbackExclusion.jobUnreadable;
   if (job.client != record.client || job.agentId != record.agentId) {
     return FeedbackExclusion.jobMismatch;
@@ -160,12 +160,14 @@ List<FeedbackExclusion?> exclusionsOf(
   Iterable<FeedbackRecord> records,
   FeedbackProvenance provenance,
 ) {
-  final rated = <int>{};
+  final rated = <PaidJobReference>{};
   final exclusions = <FeedbackExclusion?>[];
   for (final record in records) {
     var exclusion = exclusionOf(record, provenance);
-    // A record with no exclusion has a reference to a job on the escrow.
-    if (exclusion == null && !rated.add(record.jobReference!.jobId)) {
+    // A record with no exclusion has a reference to a job on a trusted
+    // escrow. A job is its escrow and its id: the same id on two escrows is
+    // two jobs.
+    if (exclusion == null && !rated.add(record.jobReference!)) {
       exclusion = FeedbackExclusion.jobAlreadyRated;
     }
     exclusions.add(exclusion);
@@ -173,22 +175,23 @@ List<FeedbackExclusion?> exclusionsOf(
   return exclusions;
 }
 
-/// The job ids a reader must read from [escrow] to decide [records]: the
-/// referenced jobs of every record that passes the score rules and points to
-/// [escrow], once each, in first-seen order.
-List<int> referencedJobIds(
+/// The jobs a reader must read to decide [records]: the referenced jobs of
+/// every record that passes the score rules and points to one of the trusted
+/// [escrows], once each, in first-seen order. Each is read from the escrow
+/// its reference names.
+List<PaidJobReference> referencedJobs(
   Iterable<FeedbackRecord> records,
-  StellarAddress escrow,
+  Set<StellarAddress> escrows,
 ) {
-  final ids = <int>{};
+  final jobs = <PaidJobReference>{};
   for (final record in records) {
     if (_scoreExclusionOf(record) != null) continue;
     final reference = record.jobReference;
-    if (reference != null && reference.escrow == escrow) {
-      ids.add(reference.jobId);
+    if (reference != null && escrows.contains(reference.escrow)) {
+      jobs.add(reference);
     }
   }
-  return ids.toList();
+  return jobs.toList();
 }
 
 /// The feedback of [records] that counts, in the same order: every record

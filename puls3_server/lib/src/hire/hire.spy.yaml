@@ -13,6 +13,10 @@ fields:
   input: String?
   ### Escrow job id, bound once when the create_job is confirmed.
   jobId: int?
+  ### StrKey of the escrow contract that holds jobId, bound with it (#273).
+  ### Null for a hire that predates the column and for a hire without a job:
+  ### it then means the escrow configured at that moment (#307).
+  escrow: String?
 indexes:
   hire_consumer_request_idx:
     fields: consumer, requestId
