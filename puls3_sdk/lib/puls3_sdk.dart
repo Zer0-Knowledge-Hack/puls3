@@ -4,6 +4,7 @@ library;
 export 'package:puls3_client/puls3_client.dart'
     show
         AgentCatalogUnavailable,
+        AgentHireStarted,
         AgentSummary,
         ClientAuthKeyProvider,
         HireDetail,

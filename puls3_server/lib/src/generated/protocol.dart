@@ -54,6 +54,7 @@ import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
+import 'studio/agent_hire_started.dart' as _i3ggywhi;
 import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
 import 'studio/builder_credential_record.dart' as _i4wr3q5v;
 import 'studio/manifest_model.dart' as _ihtr58tu;
@@ -96,6 +97,7 @@ export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
 export 'runtime/hire_run.dart';
+export 'studio/agent_hire_started.dart';
 export 'studio/agent_manifest_draft.dart';
 export 'studio/builder_credential_record.dart';
 export 'studio/manifest_model.dart';
@@ -1710,6 +1712,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _iw9spjs5.HireRunRecord) {
       return _iw9spjs5.HireRunRecord.fromJson(data) as T;
     }
+    if (t == _i3ggywhi.AgentHireStarted) {
+      return _i3ggywhi.AgentHireStarted.fromJson(data) as T;
+    }
     if (t == _i1fcn02s.AgentManifestDraft) {
       return _i1fcn02s.AgentManifestDraft.fromJson(data) as T;
     }
@@ -1870,6 +1875,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _iw9spjs5.HireRunRecord.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_i3ggywhi.AgentHireStarted?>()) {
+      return (data != null ? _i3ggywhi.AgentHireStarted.fromJson(data) : null)
+          as T;
+    }
     if (t == _is.getType<_i1fcn02s.AgentManifestDraft?>()) {
       return (data != null ? _i1fcn02s.AgentManifestDraft.fromJson(data) : null)
           as T;
@@ -2000,6 +2009,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _iw9spjs5.HireRunRecord => 'HireRunRecord',
+      _i3ggywhi.AgentHireStarted => 'AgentHireStarted',
       _i1fcn02s.AgentManifestDraft => 'AgentManifestDraft',
       _i4wr3q5v.BuilderCredentialRecord => 'BuilderCredentialRecord',
       _ihtr58tu.ManifestModel => 'ManifestModel',
@@ -2088,6 +2098,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'Puls3ApiException';
       case _iw9spjs5.HireRunRecord():
         return 'HireRunRecord';
+      case _i3ggywhi.AgentHireStarted():
+        return 'AgentHireStarted';
       case _i1fcn02s.AgentManifestDraft():
         return 'AgentManifestDraft';
       case _i4wr3q5v.BuilderCredentialRecord():
@@ -2229,6 +2241,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'HireRunRecord') {
       return deserialize<_iw9spjs5.HireRunRecord>(data['data']);
+    }
+    if (dataClassName == 'AgentHireStarted') {
+      return deserialize<_i3ggywhi.AgentHireStarted>(data['data']);
     }
     if (dataClassName == 'AgentManifestDraft') {
       return deserialize<_i1fcn02s.AgentManifestDraft>(data['data']);

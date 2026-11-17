@@ -111,6 +111,22 @@ final class _FakeStudio implements StudioApi {
     if (error != null) throw error!;
     return TestRunResult(output: 'model says: $input', remainingDailyRuns: 1);
   }
+
+  @override
+  Future<AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) async {
+    calls.add('hire-as $hiringAgentId $agentId $input $budgetUsdcStroops');
+    if (error != null) throw error!;
+    return AgentHireStarted(
+      hireId: 77,
+      hiringWallet: 'GAGENTA',
+      state: 'started',
+    );
+  }
 }
 
 /// One run of `puls3` against a fake catalog.
@@ -412,14 +428,18 @@ void main() {
   group('hire get', () {
     test('prints the hire of the session wallet', () async {
       final hire = _FakeHire();
-      final run = await _puls3([
-        ..._api,
-        'hire',
-        'get',
-        '12',
-        '--wallet',
-        _wallet,
-      ], hire: hire, studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          'hire',
+          'get',
+          '12',
+          '--wallet',
+          _wallet,
+        ],
+        hire: hire,
+        studio: _FakeStudio(),
+      );
       expect(run.code, ExitCodes.ok);
       expect(run.err, isEmpty);
       expect(hire.calls, ['get 12 $_wallet']);
@@ -445,15 +465,19 @@ void main() {
     });
 
     test('--json prints fixed fields', () async {
-      final run = await _puls3([
-        ..._api,
-        '--json',
-        'hire',
-        'get',
-        '12',
-        '--wallet',
-        _wallet,
-      ], hire: _FakeHire(), studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          '--json',
+          'hire',
+          'get',
+          '12',
+          '--wallet',
+          _wallet,
+        ],
+        hire: _FakeHire(),
+        studio: _FakeStudio(),
+      );
       final decoded = jsonDecode(run.out) as Map<String, Object?>;
       expect(decoded['id'], 12);
       expect(decoded['status'], 'submitted');
@@ -474,10 +498,14 @@ void main() {
     ]) {
       test('$arguments is a usage error without calling the server', () async {
         final hire = _FakeHire();
-        final run = await _puls3([
-          ..._api,
-          ...arguments,
-        ], hire: hire, studio: _FakeStudio());
+        final run = await _puls3(
+          [
+            ..._api,
+            ...arguments,
+          ],
+          hire: hire,
+          studio: _FakeStudio(),
+        );
         expect(run.code, ExitCodes.usage);
         expect(run.out, isEmpty);
         expect(hire.calls, isEmpty);
@@ -489,17 +517,22 @@ void main() {
   group('untrusted text', () {
     // ESC[2J clears the screen, ESC]8 opens a hyperlink, U+202E reverses
     // the text that follows, BEL rings.
-    const hostile = 'ok\x1b[2J\x1b]8;;https://evil.test\x07click\u202Eesrever\x00';
+    const hostile =
+        'ok\x1b[2J\x1b]8;;https://evil.test\x07click\u202Eesrever\x00';
 
     test('plain output drops control and bidi characters', () async {
-      final run = await _puls3([
-        ..._api,
-        'hire',
-        'get',
-        '12',
-        '--wallet',
-        _wallet,
-      ], hire: _FakeHire(result: hostile), studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          'hire',
+          'get',
+          '12',
+          '--wallet',
+          _wallet,
+        ],
+        hire: _FakeHire(result: hostile),
+        studio: _FakeStudio(),
+      );
 
       expect(run.code, ExitCodes.ok);
       expect(run.out, contains('ok[2J]8;;https://evil.testclickesrever'));
@@ -509,15 +542,19 @@ void main() {
     });
 
     test('--json escapes control characters and drops bidi ones', () async {
-      final run = await _puls3([
-        ..._api,
-        '--json',
-        'hire',
-        'get',
-        '12',
-        '--wallet',
-        _wallet,
-      ], hire: _FakeHire(result: hostile), studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          '--json',
+          'hire',
+          'get',
+          '12',
+          '--wallet',
+          _wallet,
+        ],
+        hire: _FakeHire(result: hostile),
+        studio: _FakeStudio(),
+      );
 
       expect(run.out.contains('\x1b'), isFalse);
       // JSON escapes the control characters, so the data keeps them. JSON
@@ -549,12 +586,16 @@ void main() {
     test('prepare-complete prints the unsigned envelope and nothing else '
         'happens', () async {
       final hire = _FakeHire();
-      final run = await _puls3([
-        ..._api,
-        'hire',
-        'prepare-complete',
-        '12',
-      ], hire: hire, studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          'hire',
+          'prepare-complete',
+          '12',
+        ],
+        hire: hire,
+        studio: _FakeStudio(),
+      );
       expect(run.code, ExitCodes.ok);
       expect(run.err, isEmpty);
       // One prepare call: the CLI has no way to sign or submit.
@@ -567,27 +608,35 @@ void main() {
 
     test('prepare-reject passes the reason', () async {
       final hire = _FakeHire();
-      final run = await _puls3([
-        ..._api,
-        'hire',
-        'prepare-reject',
-        '12',
-        '--reason',
-        'wrong language',
-      ], hire: hire, studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          'hire',
+          'prepare-reject',
+          '12',
+          '--reason',
+          'wrong language',
+        ],
+        hire: hire,
+        studio: _FakeStudio(),
+      );
       expect(run.code, ExitCodes.ok);
       expect(hire.calls, ['reject 12 wrong language']);
       expect(run.out, contains('purpose      reject'));
     });
 
     test('--json prints the envelope fields', () async {
-      final run = await _puls3([
-        ..._api,
-        '--json',
-        'hire',
-        'prepare-complete',
-        '12',
-      ], hire: _FakeHire(), studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          '--json',
+          'hire',
+          'prepare-complete',
+          '12',
+        ],
+        hire: _FakeHire(),
+        studio: _FakeStudio(),
+      );
       expect(jsonDecode(run.out), {
         'preparationId': 'prep-1',
         'purpose': 'complete',
@@ -600,12 +649,16 @@ void main() {
 
     test('prepare-reject without --reason is a usage error', () async {
       final hire = _FakeHire();
-      final run = await _puls3([
-        ..._api,
-        'hire',
-        'prepare-reject',
-        '12',
-      ], hire: hire, studio: _FakeStudio());
+      final run = await _puls3(
+        [
+          ..._api,
+          'hire',
+          'prepare-reject',
+          '12',
+        ],
+        hire: hire,
+        studio: _FakeStudio(),
+      );
       expect(run.code, ExitCodes.usage);
       expect(hire.calls, isEmpty);
     });
@@ -633,15 +686,19 @@ void main() {
   group('studio test-run', () {
     test('prints the model output and the runs left', () async {
       final studio = _FakeStudio();
-      final run = await _puls3([
-        ..._api,
-        'studio',
-        'test-run',
-        '--draft',
-        '3',
-        '--input',
-        'hello',
-      ], hire: _FakeHire(), studio: studio);
+      final run = await _puls3(
+        [
+          ..._api,
+          'studio',
+          'test-run',
+          '--draft',
+          '3',
+          '--input',
+          'hello',
+        ],
+        hire: _FakeHire(),
+        studio: studio,
+      );
       expect(run.code, ExitCodes.ok);
       expect(studio.calls, ['3 hello']);
       final lines = const LineSplitter().convert(run.out);
@@ -674,10 +731,124 @@ void main() {
     ]) {
       test('$arguments is a usage error without calling the server', () async {
         final studio = _FakeStudio();
-        final run = await _puls3([
+        final run = await _puls3(
+          [
+            ..._api,
+            ...arguments,
+          ],
+          hire: _FakeHire(),
+          studio: studio,
+        );
+        expect(run.code, ExitCodes.usage);
+        expect(studio.calls, isEmpty);
+      });
+    }
+  });
+
+  group('studio hire-as', () {
+    test('prints the hire id and where the tx hashes are', () async {
+      final studio = _FakeStudio();
+      final run = await _puls3(
+        [
           ..._api,
-          ...arguments,
-        ], hire: _FakeHire(), studio: studio);
+          'studio',
+          'hire-as',
+          '--as',
+          '0',
+          '--agent',
+          '5',
+          '--input',
+          'Summarise this.',
+          '--budget',
+          '0.25',
+        ],
+        hire: _FakeHire(),
+        studio: studio,
+      );
+      expect(run.code, ExitCodes.ok);
+      expect(studio.calls, ['hire-as 0 5 Summarise this. 2500000']);
+      expect(run.out, startsWith('Hire 77 of agent 5 started.'));
+      expect(run.out, contains('[agent-hire]'));
+      expect(run.out, contains('stellar.expert for GAGENTA'));
+    });
+
+    test('--json prints the started hire', () async {
+      final run = await _puls3(
+        [
+          ..._api,
+          '--json',
+          'studio',
+          'hire-as',
+          '--as',
+          '1',
+          '--agent',
+          '5',
+          '--input',
+          'hi',
+          '--budget',
+          '2',
+        ],
+        hire: _FakeHire(),
+        studio: _FakeStudio(),
+      );
+      expect(run.code, ExitCodes.ok);
+      expect(jsonDecode(run.out), {
+        'hireId': 77,
+        'hiringWallet': 'GAGENTA',
+        'state': 'started',
+      });
+    });
+
+    test('a server refusal is the server code', () async {
+      final run = await _puls3(
+        [
+          ..._api,
+          'studio',
+          'hire-as',
+          '--as',
+          '1',
+          '--agent',
+          '5',
+          '--input',
+          'hi',
+          '--budget',
+          '1',
+        ],
+        hire: _FakeHire(),
+        studio: _FakeStudio(
+          error: Puls3ApiException(code: 'HiringAgentNotOwned'),
+        ),
+      );
+      expect(run.code, ExitCodes.serverError);
+      expect(run.err, startsWith('error: HiringAgentNotOwned'));
+    });
+
+    const ok = ['--as', '1', '--agent', '5', '--input', 'hi', '--budget', '1'];
+    for (final arguments in [
+      ['--agent', '5', '--input', 'hi', '--budget', '1'],
+      ['--as', '1', '--input', 'hi', '--budget', '1'],
+      ['--as', '-1', '--agent', '5', '--input', 'hi', '--budget', '1'],
+      ['--as', '1', '--agent', '5', '--budget', '1'],
+      ['--as', '1', '--agent', '5', '--input', ' ', '--budget', '1'],
+      ['--as', '1', '--agent', '5', '--input', 'hi'],
+      ['--as', '1', '--agent', '5', '--input', 'hi', '--budget', '0'],
+      ['--as', '1', '--agent', '5', '--input', 'hi', '--budget', 'x'],
+      ['--as', '1', '--agent', '5', '--input', 'hi', '--budget', '0.12345678'],
+      ['--as', '5', '--agent', '5', '--input', 'hi', '--budget', '1'],
+      [...ok, 'extra'],
+    ]) {
+      test('$arguments is a usage error without calling the server', () async {
+        final studio = _FakeStudio();
+        final run = await _puls3(
+          [
+            ..._api,
+            'studio',
+            'hire-as',
+            ...arguments,
+          ],
+          hire: _FakeHire(),
+          studio: studio,
+        );
         expect(run.code, ExitCodes.usage);
         expect(studio.calls, isEmpty);
       });

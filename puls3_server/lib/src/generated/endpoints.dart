@@ -817,6 +817,43 @@ class Endpoints extends _is.EndpointDispatch {
                     params['signedAuthorizationEntryXdr'],
                   ),
         ),
+        'hireAgentAs': _is.MethodConnector(
+          name: 'hireAgentAs',
+          params: {
+            'hiringAgentId': _is.ParameterDescription(
+              name: 'hiringAgentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'agentId': _is.ParameterDescription(
+              name: 'agentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'input': _is.ParameterDescription(
+              name: 'input',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'budgetUsdcStroops': _is.ParameterDescription(
+              name: 'budgetUsdcStroops',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['studio'] as _i442jbsr.StudioEndpoint).hireAgentAs(
+                    session,
+                    params['hiringAgentId'],
+                    params['agentId'],
+                    params['input'],
+                    params['budgetUsdcStroops'],
+                  ),
+        ),
       },
     );
     modules['serverpod_auth_idp'] = _iais.Endpoints()

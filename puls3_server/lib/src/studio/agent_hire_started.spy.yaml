@@ -1,0 +1,9 @@
+### An agent-to-agent hire started by the hiring agent's owner (#312). The
+### rest of the hire runs on the server; its tx hashes are in the server log.
+class: AgentHireStarted
+fields:
+  hireId: int
+  ### The hiring agent's custodied wallet: client and evaluator of the hire.
+  hiringWallet: String
+  ### `started`: create_job, fund, the hired agent's submit and complete follow.
+  state: String

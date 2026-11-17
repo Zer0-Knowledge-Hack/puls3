@@ -29,6 +29,8 @@ import 'package:puls3_client/src/protocol/health/backend_health.dart'
 import 'package:puls3_client/src/protocol/hire_detail.dart' as _iytku71p;
 import 'package:puls3_client/src/protocol/prepared_transaction.dart'
     as _iy6q6dct;
+import 'package:puls3_client/src/protocol/studio/agent_hire_started.dart'
+    as _ibs5cz07;
 import 'package:puls3_client/src/protocol/studio/agent_manifest_draft.dart'
     as _itfnkyvu;
 import 'package:puls3_client/src/protocol/studio/studio_draft.dart'
@@ -536,6 +538,28 @@ class EndpointStudio extends _isc.EndpointRef {
       'draftId': draftId,
       'preparationId': preparationId,
       'signedAuthorizationEntryXdr': signedAuthorizationEntryXdr,
+    },
+  );
+
+  /// Makes the caller's live Studio agent [hiringAgentId] hire [agentId] on
+  /// [input], spending at most [budgetUsdcStroops] (#312, SOW week 2).
+  ///
+  /// The hiring agent's custodied wallet signs `create_job`, `fund` and
+  /// `complete`; no human signs. Returns once the hire exists; the rest runs
+  /// on the server and every tx hash is logged with `[agent-hire]`.
+  _ida.Future<_ibs5cz07.AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) => caller.callServerEndpoint<_ibs5cz07.AgentHireStarted>(
+    'studio',
+    'hireAgentAs',
+    {
+      'hiringAgentId': hiringAgentId,
+      'agentId': agentId,
+      'input': input,
+      'budgetUsdcStroops': budgetUsdcStroops,
     },
   );
 }

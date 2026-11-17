@@ -32,6 +32,8 @@ import 'package:puls3_server/src/generated/health/backend_health.dart'
 import 'package:puls3_server/src/generated/hire_detail.dart' as _i0z7bvay;
 import 'package:puls3_server/src/generated/prepared_transaction.dart'
     as _ip1gnsd7;
+import 'package:puls3_server/src/generated/studio/agent_hire_started.dart'
+    as _i9v551tz;
 import 'package:puls3_server/src/generated/studio/agent_manifest_draft.dart'
     as _isgb9y1j;
 import 'package:puls3_server/src/generated/studio/studio_draft.dart'
@@ -1334,6 +1336,45 @@ class _StudioEndpoint {
                   _localCallContext.arguments,
                 )
                 as _ida.Future<_i16upqdg.DeploySession>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _ida.Future<_i9v551tz.AgentHireStarted> hireAgentAs(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'hireAgentAs',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'hireAgentAs',
+          parameters: _ist.testObjectToJson({
+            'hiringAgentId': hiringAgentId,
+            'agentId': agentId,
+            'input': input,
+            'budgetUsdcStroops': budgetUsdcStroops,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i9v551tz.AgentHireStarted>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

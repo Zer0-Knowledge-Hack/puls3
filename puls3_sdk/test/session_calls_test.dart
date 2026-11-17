@@ -80,6 +80,17 @@ final class _FakeStudio implements StudioApi {
     calls.add('$draftId $input');
     return TestRunResult(output: 'ok: $input', remainingDailyRuns: 4);
   }
+
+  @override
+  Future<AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) async {
+    calls.add('hire $hiringAgentId $agentId $input $budgetUsdcStroops');
+    return AgentHireStarted(hireId: 5, hiringWallet: 'GA', state: 'started');
+  }
 }
 
 void main() {
@@ -124,6 +135,13 @@ void main() {
       expect(studio.calls, ['3 hello']);
     });
 
+    test('hireAgentAs passes the hiring agent, agent, input and budget, '
+        'and accepts registry id 0', () async {
+      final started = await sdk.hireAgentAs(0, 4, 'hello', 2000000);
+      expect(started.hireId, 5);
+      expect(studio.calls, ['hire 0 4 hello 2000000']);
+    });
+
     test('a server error code passes through unchanged', () async {
       final error = Puls3ApiException(code: 'HireNotOwned', message: 'x');
       final failing = Puls3Sdk.withApi(
@@ -141,6 +159,9 @@ void main() {
       expect(() => sdk.prepareReject(1, ' '), throwsArgumentError);
       expect(() => sdk.testRun(0, 'hello'), throwsArgumentError);
       expect(() => sdk.testRun(1, ''), throwsArgumentError);
+      expect(() => sdk.hireAgentAs(-1, 4, 'hi', 1), throwsArgumentError);
+      expect(() => sdk.hireAgentAs(1, 4, ' ', 1), throwsArgumentError);
+      expect(() => sdk.hireAgentAs(1, 4, 'hi', 0), throwsArgumentError);
       expect(hire.calls, isEmpty);
       expect(studio.calls, isEmpty);
     });
@@ -156,12 +177,23 @@ void main() {
 
     test('every hire and Studio call is SessionRequired', () async {
       Matcher sessionRequired(String operation) => throwsA(
-        isA<SessionRequired>().having((e) => e.operation, 'operation', operation),
+        isA<SessionRequired>().having(
+          (e) => e.operation,
+          'operation',
+          operation,
+        ),
       );
       expect(() => sdk.getHire(1, _wallet), sessionRequired('getHire'));
       expect(() => sdk.prepareComplete(1), sessionRequired('prepareComplete'));
-      expect(() => sdk.prepareReject(1, 'no'), sessionRequired('prepareReject'));
+      expect(
+        () => sdk.prepareReject(1, 'no'),
+        sessionRequired('prepareReject'),
+      );
       expect(() => sdk.testRun(1, 'hi'), sessionRequired('testRun'));
+      expect(
+        () => sdk.hireAgentAs(1, 2, 'hi', 1),
+        sessionRequired('hireAgentAs'),
+      );
     });
 
     test('SessionRequired names the operation and never a secret', () {
