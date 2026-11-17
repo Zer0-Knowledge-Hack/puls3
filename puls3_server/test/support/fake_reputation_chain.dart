@@ -10,6 +10,7 @@ import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
+import 'package:puls3_server/src/ledger/terminal_job_store.dart';
 import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
 
 import 'reputation_registry_contract.dart';
@@ -102,6 +103,17 @@ final class FakeReputationChain {
   /// When set, every simulation answers a `restorePreamble`.
   bool needsRestore = false;
 
+  /// When set, the escrow's instance or code is archived: every call to the
+  /// escrow, `get_job` and `job_count` alike, answers a `restorePreamble`.
+  bool archivedEscrow = false;
+
+  /// How many `job_count` reads (the check that the escrow itself is live)
+  /// the chain answered.
+  var escrowProbes = 0;
+
+  /// The `job_count` envelope of the last [_answers].
+  String? _probeEnvelope;
+
   /// Adds [feedback] for [client] under [agent], with its `tag2` as given.
   void add(int agent, StellarAddress client, StoredFeedback feedback) {
     state
@@ -134,7 +146,11 @@ final class FakeReputationChain {
   String reference(int id) => PaidJobReference(escrow: escrow, jobId: id).text;
 
   /// The adapter over this chain.
-  SorobanReputationRegistry get adapter {
+  SorobanReputationRegistry get adapter => adapterWith();
+
+  /// A new adapter over this chain, as a new process would be, keeping the
+  /// facts of final jobs in [facts] when given.
+  SorobanReputationRegistry adapterWith({TerminalJobStore? facts}) {
     final reader = ContractReader(
       SorobanRpcClient(
         httpClient: _client,
@@ -152,6 +168,7 @@ final class FakeReputationChain {
         reader,
         identityRegistry: identityRegistry,
       ),
+      facts: facts,
     );
   }
 
@@ -175,6 +192,7 @@ final class FakeReputationChain {
         throw StateError('The fake chain has no answer for this envelope');
       }
       if (_jobEnvelopes.contains(envelope)) jobReads++;
+      if (envelope == _probeEnvelope) escrowProbes++;
       result = answer;
     }
     return http.Response(
@@ -253,6 +271,11 @@ final class FakeReputationChain {
         }
       }
     }
+    // job_count touches only the escrow's instance and code, no job.
+    _probeEnvelope = _envelope('job_count', const [], contract: escrow);
+    answers[_probeEnvelope!] = archivedEscrow
+        ? {'restorePreamble': <String, Object?>{}}
+        : value({'u64': '${jobs.length}'});
     // get_job for every job id a stored record names on this escrow.
     _jobEnvelopes.clear();
     for (final byClient in state.values) {
@@ -265,7 +288,7 @@ final class FakeReputationChain {
             ScArg.u64(reference.jobId),
           ], contract: escrow);
           _jobEnvelopes.add(envelope);
-          if (archivedJobs.contains(reference.jobId)) {
+          if (archivedEscrow || archivedJobs.contains(reference.jobId)) {
             answers[envelope] = {'restorePreamble': <String, Object?>{}};
             continue;
           }

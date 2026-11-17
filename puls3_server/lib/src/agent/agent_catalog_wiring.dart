@@ -7,6 +7,7 @@ import 'package:serverpod/serverpod.dart';
 import '../chain/chain_log.dart';
 import '../feedback/reputation_wiring.dart';
 import '../ledger/contract_reader.dart';
+import '../ledger/serverpod_terminal_job_store.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
@@ -64,6 +65,11 @@ ReputationCache _reputation(StellarConfig config) {
     registry: reputationRegistryFor(
       config,
       ContractReader(rpc, source: config.simulationSource),
+      // The cache lives as long as the process, so the store opens its own
+      // session for each call instead of keeping a request's (#273).
+      facts: ServerpodTerminalJobStore(
+        () => Serverpod.instance.createSession(),
+      ),
     ),
   );
 }
