@@ -6,6 +6,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 
 import '../agent/agent_wallet_custody.dart';
 import '../agent/stellar_agent_wallet_custody.dart';
+import '../agent/usdc_trustline.dart';
 import '../chain/submission_ledger.dart';
 import '../generated/protocol.dart' hide AgentManifestDraft;
 import '../hire/chain_accounts.dart';
@@ -42,6 +43,7 @@ final class StudioDeployService {
     required SubmissionLedger sender,
     required ChainTxReader transactions,
     required AccountFunder funder,
+    required TrustlineEnsurer trustlines,
     required AgentEnvelopeSigner signer,
     required StellarConfig stellar,
     required Uri registrationBase,
@@ -60,6 +62,7 @@ final class StudioDeployService {
        _sender = sender,
        _transactions = transactions,
        _funder = funder,
+       _trustlines = trustlines,
        _signer = signer,
        _stellar = stellar,
        _registrationBase = registrationBase,
@@ -79,6 +82,7 @@ final class StudioDeployService {
   final SubmissionLedger _sender;
   final ChainTxReader _transactions;
   final AccountFunder _funder;
+  final TrustlineEnsurer _trustlines;
   final AgentEnvelopeSigner _signer;
   final StellarConfig _stellar;
   final Uri _registrationBase;
@@ -200,6 +204,14 @@ final class StudioDeployService {
       } on LedgerException {
         throw _chain();
       }
+    }
+    // The escrow pays the agent in USDC, which the SAC only credits to an
+    // account with a trustline. Its ChangeTrust uses a sequence number, so it
+    // runs before the sequence below is read.
+    try {
+      await _trustlines.ensure(wallet);
+    } on LedgerException {
+      throw _chain();
     }
     final sequence = await _accounts.sequenceOf(wallet);
     final validUntil = _nowSeconds + _validitySeconds;

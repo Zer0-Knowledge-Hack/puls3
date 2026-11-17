@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:puls3_domain/puls3_domain.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../agent/aes_gcm_secret_cipher.dart';
 import '../agent/serverpod_agent_wallet_store.dart';
 import '../agent/stellar_agent_wallet_custody.dart';
+import '../agent/usdc_trustline.dart';
 import '../agent/wallet_custody_config.dart';
+import '../chain/chain_log.dart';
 import '../hire/chain_accounts.dart';
 import '../hire/hire_relay_config.dart';
 import '../generated/protocol.dart';
@@ -70,6 +74,11 @@ final class StudioDeployWiring {
     final friendbot = http.Client();
     return StudioDeployWiring._((session) {
       final wallets = ServerpodAgentWalletStore(session);
+      final signer = CustodiedEnvelopeSigner(
+        wallets: wallets,
+        cipher: cipher,
+        codec: codec,
+      );
       return StudioDeployService(
         drafts: StudioDraftService(ServerpodStudioDraftStore(session)),
         deploys: ServerpodStudioDeployStore(session),
@@ -84,11 +93,13 @@ final class StudioDeployWiring {
           identityRegistry: stellar.identityRegistry.value,
         ),
         funder: FriendbotFunder(friendbot),
-        signer: CustodiedEnvelopeSigner(
-          wallets: wallets,
-          cipher: cipher,
-          codec: codec,
+        trustlines: RpcTrustlineEnsurer(
+          rpc: rpc,
+          signer: signer,
+          asset: stellar.usdcAsset,
+          networkPassphrase: stellar.networkPassphrase,
         ),
+        signer: signer,
         stellar: stellar,
         registrationBase: _registrationBase(session, environment),
         preparationValiditySeconds: validity,
@@ -101,4 +112,72 @@ final class StudioDeployWiring {
   final String networkPassphrase;
 
   StudioDeployService serviceOn(Session session) => _build(session);
+}
+
+/// Adds the missing USDC trustline of every custodied agent wallet, once, in
+/// the background (wallets created before deploys added it themselves).
+///
+/// Does nothing when the custody key is unset or the Stellar configuration
+/// is invalid. Logs one info line per trustline added and one warning per
+/// failure; it never throws, so it cannot crash the server.
+void startTrustlineBackfill(Serverpod pod, Map<String, String> env) {
+  final StellarConfig stellar;
+  final WalletCustodyConfig custody;
+  try {
+    stellar = StellarConfig.fromEnvironment(env);
+    custody = WalletCustodyConfig.fromEnvironment(env);
+  } on Object {
+    return;
+  }
+  final cipher = AesGcmSecretCipher(
+    keys: {custody.keyVersion: custody.secretKey},
+    writeKeyVersion: custody.keyVersion,
+  );
+  final codec = StellarEnvelopeCodec.forPassphrase(stellar.networkPassphrase);
+  unawaited(() async {
+    final httpClient = http.Client();
+    Session? session;
+    try {
+      session = await pod.createSession();
+      final open = session;
+      await backfillTrustlines(
+        wallets: () async => [
+          for (final row in await AgentWallet.db.find(open))
+            StellarAddress.parse(row.address),
+        ],
+        ensurer: RpcTrustlineEnsurer(
+          rpc: SorobanRpcClient(
+            httpClient: httpClient,
+            url: stellar.rpcUrl,
+            timeout: _rpcTimeout,
+          ),
+          signer: CustodiedEnvelopeSigner(
+            wallets: ServerpodAgentWalletStore(open),
+            cipher: cipher,
+            codec: codec,
+          ),
+          asset: stellar.usdcAsset,
+          networkPassphrase: stellar.networkPassphrase,
+        ),
+        log: _trustlineLog,
+      );
+    } on Object catch (e) {
+      _trustlineLog(
+        ChainLogLevel.warning,
+        'USDC trustline backfill stopped: ${e.runtimeType}',
+      );
+    } finally {
+      await session?.close();
+      httpClient.close();
+    }
+  }());
+}
+
+void _trustlineLog(ChainLogLevel level, String message) {
+  final line = '[usdc-trustline] ${level.name}: $message';
+  if (level == ChainLogLevel.info) {
+    stdout.writeln(line);
+  } else {
+    stderr.writeln(line);
+  }
 }

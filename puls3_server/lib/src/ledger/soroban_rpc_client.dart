@@ -196,17 +196,25 @@ final class SorobanRpcClient {
     );
   }
 
-  /// The raw `LedgerEntryData` XDR of [account] through `getLedgerEntries`,
+  /// The raw `LedgerEntryData` XDR of [account] (see [ledgerEntry]),
   /// or `null` when the account does not exist. An unreachable node or an
   /// entry that is not base64 is a [LedgerUnavailable], never `null`.
-  Future<Uint8List?> accountEntry(StellarAddress account) async {
-    const method = 'getLedgerEntries';
+  Future<Uint8List?> accountEntry(StellarAddress account) {
     final key = XdrWriter()
       ..uint32(_ledgerKeyAccount)
       ..uint32(_publicKeyTypeEd25519)
       ..opaque(rawKey(account));
+    return ledgerEntry(key.bytes);
+  }
+
+  /// The raw `LedgerEntryData` XDR for the XDR `LedgerKey` [key] through
+  /// `getLedgerEntries`, or `null` when the ledger has no such entry. An
+  /// unreachable node or an entry that is not base64 is a
+  /// [LedgerUnavailable], never `null`.
+  Future<Uint8List?> ledgerEntry(Uint8List key) async {
+    const method = 'getLedgerEntries';
     final result = await _call(method, {
-      'keys': [base64Encode(key.bytes)],
+      'keys': [base64Encode(key)],
       'xdrFormat': 'base64',
     });
     if (!result.containsKey('entries')) {

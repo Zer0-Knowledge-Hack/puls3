@@ -4,11 +4,13 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/agent/agent_wallet_custody.dart';
 import 'package:puls3_server/src/agent/stellar_agent_wallet_custody.dart';
+import 'package:puls3_server/src/agent/usdc_trustline.dart';
 import 'package:puls3_server/src/chain/submission_ledger.dart';
 import 'package:puls3_server/src/generated/protocol.dart'
     hide AgentManifestDraft;
 import 'package:puls3_server/src/hire/chain_accounts.dart';
 import 'package:puls3_server/src/ledger/envelope_codec.dart';
+import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:puls3_server/src/ledger/strkey.dart';
@@ -170,6 +172,59 @@ void main() {
       );
     },
   );
+
+  test(
+    'prepareWalletAuthorization ensures the wallet USDC trustline before '
+    'it reads the sequence',
+    () async {
+      final draftId = await rig.registered();
+      rig.accounts.simulation = SimulationData(
+        transactionData: base64Encode(const [1, 2, 3, 4]),
+        minResourceFee: 50,
+        auth: [_addressEntry(rig.owner, expiration: 0)],
+        latestLedger: _latestLedger,
+      );
+      final readsBefore = rig.accounts.sequenceReads;
+
+      await rig.service.prepareWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+      );
+
+      expect(rig.trustlines.calls, [
+        (StellarAddress.parse(_agent), readsBefore),
+      ]);
+    },
+  );
+
+  test('a trustline that cannot be added is a chain error', () async {
+    final draftId = await rig.registered();
+    rig.accounts.simulation = SimulationData(
+      transactionData: base64Encode(const [1, 2, 3, 4]),
+      minResourceFee: 50,
+      auth: [_addressEntry(rig.owner, expiration: 0)],
+      latestLedger: _latestLedger,
+    );
+    rig.trustlines.failure = const LedgerUnavailable('ChangeTrust failed');
+
+    await expectLater(
+      rig.service.prepareWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+      ),
+      throwsA(
+        isA<Puls3ApiException>().having(
+          (e) => e.code,
+          'code',
+          'ChainUnavailable',
+        ),
+      ),
+    );
+    expect(
+      rig.accounts.simulated.where((s) => s.function == 'set_agent_wallet'),
+      isEmpty,
+    );
+  });
 
   test('a simulation without the latest ledger is a chain error', () async {
     final draftId = await rig.registered();
@@ -463,6 +518,7 @@ final class _Rig {
       sender: _Sender(sent, sentHashes),
       transactions: transactions,
       funder: _Funder(),
+      trustlines: trustlines,
       signer: _Signer(),
       stellar: StellarConfig.testnet,
       registrationBase: Uri.parse('https://puls3.test'),
@@ -481,6 +537,7 @@ final class _Rig {
   late final _Accounts accounts;
   late final _Transactions transactions;
   late final StudioDeployService service;
+  late final _Trustlines trustlines = _Trustlines(accounts);
   final sent = <String>[];
   final sentHashes = <String>[];
   final owner = StellarAddress.parse(_owner);
@@ -577,9 +634,13 @@ final class _Accounts implements ChainAccounts {
     minResourceFee: 20,
   );
   final simulated = <EnvelopeSpec>[];
+  int sequenceReads = 0;
 
   @override
-  Future<int> sequenceOf(StellarAddress account) async => 10;
+  Future<int> sequenceOf(StellarAddress account) async {
+    sequenceReads++;
+    return 10;
+  }
 
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
@@ -646,6 +707,23 @@ final class _Transactions implements ChainTxReader {
 final class _Funder implements AccountFunder {
   @override
   Future<void> fund(StellarAddress account) async {}
+}
+
+final class _Trustlines implements TrustlineEnsurer {
+  _Trustlines(this.accounts);
+
+  final _Accounts accounts;
+  LedgerException? failure;
+
+  /// The wallet of each call, and how many sequence reads came before it.
+  final calls = <(StellarAddress, int)>[];
+
+  @override
+  Future<bool> ensure(StellarAddress account) async {
+    calls.add((account, accounts.sequenceReads));
+    if (failure case final failure?) throw failure;
+    return true;
+  }
 }
 
 final class _Signer implements AgentEnvelopeSigner {
