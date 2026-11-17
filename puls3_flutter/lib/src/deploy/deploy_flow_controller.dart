@@ -149,6 +149,7 @@ class DeployFlowController extends ChangeNotifier {
   PreparedDeploy? _prepared;
   String? _signed;
   Registration? _registration;
+  bool _alreadyActive = false;
   String? _authEntry;
   String? _signedAuth;
 
@@ -180,6 +181,7 @@ class DeployFlowController extends ChangeNotifier {
       _prepared = null;
       _signed = null;
       _registration = null;
+      _alreadyActive = false;
       _authEntry = null;
       _signedAuth = null;
     }
@@ -203,38 +205,24 @@ class DeployFlowController extends ChangeNotifier {
           });
       _prepared = prepared;
 
-      final signed =
-          _signed ??
-          await _attempt<String>(DeployStep.awaitingSignature, () async {
-            // The transaction names the account it was prepared for. If the
-            // wallet switched account since, it cannot sign it. After a
-            // network switch the wallet forgot its session: connect again.
-            if (_wallet.address == null) {
-              await _waitForWallet(_wallet.connect());
-            }
-            if (_wallet.address != _builder) throw const _AccountChanged();
-            return _waitForWallet(
-              _wallet.signTransaction(prepared.unsignedTransaction),
-            );
-          });
-      _signed = signed;
+      // A resumed deploy (#321) is already registered: signing and
+      // registering are done, and an active agent needs no prompt at all.
+      if (_registration == null && prepared.registered != null) {
+        _registration = prepared.registered;
+        _alreadyActive = prepared.active;
+      }
 
-      final registration =
-          _registration ??
-          await _attempt<Registration>(
-            DeployStep.registering,
-            () async => _verifyRegistration(
-              await _backend(_gateway.submitRegistration(prepared, signed)),
-            ),
-          );
+      final registration = _registration ?? await _register(prepared);
       _registration = registration;
 
-      final entry =
-          _authEntry ??
-          await _attempt<String?>(
-            DeployStep.activating,
-            () async => _backend(_gateway.walletAuthorization(registration)),
-          );
+      final entry = _alreadyActive
+          ? null
+          : _authEntry ??
+                await _attempt<String?>(
+                  DeployStep.activating,
+                  () async =>
+                      _backend(_gateway.walletAuthorization(registration)),
+                );
       _authEntry = entry;
       if (entry != null && entry.isNotEmpty) {
         final signedAuth =
@@ -280,6 +268,31 @@ class DeployFlowController extends ChangeNotifier {
       _running = false;
       _notify();
     }
+  }
+
+  /// Signs the prepared registration and submits it until it is confirmed.
+  Future<Registration> _register(PreparedDeploy prepared) async {
+    final signed =
+        _signed ??
+        await _attempt<String>(DeployStep.awaitingSignature, () async {
+          // The transaction names the account it was prepared for. If the
+          // wallet switched account since, it cannot sign it. After a
+          // network switch the wallet forgot its session: connect again.
+          if (_wallet.address == null) {
+            await _waitForWallet(_wallet.connect());
+          }
+          if (_wallet.address != _builder) throw const _AccountChanged();
+          return _waitForWallet(
+            _wallet.signTransaction(prepared.unsignedTransaction),
+          );
+        });
+    _signed = signed;
+    return _attempt<Registration>(
+      DeployStep.registering,
+      () async => _verifyRegistration(
+        await _backend(_gateway.submitRegistration(prepared, signed)),
+      ),
+    );
   }
 
   /// Marks a wallet prompt as open and applies [signatureTimeout] to it.
@@ -404,6 +417,11 @@ class DeployFlowController extends ChangeNotifier {
   };
 
   PreparedDeploy _verifyPrepared(PreparedDeploy prepared) {
+    final registered = prepared.registered;
+    if (registered != null) {
+      _verifyRegistration(registered);
+      return prepared;
+    }
     if (prepared.preparationId.isEmpty ||
         prepared.unsignedTransaction.isEmpty) {
       throw const _InvalidResponse('The prepared transaction is empty.');
