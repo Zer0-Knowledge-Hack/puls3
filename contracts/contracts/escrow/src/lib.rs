@@ -29,6 +29,13 @@ pub const MAX_DESCRIPTION_LEN: u32 = 256;
 pub const BPS_DENOMINATOR: u32 = 10_000;
 /// Hard fee ceiling: at most 10% (1,000 bps) to protect providers.
 pub const MAX_FEE_BPS: u32 = 1_000;
+/// Ledgers a proposed identity registry waits before it can take effect (about
+/// 3 days at 5 s a ledger), so a compromised admin cannot redirect new jobs at
+/// once and the change is public before it applies (audit E-2, #206).
+pub const REGISTRY_TIMELOCK_LEDGERS: u32 = 51_840;
+/// Ledgers after the timelock during which the proposal can still be executed
+/// (about 7 days). After that it has expired and must be proposed again.
+pub const REGISTRY_EXECUTION_WINDOW: u32 = 120_960;
 
 const CONTRACT_VERSION: &str = "0.1.0";
 
@@ -73,6 +80,15 @@ pub enum EscrowError {
     NoPendingAdmin = 118,
     /// `accept_admin`: the caller is not the pending admin.
     NotPendingAdmin = 119,
+    /// A proposed identity registry is waiting and has not expired: cancel it
+    /// first (audit E-2).
+    RegistryChangePending = 120,
+    /// No identity registry change is proposed.
+    NoRegistryChange = 121,
+    /// The proposed identity registry's timelock has not passed yet.
+    RegistryTimelockNotExpired = 122,
+    /// The proposed identity registry was not executed in time; propose it again.
+    RegistryChangeExpired = 123,
 }
 
 #[contracttype]
@@ -124,6 +140,18 @@ pub enum DataKey {
     PendingAdmin,
     /// The treasury snapshotted at `fund` for a job with a fee, read at settlement.
     JobTreasury(u64),
+    /// The identity registry proposed by `propose_identity_registry`, until it is
+    /// executed or cancelled (audit E-2).
+    PendingIdentityRegistry,
+}
+
+/// A proposed identity registry (audit E-2). It takes effect only through
+/// `execute_identity_registry`, `REGISTRY_TIMELOCK_LEDGERS` after `proposed_at`.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RegistryProposal {
+    pub registry: Address,
+    pub proposed_at: u32,
 }
 
 #[contractevent]
@@ -241,6 +269,21 @@ pub struct LimitsUpdated {
 #[contractevent]
 #[derive(Clone)]
 pub struct RegistryUpdated {
+    pub registry: Address,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct RegistryChangeProposed {
+    pub registry: Address,
+    pub proposed_at: u32,
+    pub executable_at: u32,
+    pub expires_at: u32,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct RegistryChangeCancelled {
     pub registry: Address,
 }
 
@@ -384,19 +427,89 @@ impl EscrowContract {
         Ok(())
     }
 
-    /// Admin only. Only `create_job` consults the registry, so in-flight jobs are unaffected.
-    pub fn set_identity_registry(
+    /// Admin only. The first of two steps (audit E-2, #206): records `registry` as
+    /// proposed and emits `RegistryChangeProposed`. The registry names the wallet of
+    /// every new job's provider, so it changes only through `execute_identity_registry`,
+    /// after `REGISTRY_TIMELOCK_LEDGERS`: a compromised admin cannot redirect new jobs at
+    /// once, and the change is public for days before it applies. Only `create_job`
+    /// consults the registry, so in-flight jobs are unaffected either way. A live
+    /// proposal must be cancelled first (`RegistryChangePending`); an expired one can be
+    /// replaced.
+    pub fn propose_identity_registry(
         e: &Env,
         caller: Address,
         registry: Address,
     ) -> Result<(), EscrowError> {
         require_admin(e, &caller)?;
-        e.storage()
-            .instance()
-            .set(&DataKey::IdentityRegistry, &registry);
-        RegistryUpdated { registry }.publish(e);
+        let now = e.ledger().sequence();
+        if let Some(pending) = Self::pending_identity_registry(e) {
+            if !registry_change_expired(&pending, now) {
+                return Err(EscrowError::RegistryChangePending);
+            }
+        }
+        e.storage().instance().set(
+            &DataKey::PendingIdentityRegistry,
+            &RegistryProposal {
+                registry: registry.clone(),
+                proposed_at: now,
+            },
+        );
+        RegistryChangeProposed {
+            registry,
+            proposed_at: now,
+            executable_at: now.saturating_add(REGISTRY_TIMELOCK_LEDGERS),
+            expires_at: registry_change_expires_at(now),
+        }
+        .publish(e);
         extend_instance(e);
         Ok(())
+    }
+
+    /// Admin only. Drops the proposed registry and emits `RegistryChangeCancelled`.
+    pub fn cancel_identity_registry(e: &Env, caller: Address) -> Result<(), EscrowError> {
+        require_admin(e, &caller)?;
+        let pending = Self::pending_identity_registry(e).ok_or(EscrowError::NoRegistryChange)?;
+        e.storage()
+            .instance()
+            .remove(&DataKey::PendingIdentityRegistry);
+        RegistryChangeCancelled {
+            registry: pending.registry,
+        }
+        .publish(e);
+        extend_instance(e);
+        Ok(())
+    }
+
+    /// Admin only. Applies the proposed registry once its timelock has passed
+    /// (`RegistryTimelockNotExpired` before) and before it expires
+    /// (`RegistryChangeExpired`), and emits `RegistryUpdated`.
+    pub fn execute_identity_registry(e: &Env, caller: Address) -> Result<(), EscrowError> {
+        require_admin(e, &caller)?;
+        let pending = Self::pending_identity_registry(e).ok_or(EscrowError::NoRegistryChange)?;
+        let now = e.ledger().sequence();
+        if now.saturating_sub(pending.proposed_at) < REGISTRY_TIMELOCK_LEDGERS {
+            return Err(EscrowError::RegistryTimelockNotExpired);
+        }
+        if registry_change_expired(&pending, now) {
+            return Err(EscrowError::RegistryChangeExpired);
+        }
+        let instance = e.storage().instance();
+        instance.set(&DataKey::IdentityRegistry, &pending.registry);
+        instance.remove(&DataKey::PendingIdentityRegistry);
+        RegistryUpdated {
+            registry: pending.registry,
+        }
+        .publish(e);
+        extend_instance(e);
+        Ok(())
+    }
+
+    /// The identity registry proposed by `propose_identity_registry` and not executed
+    /// or cancelled yet.
+    pub fn pending_identity_registry(e: &Env) -> Option<RegistryProposal> {
+        e.storage()
+            .instance()
+            .get(&DataKey::PendingIdentityRegistry)
     }
 
     /// Admin only. The admin configures the contract and has no power over job funds.
@@ -852,6 +965,17 @@ fn validate_fee(fee_bps: u32, has_treasury: bool) -> Result<(), EscrowError> {
 }
 
 /// Both durations positive and `approval_window < max_expiry`.
+/// Last ledger at which a registry change proposed at `proposed_at` can be executed.
+fn registry_change_expires_at(proposed_at: u32) -> u32 {
+    proposed_at
+        .saturating_add(REGISTRY_TIMELOCK_LEDGERS)
+        .saturating_add(REGISTRY_EXECUTION_WINDOW)
+}
+
+fn registry_change_expired(proposal: &RegistryProposal, now: u32) -> bool {
+    now > registry_change_expires_at(proposal.proposed_at)
+}
+
 fn validate_limits(max_expiry: u64, approval_window: u64) -> Result<(), EscrowError> {
     if max_expiry == 0 || approval_window == 0 || approval_window >= max_expiry {
         return Err(EscrowError::InvalidDuration);
