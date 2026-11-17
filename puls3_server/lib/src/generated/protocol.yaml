@@ -25,6 +25,7 @@ hire:
   - prepareComplete:
   - prepareReject:
   - getHire:
+  - listMyHires:
   - submitEscrowCall:
 studio:
   - saveDraft:

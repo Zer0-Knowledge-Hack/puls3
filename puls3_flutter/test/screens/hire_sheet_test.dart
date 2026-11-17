@@ -290,6 +290,9 @@ class ScriptedHireGateway implements HireGateway {
   Future<HireProgress> getHire(int hireId, String consumer) async =>
       throw const HireNotFound();
 
+  @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async => const [];
+
   EscrowPreparation _prep(String purpose) => EscrowPreparation(
     preparationId: 'prep-$purpose-${_nextPreparation++}',
     purpose: purpose,

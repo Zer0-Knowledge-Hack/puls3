@@ -94,6 +94,9 @@ class _ProgressGateway implements HireGateway {
   final bool isDemo;
 
   @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async => const [];
+
+  @override
   Future<HireProgress> getHire(int hireId, String consumer) async {
     reads.add((hireId, consumer));
     final next = answers.length > 1 ? answers.removeAt(0) : answers.first;

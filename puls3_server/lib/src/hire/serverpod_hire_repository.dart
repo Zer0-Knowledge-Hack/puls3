@@ -146,6 +146,24 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
     return rows;
   }
 
+  @override
+  Future<List<HireRow>> listByConsumer(
+    String consumer, {
+    int limit = 100,
+  }) async {
+    if (limit < 1) {
+      throw ArgumentError.value(limit, 'limit', 'must be at least 1');
+    }
+    // `hire_consumer_request_idx` leads with `consumer`.
+    final records = await HireRecord.db.find(
+      session,
+      where: (t) => t.consumer.equals(consumer),
+      orderByList: (t) => [t.id.desc()],
+      limit: limit,
+    );
+    return [for (final record in records) await _row(record)];
+  }
+
   /// The wire view of [record]: no status until the job exists, `open`
   /// after, `funded` once a payment is recorded, then the escrow state
   /// derived from confirmed submissions (see [_settlement]).

@@ -1482,4 +1482,104 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get collabErrorGeneric => 'Algo salió mal. Inténtalo de nuevo.';
+
+  @override
+  String get navMyHires => 'Mis contrataciones';
+
+  @override
+  String get myHiresTitle => 'Mis contrataciones';
+
+  @override
+  String get myHiresSubtitle =>
+      'Todos los agentes que contrataste con esta billetera. Abre uno para ver su resultado, aprobarlo o pedir un reembolso.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Requieren tu acción';
+
+  @override
+  String get myHiresTabInProgress => 'En curso';
+
+  @override
+  String get myHiresTabFinished => 'Finalizadas';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'No tienes nada pendiente';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'Cuando un agente entregue su trabajo, aquí lo apruebas o lo rechazas.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'No hay contrataciones en curso';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'Las contrataciones que pagas aparecen aquí mientras el agente trabaja.';
+
+  @override
+  String get myHiresEmptyFinishedTitle =>
+      'Aún no hay contrataciones finalizadas';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Aquí aparecen las contrataciones aprobadas, reembolsadas y vencidas.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Explorar el Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Conecta tu billetera';
+
+  @override
+  String get myHiresConnectBody =>
+      'Tus contrataciones están ligadas a la billetera que las pagó. Conéctala para verlas.';
+
+  @override
+  String get myHiresConnectAction => 'Conectar billetera';
+
+  @override
+  String get myHiresSignInTitle => 'Inicia sesión para ver tus contrataciones';
+
+  @override
+  String get myHiresSignInBody =>
+      'Tu billetera firma un mensaje de inicio de sesión. Solo prueba que la cuenta es tuya y no mueve fondos.';
+
+  @override
+  String get myHiresSignInAction => 'Iniciar sesión con la billetera';
+
+  @override
+  String get myHiresSigningIn => 'Iniciando sesión…';
+
+  @override
+  String get myHiresLoadErrorTitle => 'No pudimos cargar tus contrataciones';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Aprueba antes del $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Esperando el pago';
+
+  @override
+  String get myHiresStatusInProgress => 'En curso';
+
+  @override
+  String get myHiresStatusReview => 'Lista para tu revisión';
+
+  @override
+  String get myHiresStatusCompleted => 'Completada';
+
+  @override
+  String get myHiresStatusRejected => 'Reembolsada';
+
+  @override
+  String get myHiresStatusExpired => 'Vencida';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: estas contrataciones son ejemplos y no se movieron fondos.';
+
+  @override
+  String get hireOpenMyHires => 'Mis contrataciones';
 }

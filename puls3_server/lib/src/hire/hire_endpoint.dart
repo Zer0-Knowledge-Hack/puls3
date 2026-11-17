@@ -15,8 +15,6 @@ import 'session_wallet.dart';
 /// (`WalletMismatch`), and ownership of a hire is checked against the session
 /// wallet by the services.
 ///
-/// `listHires` is not part of this endpoint yet.
-///
 /// Follow-ups: `InputTooLong` has no documented limit, so the input length is
 /// not checked here; `PersistenceUnavailable` is not mapped, so a database
 /// failure surfaces as Serverpod's own internal error.
@@ -136,6 +134,17 @@ class HireEndpoint extends Endpoint {
         _servicesOn(session).query ??
         (throw StateError('HireServices has no query service'));
     return query.getHire(wallet, hireId);
+  }
+
+  /// The session wallet's hires, newest first and capped, so the app can
+  /// list them (My hires). The consumer is always the session wallet: there
+  /// is no wallet parameter to ask for anyone else's.
+  Future<List<HireSummary>> listMyHires(Session session) async {
+    final wallet = await _wallet.requireLogin(session);
+    final query =
+        _servicesOn(session).query ??
+        (throw StateError('HireServices has no query service'));
+    return query.listMyHires(wallet);
   }
 
   /// Verifies the wallet-signed envelope of [preparationId] and relays it.
