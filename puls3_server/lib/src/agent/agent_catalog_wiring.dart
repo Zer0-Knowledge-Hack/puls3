@@ -13,6 +13,8 @@ import '../ledger/stellar_config.dart';
 import 'agent_catalog_service.dart';
 import 'catalog_reader.dart';
 import 'custodied_wallets.dart';
+import 'hidden_agents.dart';
+import 'hidden_catalog_reader.dart';
 import 'hireable_catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
 import 'reputation_catalog_reader.dart';
@@ -107,7 +109,9 @@ void catalogConsoleLog(ChainLogLevel level, String message) {
 
 /// Builds the catalog reader for one request: the Postgres index, falling back
 /// to the on-chain catalog while the index is empty, with each agent's
-/// reputation added by the #11 function.
+/// reputation added by the #11 function. The agents listed in
+/// `PULS3_HIDDEN_AGENT_IDS` are dropped first, so they get no custody or
+/// reputation read and no caller of this reader ever sees them.
 ///
 /// Every Soroban import lives here, not in the endpoint, so the endpoint
 /// depends only on [CatalogReader]. The fallback is a process-wide singleton;
@@ -117,9 +121,8 @@ CatalogReader buildAgentCatalogReader(
   Map<String, String>? environment,
   http.Client? httpClient,
 }) {
-  final config = StellarConfig.fromEnvironment(
-    environment ?? Platform.environment,
-  );
+  final env = environment ?? Platform.environment;
+  final config = StellarConfig.fromEnvironment(env);
   final fallback = (environment == null && httpClient == null)
       ? chainCatalog(Platform.environment)
       : _buildChainCatalog(
@@ -128,12 +131,15 @@ CatalogReader buildAgentCatalogReader(
         );
   return ReputationCatalogReader(
     inner: HireableCatalogReader(
-      inner: IndexedAgentCatalogService(
-        index: ServerpodAgentIndexRepository(
-          session,
-          network: config.networkPassphrase,
+      inner: HiddenCatalogReader(
+        inner: IndexedAgentCatalogService(
+          index: ServerpodAgentIndexRepository(
+            session,
+            network: config.networkPassphrase,
+          ),
+          fallback: fallback,
         ),
-        fallback: fallback,
+        hidden: HiddenAgents.fromEnvironment(env),
       ),
       custody: custodyOn(session),
     ),

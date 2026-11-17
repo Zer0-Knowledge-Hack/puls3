@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
+import 'package:puls3_server/src/agent/hidden_agents.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
@@ -150,13 +151,67 @@ void main() {
         expect(rig.hires.all, isEmpty);
       });
 
-      test('a chain outage reading the payee is HireLedgerUnavailable', () async {
-        rig.ledger.walletError = const LedgerUnavailable('RPC down');
+      test(
+        'a chain outage reading the payee is HireLedgerUnavailable',
+        () async {
+          rig.ledger.walletError = const LedgerUnavailable('RPC down');
 
+          await expectLater(
+            create(withLookup((_) => agentSummary)),
+            throwsA(isA<HireLedgerUnavailable>()),
+          );
+        },
+      );
+    });
+
+    group('a hidden agent (moderation)', () {
+      HireService hiding(String value) => HireService(
+        hires: rig.hires,
+        preparations: rig.preparations,
+        relay: rig.service,
+        registry: rig.ledger,
+        catalog: AgentCatalogService(rig.ledger),
+        custody: rig.custodyOf,
+        config: HireRelayConfig(env),
+        hidden: HiddenAgents.fromEnvironment({
+          'PULS3_HIDDEN_AGENT_IDS': value,
+        }),
+        now: () => rig.clock,
+      );
+
+      test('is AgentUnavailable and stores nothing', () async {
         await expectLater(
-          create(withLookup((_) => agentSummary)),
-          throwsA(isA<HireLedgerUnavailable>()),
+          create(hiding('7')),
+          throwsA(
+            isA<AgentUnavailable>().having((e) => e.agentId, 'agentId', 7),
+          ),
         );
+        expect(rig.hires.all, isEmpty);
+        expect(rig.codec.built, isEmpty);
+      });
+
+      test('another hidden id leaves this agent hireable', () async {
+        final result = await create(hiding('15,16'));
+
+        expect(result.hire.agentId, 7);
+      });
+
+      test('with the variable unset the agent is hireable', () async {
+        final result = await create(
+          HireService(
+            hires: rig.hires,
+            preparations: rig.preparations,
+            relay: rig.service,
+            registry: rig.ledger,
+            catalog: AgentCatalogService(rig.ledger),
+            custody: rig.custodyOf,
+            config: HireRelayConfig(env),
+            hidden: HiddenAgents.fromEnvironment(const {}),
+            now: () => rig.clock,
+          ),
+        );
+
+        expect(result.hire.agentId, 7);
       });
     });
 
