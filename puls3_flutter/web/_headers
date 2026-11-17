@@ -1,0 +1,7 @@
+# Cloudflare Pages headers (copied into build/web by `flutter build web`).
+# Flutter web files keep fixed names across releases (main.dart.js,
+# flutter_bootstrap.js, canvaskit/*), so browsers must revalidate them on
+# every load instead of reusing a stale copy for hours after a deploy.
+# Revalidation is cheap: Pages answers 304 when the ETag still matches.
+/*
+  Cache-Control: no-cache
