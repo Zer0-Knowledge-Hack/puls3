@@ -29,6 +29,10 @@ final class _FakeIndex implements AgentIndexRepository {
   Future<AgentSummary?> findByAgentId(String agentId) async => rows[agentId];
 
   @override
+  Future<AgentSummary?> findByRegistryId(int registryId) async =>
+      rows.values.where((a) => a.registryId == registryId).firstOrNull;
+
+  @override
   Future<Set<int>> registryIds() async =>
       {for (final row in rows.values) row.registryId};
 

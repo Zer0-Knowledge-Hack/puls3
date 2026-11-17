@@ -6,11 +6,11 @@ import 'package:serverpod/serverpod.dart';
 import '../agent/agent_catalog_service.dart';
 import '../agent/agent_catalog_wiring.dart' show catalogConsoleLog;
 import '../agent/custodied_wallets.dart';
+import '../agent/serverpod_agent_index_repository.dart';
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
 import '../feedback/feedback_service.dart';
 import '../feedback/reputation_wiring.dart';
-import '../generated/protocol.dart' show AgentSummary;
 import '../ledger/envelope_codec.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
@@ -20,6 +20,7 @@ import '../ledger/stellar_envelope_codec.dart';
 import '../runtime/serverpod_hire_run_store.dart';
 import 'chain_accounts.dart';
 import 'escrow_relay_service.dart';
+import 'hire_agent_lookup.dart';
 import 'hire_query_service.dart';
 import 'hire_relay_config.dart';
 import 'hire_service.dart';
@@ -104,10 +105,14 @@ final class HireWiring {
     final repository = ServerpodHireRepository(session);
     final preparations = ServerpodEscrowPreparationStore(session);
     final submissions = ServerpodChainSubmissionStore(session);
-    Future<AgentSummary?> agentOf(int registryId) async =>
-        (await catalog.list())
-            .where((agent) => agent.registryId == registryId)
-            .firstOrNull;
+    // One agent from the catalog index, not the whole catalog (#206, I-2).
+    final agentOf = hireAgentLookup(
+      index: ServerpodAgentIndexRepository(
+        session,
+        network: stellar.networkPassphrase,
+      ),
+      fallback: catalog,
+    );
     final relay = EscrowRelayService(
       preparations: preparations,
       submissions: submissions,
@@ -129,6 +134,7 @@ final class HireWiring {
         catalog: catalog,
         custody: custodyOn(session),
         config: config,
+        agentOf: agentOf,
       ),
       relay: relay,
       feedback: FeedbackService(
