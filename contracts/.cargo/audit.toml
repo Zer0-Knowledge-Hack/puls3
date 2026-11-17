@@ -13,4 +13,11 @@ ignore = [
   # can bring. Way out: drop this line when soroban-sdk moves to it. CI keeps
   # the wasm-graph claim true (`contracts` job, #281).
   "RUSTSEC-2026-0387",
+  # RUSTSEC-2024-0436: paste 1.0.15, no longer maintained (a warning, so
+  # `cargo audit --deny warnings` fails on it). It is a proc-macro pulled by
+  # ark-ff 0.5 through soroban-env-host 28, host-only like the entry above,
+  # and absent from the wasm graph. No fixed release exists. Way out: drop
+  # this line when soroban-env-host stops depending on it. CI keeps the
+  # wasm-graph claim true (`contracts` job, #281).
+  "RUSTSEC-2024-0436",
 ]

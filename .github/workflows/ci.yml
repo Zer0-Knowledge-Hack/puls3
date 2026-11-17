@@ -229,12 +229,16 @@ jobs:
       # never hides the results below. This check is deterministic: the
       # crypto-bigint ignore in .cargo/audit.toml only holds while the wasm
       # graph stays free of it.
-      - name: Keep crypto-bigint out of the wasm graph
+      - name: Keep ignored advisory crates out of the wasm graph
         run: |
-          out="$(cargo tree -i crypto-bigint@0.5.5 -e normal --target wasm32v1-none 2>/dev/null || true)"
-          if [[ -n "$out" ]]; then
-            echo "$out" >&2
-            echo "crypto-bigint 0.5.5 reached the wasm graph: the RUSTSEC-2026-0387 ignore no longer holds." >&2
+          # List the whole wasm graph instead of querying one version: a
+          # version-pinned `cargo tree -i` fails when the lock moves to another
+          # version, and that failure must never read as "not in the graph".
+          # A cargo failure here fails the step (bash -e) with its stderr shown.
+          tree="$(cargo tree --workspace -e normal --target wasm32v1-none --prefix none)"
+          if matches="$(grep -E '^(crypto-bigint|paste) ' <<<"$tree")"; then
+            echo "$matches" >&2
+            echo "An ignored crate reached the wasm graph: the RUSTSEC-2026-0387 / RUSTSEC-2024-0436 ignores in contracts/.cargo/audit.toml no longer hold." >&2
             exit 1
           fi
       - run: cargo test
