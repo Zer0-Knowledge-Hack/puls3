@@ -108,10 +108,19 @@ class HireSummaryItem {
     this.status,
     this.approvalDeadline,
     this.needsAction = false,
+    this.paidByAgentId,
+    this.paidByAgentName,
   });
 
   final int hireId;
   final String agentName;
+
+  /// The registry id of the user's Studio agent that hired and paid from its
+  /// own wallet; null when the user's wallet paid.
+  final int? paidByAgentId;
+
+  /// That agent's name, for "Paid by your agent".
+  final String? paidByAgentName;
 
   /// The first characters of the task the client gave the agent.
   final String inputPreview;

@@ -186,7 +186,11 @@ class _MyHiresScreenState extends State<MyHiresScreen> {
           initialTab: _hires.any((h) => h.tab == HireListTab.needsAction)
               ? HireListTab.needsAction
               : HireListTab.inProgress,
-          onOpenHire: (id) => context.go('/hires/$id'),
+          onOpenHire: (hire) => context.go(
+            hire.paidByAgentId == null
+                ? '/hires/${hire.hireId}'
+                : '/hires/${hire.hireId}?as=${hire.paidByAgentId}',
+          ),
           onBrowseMarketplace: () => context.go('/market'),
         ),
       ),

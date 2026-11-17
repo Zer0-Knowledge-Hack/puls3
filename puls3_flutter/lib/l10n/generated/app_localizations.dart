@@ -2442,18 +2442,6 @@ abstract class AppLocalizations {
   /// **'Pick a score from 1 to 5 and keep the comment to {max} characters.'**
   String rateInvalid(int max);
 
-  /// No description provided for @collabTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Collaborate: hire another agent'**
-  String get collabTitle;
-
-  /// No description provided for @collabLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.'**
-  String get collabLead;
-
   /// No description provided for @collabWalletLabel.
   ///
   /// In en, this message translates to:
@@ -2489,54 +2477,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Address copied'**
   String get collabWalletCopied;
-
-  /// No description provided for @collabAgentLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Agent to hire'**
-  String get collabAgentLabel;
-
-  /// No description provided for @collabNoAgents.
-  ///
-  /// In en, this message translates to:
-  /// **'No other agent can be hired right now.'**
-  String get collabNoAgents;
-
-  /// No description provided for @collabInstructionsLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'What should it do?'**
-  String get collabInstructionsLabel;
-
-  /// No description provided for @collabInstructionsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'For example: summarize this article in three bullet points.'**
-  String get collabInstructionsHint;
-
-  /// No description provided for @collabBudgetLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Maximum budget (USDC)'**
-  String get collabBudgetLabel;
-
-  /// No description provided for @collabBudgetInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter an amount above zero, for example 1.50.'**
-  String get collabBudgetInvalid;
-
-  /// No description provided for @collabHire.
-  ///
-  /// In en, this message translates to:
-  /// **'Hire'**
-  String get collabHire;
-
-  /// No description provided for @collabHiring.
-  ///
-  /// In en, this message translates to:
-  /// **'Starting the hire…'**
-  String get collabHiring;
 
   /// No description provided for @collabProgressTitle.
   ///
@@ -2591,12 +2531,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This hire was cancelled and the money went back to your agent.'**
   String get collabRefunded;
-
-  /// No description provided for @collabHireAnother.
-  ///
-  /// In en, this message translates to:
-  /// **'Hire again'**
-  String get collabHireAnother;
 
   /// No description provided for @collabErrorNotOwned.
   ///
@@ -2831,6 +2765,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My hires'**
   String get hireOpenMyHires;
+
+  /// No description provided for @hirePayerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Who pays?'**
+  String get hirePayerTitle;
+
+  /// No description provided for @hirePayerYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You (your wallet)'**
+  String get hirePayerYou;
+
+  /// No description provided for @hirePayerAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent {name} (pays from its own wallet)'**
+  String hirePayerAgent(String name);
+
+  /// No description provided for @hireAsAgentLead.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} hires this agent and pays {price} USDC from its own wallet. You do not need to sign anything.'**
+  String hireAsAgentLead(String name, String price);
+
+  /// No description provided for @hireAsAgentConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire with {name}'**
+  String hireAsAgentConfirm(String name);
+
+  /// No description provided for @hireAsAgentHiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the hire…'**
+  String get hireAsAgentHiring;
+
+  /// No description provided for @hireAsAgentInputMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what the agent should do first.'**
+  String get hireAsAgentInputMissing;
+
+  /// No description provided for @myHiresPaidByAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid by your agent {name}'**
+  String myHiresPaidByAgent(String name);
+
+  /// No description provided for @agentHireDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire made by your agent'**
+  String get agentHireDetailTitle;
+
+  /// No description provided for @agentHireDetailConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect the wallet that owns this agent to see this hire.'**
+  String get agentHireDetailConnect;
 }
 
 class _AppLocalizationsDelegate

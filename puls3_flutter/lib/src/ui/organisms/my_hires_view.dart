@@ -20,7 +20,7 @@ class MyHiresView extends StatelessWidget {
   });
 
   final List<HireSummaryItem> hires;
-  final ValueChanged<int> onOpenHire;
+  final ValueChanged<HireSummaryItem> onOpenHire;
   final VoidCallback onBrowseMarketplace;
   final bool isDemo;
   final HireListTab initialTab;
@@ -94,7 +94,7 @@ class _HireList extends StatelessWidget {
 
   final HireListTab tab;
   final List<HireSummaryItem> hires;
-  final ValueChanged<int> onOpenHire;
+  final ValueChanged<HireSummaryItem> onOpenHire;
   final VoidCallback onBrowseMarketplace;
 
   @override
@@ -130,7 +130,7 @@ class _HireList extends StatelessWidget {
       itemCount: hires.length,
       separatorBuilder: (_, _) => const SizedBox(height: Puls3Spacing.sm),
       itemBuilder: (context, i) =>
-          _HireRow(hire: hires[i], onTap: () => onOpenHire(hires[i].hireId)),
+          _HireRow(hire: hires[i], onTap: () => onOpenHire(hires[i])),
     );
   }
 }
@@ -171,6 +171,14 @@ class _HireRow extends StatelessWidget {
                   _StatusChip(hire: hire),
                 ],
               ),
+              if (hire.paidByAgentName case final payer?) ...[
+                const SizedBox(height: Puls3Spacing.xxs),
+                Text(
+                  l10n.myHiresPaidByAgent(payer),
+                  key: ValueKey('my-hires-paid-by-${hire.hireId}'),
+                  style: Puls3Text.caption.copyWith(color: Puls3Colors.accent),
+                ),
+              ],
               const SizedBox(height: Puls3Spacing.xxs),
               Text(
                 hire.inputPreview,

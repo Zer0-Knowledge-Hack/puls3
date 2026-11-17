@@ -285,6 +285,8 @@ class ServerHireGateway implements HireGateway {
           status: hire.status,
           approvalDeadline: hire.approvalDeadline,
           needsAction: hire.needsAction,
+          paidByAgentId: hire.paidByAgentId,
+          paidByAgentName: hire.paidByAgentName,
         ),
     ];
   }

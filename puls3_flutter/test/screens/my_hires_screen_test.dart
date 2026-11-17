@@ -76,8 +76,12 @@ Future<void> _pump(
       ),
       GoRoute(
         path: '/hires/:id',
-        builder: (_, state) =>
-            Scaffold(body: Text('detail ${state.pathParameters['id']}')),
+        builder: (_, state) => Scaffold(
+          body: Text(
+            'detail ${state.pathParameters['id']}'
+            '${state.uri.queryParameters['as'] == null ? '' : ' as ${state.uri.queryParameters['as']}'}',
+          ),
+        ),
       ),
       GoRoute(
         path: '/market',
@@ -149,6 +153,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('detail 5'), findsOneWidget);
+  });
+
+  testWidgets('a hire paid by an agent of the user says so and opens as it', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      gateway: _ListGateway(const [
+        HireSummaryItem(
+          hireId: 8,
+          agentName: 'Translator',
+          inputPreview: 'Translate the email',
+          priceUsdcStroops: 5000000,
+          status: 'funded',
+          paidByAgentId: 11,
+          paidByAgentName: 'Scout',
+        ),
+      ]),
+    );
+
+    expect(find.text('Paid by your agent Scout'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('my-hires-row-8')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('detail 8 as 11'), findsOneWidget);
+  });
+
+  testWidgets('a hire the user paid names no agent', (tester) async {
+    await _pump(tester, gateway: _ListGateway(_rows));
+
+    expect(find.textContaining('Paid by your agent'), findsNothing);
   });
 
   testWidgets('an empty tab links to the Marketplace', (tester) async {
