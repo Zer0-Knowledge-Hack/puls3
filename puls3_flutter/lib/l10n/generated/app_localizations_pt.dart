@@ -1474,6 +1474,107 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get collabErrorGeneric => 'Algo deu errado. Tente de novo.';
+
+  @override
+  String get navMyHires => 'Minhas contratações';
+
+  @override
+  String get myHiresTitle => 'Minhas contratações';
+
+  @override
+  String get myHiresSubtitle =>
+      'Todos os agentes que você contratou com esta carteira. Abra um para ver o resultado, aprovar ou pedir reembolso.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Precisam da sua ação';
+
+  @override
+  String get myHiresTabInProgress => 'Em andamento';
+
+  @override
+  String get myHiresTabFinished => 'Finalizadas';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'Nada pendente agora';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'Quando um agente entregar o trabalho, você aprova ou rejeita aqui.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'Nenhuma contratação em andamento';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'As contratações que você paga aparecem aqui enquanto o agente trabalha.';
+
+  @override
+  String get myHiresEmptyFinishedTitle =>
+      'Nenhuma contratação finalizada ainda';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Contratações aprovadas, reembolsadas e expiradas aparecem aqui.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Explorar o Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Conecte sua carteira';
+
+  @override
+  String get myHiresConnectBody =>
+      'Suas contratações estão ligadas à carteira que pagou por elas. Conecte-a para vê-las.';
+
+  @override
+  String get myHiresConnectAction => 'Conectar carteira';
+
+  @override
+  String get myHiresSignInTitle => 'Entre para ver suas contratações';
+
+  @override
+  String get myHiresSignInBody =>
+      'Sua carteira assina uma mensagem de login. Ela só prova que a conta é sua e não movimenta fundos.';
+
+  @override
+  String get myHiresSignInAction => 'Entrar com a carteira';
+
+  @override
+  String get myHiresSigningIn => 'Entrando…';
+
+  @override
+  String get myHiresLoadErrorTitle =>
+      'Não foi possível carregar suas contratações';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Aprove até $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Aguardando pagamento';
+
+  @override
+  String get myHiresStatusInProgress => 'Em andamento';
+
+  @override
+  String get myHiresStatusReview => 'Pronta para sua revisão';
+
+  @override
+  String get myHiresStatusCompleted => 'Concluída';
+
+  @override
+  String get myHiresStatusRejected => 'Reembolsada';
+
+  @override
+  String get myHiresStatusExpired => 'Expirada';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: estas contratações são exemplos e nenhum fundo foi movimentado.';
+
+  @override
+  String get hireOpenMyHires => 'Minhas contratações';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2946,6 +3047,107 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get collabErrorGeneric => 'Algo deu errado. Tente de novo.';
+
+  @override
+  String get navMyHires => 'Minhas contratações';
+
+  @override
+  String get myHiresTitle => 'Minhas contratações';
+
+  @override
+  String get myHiresSubtitle =>
+      'Todos os agentes que você contratou com esta carteira. Abra um para ver o resultado, aprovar ou pedir reembolso.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Precisam da sua ação';
+
+  @override
+  String get myHiresTabInProgress => 'Em andamento';
+
+  @override
+  String get myHiresTabFinished => 'Finalizadas';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'Nada pendente agora';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'Quando um agente entregar o trabalho, você aprova ou rejeita aqui.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'Nenhuma contratação em andamento';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'As contratações que você paga aparecem aqui enquanto o agente trabalha.';
+
+  @override
+  String get myHiresEmptyFinishedTitle =>
+      'Nenhuma contratação finalizada ainda';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Contratações aprovadas, reembolsadas e expiradas aparecem aqui.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Explorar o Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Conecte sua carteira';
+
+  @override
+  String get myHiresConnectBody =>
+      'Suas contratações estão ligadas à carteira que pagou por elas. Conecte-a para vê-las.';
+
+  @override
+  String get myHiresConnectAction => 'Conectar carteira';
+
+  @override
+  String get myHiresSignInTitle => 'Entre para ver suas contratações';
+
+  @override
+  String get myHiresSignInBody =>
+      'Sua carteira assina uma mensagem de login. Ela só prova que a conta é sua e não movimenta fundos.';
+
+  @override
+  String get myHiresSignInAction => 'Entrar com a carteira';
+
+  @override
+  String get myHiresSigningIn => 'Entrando…';
+
+  @override
+  String get myHiresLoadErrorTitle =>
+      'Não foi possível carregar suas contratações';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Aprove até $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Aguardando pagamento';
+
+  @override
+  String get myHiresStatusInProgress => 'Em andamento';
+
+  @override
+  String get myHiresStatusReview => 'Pronta para sua revisão';
+
+  @override
+  String get myHiresStatusCompleted => 'Concluída';
+
+  @override
+  String get myHiresStatusRejected => 'Reembolsada';
+
+  @override
+  String get myHiresStatusExpired => 'Expirada';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: estas contratações são exemplos e nenhum fundo foi movimentado.';
+
+  @override
+  String get hireOpenMyHires => 'Minhas contratações';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -4421,4 +4623,106 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get collabErrorGeneric => 'Algo deu errado. Tente de novo.';
+
+  @override
+  String get navMyHires => 'As minhas contratações';
+
+  @override
+  String get myHiresTitle => 'As minhas contratações';
+
+  @override
+  String get myHiresSubtitle =>
+      'Todos os agentes que contratou com esta carteira. Abra um para ver o resultado, aprovar ou pedir reembolso.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Precisam da sua ação';
+
+  @override
+  String get myHiresTabInProgress => 'Em curso';
+
+  @override
+  String get myHiresTabFinished => 'Terminadas';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'Nada pendente de momento';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'Quando um agente entregar o trabalho, aprova-o ou rejeita-o aqui.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'Nenhuma contratação em curso';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'As contratações que paga aparecem aqui enquanto o agente trabalha.';
+
+  @override
+  String get myHiresEmptyFinishedTitle =>
+      'Ainda não há contratações terminadas';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Contratações aprovadas, reembolsadas e expiradas aparecem aqui.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Explorar o Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Ligue a sua carteira';
+
+  @override
+  String get myHiresConnectBody =>
+      'As suas contratações estão associadas à carteira que as pagou. Ligue-a para as ver.';
+
+  @override
+  String get myHiresConnectAction => 'Ligar carteira';
+
+  @override
+  String get myHiresSignInTitle =>
+      'Inicie sessão para ver as suas contratações';
+
+  @override
+  String get myHiresSignInBody =>
+      'A sua carteira assina uma mensagem de início de sessão. Só prova que a conta é sua e não movimenta fundos.';
+
+  @override
+  String get myHiresSignInAction => 'Iniciar sessão com a carteira';
+
+  @override
+  String get myHiresSigningIn => 'A iniciar sessão…';
+
+  @override
+  String get myHiresLoadErrorTitle =>
+      'Não foi possível carregar as suas contratações';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Aprove até $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'A aguardar pagamento';
+
+  @override
+  String get myHiresStatusInProgress => 'Em curso';
+
+  @override
+  String get myHiresStatusReview => 'Pronta para a sua revisão';
+
+  @override
+  String get myHiresStatusCompleted => 'Concluída';
+
+  @override
+  String get myHiresStatusRejected => 'Reembolsada';
+
+  @override
+  String get myHiresStatusExpired => 'Expirada';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: estas contratações são exemplos e não foram movimentados fundos.';
+
+  @override
+  String get hireOpenMyHires => 'As minhas contratações';
 }

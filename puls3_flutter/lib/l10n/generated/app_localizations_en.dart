@@ -1456,4 +1456,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get collabErrorGeneric => 'Something went wrong. Try again.';
+
+  @override
+  String get navMyHires => 'My hires';
+
+  @override
+  String get myHiresTitle => 'My hires';
+
+  @override
+  String get myHiresSubtitle =>
+      'Every agent you hired with this wallet. Open one to see its result, approve it or ask for a refund.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Needs your action';
+
+  @override
+  String get myHiresTabInProgress => 'In progress';
+
+  @override
+  String get myHiresTabFinished => 'Finished';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'Nothing to do right now';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'When an agent delivers, you approve or reject its work here.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'No hires in progress';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'Hires you pay for show up here while the agent works on them.';
+
+  @override
+  String get myHiresEmptyFinishedTitle => 'No finished hires yet';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Approved, refunded and expired hires show up here.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Browse the Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Connect your wallet';
+
+  @override
+  String get myHiresConnectBody =>
+      'Your hires are linked to the wallet that paid for them. Connect it to see them.';
+
+  @override
+  String get myHiresConnectAction => 'Connect wallet';
+
+  @override
+  String get myHiresSignInTitle => 'Sign in to see your hires';
+
+  @override
+  String get myHiresSignInBody =>
+      'Your wallet signs a sign-in message. It only proves the account is yours and moves no funds.';
+
+  @override
+  String get myHiresSignInAction => 'Sign in with wallet';
+
+  @override
+  String get myHiresSigningIn => 'Signing in…';
+
+  @override
+  String get myHiresLoadErrorTitle => 'Could not load your hires';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Approve by $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Waiting for payment';
+
+  @override
+  String get myHiresStatusInProgress => 'In progress';
+
+  @override
+  String get myHiresStatusReview => 'Ready for your review';
+
+  @override
+  String get myHiresStatusCompleted => 'Completed';
+
+  @override
+  String get myHiresStatusRejected => 'Refunded';
+
+  @override
+  String get myHiresStatusExpired => 'Expired';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: these hires are samples and no funds moved.';
+
+  @override
+  String get hireOpenMyHires => 'My hires';
 }

@@ -155,4 +155,9 @@ abstract interface class HireLifecycleStore {
   ///
   /// Throws [ArgumentError] when [limit] is below 1.
   Future<List<HireRow>> listWithJob({int afterId = 0, int limit = 100});
+
+  /// The hires of [consumer], newest first (by id), at most [limit].
+  ///
+  /// Throws [ArgumentError] when [limit] is below 1.
+  Future<List<HireRow>> listByConsumer(String consumer, {int limit = 100});
 }

@@ -36,6 +36,7 @@ class HirePaymentView extends StatelessWidget {
     this.paymentConfirmed = false,
     this.onOpenExplorer,
     this.onViewHire,
+    this.onMyHires,
   });
 
   final HirePhase phase;
@@ -81,6 +82,10 @@ class HirePaymentView extends StatelessWidget {
 
   /// Opens the hire detail (S06), where the agent's progress shows.
   final VoidCallback? onViewHire;
+
+  /// Opens My hires, where every hire of the wallet stays reachable. Null
+  /// hides the action.
+  final VoidCallback? onMyHires;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +322,17 @@ class HirePaymentView extends StatelessWidget {
             icon: Icons.track_changes_rounded,
             expand: true,
             onPressed: onViewHire,
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+        ],
+        if (onMyHires != null) ...[
+          PrimaryButton(
+            key: const ValueKey('hire-payment-my-hires'),
+            label: l10n.hireOpenMyHires,
+            icon: Icons.receipt_long_outlined,
+            variant: PrimaryButtonVariant.outline,
+            expand: true,
+            onPressed: onMyHires,
           ),
           const SizedBox(height: Puls3Spacing.sm),
         ],

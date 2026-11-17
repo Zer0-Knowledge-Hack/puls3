@@ -132,6 +132,9 @@ class _HireSheetState extends State<HireSheet> {
                   onViewHire: flow.hireId == null
                       ? null
                       : () => _leaveTo('/hires/${flow.hireId}'),
+                  onMyHires: flow.hireId == null
+                      ? null
+                      : () => _leaveTo('/hires'),
                   onOpenExplorer: hash == null || hash.isEmpty
                       ? null
                       : () => unawaited(

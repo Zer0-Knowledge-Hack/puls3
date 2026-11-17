@@ -2651,6 +2651,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong. Try again.'**
   String get collabErrorGeneric;
+
+  /// No description provided for @navMyHires.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get navMyHires;
+
+  /// No description provided for @myHiresTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get myHiresTitle;
+
+  /// No description provided for @myHiresSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every agent you hired with this wallet. Open one to see its result, approve it or ask for a refund.'**
+  String get myHiresSubtitle;
+
+  /// No description provided for @myHiresTabNeedsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs your action'**
+  String get myHiresTabNeedsAction;
+
+  /// No description provided for @myHiresTabInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get myHiresTabInProgress;
+
+  /// No description provided for @myHiresTabFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get myHiresTabFinished;
+
+  /// No description provided for @myHiresEmptyNeedsActionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to do right now'**
+  String get myHiresEmptyNeedsActionTitle;
+
+  /// No description provided for @myHiresEmptyNeedsActionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'When an agent delivers, you approve or reject its work here.'**
+  String get myHiresEmptyNeedsActionBody;
+
+  /// No description provided for @myHiresEmptyInProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No hires in progress'**
+  String get myHiresEmptyInProgressTitle;
+
+  /// No description provided for @myHiresEmptyInProgressBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Hires you pay for show up here while the agent works on them.'**
+  String get myHiresEmptyInProgressBody;
+
+  /// No description provided for @myHiresEmptyFinishedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No finished hires yet'**
+  String get myHiresEmptyFinishedTitle;
+
+  /// No description provided for @myHiresEmptyFinishedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved, refunded and expired hires show up here.'**
+  String get myHiresEmptyFinishedBody;
+
+  /// No description provided for @myHiresBrowseMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the Marketplace'**
+  String get myHiresBrowseMarketplace;
+
+  /// No description provided for @myHiresConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your wallet'**
+  String get myHiresConnectTitle;
+
+  /// No description provided for @myHiresConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your hires are linked to the wallet that paid for them. Connect it to see them.'**
+  String get myHiresConnectBody;
+
+  /// No description provided for @myHiresConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect wallet'**
+  String get myHiresConnectAction;
+
+  /// No description provided for @myHiresSignInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your hires'**
+  String get myHiresSignInTitle;
+
+  /// No description provided for @myHiresSignInBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet signs a sign-in message. It only proves the account is yours and moves no funds.'**
+  String get myHiresSignInBody;
+
+  /// No description provided for @myHiresSignInAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with wallet'**
+  String get myHiresSignInAction;
+
+  /// No description provided for @myHiresSigningIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in…'**
+  String get myHiresSigningIn;
+
+  /// No description provided for @myHiresLoadErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your hires'**
+  String get myHiresLoadErrorTitle;
+
+  /// No description provided for @myHiresApproveBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve by {date}'**
+  String myHiresApproveBy(String date);
+
+  /// No description provided for @myHiresStatusAwaitingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for payment'**
+  String get myHiresStatusAwaitingPayment;
+
+  /// No description provided for @myHiresStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get myHiresStatusInProgress;
+
+  /// No description provided for @myHiresStatusReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for your review'**
+  String get myHiresStatusReview;
+
+  /// No description provided for @myHiresStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get myHiresStatusCompleted;
+
+  /// No description provided for @myHiresStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get myHiresStatusRejected;
+
+  /// No description provided for @myHiresStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get myHiresStatusExpired;
+
+  /// No description provided for @myHiresDemoNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo: these hires are samples and no funds moved.'**
+  String get myHiresDemoNote;
+
+  /// No description provided for @hireOpenMyHires.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get hireOpenMyHires;
 }
 
 class _AppLocalizationsDelegate
