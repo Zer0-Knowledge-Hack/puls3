@@ -77,6 +77,7 @@ ServerHireGateway _gateway({
   PrepareEscrowCall? prepareFund,
   PrepareEscrowCall? prepareComplete,
   PrepareRejectCall? prepareReject,
+  PrepareClaimRefundCall? prepareClaimRefund,
   SubmitEscrowCall? submit,
   GetHireCall? getHire,
   PrepareFeedbackCall? prepareFeedback,
@@ -95,6 +96,8 @@ ServerHireGateway _gateway({
   prepareFund: prepareFund ?? (_) async => _prepared('fund'),
   prepareComplete: prepareComplete ?? (_) async => _prepared('complete'),
   prepareReject: prepareReject ?? (_, _) async => _prepared('reject'),
+  prepareClaimRefund:
+      prepareClaimRefund ?? (_) async => _prepared('claimRefund'),
   submitEscrowCall: submit ?? (_, _, _) async => _detail('submitted'),
   getHire: getHire ?? (_, _) async => _detail('confirmed'),
   prepareFeedback:
@@ -269,6 +272,22 @@ void main() {
         );
       },
     );
+
+    test('prepareClaimRefund returns the consumer-signed claim', () async {
+      final asked = <int>[];
+      final gateway = _gateway(
+        prepareClaimRefund: (hireId) async {
+          asked.add(hireId);
+          return _prepared('claimRefund');
+        },
+      );
+
+      final preparation = await gateway.prepareClaimRefund(3);
+
+      expect(asked, [3]);
+      expect(preparation.purpose, 'claimRefund');
+      expect(preparation.unsignedTransaction, 'AAAA-unsigned');
+    });
 
     test(
       'createHire passes the request through and returns the create_job',
@@ -583,6 +602,7 @@ void main() {
         prepareFund: (_) async => _prepared('fund'),
         prepareComplete: (_) async => _prepared('complete'),
         prepareReject: (_, _) async => _prepared('reject'),
+        prepareClaimRefund: (_) async => _prepared('claimRefund'),
         submitEscrowCall: (_, _, _) async => _detail('submitted'),
         getHire: (_, _) async => _detail('confirmed'),
         prepareFeedback: (_, _, _) async => _prepared('giveFeedback'),
@@ -647,6 +667,9 @@ void main() {
       String? result,
       String? paymentTransaction = 'fa11ce',
       ChainSubmission? submission,
+      DateTime? expiresAt,
+      bool runFinished = false,
+      String? submitErrorCode,
     }) => HireDetail(
       hire: _hire(3).copyWith(
         status: status,
@@ -663,6 +686,9 @@ void main() {
       ),
       input: 'Answer this ticket',
       result: result,
+      expiresAt: expiresAt,
+      runFinished: runFinished,
+      submitErrorCode: submitErrorCode,
       escrowSubmission: submission,
     );
 
@@ -701,6 +727,42 @@ void main() {
         'https://stellar.expert/explorer/testnet/tx/fa11ce',
       );
     });
+
+    test(
+      'maps a finished run, a blocked submit and the refund window',
+      () async {
+        final expires = DateTime.utc(2026, 11, 20);
+        final hire = await _gateway(
+          getHire: (_, _) async => funded(
+            runFinished: true,
+            submitErrorCode: 'EscrowCallFailed',
+            expiresAt: expires,
+          ),
+        ).getHire(3, _consumer);
+
+        expect(hire.stage, HireStage.recording);
+        expect(hire.result, isNull);
+        expect(hire.runFinished, isTrue);
+        expect(hire.submitErrorCode, 'EscrowCallFailed');
+        expect(hire.submitBlockedReason, contains('several attempts'));
+        expect(hire.canRejectStuckSubmit, isTrue);
+        expect(
+          hire.canClaimRefundAt(expires.subtract(const Duration(minutes: 1))),
+          isFalse,
+        );
+        expect(hire.canClaimRefundAt(expires), isTrue);
+
+        final unknown = await _gateway(
+          getHire: (_, _) async => funded(
+            runFinished: true,
+            submitErrorCode: 'OutcomeUnknown',
+            expiresAt: expires,
+          ),
+        ).getHire(3, _consumer);
+        expect(unknown.canRejectStuckSubmit, isFalse);
+        expect(unknown.canClaimRefundAt(expires), isFalse);
+      },
+    );
 
     test('takes the payment from the fund submission until the hire has '
         'one', () async {

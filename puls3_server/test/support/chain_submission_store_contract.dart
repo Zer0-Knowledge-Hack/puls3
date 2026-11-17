@@ -371,6 +371,18 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     },
   );
 
+  test('hasSubmitted ignores consumer-prepared records', () async {
+    create();
+    final prepared = await insert(
+      preparationId: 'consumer-prep',
+      purpose: SubmissionPurpose.claimRefund,
+    );
+
+    expect(await repo.hasSubmitted({SubmissionPurpose.claimRefund}), isFalse);
+
+    await repo.markConfirmed(prepared.id);
+  });
+
   test('listSubmitted rejects a limit below 1', () async {
     create();
 
@@ -473,7 +485,7 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     create();
 
     for (final purpose in SubmissionPurpose.values.where(
-      (p) => !p.isServerSigned,
+      (p) => !p.isServerSigned && !p.isPermissionless,
     )) {
       expect(
         () => insert(preparationId: null, purpose: purpose),
@@ -498,6 +510,25 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
       );
     }
     expect(await repo.listSubmitted(), isEmpty);
+  });
+
+  test('claimRefund accepts a preparation (consumer-signed) and none '
+      '(relay-signed)', () async {
+    create();
+
+    final consumer = await insert(
+      preparationId: 'prep-claim',
+      purpose: SubmissionPurpose.claimRefund,
+    );
+    final relay = await insert(
+      transactionHash: _txB,
+      preparationId: null,
+      purpose: SubmissionPurpose.claimRefund,
+      hireId: 8,
+    );
+
+    expect(consumer.preparationId, 'prep-claim');
+    expect(relay.preparationId, isNull);
   });
 
   test('markFailed rejects an unknown outcome code', () async {

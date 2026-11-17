@@ -14,6 +14,15 @@ fields:
   expiresAt: DateTime?
   ### The job's approval_deadline, set once the job is submitted.
   approvalDeadline: DateTime?
+  ### Whether the agent run succeeded, even while its result is still hidden
+  ### before the escrow `submit`. The app uses it to say the agent finished
+  ### while the result is being recorded (#277).
+  runFinished: bool, default=false
+  ### While the hire is funded, why the agent's `submit` cannot happen:
+  ### `AgentCannotDeliver` (payee not custodied), `SubmitSimulationRejected`,
+  ### `EscrowCallFailed` or `OutcomeUnknown`. Null when no submit is needed or
+  ### one may still land. The result stays hidden until `submit` confirms.
+  submitErrorCode: String?
   rejectReason: String?
   ### The hire's latest escrow submission, any purpose.
   escrowSubmission: ChainSubmission?

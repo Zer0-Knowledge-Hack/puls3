@@ -352,6 +352,68 @@ void main() {
     });
   });
 
+  group('prepareClaimRefund', () {
+    test('builds a permissionless claim_refund with only the job id', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.clock = DateTime.utc(2028);
+
+      final prepared = await rig.service.prepareClaimRefund(_wallet, hire.id);
+
+      expect(prepared.purpose, 'claimRefund');
+      expect(prepared.signer, alice);
+      expect(
+        _builtCall(rig),
+        _call('claim_refund', [const ScArg.u64(3)]),
+      );
+      final stored = (await rig.preparations.findByPreparationId(
+        prepared.preparationId,
+      ))!;
+      expect(stored.purpose, SubmissionPurpose.claimRefund);
+    });
+
+    test('is InvalidHireTransition before expired_at', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+
+      await expectLater(
+        rig.service.prepareClaimRefund(_wallet, hire.id),
+        throwsA(api('InvalidHireTransition')),
+      );
+      expect(rig.preparations.all, isEmpty);
+      expect(rig.accounts.sequenceReads, isEmpty);
+    });
+
+    test('is SubmissionInProgress while a record is submitted', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.clock = DateTime.utc(2028);
+      await rig.record(hire.id, SubmissionPurpose.createJob);
+
+      await expectLater(
+        rig.service.prepareClaimRefund(_wallet, hire.id),
+        throwsA(api('SubmissionInProgress')),
+      );
+      expect(rig.preparations.all, isEmpty);
+    });
+
+    test(
+      'is OutcomeUnknown after a record failed with OutcomeUnknown',
+      () async {
+        final hire = await rig.hire(status: HireStatus.funded);
+        rig.clock = DateTime.utc(2028);
+        await rig.record(
+          hire.id,
+          SubmissionPurpose.createJob,
+          failedWith: SubmissionOutcomeCode.outcomeUnknown,
+        );
+
+        await expectLater(
+          rig.service.prepareClaimRefund(_wallet, hire.id),
+          throwsA(api('OutcomeUnknown')),
+        );
+        expect(rig.preparations.all, isEmpty);
+      },
+    );
+  });
+
   group('state guards', () {
     final cases = <(String, HireStatus?)>[
       ('createJob', HireStatus.open),
