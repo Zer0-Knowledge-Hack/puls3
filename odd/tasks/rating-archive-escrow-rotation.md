@@ -11,7 +11,7 @@ Objective: implement the four items of #273 (follow-up of #201). Branch `fix/273
 ## Tasks
 - [x] **T1** (S1) Terminal job fact store + registry fallback + ADR-0009. Route: inline. Risk: item 1 (new persisted table, additive migration only). Checks: unit suite 833 pass, analyze clean; Postgres integration test written but NOT run (Docker daemon down).
 - [x] **T2** (S2) Distinguish archived escrow instance/code from an archived job (job_count probe in ContractEscrowJobReader). Route: inline. Risk: none (only the registry reads `archived`). Checks: 1164 unit tests pass, analyze clean.
-- [ ] **T3** (S3) Escrow column on hire (migration) + trusted escrow list in domain/reader. Route: inline. Risk: items 1, 3.
+- [ ] **T3** (S3) Escrow column on hire (migration) + trusted escrow list in domain/reader. Route: inline. Risk: items 1, 3. Decision (user, 2026-11-17): pre-existing hires use the configured escrow (null = configured); backfill option tracked in #307.
 - [ ] **T4** (S4) Comment on #200. Route: inline.
 
 ## Log
