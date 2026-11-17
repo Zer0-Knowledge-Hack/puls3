@@ -18,7 +18,7 @@ Since #279 (#276), `createHire` refuses an agent whose payee wallet has no `agen
   - Route: inline (one new test-support file plus a two-line call in `e2e_world.dart`; no research left).
   - Check: `dart test -t e2e --run-skipped -j 1 test/e2e` (RED observed on `1b5d75d`: 2 failing with `AgentCannotDeliver`).
 - [ ] **T2** Browser E2E seed stores its agent key in custody in the `puls3_e2e` database.
-  - Route: to be decided after T1.
+  - Route: delegated (one writer: seed, run script, README).
   - Check: `bash scripts/e2e-flutter-local.sh` (needs `chromedriver`).
 
 ## Acceptance criteria
@@ -43,6 +43,10 @@ Since #279 (#276), `createHire` refuses an agent whose payee wallet has no `agen
 - Agent id 0 moved to its own issue #291, fixed in #293 (`ff152e6`, merged). This branch is rebased on it.
 - [x] **T1c** (fourth finding) `setup-local-soroban.sh` called Friendbot once and went on when it failed, so on a fresh ledger the deploy hit `Account not found` for the admin. It now retries until Friendbot answers 200, accepts 400 (already funded), and fails before deploying when it never funds. Route: inline. Checks: `scripts/tests/local-soroban.test.sh` 36/36 (6 new cases, RED observed first).
 - Fresh ledger + reset `postgres_test`, after rebase on `ff152e6`: setup exit 0, server E2E `+2: All tests passed!`.
+
+- T2 RED: the seeded agent's page shows "This agent cannot be hired yet." (no `agent_wallet` row in `puls3_e2e`).
+- T2 change: `tool/e2e_seed_local.dart` starts a Serverpod (development mode, `--apply-migrations`), calls `custodyAgentKey`, and shuts it down; `scripts/e2e-flutter-local.sh` shares one `e2e_database_env` function between the seed and the server. Checks: `dart analyze --fatal-infos` clean, `dart format` unchanged, `scripts/tests/local-soroban.test.sh` 36/36.
+- `bash scripts/e2e-flutter-local.sh` (Windows): the custody check passes (the seed applies migrations, stores the row, "Seeded agent 3"; the hire form opens), then the hire fails with "Your wallet session ended": `walletAuth.createChallenge` throws `AuthenticationUnavailable` (`wallet_auth_config.dart:68`). Fifth finding, not caused by T2: on Windows, Dart's `Platform.environment` upper-cases variable names (`SERVERPOD_PASSWORD_walletAuthSigningKey` arrives as `SERVERPOD_PASSWORD_WALLETAUTHSIGNINGKEY`), and Serverpod's `PasswordManager` keeps the suffix as the password name, so `getPassword('walletAuthSigningKey')` is null. The run script cannot fix it; it needs a case-safe way to pass the key (for example a custom password mapping in `lib/server.dart`, or a run-scoped `config/passwords.yaml`), which is outside T2's surface. T2 stays open. Server E2E after the T2 change: `+2: All tests passed!`.
 
 ## Next step
 Push and open the PR for T1/T1b/T1c (`Refs #290`, T2 still open), then T2 (needs `chromedriver`).

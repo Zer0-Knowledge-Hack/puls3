@@ -428,7 +428,9 @@ CHROMEDRIVER=/path/to/chromedriver bash scripts/e2e-flutter-local.sh
 
 The script seeds an agent and a funded consumer wallet
 (`puls3_server/tool/e2e_seed_local.dart`), starts the server on a database of
-its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. Every key is
+its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. The seed
+also stores the agent's key in custody in that database, as a Studio deploy
+does, because the server refuses to hire an agent without it. Every key is
 ephemeral and lives in a temp directory the script removes. The wallet is
 `AutomatedKeyWallet`, a test fixture next to the test. The USDC balance check
 (Horizon on testnet) is stood in for, because the sandbox pays in its native
