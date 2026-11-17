@@ -1,5 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
+import 'classic_asset.dart';
+
 /// The network values the Soroban adapter needs (ADR-0001 §5).
 ///
 /// Every value is public, so it is read from `PULS3_STELLAR_*` environment
@@ -10,6 +12,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 /// | `PULS3_STELLAR_RPC_URL` | [rpcUrl] |
 /// | `PULS3_STELLAR_NETWORK_PASSPHRASE` | [networkPassphrase] |
 /// | `PULS3_STELLAR_USDC_SAC` | [usdcSac] |
+/// | `PULS3_STELLAR_USDC_ASSET` | [usdcAsset] (`CODE:ISSUER`) |
 /// | `PULS3_STELLAR_IDENTITY_REGISTRY` | [identityRegistry] |
 /// | `PULS3_STELLAR_ESCROW` | [escrow] |
 /// | `PULS3_STELLAR_PREVIOUS_ESCROWS` | [previousEscrows] (comma-separated) |
@@ -27,6 +30,7 @@ final class StellarConfig {
     this.previousEscrows = const [],
     this.reputationRegistry,
     this.rpcTimeout = defaultRpcTimeout,
+    this.usdcAsset = ClassicAsset.circleTestnetUsdc,
   });
 
   /// Builds the configuration from [env] (normally `Platform.environment`).
@@ -34,7 +38,8 @@ final class StellarConfig {
   /// An unset or empty variable keeps its [testnet] value. A set variable
   /// overrides it. An invalid address throws [InvalidStellarAddress]. A
   /// timeout that is not a positive whole number of seconds throws
-  /// [ArgumentError].
+  /// [ArgumentError]. An asset that is not `CODE:ISSUER` throws a
+  /// [FormatException].
   factory StellarConfig.fromEnvironment(Map<String, String> env) {
     String? read(String name) {
       final value = env[name];
@@ -88,6 +93,10 @@ final class StellarConfig {
         null => testnet.reputationRegistry,
       },
       rpcTimeout: timeout(),
+      usdcAsset: switch (read('PULS3_STELLAR_USDC_ASSET')) {
+        final value? => ClassicAsset.parse(value),
+        null => testnet.usdcAsset,
+      },
     );
   }
 
@@ -121,6 +130,10 @@ final class StellarConfig {
 
   /// The Stellar Asset Contract of the accepted USDC.
   final StellarAddress usdcSac;
+
+  /// The classic asset behind [usdcSac]. A custodied agent wallet needs a
+  /// trustline to it before the escrow can pay the agent.
+  final ClassicAsset usdcAsset;
   final StellarAddress identityRegistry;
   final StellarAddress escrow;
 
@@ -158,7 +171,8 @@ final class StellarConfig {
       _sameAddresses(other.previousEscrows, previousEscrows) &&
       other.simulationSource == simulationSource &&
       other.reputationRegistry == reputationRegistry &&
-      other.rpcTimeout == rpcTimeout;
+      other.rpcTimeout == rpcTimeout &&
+      other.usdcAsset == usdcAsset;
 
   @override
   int get hashCode => Object.hash(
@@ -171,6 +185,7 @@ final class StellarConfig {
     simulationSource,
     reputationRegistry,
     rpcTimeout,
+    usdcAsset,
   );
 }
 
