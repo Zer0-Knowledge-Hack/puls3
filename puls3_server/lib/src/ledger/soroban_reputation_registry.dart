@@ -4,6 +4,7 @@ import 'contract_reader.dart';
 import 'escrow_job.dart';
 import 'ledger_errors.dart';
 import 'sc_val_json.dart';
+import 'terminal_job_store.dart';
 import 'xdr_invoke_encoder.dart';
 
 /// How many clients one `get_clients_paginated` call asks for. It is the
@@ -46,16 +47,22 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     required StellarAddress escrow,
     required EscrowJobReader jobs,
     required AgentOwnerReader owners,
+    TerminalJobStore? facts,
   }) : _registry = registry,
        _escrow = escrow,
        _jobs = jobs,
-       _owners = owners;
+       _owners = owners,
+       _facts = facts;
 
   final ContractReader _reader;
   final StellarAddress _registry;
   final StellarAddress _escrow;
   final EscrowJobReader _jobs;
   final AgentOwnerReader _owners;
+
+  /// The jobs read in a final state, kept across restarts (#273), or null
+  /// when none are kept. Read only for a job whose entry is archived.
+  final TerminalJobStore? _facts;
 
   /// Jobs read in a final state (`Completed`, `Rejected`, `Expired`). The
   /// escrow never changes them again, so they are not read twice, and a job
@@ -147,21 +154,40 @@ final class SorobanReputationRegistry implements ReputationRegistry {
         if (job.state == JobState.completed ||
             job.state == JobState.rejected ||
             job.state == JobState.expired) {
-          _final[batch[i]] = job;
+          if (await _remember(batch[i], job)) _final[batch[i]] = job;
         }
       }
     }
     return FeedbackProvenance(escrow: _escrow, jobs: jobs, owner: owner);
   }
 
-  /// Job [id], or null when the escrow has no such job or its entry is
-  /// archived.
+  /// Keeps a job read in a final state, so it still counts once its entry
+  /// archives. Returns whether it is kept (true when no store is used). A
+  /// store that fails does not hide a job the chain just answered: the job
+  /// counts now and is offered to the store again on the next read.
+  Future<bool> _remember(int id, ReferencedJob job) async {
+    final facts = _facts;
+    if (facts == null) return true;
+    try {
+      await facts.save(_escrow, id, job);
+      return true;
+    } on Exception {
+      return false;
+    }
+  }
+
+  /// Job [id], or null when the escrow has no such job, or its entry is
+  /// archived and no fact was kept of it.
+  ///
+  /// A readable job is always the chain's answer. A stored fact stands in
+  /// only for an archived entry, which cannot be read; a store that fails
+  /// there is an error for the whole read, never "no rating".
   Future<ReferencedJob?> _job(int id) async {
     final EscrowJob? job;
     try {
       job = await _jobs.escrowJob(id);
     } on LedgerUnavailable catch (e) {
-      if (e.archived) return null;
+      if (e.archived) return _facts?.find(_escrow, id);
       rethrow;
     }
     if (job == null) return null;
