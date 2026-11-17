@@ -198,6 +198,7 @@ puls3_cli/       The puls3 command line, a client of puls3_sdk
 spikes/          Payments proof of concept (payments-poc)
 docs/adr/        Architecture decision records
 docs/verification/ How to verify the on-chain evidence (onchain.md)
+docs/audits/      Security audits and their findings (2026-10-25-smart-contract-audit.md)
 docs/studio/      Agent Studio builder guide (builder-guide.md)
 docs/cli/         puls3 command line reference (reference.md)
 docs/mcp/         MCP server setup for Cursor and Claude Desktop (setup.md)
