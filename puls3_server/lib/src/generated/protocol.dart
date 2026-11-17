@@ -49,6 +49,7 @@ import 'hire/hire_payment.dart' as _i7gyvijy;
 import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_view.dart' as _ivruwodq;
 import 'hire_detail.dart' as _ipbsq2gs;
+import 'ledger/terminal_job_fact.dart' as _itxj7opn;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
@@ -90,6 +91,7 @@ export 'hire/hire_payment.dart';
 export 'hire/hire_request_invalid.dart';
 export 'hire/hire_view.dart';
 export 'hire_detail.dart';
+export 'ledger/terminal_job_fact.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
@@ -1342,6 +1344,78 @@ class Protocol extends _is.DatabaseSerializationManager {
       managed: true,
     ),
     _isp.TableDefinition(
+      name: 'terminal_job_fact',
+      dartName: 'TerminalJobFact',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'escrow',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'jobId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'client',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'agentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'state',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'observedAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'terminal_job_fact_job_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'escrow',
+            ),
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'jobId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
       name: 'wallet_account',
       dartName: 'WalletAccount',
       schema: 'public',
@@ -1615,6 +1689,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ipbsq2gs.HireDetail) {
       return _ipbsq2gs.HireDetail.fromJson(data) as T;
     }
+    if (t == _itxj7opn.TerminalJobFact) {
+      return _itxj7opn.TerminalJobFact.fromJson(data) as T;
+    }
     if (t == _ikmm2vup.Payment) {
       return _ikmm2vup.Payment.fromJson(data) as T;
     }
@@ -1766,6 +1843,10 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _is.getType<_ipbsq2gs.HireDetail?>()) {
       return (data != null ? _ipbsq2gs.HireDetail.fromJson(data) : null) as T;
     }
+    if (t == _is.getType<_itxj7opn.TerminalJobFact?>()) {
+      return (data != null ? _itxj7opn.TerminalJobFact.fromJson(data) : null)
+          as T;
+    }
     if (t == _is.getType<_ikmm2vup.Payment?>()) {
       return (data != null ? _ikmm2vup.Payment.fromJson(data) : null) as T;
     }
@@ -1908,6 +1989,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _i1txwkfs.HireRequestInvalid => 'HireRequestInvalid',
       _ivruwodq.HireView => 'HireView',
       _ipbsq2gs.HireDetail => 'HireDetail',
+      _itxj7opn.TerminalJobFact => 'TerminalJobFact',
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
@@ -1990,6 +2072,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'HireView';
       case _ipbsq2gs.HireDetail():
         return 'HireDetail';
+      case _itxj7opn.TerminalJobFact():
+        return 'TerminalJobFact';
       case _ikmm2vup.Payment():
         return 'Payment';
       case _i83uy5s0.PreparedTransaction():
@@ -2125,6 +2209,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'HireDetail') {
       return deserialize<_ipbsq2gs.HireDetail>(data['data']);
     }
+    if (dataClassName == 'TerminalJobFact') {
+      return deserialize<_itxj7opn.TerminalJobFact>(data['data']);
+    }
     if (dataClassName == 'Payment') {
       return deserialize<_ikmm2vup.Payment>(data['data']);
     }
@@ -2226,6 +2313,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _ikb6z54u.HireRecord.t;
       case _i7gyvijy.HirePaymentRecord:
         return _i7gyvijy.HirePaymentRecord.t;
+      case _itxj7opn.TerminalJobFact:
+        return _itxj7opn.TerminalJobFact.t;
       case _iw9spjs5.HireRunRecord:
         return _iw9spjs5.HireRunRecord.t;
       case _i4wr3q5v.BuilderCredentialRecord:

@@ -1,0 +1,25 @@
+### What the server read of an escrow job in a final state (`Completed`,
+### `Rejected` or `Expired`), kept so a rating still counts after the job's
+### entry archives (#273). A final state never changes, so the row is a cache
+### of the chain: it is read only for an archived entry, never over a job that
+### `get_job` can answer.
+class: TerminalJobFact
+table: terminal_job_fact
+serverOnly: true
+fields:
+  ### StrKey of the escrow contract the job was read from.
+  escrow: String
+  ### The job id on that escrow.
+  jobId: int
+  ### StrKey of the job's client.
+  client: String
+  ### The hired agent's registry id.
+  agentId: int
+  ### The final `JobState` name: completed, rejected or expired.
+  state: String
+  ### When the server read it from the chain.
+  observedAt: DateTime
+indexes:
+  terminal_job_fact_job_idx:
+    fields: escrow, jobId
+    unique: true

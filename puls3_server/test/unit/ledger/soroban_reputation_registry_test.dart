@@ -7,9 +7,11 @@ import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/ledger/soroban_reputation_registry.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
+import 'package:puls3_server/src/ledger/terminal_job_store.dart';
 import 'package:test/test.dart';
 
 import '../../support/fake_reputation_chain.dart';
+import '../../support/in_memory_terminal_job_store.dart';
 import '../../support/reputation_registry_contract.dart';
 
 final _alice = StellarAddress.parse(
@@ -62,12 +64,26 @@ final class _ScriptedJobs implements EscrowJobReader {
   }
 }
 
+/// A store whose database is down.
+final class _BrokenStore implements TerminalJobStore {
+  @override
+  Future<ReferencedJob?> find(StellarAddress escrow, int jobId) =>
+      Future.error(Exception('database down'));
+
+  @override
+  Future<void> save(StellarAddress escrow, int jobId, ReferencedJob job) =>
+      Future.error(Exception('database down'));
+}
+
 final class _NoOwners implements AgentOwnerReader {
   @override
   Future<StellarAddress?> ownerOf(AgentId agent) async => null;
 }
 
-EscrowJob _escrowJob(StellarAddress client) => EscrowJob(
+EscrowJob _escrowJob(
+  StellarAddress client, {
+  EscrowJobState state = EscrowJobState.completed,
+}) => EscrowJob(
   client: client,
   provider: client,
   evaluator: client,
@@ -77,28 +93,31 @@ EscrowJob _escrowJob(StellarAddress client) => EscrowJob(
   feeBps: 0,
   expiredAt: 0,
   description: '',
-  state: EscrowJobState.completed,
+  state: state,
   submittedAt: 0,
   approvalDeadline: 0,
   deliverable: null,
 );
 
 /// A registry over [jobs]; the registry reads are not used by provenanceOf.
-SorobanReputationRegistry _overJobs(EscrowJobReader jobs) =>
-    SorobanReputationRegistry(
-      ContractReader(
-        SorobanRpcClient(
-          httpClient: MockClient((_) async => http.Response('', 503)),
-          url: StellarConfig.testnet.rpcUrl,
-          timeout: const Duration(seconds: 1),
-        ),
-        source: StellarConfig.testnet.simulationSource,
-      ),
-      registry: StellarConfig.testnet.escrow,
-      escrow: FakeReputationChain.defaultEscrow,
-      jobs: jobs,
-      owners: _NoOwners(),
-    );
+SorobanReputationRegistry _overJobs(
+  EscrowJobReader jobs, {
+  TerminalJobStore? facts,
+}) => SorobanReputationRegistry(
+  ContractReader(
+    SorobanRpcClient(
+      httpClient: MockClient((_) async => http.Response('', 503)),
+      url: StellarConfig.testnet.rpcUrl,
+      timeout: const Duration(seconds: 1),
+    ),
+    source: StellarConfig.testnet.simulationSource,
+  ),
+  registry: StellarConfig.testnet.escrow,
+  escrow: FakeReputationChain.defaultEscrow,
+  jobs: jobs,
+  owners: _NoOwners(),
+  facts: facts,
+);
 
 /// A record of agent 7 by Alice for job [id] on the trusted escrow.
 FeedbackRecord _paidRecord(int id) => FeedbackRecord(
@@ -443,6 +462,118 @@ void main() {
           expect(provenance.jobs.keys, [1]);
         },
       );
+
+      group('terminal job facts (#273)', () {
+        const archived = LedgerUnavailable('restore', archived: true);
+
+        test(
+          'a completed job keeps counting after it archives and the process '
+          'restarts',
+          () async {
+            final facts = InMemoryTerminalJobStore();
+            final first = await _overJobs(
+              _ScriptedJobs({1: _escrowJob(_alice)}),
+              facts: facts,
+            ).provenanceOf([_paidRecord(1)]);
+            expect(first.jobs.keys, [1]);
+
+            // A new registry is a new process: no memory, the job archived.
+            final restarted = await _overJobs(
+              _ScriptedJobs({1: archived}),
+              facts: facts,
+            ).provenanceOf([_paidRecord(1)]);
+
+            expect(restarted.jobs[1]?.state, JobState.completed);
+            expect(restarted.jobs[1]?.client, _alice);
+            expect(restarted.jobs[1]?.agentId, AgentId(7));
+          },
+        );
+
+        test('a fact never overrules a job the chain can still read', () async {
+          final facts = InMemoryTerminalJobStore();
+          await facts.save(
+            FakeReputationChain.defaultEscrow,
+            1,
+            ReferencedJob(
+              client: _alice,
+              agentId: AgentId(7),
+              state: JobState.completed,
+            ),
+          );
+
+          final provenance = await _overJobs(
+            _ScriptedJobs({1: _escrowJob(_bob)}),
+            facts: facts,
+          ).provenanceOf([_paidRecord(1)]);
+
+          expect(provenance.jobs[1]?.client, _bob);
+        });
+
+        test('only final states are stored', () async {
+          final facts = InMemoryTerminalJobStore();
+          final funded = _escrowJob(_alice, state: EscrowJobState.funded);
+
+          await _overJobs(
+            _ScriptedJobs({1: funded}),
+            facts: facts,
+          ).provenanceOf([_paidRecord(1)]);
+          final later = await _overJobs(
+            _ScriptedJobs({1: archived}),
+            facts: facts,
+          ).provenanceOf([_paidRecord(1)]);
+
+          expect(facts.saves, 0);
+          expect(later.jobs, isEmpty);
+        });
+
+        test('an archived job with no stored fact is still dropped', () async {
+          final provenance = await _overJobs(
+            _ScriptedJobs({1: archived}),
+            facts: InMemoryTerminalJobStore(),
+          ).provenanceOf([_paidRecord(1)]);
+
+          expect(provenance.jobs, isEmpty);
+        });
+
+        test('a store that cannot save does not hide a readable job', () async {
+          final registry = _overJobs(
+            _ScriptedJobs({1: _escrowJob(_alice)}),
+            facts: _BrokenStore(),
+          );
+
+          final provenance = await registry.provenanceOf([_paidRecord(1)]);
+
+          expect(provenance.jobs.keys, [1]);
+        });
+
+        test('a store that cannot read fails the read, never "no rating"', () {
+          final registry = _overJobs(
+            _ScriptedJobs({1: archived}),
+            facts: _BrokenStore(),
+          );
+
+          expect(
+            registry.provenanceOf([_paidRecord(1)]),
+            throwsA(isA<Exception>()),
+          );
+        });
+
+        test(
+          'a job read in a final state is stored once per process',
+          () async {
+            final facts = InMemoryTerminalJobStore();
+            final registry = _overJobs(
+              _ScriptedJobs({1: _escrowJob(_alice)}),
+              facts: facts,
+            );
+
+            await registry.provenanceOf([_paidRecord(1)]);
+            await registry.provenanceOf([_paidRecord(1)]);
+
+            expect(facts.saves, 1);
+          },
+        );
+      });
 
       test('never more than $jobReadConcurrency job reads at once', () async {
         const count = jobReadConcurrency * 3 + 1;
