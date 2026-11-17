@@ -4,6 +4,8 @@ import 'package:test/test.dart';
 
 const _alice = 'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H';
 const _bob = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
+const _escrowA = 'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2';
+const _escrowB = 'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ';
 
 NewHire _newHire({
   String consumer = _alice,
@@ -69,6 +71,42 @@ void hireLifecycleStoreContract(HireLifecycleStore Function() build) {
       (await store.findHireByRequest(_alice, 'request-1'))!.input,
       'summarise this',
     );
+  });
+
+  test('bindJob keeps the escrow the job lives on (#273)', () async {
+    final hire = await store.insertHire(_newHire());
+
+    await store.bindJob(
+      hire.id,
+      3,
+      expiredAt: 1800000500,
+      escrow: _escrowA,
+    );
+
+    expect((await store.findHire(hire.id))!.escrow, _escrowA);
+  });
+
+  test('a job bound without an escrow leaves it empty (#273)', () async {
+    final hire = await store.insertHire(_newHire());
+
+    await store.bindJob(hire.id, 3, expiredAt: 1800000500);
+
+    expect((await store.findHire(hire.id))!.escrow, isNull);
+  });
+
+  test('binding the same job again keeps the first escrow (#273)', () async {
+    final hire = await store.insertHire(_newHire());
+    await store.bindJob(hire.id, 3, expiredAt: 1800000500, escrow: _escrowA);
+
+    final result = await store.bindJob(
+      hire.id,
+      3,
+      expiredAt: 1800000500,
+      escrow: _escrowB,
+    );
+
+    expect(result, JobBinding.alreadyBound);
+    expect((await store.findHire(hire.id))!.escrow, _escrowA);
   });
 
   test('bindJob sets the job id and expired_at and opens the hire', () async {

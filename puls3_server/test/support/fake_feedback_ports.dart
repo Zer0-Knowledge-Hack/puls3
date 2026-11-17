@@ -30,7 +30,13 @@ final class FakeAgentOwners implements AgentOwnerReader {
 final class FakeReputationCalls implements ReputationCalls {
   final built =
       <
-        ({StellarAddress client, AgentId agent, Feedback feedback, int jobId})
+        ({
+          StellarAddress client,
+          AgentId agent,
+          Feedback feedback,
+          int jobId,
+          StellarAddress? escrow,
+        })
       >[];
 
   /// When set, [giveFeedback] throws it instead of building the call.
@@ -42,10 +48,17 @@ final class FakeReputationCalls implements ReputationCalls {
     required AgentId agent,
     required Feedback feedback,
     required int jobId,
+    StellarAddress? escrow,
   }) {
     final failure = this.failure;
     if (failure != null) throw failure;
-    built.add((client: client, agent: agent, feedback: feedback, jobId: jobId));
+    built.add((
+      client: client,
+      agent: agent,
+      feedback: feedback,
+      jobId: jobId,
+      escrow: escrow,
+    ));
     return ContractCall(
       contract: fakeReputationRegistry,
       function: 'give_feedback',

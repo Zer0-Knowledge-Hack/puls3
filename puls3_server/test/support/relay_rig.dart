@@ -108,8 +108,12 @@ final class RelayRig {
 
   /// A stored hire of [consumer] (the session wallet by default) in
   /// [status]: null has no job, any other status has job `id + 2` (3 for
-  /// the first hire).
-  Future<HireRow> hire({HireStatus? status, String consumer = alice}) async {
+  /// the first hire). The job is bound with [escrow] when given (#273).
+  Future<HireRow> hire({
+    HireStatus? status,
+    String consumer = alice,
+    String? escrow,
+  }) async {
     final row = await hires.insertHire(
       NewHire(
         consumer: consumer,
@@ -122,7 +126,12 @@ final class RelayRig {
       ),
     );
     if (status == null) return row;
-    await hires.bindJob(row.id, row.id + 2, expiredAt: 1800000000);
+    await hires.bindJob(
+      row.id,
+      row.id + 2,
+      expiredAt: 1800000000,
+      escrow: escrow,
+    );
     hires.statusOverride[row.id] = status;
     return (await hires.findHire(row.id))!;
   }

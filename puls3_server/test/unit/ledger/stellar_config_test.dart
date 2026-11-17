@@ -123,6 +123,73 @@ void main() {
       }
     });
 
+    group('previous escrows (#273)', () {
+      final old = StellarConfig.testnet.identityRegistry.value;
+      final older = StellarConfig.testnet.usdcSac.value;
+
+      test('none by default', () {
+        expect(
+          StellarConfig.fromEnvironment(const {}).previousEscrows,
+          isEmpty,
+        );
+        expect(
+          StellarConfig.fromEnvironment(const {
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': '',
+          }).previousEscrows,
+          isEmpty,
+        );
+      });
+
+      test('a comma-separated list of contracts, in order', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS': '$old, $older ,',
+        });
+
+        expect(config.previousEscrows, [
+          StellarAddress.parse(old),
+          StellarAddress.parse(older),
+        ]);
+      });
+
+      test('trusted escrows are the configured one and the previous ones', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS': old,
+        });
+
+        expect(config.trustedEscrows, {
+          StellarConfig.testnet.escrow,
+          StellarAddress.parse(old),
+        });
+      });
+
+      test('the configured escrow listed again is trusted once', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS':
+              '${StellarConfig.testnet.escrow.value},$old',
+        });
+
+        expect(config.trustedEscrows, hasLength(2));
+      });
+
+      test('an invalid address throws', () {
+        expect(
+          () => StellarConfig.fromEnvironment(const {
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': 'not-an-address',
+          }),
+          throwsA(isA<InvalidStellarAddress>()),
+        );
+      });
+
+      test('a list changes the configuration', () {
+        expect(
+          StellarConfig.fromEnvironment({
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': old,
+          }),
+          isNot(StellarConfig.testnet),
+        );
+      });
+    });
+
     test('an invalid address throws', () {
       expect(
         () => StellarConfig.fromEnvironment(const {

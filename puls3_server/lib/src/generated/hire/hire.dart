@@ -24,6 +24,7 @@ abstract class HireRecord
     this.requestId,
     this.input,
     this.jobId,
+    this.escrow,
   });
 
   factory HireRecord({
@@ -36,6 +37,7 @@ abstract class HireRecord
     String? requestId,
     String? input,
     int? jobId,
+    String? escrow,
   }) = _HireRecordImpl;
 
   factory HireRecord.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -49,6 +51,7 @@ abstract class HireRecord
       requestId: jsonSerialization['requestId'] as String?,
       input: jsonSerialization['input'] as String?,
       jobId: jsonSerialization['jobId'] as int?,
+      escrow: jsonSerialization['escrow'] as String?,
     );
   }
 
@@ -78,6 +81,11 @@ abstract class HireRecord
   /// Escrow job id, bound once when the create_job is confirmed.
   int? jobId;
 
+  /// StrKey of the escrow contract that holds jobId, bound with it (#273).
+  /// Null for a hire that predates the column and for a hire without a job:
+  /// it then means the escrow configured at that moment (#307).
+  String? escrow;
+
   @override
   _is.Table<int?> get table => t;
 
@@ -94,6 +102,7 @@ abstract class HireRecord
     String? requestId,
     String? input,
     int? jobId,
+    String? escrow,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -108,6 +117,7 @@ abstract class HireRecord
       if (requestId != null) 'requestId': requestId,
       if (input != null) 'input': input,
       if (jobId != null) 'jobId': jobId,
+      if (escrow != null) 'escrow': escrow,
     };
   }
 
@@ -157,6 +167,7 @@ class _HireRecordImpl extends HireRecord {
     String? requestId,
     String? input,
     int? jobId,
+    String? escrow,
   }) : super._(
          id: id,
          consumer: consumer,
@@ -167,6 +178,7 @@ class _HireRecordImpl extends HireRecord {
          requestId: requestId,
          input: input,
          jobId: jobId,
+         escrow: escrow,
        );
 
   /// Returns a shallow copy of this [HireRecord]
@@ -183,6 +195,7 @@ class _HireRecordImpl extends HireRecord {
     Object? requestId = _Undefined,
     Object? input = _Undefined,
     Object? jobId = _Undefined,
+    Object? escrow = _Undefined,
   }) {
     return HireRecord(
       id: id is int? ? id : this.id,
@@ -194,6 +207,7 @@ class _HireRecordImpl extends HireRecord {
       requestId: requestId is String? ? requestId : this.requestId,
       input: input is String? ? input : this.input,
       jobId: jobId is int? ? jobId : this.jobId,
+      escrow: escrow is String? ? escrow : this.escrow,
     );
   }
 }
@@ -240,6 +254,11 @@ class HireRecordUpdateTable extends _is.UpdateTable<HireRecordTable> {
     table.jobId,
     value,
   );
+
+  _is.ColumnValue<String, String> escrow(String? value) => _is.ColumnValue(
+    table.escrow,
+    value,
+  );
 }
 
 class HireRecordTable extends _is.Table<int?> {
@@ -277,6 +296,10 @@ class HireRecordTable extends _is.Table<int?> {
       'jobId',
       this,
     );
+    escrow = _is.ColumnString(
+      'escrow',
+      this,
+    );
   }
 
   late final HireRecordUpdateTable updateTable;
@@ -300,6 +323,11 @@ class HireRecordTable extends _is.Table<int?> {
   /// Escrow job id, bound once when the create_job is confirmed.
   late final _is.ColumnInt jobId;
 
+  /// StrKey of the escrow contract that holds jobId, bound with it (#273).
+  /// Null for a hire that predates the column and for a hire without a job:
+  /// it then means the escrow configured at that moment (#307).
+  late final _is.ColumnString escrow;
+
   @override
   List<_is.Column> get columns => [
     id,
@@ -311,6 +339,7 @@ class HireRecordTable extends _is.Table<int?> {
     requestId,
     input,
     jobId,
+    escrow,
   ];
 }
 

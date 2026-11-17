@@ -33,3 +33,13 @@ ADR-0008 says a rating is trustworthy because anyone can recompute it from the c
 
 - **Restoring archived jobs from the server** (a funded server account paying a restore) and **a keeper that calls `extend_ttl`** would keep the whole rating on chain. Both need a decision on who signs and pays, and a measured cost. They are tracked apart from #273.
 - Archived escrow instance or code, and escrow rotation, are the other items of #273 and have their own changes.
+
+## Escrow rotation (#273, item 3)
+
+A rating names its job as `puls3:job:v1:<escrow>:<job id>`, so a job is its escrow and its id: the same id on two escrows is two jobs.
+
+1. **The reader trusts a list.** `PULS3_STELLAR_ESCROW` is the escrow new hires use. `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated) lists the ones it replaced. A reference to any escrow outside the two is still `otherEscrow`, and each job is read from the escrow its reference names. `FeedbackProvenance` holds `escrows` and keys its jobs by reference; the verification script reads the same list as the server.
+2. **The hire stores its escrow.** `hire.escrow` is set when the `create_job` is confirmed, to the escrow the tracker reads the event from, and `give_feedback` names that escrow in the reference and the commitment. The column is nullable and added without a backfill.
+3. **A hire without an escrow means the configured one.** That covers hires created before the column and hires without a job. The alternative, filling in the escrow address for existing hires, is tracked in #307 and has to be decided before the first rotation in an environment that has hires.
+
+Not covered: hires that are still in flight when the escrow is rotated (prepared, funded or settled through the new escrow). The relay and the deadline runner use the configured escrow for every call, so this change keeps their ratings checkable, not their settlement.

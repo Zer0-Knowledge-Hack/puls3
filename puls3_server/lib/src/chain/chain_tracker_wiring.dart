@@ -73,6 +73,7 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
       ledger: reader,
       jobs: reader,
       usdc: stellar.usdcSac,
+      escrow: stellar.escrow,
     ),
     log: log,
   );

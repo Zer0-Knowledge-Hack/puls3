@@ -100,6 +100,7 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
     int hireId,
     int jobId, {
     required int expiredAt,
+    String? escrow,
   }) async {
     final record = await HireRecord.db.findById(session, hireId);
     if (record == null) throw StateError('hire $hireId does not exist');
@@ -108,7 +109,11 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
     try {
       final updated = await HireRecord.db.updateWhere(
         session,
-        columnValues: (t) => [t.jobId(jobId), t.expiredAt(expiredAt)],
+        columnValues: (t) => [
+          t.jobId(jobId),
+          t.expiredAt(expiredAt),
+          t.escrow(escrow),
+        ],
         where: (t) => t.id.equals(hireId) & t.jobId.equals(null),
       );
       if (updated.isNotEmpty) return JobBinding.bound;
@@ -160,6 +165,7 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       requestId: record.requestId,
       input: record.input,
       jobId: record.jobId,
+      escrow: record.escrow,
       paymentTransaction: payment?.transactionHash,
       status: payment != null
           ? await _settlement(record.id!, transaction: transaction) ??

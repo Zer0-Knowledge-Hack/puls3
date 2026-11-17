@@ -26,7 +26,9 @@ submits a transaction.
 The chain is read from the testnet values unless these variables override
 them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_USDC_SAC`, `PULS3_STELLAR_IDENTITY_REGISTRY`,
-`PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
+`PULS3_STELLAR_ESCROW`, `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated: the
+escrows `PULS3_STELLAR_ESCROW` replaced, whose jobs still make a rating count)
+and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
 `PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id

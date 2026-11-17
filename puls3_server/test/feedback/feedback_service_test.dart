@@ -2,6 +2,7 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/feedback/feedback_service.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
+import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
 import '../support/fake_envelope_codec.dart';
@@ -151,6 +152,26 @@ void main() {
       expect(calls.built.single.jobId, hire.jobId);
       expect(hire.jobId, isNotNull);
       expect(rig.codec.built.single.spec.contract, fakeReputationRegistry);
+    });
+
+    test('the rating names the escrow the hire was funded on (#273)', () async {
+      final old = StellarConfig.testnet.usdcSac;
+      final hire = await rig.hire(
+        status: HireStatus.completed,
+        escrow: old.value,
+      );
+
+      await service.prepare(_wallet, hire.id, 4, '');
+
+      expect(calls.built.single.escrow, old);
+    });
+
+    test('a hire with no escrow of its own uses the configured one', () async {
+      final hire = await rig.hire(status: HireStatus.completed);
+
+      await service.prepare(_wallet, hire.id, 4, '');
+
+      expect(calls.built.single.escrow, isNull);
     });
 
     test('a hire that is not completed is HireNotCompleted', () async {
