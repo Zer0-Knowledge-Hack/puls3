@@ -355,6 +355,71 @@ void main() {
         );
       });
 
+      group('an archived escrow contract (#273)', () {
+        test('is unavailable, never an agent with no ratings', () async {
+          final chain = FakeReputationChain()
+            ..addPaid(7, _alice, _stored(5))
+            ..addPaid(7, _bob, _stored(4))
+            ..archivedEscrow = true;
+
+          await expectLater(
+            chain.adapter.feedbacksOf(AgentId(7)),
+            throwsA(
+              isA<LedgerUnavailable>().having(
+                (e) => e.archived,
+                'archived',
+                isFalse,
+              ),
+            ),
+          );
+        });
+
+        test('stays unavailable for a job whose fact is stored', () async {
+          final chain = FakeReputationChain()..addPaid(7, _alice, _stored(5));
+          final facts = InMemoryTerminalJobStore();
+          final live = chain.adapterWith(facts: facts);
+          expect(await live.feedbacksOf(AgentId(7)), hasLength(1));
+
+          chain.archivedEscrow = true;
+
+          // The other jobs of the agent have no fact, so a partial score
+          // would look like "no ratings" for them.
+          await expectLater(
+            chain.adapterWith(facts: facts).feedbacksOf(AgentId(7)),
+            throwsA(isA<LedgerUnavailable>()),
+          );
+        });
+
+        test('one archived job does not make the escrow unavailable', () async {
+          final chain = FakeReputationChain()..addPaid(7, _alice, _stored(5));
+          final archived = chain.addPaid(7, _bob, _stored(1));
+          chain.archivedJobs.add(archived);
+
+          final counted = await chain.adapter.feedbacksOf(AgentId(7));
+
+          expect(counted.map((f) => f.score), [5]);
+        });
+
+        test('is checked once for a batch of archived jobs', () async {
+          final chain = FakeReputationChain();
+          for (var i = 0; i < 3; i++) {
+            chain.archivedJobs.add(chain.addPaid(7, _alice, _stored(5)));
+          }
+
+          await chain.adapter.feedbacksOf(AgentId(7));
+
+          expect(chain.escrowProbes, 1);
+        });
+
+        test('is not checked while every job is readable', () async {
+          final chain = FakeReputationChain()..addPaid(7, _alice, _stored(5));
+
+          await chain.adapter.feedbacksOf(AgentId(7));
+
+          expect(chain.escrowProbes, 0);
+        });
+      });
+
       test('a job in a final state is read once per adapter', () async {
         final chain = FakeReputationChain();
         chain.addPaid(7, _alice, _stored(5));
