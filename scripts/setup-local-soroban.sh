@@ -93,12 +93,30 @@ if [ -z "$ADMIN" ]; then
   exit 1
 fi
 
+friendbot_status() {
+  curl -sS -o /dev/null -w '%{http_code}' "$FRIENDBOT_URL?addr=$ADMIN" 2>/dev/null || true
+}
+
+# On a fresh ledger Friendbot can answer after the RPC is healthy, so retry
+# until it funds the account. 400 means it already funded it on an earlier
+# run, which is fine; any other answer means it is not ready yet.
 echo "Funding $ADMIN from the local Friendbot..."
-if ! curl -fsS "$FRIENDBOT_URL?addr=$ADMIN" >/dev/null 2>&1; then
-  # Local Friendbot refuses an account it already funded; that is fine on a
-  # re-run, and every later call still works because the account exists.
-  echo "note: Friendbot did not fund $ADMIN (already funded or Friendbot not ready)." >&2
-fi
+deadline=$((SECONDS + TIMEOUT_SECONDS))
+while :; do
+  status="$(friendbot_status)"
+  case "$status" in
+    200) break ;;
+    400)
+      echo "note: Friendbot did not fund $ADMIN (already funded)." >&2
+      break
+      ;;
+  esac
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "error: Friendbot at $FRIENDBOT_URL did not fund $ADMIN (last status: ${status:-none})." >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 build_if_needed() { # build_if_needed <package> <wasm>
   local package="$1" wasm="$2"
@@ -165,6 +183,18 @@ SAC_ID="$(stellar contract id asset --asset native --network "$NETWORK" | tr -d 
 if [ -z "$SAC_ID" ]; then
   echo "error: could not derive the native SAC id." >&2
   exit 1
+fi
+# A fresh quickstart ledger has no SAC for the native asset: its id can be
+# derived, but `fund` traps with Error(Storage, MissingValue) until the
+# contract is deployed. Deploy it once per ledger.
+if stellar contract info interface --id "$SAC_ID" --network "$NETWORK" >/dev/null 2>&1; then
+  echo "The native SAC is already deployed."
+else
+  echo "Deploying the native SAC..."
+  stellar contract asset deploy \
+    --asset native \
+    --source-account "$IDENTITY" \
+    --network "$NETWORK" >/dev/null
 fi
 
 echo "Allow-listing the native SAC on the escrow..."
