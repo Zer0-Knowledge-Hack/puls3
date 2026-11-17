@@ -4,6 +4,9 @@
 //   dart run bin/receipt.dart anchor  --tx <hash> --registry-id 7 --key-file attester.secret [--mode hash]
 //   dart run bin/receipt.dart verify  --cid <cid> --key <G…> [--record out/<cid>.json]
 //   dart run bin/receipt.dart measure --tx <hash> --registry-id 7 --key-file attester.secret --count 20
+//   dart run bin/receipt.dart queue-add    --tx <hash> [--queue out/queue.json]
+//   dart run bin/receipt.dart queue-run    --key-file attester.secret [--queue out/queue.json] [--verify-after 15]
+//   dart run bin/receipt.dart queue-status [--queue out/queue.json]
 import 'dart:convert';
 import 'dart:io';
 
@@ -41,7 +44,28 @@ Future<void> main(List<String> arguments) async {
           defaultsTo: '3500',
           help: 'Pause between anchors; 3500 stays under 20 per minute',
         ),
-    );
+    )
+    ..addCommand(
+      'queue-add',
+      _queueOptions()..addOption(
+        'tx',
+        mandatory: true,
+        help: 'A confirmed escrow complete transaction',
+      ),
+    )
+    ..addCommand(
+      'queue-run',
+      _queueOptions()
+        ..addOption('key-file', mandatory: true)
+        ..addOption('mode', allowed: ['record', 'hash'], defaultsTo: 'record')
+        ..addOption('tag', defaultsTo: 'puls3-spike-274')
+        ..addOption(
+          'verify-after',
+          defaultsTo: '15',
+          help: 'Minutes between anchoring and the first verification',
+        ),
+    )
+    ..addCommand('queue-status', _queueOptions());
 
   final ArgResults args;
   try {
@@ -50,7 +74,10 @@ Future<void> main(List<String> arguments) async {
   } on FormatException catch (e) {
     stderr
       ..writeln('error: ${e.message}')
-      ..writeln('commands: keygen, anchor, verify, reverify, measure');
+      ..writeln(
+        'commands: keygen, anchor, verify, reverify, measure, '
+        'queue-add, queue-run, queue-status',
+      );
     exitCode = 64;
     return;
   }
@@ -63,6 +90,9 @@ Future<void> main(List<String> arguments) async {
       'anchor' => await _anchor(command, client),
       'verify' => await _verify(command, client),
       'reverify' => await _reverify(command, client),
+      'queue-add' => await _queueAdd(command, client),
+      'queue-run' => await _queueRun(command, client),
+      'queue-status' => await _queueStatus(command),
       _ => await _measure(command, client),
     };
   } on FormatException catch (e) {
@@ -86,6 +116,89 @@ ArgParser _anchorOptions() => ArgParser()
   ..addOption('key-file', mandatory: true)
   ..addOption('mode', allowed: ['record', 'hash'], defaultsTo: 'record')
   ..addOption('tag', defaultsTo: 'puls3-spike-246');
+
+ArgParser _queueOptions() =>
+    ArgParser()..addOption('queue', defaultsTo: 'out/queue.json');
+
+/// The queue over the file in `--queue`. Only `queue-run` needs a real key;
+/// the other commands never sign, so they get no signer.
+ReceiptQueue _queue(
+  ArgResults args,
+  http.Client client, {
+  required ReceiptSigner signer,
+  AnchorMode mode = AnchorMode.record,
+  String? tag,
+  Duration verifyDelay = const Duration(minutes: 15),
+}) => ReceiptQueue(
+  store: FileReceiptStore(File(args.option('queue')!)),
+  signer: signer,
+  chain: HorizonReader(client).settlement,
+  job: SorobanJobReader(client).job,
+  anchor: NiriumAuditClient(client).anchor,
+  read: IpfsReader(client).read,
+  mode: mode,
+  tag: tag,
+  verifyDelay: verifyDelay,
+);
+
+Future<int> _queueAdd(ArgResults args, http.Client client) async {
+  // Queuing writes one row and signs nothing, so any key serves here.
+  final queue = _queue(args, client, signer: ReceiptSigner.random());
+  final bool added;
+  try {
+    added = await queue.enqueue(args.option('tx')!);
+  } on ArgumentError catch (e) {
+    throw FormatException('--tx ${e.message}');
+  }
+  stdout.writeln(added ? 'queued' : 'already queued');
+  return 0;
+}
+
+/// One pass: anchors what is pending and verifies what is due.
+Future<int> _queueRun(ArgResults args, http.Client client) async {
+  final signer = ReceiptSigner.fromSecret(
+    File(args.option('key-file')!).readAsStringSync(),
+  );
+  final minutes = int.tryParse(args.option('verify-after')!);
+  if (minutes == null || minutes < 0) {
+    throw const FormatException('--verify-after must be a number of minutes');
+  }
+  final changed = await _queue(
+    args,
+    client,
+    signer: signer,
+    mode: AnchorMode.values.byName(args.option('mode')!),
+    tag: args.option('tag'),
+    verifyDelay: Duration(minutes: minutes),
+  ).runOnce();
+  if (changed.isEmpty) stdout.writeln('nothing is due');
+  changed.forEach(_printReceipt);
+  return changed.any((r) => r.state == ReceiptState.failed) ? 1 : 0;
+}
+
+Future<int> _queueStatus(ArgResults args) async {
+  final receipts = await FileReceiptStore(File(args.option('queue')!)).all();
+  if (receipts.isEmpty) stdout.writeln('the queue is empty');
+  receipts.forEach(_printReceipt);
+  return 0;
+}
+
+void _printReceipt(QueuedReceipt receipt) {
+  stdout.writeln(
+    '${receipt.state.name.padRight(9)} ${receipt.txHash}'
+    '${receipt.cid == null ? '' : '  ${receipt.cid}'}',
+  );
+  if (receipt.state == ReceiptState.pending ||
+      receipt.state == ReceiptState.anchored) {
+    stdout.writeln(
+      '          next try ${receipt.notBefore.toIso8601String()}'
+      '${receipt.attempts == 0 ? '' : ' (failed tries: ${receipt.attempts})'}',
+    );
+  }
+  if (receipt.reason != null) {
+    stdout.writeln('          ${receipt.reason}');
+  }
+}
 
 int _keygen(ArgResults args) {
   final file = File(args.option('out')!);

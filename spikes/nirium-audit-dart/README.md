@@ -1,4 +1,4 @@
-# Nirium receipt spike (#246)
+# Nirium receipt spike (#246, #274)
 
 This standalone Dart package anchors a puls3 receipt for a settled escrow job
 on Nirium's Audit Trail and verifies it without calling Nirium. The verdict
@@ -6,6 +6,7 @@ and the evidence are in
 [`docs/spikes/nirium-audit.md`](../../docs/spikes/nirium-audit.md).
 
 The package is not part of the workspace and does not touch `puls3_server`.
+It is where the Nirium work stays until the team decides to build on it.
 
 ## Checks
 
@@ -48,6 +49,33 @@ dart run bin/receipt.dart measure --tx $TX --registry-id 7 \
 dart run bin/receipt.dart reverify --measure out/measure-hash-<ts>.json \
   --key <G…> --record out/<cid>.json
 ```
+
+## The receipt queue (#274)
+
+`lib/src/queue.dart` is how a server would anchor a receipt for every settled
+hire without the hire waiting for it. It still lives here, outside
+`puls3_server`, until the team decides whether to build on Nirium.
+
+- A hire only **queues** its `complete` transaction: one row, no network call.
+- A pass (`runOnce`, from a timer) **anchors** what is pending. A 429, a 5xx or
+  a network error is retried with a pause that doubles from 30 seconds to one
+  hour. Another 4xx, or a transaction that is not a settlement, fails at once.
+- 15 minutes later a pass **verifies** the receipt from IPFS and the chain. A
+  CID that cannot be read yet, or a chain that does not answer, is retried. A
+  readable document that is wrong fails and is never shown as verified.
+- A step gives up after 12 tries. The queue is one JSON file, rewritten
+  through a temporary file, so it survives a restart. It never holds the key.
+
+```bash
+dart run bin/receipt.dart queue-add --tx $TX
+dart run bin/receipt.dart queue-run --key-file attester.secret   # anchors
+dart run bin/receipt.dart queue-status
+# 15 minutes later (or pass --verify-after 0 to try at once):
+dart run bin/receipt.dart queue-run --key-file attester.secret   # verifies
+```
+
+`queue-run` exits 1 when a receipt failed in that pass. Run it from a loop or
+a scheduler to act as the timer.
 
 `verify` exits 0 for a trusted receipt. Otherwise it exits 1 and prints each
 reason on stderr.

@@ -5,6 +5,7 @@ library;
 export 'src/cid.dart';
 export 'src/clients.dart';
 export 'src/escrow_job.dart';
+export 'src/queue.dart';
 export 'src/receipt.dart';
 export 'src/settlement.dart';
 export 'src/strkey.dart' show decodeScVal, encodeStrkey;
