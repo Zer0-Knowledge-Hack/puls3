@@ -81,6 +81,8 @@ TrackerLoop? startCatalogIndexer(Serverpod pod, Map<String, String> env) {
   const ChainLog log = _consoleLog;
   final registry = SorobanLedger(rpc, stellar);
   final events = SorobanRegistryEventReader(rpc, stellar);
+  // The first pass that succeeds after a start re-reads every agent.
+  var rehydrated = false;
   final loop = TrackerLoop(
     interval: config.interval,
     passTimeout: _passTimeout,
@@ -97,7 +99,8 @@ TrackerLoop? startCatalogIndexer(Serverpod pod, Map<String, String> env) {
           ),
           log: log,
         );
-        final summary = await indexer.pass();
+        final summary = await indexer.pass(rehydrateAll: !rehydrated);
+        rehydrated = true;
         log(ChainLogLevel.info, 'Catalog index pass: $summary');
       } finally {
         await session.close();

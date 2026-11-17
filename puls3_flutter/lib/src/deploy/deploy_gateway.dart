@@ -45,17 +45,36 @@ abstract interface class DeployGateway {
   );
 }
 
-/// A registration the server prepared and the wallet must sign unchanged.
+/// A registration the server prepared and the wallet must sign unchanged,
+/// or, when resuming a deploy (#321), the registration the chain already
+/// confirmed.
 class PreparedDeploy {
   const PreparedDeploy({
     required this.preparationId,
     required this.unsignedTransaction,
-  });
+  }) : registered = null,
+       active = false;
 
+  /// The draft is already registered on chain: the flow skips signing and
+  /// registering and resumes at activation. When [active] is true the agent
+  /// is already live and activation needs no wallet prompt either.
+  const PreparedDeploy.registered(
+    Registration this.registered, {
+    this.active = false,
+  }) : preparationId = '',
+       unsignedTransaction = '';
+
+  /// Empty when [registered] is set.
   final String preparationId;
 
-  /// Base64 unsigned transaction envelope.
+  /// Base64 unsigned transaction envelope. Empty when [registered] is set.
   final String unsignedTransaction;
+
+  /// The confirmed registration of a resumed deploy, or null for a new one.
+  final Registration? registered;
+
+  /// The resumed agent is already active: nothing is left to sign.
+  final bool active;
 }
 
 /// A confirmed on-chain registration.

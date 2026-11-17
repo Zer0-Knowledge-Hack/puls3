@@ -67,9 +67,14 @@ class ScriptedGateway implements DeployGateway {
     return call.future;
   }
 
+  /// Registrations [walletAuthorization] was asked about.
+  final walletAuthorizations = <Registration>[];
+
   @override
-  Future<String?> walletAuthorization(Registration registration) async =>
-      authorizationEntry;
+  Future<String?> walletAuthorization(Registration registration) async {
+    walletAuthorizations.add(registration);
+    return authorizationEntry;
+  }
 
   @override
   Future<void> submitWalletAuthorization(
@@ -327,6 +332,95 @@ void main() {
 
       await tester.tap(find.text('Done'));
       expect(h.closed, 1);
+    });
+  });
+
+  group('resume after registration (#321)', () {
+    const resumed = Registration(agentId: 30, transactionHash: _txHash);
+
+    testWidgets('a registered draft signs only the wallet entry, then live', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      h.gateway.authorizationEntry = 'auth-entry';
+      await h.pump();
+      h.gateway.prepares.last.complete(
+        const PreparedDeploy.registered(resumed),
+      );
+      await h.settle();
+
+      // Preparing, signing and registering are done: it resumes at
+      // activation with the confirmed id and transaction.
+      expect(h.statusOf(DeployStep.preparing), StepStatus.done);
+      expect(h.statusOf(DeployStep.awaitingSignature), StepStatus.done);
+      expect(h.statusOf(DeployStep.registering), StepStatus.done);
+      expect(h.statusOf(DeployStep.activating), StepStatus.active);
+      expect(find.text('#30'), findsOneWidget);
+      expect(find.text('aa11bb22…00112233'), findsOneWidget);
+
+      await h.sign();
+      expect(h.gateway.signedPayloads, isEmpty);
+      expect(h.gateway.submissions, isEmpty);
+      expect(h.gateway.walletAuthorizations.single.agentId, 30);
+      expect(h.gateway.signedAuthEntries.single, endsWith('auth-entry'));
+
+      await h.completeActivation();
+      expect(find.byKey(const ValueKey('deploy-success')), findsOneWidget);
+      expect(h.live.single.agentId, 30);
+      expect(h.live.single.transactionHash, _txHash);
+      expect(h.live.single.agentWallet, _agentWallet);
+    });
+
+    testWidgets('an active agent goes live without any wallet prompt', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      h.gateway.authorizationEntry = 'auth-entry';
+      await h.pump();
+      h.gateway.prepares.last.complete(
+        const PreparedDeploy.registered(resumed, active: true),
+      );
+      await h.settle();
+      await h.completeActivation();
+
+      expect(h.gateway.walletAuthorizations, isEmpty);
+      expect(h.gateway.signedPayloads, isEmpty);
+      expect(h.gateway.signedAuthEntries, isEmpty);
+      expect(find.byKey(const ValueKey('deploy-success')), findsOneWidget);
+      expect(h.live.single.agentId, 30);
+    });
+
+    testWidgets('a resumed registration is verified like a new one', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      await h.pump();
+      h.gateway.prepares.last.complete(
+        const PreparedDeploy.registered(
+          Registration(agentId: 30, transactionHash: 'not-a-hash'),
+        ),
+      );
+      await h.settle();
+
+      expect(h.errorPanel(DeployErrorKind.invalidResponse), findsOneWidget);
+      expect(h.gateway.activations, isEmpty);
+    });
+
+    testWidgets('a first deploy still signs the registration and the entry', (
+      tester,
+    ) async {
+      final h = _Harness(tester);
+      h.gateway.authorizationEntry = 'auth-entry';
+      await h.pump();
+      await h.completePrepare();
+      await h.sign();
+      await h.completeRegistration();
+      await h.sign();
+      await h.completeActivation();
+
+      expect(h.gateway.signedPayloads, hasLength(1));
+      expect(h.gateway.signedAuthEntries, hasLength(1));
+      expect(h.live.single.agentId, 42);
     });
   });
 

@@ -183,10 +183,16 @@ final class SorobanRpcClient {
     final results = result['results'];
     final first = results is List && results.isNotEmpty ? results.first : null;
     final auth = first is Map ? first['auth'] : null;
+    final latestLedger = switch (result['latestLedger']) {
+      final int ledger => ledger,
+      final String ledger => int.tryParse(ledger),
+      _ => null,
+    };
     return SimulationData(
       transactionData: transactionData,
       minResourceFee: minResourceFee,
       auth: auth is List ? auth.whereType<String>().toList() : const [],
+      latestLedger: latestLedger,
     );
   }
 
@@ -330,7 +336,9 @@ final class SorobanRpcClient {
           contractId: contractId,
           topicJson: topics,
           valueJson: raw['valueJson'],
-          inSuccessfulContractCall: raw['inSuccessfulContractCall'] == true,
+          // Stellar RPC no longer sends this key (it only returns events of
+          // successful calls), so only an explicit false marks a failure.
+          inSuccessfulContractCall: raw['inSuccessfulContractCall'] != false,
           txHash: raw['txHash'] is String ? raw['txHash'] as String : null,
         ),
       );
