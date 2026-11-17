@@ -37,21 +37,57 @@ const escrowJobNotFound = 1;
 ///
 /// An archived job is a [LedgerUnavailable] with `archived` set, any other
 /// failure a [LedgerException].
+///
+/// A simulation answers `restorePreamble` when any entry of its footprint is
+/// archived, so an archived escrow instance or code looks exactly like an
+/// archived job (#273). When `get_job` says archived, `job_count`, which
+/// touches the instance and the code but no job, tells them apart: if it is
+/// archived too, the escrow itself needs a restore and the read is a
+/// [LedgerUnavailable] without `archived`, a failure for the caller and never
+/// "this job is gone". Concurrent checks share one read.
 final class ContractEscrowJobReader implements EscrowJobReader {
   ContractEscrowJobReader(this._reader, {required this.escrow});
 
   final ContractReader _reader;
   final StellarAddress escrow;
 
+  Future<bool>? _probe;
+
   @override
   Future<EscrowJob?> escrowJob(int jobId) async {
-    final value = await _reader.read(
-      escrow,
-      'get_job',
-      [ScArg.u64(jobId)],
-      absentErrors: const {escrowJobNotFound},
-    );
+    final Object? value;
+    try {
+      value = await _reader.read(
+        escrow,
+        'get_job',
+        [ScArg.u64(jobId)],
+        absentErrors: const {escrowJobNotFound},
+      );
+    } on LedgerUnavailable catch (e) {
+      if (e.archived && await _escrowArchived()) {
+        throw const LedgerUnavailable(
+          'The escrow contract instance or code is archived and needs a '
+          'restore',
+        );
+      }
+      rethrow;
+    }
     return value == null ? null : readOptional(value, decodeEscrowJob);
+  }
+
+  Future<bool> _escrowArchived() =>
+      _probe ??= _probeEscrow().whenComplete(() => _probe = null);
+
+  /// Whether `job_count` needs a restore. Any other failure of the check is
+  /// the caller's failure: not knowing is never read as "the job is gone".
+  Future<bool> _probeEscrow() async {
+    try {
+      await _reader.read(escrow, 'job_count', const []);
+      return false;
+    } on LedgerUnavailable catch (e) {
+      if (e.archived) return true;
+      rethrow;
+    }
   }
 }
 
