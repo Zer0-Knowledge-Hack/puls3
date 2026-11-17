@@ -364,11 +364,21 @@ fn error_codes_are_stable_and_distinct() {
         EscrowError::ArithmeticOverflow as u32,
         EscrowError::FeeExceedsMax as u32,
         EscrowError::NothingToWithdraw as u32,
+        EscrowError::EvaluatorIsProvider as u32,
+        EscrowError::NoPendingAdmin as u32,
+        EscrowError::NotPendingAdmin as u32,
+        EscrowError::RegistryChangePending as u32,
+        EscrowError::NoRegistryChange as u32,
+        EscrowError::RegistryTimelockNotExpired as u32,
+        EscrowError::RegistryChangeExpired as u32,
     ];
     assert_eq!(erc_shaped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     assert_eq!(
         puls3,
-        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116]
+        [
+            100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+            117, 118, 119, 120, 121, 122, 123
+        ]
     );
 }
 
@@ -1958,16 +1968,133 @@ fn a_window_change_does_not_move_a_stored_deadline() {
 // 4.3 A5 / A6: registry binding and admin handover
 // ---------------------------------------------------------------------------
 
+/// Proposes [registry], waits out the timelock and executes it (audit E-2).
+fn rebind_registry(ctx: &Ctx, registry: &Address) {
+    ctx.escrow().propose_identity_registry(&ctx.admin, registry);
+    advance_ledgers(ctx, REGISTRY_TIMELOCK_LEDGERS);
+    ctx.escrow().execute_identity_registry(&ctx.admin);
+}
+
+fn advance_ledgers(ctx: &Ctx, ledgers: u32) {
+    let info = ctx.env.ledger().get();
+    ctx.env
+        .ledger()
+        .set_sequence_number(info.sequence_number + ledgers);
+}
+
 #[test]
 fn rebinding_the_registry_emits_an_event_and_updates_the_getter() {
     let ctx = setup();
     let other = deploy_registry(&ctx.env);
-    ctx.escrow().set_identity_registry(&ctx.admin, &other);
+    rebind_registry(&ctx, &other);
     let events = ctx.job_events();
     assert_eq!(ctx.escrow().identity_registry(), other);
     assert_eq!(
         events,
         [RegistryUpdated { registry: other }.to_xdr(&ctx.env, &ctx.escrow_id)]
+    );
+    assert_eq!(ctx.escrow().pending_identity_registry(), None);
+}
+
+#[test]
+fn a_proposed_registry_waits_for_the_timelock() {
+    let ctx = setup();
+    let other = deploy_registry(&ctx.env);
+    let start = ctx.env.ledger().sequence();
+    ctx.escrow().propose_identity_registry(&ctx.admin, &other);
+    // Proposed, public and pending, but not in effect.
+    assert_eq!(
+        ctx.job_events(),
+        [RegistryChangeProposed {
+            registry: other.clone(),
+            proposed_at: start,
+            executable_at: start + REGISTRY_TIMELOCK_LEDGERS,
+            expires_at: start + REGISTRY_TIMELOCK_LEDGERS + REGISTRY_EXECUTION_WINDOW,
+        }
+        .to_xdr(&ctx.env, &ctx.escrow_id)]
+    );
+    assert_eq!(ctx.escrow().identity_registry(), ctx.registry_id);
+    assert_eq!(
+        ctx.escrow().pending_identity_registry(),
+        Some(RegistryProposal {
+            registry: other.clone(),
+            proposed_at: start,
+        })
+    );
+    // One ledger short of the timelock: refused, nothing changes.
+    advance_ledgers(&ctx, REGISTRY_TIMELOCK_LEDGERS - 1);
+    assert_eq!(
+        err(ctx.escrow().try_execute_identity_registry(&ctx.admin)),
+        EscrowError::RegistryTimelockNotExpired
+    );
+    assert_eq!(ctx.escrow().identity_registry(), ctx.registry_id);
+    // At the timelock it applies.
+    advance_ledgers(&ctx, 1);
+    ctx.escrow().execute_identity_registry(&ctx.admin);
+    assert_eq!(ctx.escrow().identity_registry(), other);
+}
+
+#[test]
+fn a_registry_change_expires_and_can_then_be_proposed_again() {
+    let ctx = setup();
+    let other = deploy_registry(&ctx.env);
+    ctx.escrow().propose_identity_registry(&ctx.admin, &other);
+    advance_ledgers(
+        &ctx,
+        REGISTRY_TIMELOCK_LEDGERS + REGISTRY_EXECUTION_WINDOW + 1,
+    );
+    assert_eq!(
+        err(ctx.escrow().try_execute_identity_registry(&ctx.admin)),
+        EscrowError::RegistryChangeExpired
+    );
+    assert_eq!(ctx.escrow().identity_registry(), ctx.registry_id);
+    // The expired proposal does not block a new one.
+    rebind_registry(&ctx, &other);
+    assert_eq!(ctx.escrow().identity_registry(), other);
+}
+
+#[test]
+fn a_live_proposal_must_be_cancelled_before_another() {
+    let ctx = setup();
+    let first = deploy_registry(&ctx.env);
+    let second = deploy_registry(&ctx.env);
+    ctx.escrow().propose_identity_registry(&ctx.admin, &first);
+    assert_eq!(
+        err(ctx
+            .escrow()
+            .try_propose_identity_registry(&ctx.admin, &second)),
+        EscrowError::RegistryChangePending
+    );
+    ctx.escrow().cancel_identity_registry(&ctx.admin);
+    assert_eq!(
+        ctx.job_events(),
+        [RegistryChangeCancelled {
+            registry: first.clone()
+        }
+        .to_xdr(&ctx.env, &ctx.escrow_id)]
+    );
+    assert_eq!(ctx.escrow().pending_identity_registry(), None);
+    // Cancelled: executing later does nothing.
+    advance_ledgers(&ctx, REGISTRY_TIMELOCK_LEDGERS);
+    assert_eq!(
+        err(ctx.escrow().try_execute_identity_registry(&ctx.admin)),
+        EscrowError::NoRegistryChange
+    );
+    assert_eq!(ctx.escrow().identity_registry(), ctx.registry_id);
+    // And a new proposal is accepted.
+    ctx.escrow().propose_identity_registry(&ctx.admin, &second);
+}
+
+#[test]
+fn nothing_to_cancel_or_execute_without_a_proposal() {
+    let ctx = setup();
+    assert_eq!(
+        err(ctx.escrow().try_cancel_identity_registry(&ctx.admin)),
+        EscrowError::NoRegistryChange
+    );
+    assert_eq!(
+        err(ctx.escrow().try_execute_identity_registry(&ctx.admin)),
+        EscrowError::NoRegistryChange
     );
 }
 
@@ -1978,7 +2105,7 @@ fn new_jobs_resolve_the_wallet_from_the_rebound_registry() {
     let other = IdentityRegistryContractClient::new(&ctx.env, &other_id);
     let new_provider = Address::generate(&ctx.env);
     let new_agent = other.register(&new_provider);
-    ctx.escrow().set_identity_registry(&ctx.admin, &other_id);
+    rebind_registry(&ctx, &other_id);
     // Agent 0 now resolves to the rebound registry's wallet, not the old provider.
     assert_eq!(
         ctx.try_create(
@@ -2013,7 +2140,7 @@ fn in_flight_jobs_settle_with_no_registry_call() {
     let by_refund = ctx.funded(NOW + 5_000);
     // Rebind to an address with no contract behind it: any registry call would trap.
     let dead = Address::generate(&ctx.env);
-    ctx.escrow().set_identity_registry(&ctx.admin, &dead);
+    rebind_registry(&ctx, &dead);
     ctx.escrow()
         .complete(&ctx.client, &by_complete, &ctx.hash(1));
     ctx.escrow().reject(&ctx.client, &by_reject, &ctx.hash(1));
@@ -2188,7 +2315,15 @@ fn every_setter_rejects_a_non_admin() {
         EscrowError::NotAdmin
     );
     assert_eq!(
-        err(e.try_set_identity_registry(&x, &ctx.registry_id)),
+        err(e.try_propose_identity_registry(&x, &ctx.registry_id)),
+        EscrowError::NotAdmin
+    );
+    assert_eq!(
+        err(e.try_cancel_identity_registry(&x)),
+        EscrowError::NotAdmin
+    );
+    assert_eq!(
+        err(e.try_execute_identity_registry(&x)),
         EscrowError::NotAdmin
     );
     assert_eq!(err(e.try_set_admin(&x, &x)), EscrowError::NotAdmin);
@@ -2208,7 +2343,11 @@ fn every_setter_needs_the_admin_signature() {
     assert!(e.try_set_treasury(a, a).is_err());
     assert!(e.try_set_max_expiry(a, &MAX_EXPIRY).is_err());
     assert!(e.try_set_approval_window(a, &APPROVAL_WINDOW).is_err());
-    assert!(e.try_set_identity_registry(a, &ctx.registry_id).is_err());
+    assert!(e
+        .try_propose_identity_registry(a, &ctx.registry_id)
+        .is_err());
+    assert!(e.try_cancel_identity_registry(a).is_err());
+    assert!(e.try_execute_identity_registry(a).is_err());
     assert!(e.try_set_admin(a, a).is_err());
     assert!(e.is_token_allowed(&ctx.token));
 }
@@ -2425,7 +2564,10 @@ fn contract_exports_exactly_the_specified_functions() {
         "set_treasury",
         "set_max_expiry",
         "set_approval_window",
-        "set_identity_registry",
+        "propose_identity_registry",
+        "cancel_identity_registry",
+        "execute_identity_registry",
+        "pending_identity_registry",
         "set_admin",
         "accept_admin",
         "pending_admin",

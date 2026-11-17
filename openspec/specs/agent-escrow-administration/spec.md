@@ -114,7 +114,20 @@ The contract MUST expose `set_token_allowed(caller, token, allowed: bool)` and t
 - **THEN** `NotAdmin`
 
 ### Requirement: A5. identity registry binding
-`set_identity_registry(caller, registry: Address)` (admin only) and getter `identity_registry()`. The registry MUST be set at construction. `create_job` uses the bound registry for `get_agent_wallet` / `agent_exists` lookups (lifecycle R1). The address is never stored per job; only the verified `provider` and `agent_id` are. Emits `RegistryUpdated(registry)`.
+The registry MUST be set at construction, and is read with `identity_registry()`. `create_job` uses the bound registry for `get_agent_wallet` / `agent_exists` lookups (lifecycle R1). The address is never stored per job; only the verified `provider` and `agent_id` are.
+
+The registry names the wallet of every new job's provider, so it changes in two timelocked steps (audit E-2, #206), all admin only:
+- `propose_identity_registry(caller, registry)` records the proposal and emits `RegistryChangeProposed(registry, proposed_at, executable_at, expires_at)`. A live proposal must be cancelled first (`RegistryChangePending`); an expired one can be replaced.
+- `execute_identity_registry(caller)` applies it once `REGISTRY_TIMELOCK_LEDGERS` (51 840 ledgers, about 3 days) have passed (`RegistryTimelockNotExpired` before) and within `REGISTRY_EXECUTION_WINDOW` (120 960 ledgers, about 7 days) after that (`RegistryChangeExpired` later), and emits `RegistryUpdated(registry)`.
+- `cancel_identity_registry(caller)` drops the proposal and emits `RegistryChangeCancelled(registry)`.
+- `pending_identity_registry()` returns the proposal (`registry`, `proposed_at`), if any. With nothing proposed, cancel and execute fail with `NoRegistryChange`.
+
+A compromised admin key therefore cannot redirect new jobs at once: the change is public on chain for days, and can be watched for (`RegistryChangeProposed`) before it applies.
+
+#### Scenario: a registry change waits for its timelock
+- **WHEN** the admin proposes registry B
+- **THEN** `identity_registry()` is still A, and `execute_identity_registry` fails with `RegistryTimelockNotExpired` until `REGISTRY_TIMELOCK_LEDGERS` have passed
+- **AND THEN** it applies B and emits `RegistryUpdated(B)`
 
 #### Scenario: registry swap does not affect in-flight jobs
 - **GIVEN** a `Funded` job
@@ -154,7 +167,7 @@ The contract MUST expose `admin()`, `pending_admin()`, `identity_registry()`, `t
 - **THEN** the matching getter returns the new value
 
 ### Requirement: A8. admin events and errors
-Each successful admin change emits one event (`TokenAllowedSet`, `FeeConfigUpdated`, `LimitsUpdated`, `RegistryUpdated`, `AdminChanged`); failed calls emit none. Additional error variants: `NotAdmin`, `InvalidFeeBps`, `TreasuryNotSet`, `InvalidDuration`, `RegistryNotSet`.
+Each successful admin change emits one event (`TokenAllowedSet`, `FeeConfigUpdated`, `LimitsUpdated`, `RegistryChangeProposed`, `RegistryChangeCancelled`, `RegistryUpdated`, `AdminProposed`, `AdminChanged`); failed calls emit none. Additional error variants: `NotAdmin`, `InvalidFeeBps`, `TreasuryNotSet`, `InvalidDuration`, `RegistryNotSet`, `RegistryChangePending`, `NoRegistryChange`, `RegistryTimelockNotExpired`, `RegistryChangeExpired`.
 
 ## Open items (not decided; do not hard-code)
 
