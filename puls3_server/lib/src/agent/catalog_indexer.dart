@@ -69,9 +69,14 @@ final class CatalogIndexer {
 
   /// Reads the chain once and syncs the index.
   ///
+  /// [rehydrateAll] re-reads every indexed agent from state, not just the
+  /// ones with new events. The loop sets it on its first pass after a start,
+  /// so a change whose event the index missed is recovered on the next
+  /// deploy.
+  ///
   /// A failure to read the latest ledger or the agent count throws a
   /// [LedgerException], so the caller leaves the index untouched and retries.
-  Future<IndexPassSummary> pass() async {
+  Future<IndexPassSummary> pass({bool rehydrateAll = false}) async {
     final latest = await _events.latestLedger();
     final checkpoint = await _repository.lastProcessedLedger();
     final total = await _registry.totalAgents();
@@ -79,7 +84,7 @@ final class CatalogIndexer {
 
     final affected = <int>{};
     var advanceCursor = checkpoint == null;
-    var recoverAll = false;
+    var recoverAll = rehydrateAll;
     if (checkpoint != null) {
       try {
         final batch = await _events.eventsSince(checkpoint + 1);

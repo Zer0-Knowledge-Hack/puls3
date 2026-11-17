@@ -84,7 +84,7 @@ final class CliSession implements RefresherClientAuthKeyProvider {
     final path = defaultSessionFile(environment);
     if (path == null) return null;
     final client = Client(normalizeApiUrl(apiUrl));
-    return load(
+    final session = await load(
       File(path),
       seed: environment[refreshTokenVariable],
       refresh: (token) async {
@@ -102,6 +102,12 @@ final class CliSession implements RefresherClientAuthKeyProvider {
         );
       },
     );
+    if (session == null) {
+      client.close();
+    } else {
+      session._closeTransport = client.close;
+    }
+    return session;
   }
 
   /// The session saved in [file], or a new one from [seed].
@@ -247,6 +253,12 @@ final class CliSession implements RefresherClientAuthKeyProvider {
 
   /// The last queued holder of each session file's lock in this process.
   static final _inProcess = <String, Completer<void>>{};
+
+  /// Closes the connection [open] made for refreshes, so a program can
+  /// exit. The saved session is kept.
+  void close() => _closeTransport?.call();
+
+  void Function()? _closeTransport;
 
   @override
   String toString() => 'CliSession(${_file.path})';

@@ -11,4 +11,6 @@ export 'src/puls3_command.dart'
         SdkConnector,
         StdinReader,
         apiUrlVariable,
-        runPuls3;
+        printable,
+        runPuls3,
+        walletVariable;

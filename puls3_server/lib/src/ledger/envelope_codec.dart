@@ -43,6 +43,7 @@ final class SimulationData {
     required this.transactionData,
     required this.minResourceFee,
     this.auth = const [],
+    this.latestLedger,
   });
 
   /// The base64 XDR `SorobanTransactionData`.
@@ -53,6 +54,11 @@ final class SimulationData {
 
   /// The base64 XDR `SorobanAuthorizationEntry` list of the first result.
   final List<String> auth;
+
+  /// The ledger the simulation ran against, when the node reported it.
+  /// Address auth entries are simulated with an expiration of 0, so whoever
+  /// forwards one for signing sets its expiration from this ledger.
+  final int? latestLedger;
 }
 
 /// An unsigned envelope ready to hand to the wallet.

@@ -2,7 +2,23 @@
 
 `puls3` is the command line for the puls3 API. It is a client of [`puls3_sdk`](../../puls3_sdk/) ([ADR-0007](../adr/0007-developer-sdk.md)), so it uses the same calls and the same errors as the SDK.
 
-**It never signs or submits a transaction.** It reads the catalog, and runs an agent manifest locally with your own model credential ([`run`](run-locally.md)). The hire and Studio commands (`hire get`, `hire prepare-complete` and the rest) wait for the wallet session decision in ADR-0007 and for [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259). To deploy an agent, or to approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
+**It never signs or submits a transaction.** The catalog commands and [`run`](run-locally.md) need no session. The hire and Studio commands act for a wallet, so they need that wallet's session; `hire prepare-complete` and `hire prepare-reject` print the unsigned envelope for the wallet to sign, and stop there. To sign, deploy an agent, or approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
+
+## Wallet session
+
+Hire and Studio commands act for your wallet, so they need a session of it. The CLI never asks for a wallet key; it uses a separate **CLI session** that the app gives you (ADR-0007, option A′):
+
+1. Open [puls3.org](https://puls3.org/), connect your wallet and open the wallet sheet.
+2. Choose **Copy session for CLI**. The app shows a refresh token once, valid for 72 hours.
+3. Set it in your shell, never as an argument:
+
+   ```bash
+   export PULS3_REFRESH_TOKEN='<the token>'
+   ```
+
+The first command saves the session in a file only you can read (mode 0600) and keeps the rotated tokens there. Later commands, and the MCP server, use that file; `PULS3_REFRESH_TOKEN` is read again only when you copy a new session. After 72 hours, or after you revoke it in the app, commands exit 77: copy a new session. A revocation takes up to 10 minutes to stop a token already in use.
+
+Without a session the catalog commands still work, and hire and Studio commands exit 77 (`SessionRequired`) before sending anything.
 
 ## Run it
 
@@ -78,6 +94,60 @@ An unknown id exits 3 with `error: NotFound: no agent with id <id>`. With `--jso
 
 The JSON fields are fixed: `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `wallet`, `model`, `rating`, `paidHireCount`. Prices are integer stroops (7 decimals); `wallet` and `model` can be `null`.
 
+### `hire get <id>`
+
+One hire of the session wallet. The server checks that the hire is that wallet's: the wallet goes in `--wallet` or `PULS3_WALLET`. It is the public `G...` address, not a secret.
+
+```text
+$ puls3 hire get 12 --wallet GABK...HF5H
+hire 12  submitted
+agent        agt-001  Ledger Scout
+price        0.50 USDC
+job id       34
+expires      2026-11-18T12:00:00.000Z
+approve by   2026-11-12T00:00:00.000Z
+payment      https://stellar.expert/explorer/testnet/tx/...
+
+input
+summarise this
+
+result
+a summary
+```
+
+`--json` prints the fixed fields `id`, `status`, `agentId`, `agentName`, `consumer`, `priceUsdcStroops`, `jobId`, `expiresAt`, `approvalDeadline` (ISO 8601, UTC), `input`, `result`, `rejectReason` and `paymentExplorerUrl`. Server codes: `InvalidHireId`, `InvalidStellarAddress`, `WalletMismatch`, `HireNotFound`, `HireNotOwned`, `ChainDataUnavailable` (exit 1).
+
+### `hire prepare-complete <id>` and `hire prepare-reject <id> --reason <text>`
+
+The unsigned `complete` or `reject` of a submitted hire, for the session wallet to sign. **The CLI does not sign or submit it**: no transaction reaches the chain, and the hire does not change.
+
+```text
+$ puls3 hire prepare-complete 12
+preparation  9f3c...
+purpose      complete
+signer       GABK...HF5H
+network      Test SDF Network ; September 2015
+expires      2026-11-11T12:05:00.000Z
+
+unsigned transaction (not signed, not submitted):
+AAAAAgAAAAA...
+```
+
+The last line is the transaction envelope XDR, base64. `--json` prints `preparationId`, `purpose`, `signer`, `networkPassphrase`, `unsignedTransactionXdr` and `expiresAt`. Server codes: `InvalidHireId`, `HireNotFound`, `HireNotOwned`, `InvalidHireTransition`, `InvalidRejectReason` (reject), `SubmissionInProgress`, `OutcomeUnknown`, `ChainUnavailable` (exit 1).
+
+### `studio test-run --draft <id> --input <text>`
+
+Runs one of the session wallet's saved drafts once, with the builder's own provider credential. No hire and no payment.
+
+```text
+$ puls3 studio test-run --draft 3 --input "Summarise: ..."
+<the model's output>
+
+4 test runs left today
+```
+
+`--json` prints `output` and `remainingDailyRuns`. Server codes: `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable` (for example, no provider credential saved), `AgentExecutionFailed` (exit 1).
+
 ### `run --manifest <file.json> --input <text>`
 
 Runs an agent from its manifest on your machine, with your own model credential, without the puls3 server and without any transaction. The input can also come from `--input-file <path>` or stdin (`--input -`).
@@ -90,18 +160,32 @@ puls3 run --manifest example/soroban_pre_audit.json --input "pub fn withdraw(...
 
 It prints the agent's output; `--json` prints `{output, model, inputChars, outputChars, elapsedMs}`. See [Run an agent locally](run-locally.md) for the manifest, credentials, limits and its own exit codes (65 invalid manifest or input, 66 unreadable file, 78 missing credential).
 
+## Environment
+
+| Variable | Used by | Secret |
+|---|---|---|
+| `PULS3_API_URL` | every command, when `--api` is not given | no |
+| `PULS3_WALLET` | `hire get`, when `--wallet` is not given | no, it is a public address |
+| `PULS3_REFRESH_TOKEN` | hire and Studio commands: seeds the session once | **yes**: a bearer secret for 72 hours. Never an argument, never in the repository (`docs/infra/secrets.md`) |
+| `PULS3_SESSION_FILE` | where the rotated session is kept. Default `~/.config/puls3/session.json` (`$XDG_CONFIG_HOME/puls3/session.json` when set), `%APPDATA%\puls3\session.json` on Windows | the file is: mode 0600, plus a `.lock` beside it that holds no secret |
+
 ## Output and exit codes
 
 A result goes to stdout. A failure writes one `error: <code>: <message>` line to stderr, plus the usage for a usage error, and nothing to stdout.
 
+Text that comes from the server or an agent (names, descriptions, inputs, results, reasons, error messages) is printed without terminal control characters or bidirectional overrides, so it cannot move the cursor, clear the screen or disguise itself. `--json` keeps control characters, escaped by JSON.
+
 | Exit | Code on stderr | When |
 |---|---|---|
 | 0 | none | Success, or `--help`. |
-| 1 | the server's `Puls3ApiException` code | The server answered with an error of its own. The catalog calls raise none today (an outage is `AgentCatalogUnavailable`, exit 69), so this is for the codes the API contract adds later. |
+| 1 | the server's `Puls3ApiException` code | The server answered with an error of its own, for example `HireNotOwned` or `RuntimeUnavailable`. Each command above lists its codes. The catalog calls raise none (an outage is `AgentCatalogUnavailable`, exit 69). |
 | 3 | `NotFound` | `catalog get` with an id the catalog does not have. |
 | 64 | `Usage` | Unknown command, missing or extra argument, no server URL, or a URL that is not absolute `http`/`https`. Nothing is sent. |
 | 69 | `Unreachable` | The server did not answer in 20 seconds, or the connection failed (DNS, TLS, socket). |
 | 69 | `AgentCatalogUnavailable` | The server is up but cannot read the catalog. It is never shown as an empty list. |
+| 74 | `SessionFile` | The session file cannot be read or written (for example its directory is not writable). |
+| 77 | `SessionRequired` | A hire or Studio command with no wallet session. Nothing is sent. |
+| 77 | `Unauthorized` | The server refused the session: expired, revoked, or not valid. |
 | 1, 65, 66, 69, 78 | see [run-locally.md](run-locally.md#errors-and-exit-codes) | `run` failures: provider error, invalid manifest or input, unreadable file, unreachable provider, missing credential. |
 
 A server that was idle can take more than 20 seconds to answer the first call, so one `Unreachable` right after a pause is worth one retry.
