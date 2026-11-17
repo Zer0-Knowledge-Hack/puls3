@@ -68,7 +68,12 @@ class HireEndpoint extends Endpoint {
   ) async {
     final wallet = await _wallet.requireLogin(session);
     _requireSameWallet(wallet, consumer);
-    if (agentId < 1) throw Puls3ApiException(code: 'InvalidAgentId');
+    // Registry ids are the contract's u32 and start at 0 (#291).
+    try {
+      AgentId(agentId);
+    } on InvalidAgentId {
+      throw Puls3ApiException(code: 'InvalidAgentId');
+    }
     try {
       return await _servicesOn(session).hires.createHire(
         agentId: agentId,
