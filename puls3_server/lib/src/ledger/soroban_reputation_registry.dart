@@ -48,16 +48,20 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     required EscrowJobReader jobs,
     required AgentOwnerReader owners,
     TerminalJobStore? facts,
+    Map<StellarAddress, EscrowJobReader> otherEscrows = const {},
   }) : _registry = registry,
        _escrow = escrow,
-       _jobs = jobs,
+       _readers = {escrow: jobs, ...otherEscrows},
        _owners = owners,
        _facts = facts;
 
   final ContractReader _reader;
   final StellarAddress _registry;
   final StellarAddress _escrow;
-  final EscrowJobReader _jobs;
+
+  /// The job reader of each trusted escrow: the configured one and the ones
+  /// it replaced (#273), each over its own contract.
+  final Map<StellarAddress, EscrowJobReader> _readers;
   final AgentOwnerReader _owners;
 
   /// The jobs read in a final state, kept across restarts (#273), or null
@@ -67,11 +71,15 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   /// Jobs read in a final state (`Completed`, `Rejected`, `Expired`). The
   /// escrow never changes them again, so they are not read twice, and a job
   /// that later archives keeps counting while this process runs.
-  final _final = <int, ReferencedJob>{};
+  final _final = <PaidJobReference, ReferencedJob>{};
 
-  /// The escrow contract whose completed jobs make a rating count. It comes
-  /// from the configuration, never from a record.
+  /// The configured escrow contract, the one new ratings name. It comes from
+  /// the configuration, never from a record.
   StellarAddress get escrow => _escrow;
+
+  /// Every escrow whose completed jobs make a rating count: [escrow] and the
+  /// ones it replaced.
+  Set<StellarAddress> get trustedEscrows => _readers.keys.toSet();
 
   /// A registry or escrow read failure is a [LedgerException]: the caller
   /// must not treat it as "no feedback".
@@ -117,9 +125,9 @@ final class SorobanReputationRegistry implements ReputationRegistry {
   /// read: the owner rule fails closed, as `FeedbackService` does.
   Future<StellarAddress?> _ownerOf(AgentId agent) => _owners.ownerOf(agent);
 
-  /// The jobs [records] reference on [escrow], each read once with
-  /// `get_job`, [jobReadConcurrency] at a time. A job in a final state is
-  /// read only once per process.
+  /// The jobs [records] reference on the trusted escrows, each read once with
+  /// `get_job` from the escrow its reference names, [jobReadConcurrency] at a
+  /// time. A job in a final state is read only once per process.
   ///
   /// A job the escrow does not have, or whose entry is archived, is left out,
   /// so the domain reports that one record as `jobUnreadable` and every other
@@ -131,14 +139,14 @@ final class SorobanReputationRegistry implements ReputationRegistry {
     Iterable<FeedbackRecord> records, {
     StellarAddress? owner,
   }) async {
-    final jobs = <int, ReferencedJob>{};
-    final toRead = <int>[];
-    for (final id in referencedJobIds(records, _escrow)) {
-      final known = _final[id];
+    final jobs = <PaidJobReference, ReferencedJob>{};
+    final toRead = <PaidJobReference>[];
+    for (final reference in referencedJobs(records, trustedEscrows)) {
+      final known = _final[reference];
       if (known != null) {
-        jobs[id] = known;
+        jobs[reference] = known;
       } else {
-        toRead.add(id);
+        toRead.add(reference);
       }
     }
     for (var start = 0; start < toRead.length; start += jobReadConcurrency) {
@@ -146,7 +154,7 @@ final class SorobanReputationRegistry implements ReputationRegistry {
           ? start + jobReadConcurrency
           : toRead.length;
       final batch = toRead.sublist(start, end);
-      final read = await Future.wait([for (final id in batch) _job(id)]);
+      final read = await Future.wait([for (final job in batch) _job(job)]);
       for (var i = 0; i < batch.length; i++) {
         final job = read[i];
         if (job == null) continue;
@@ -158,36 +166,41 @@ final class SorobanReputationRegistry implements ReputationRegistry {
         }
       }
     }
-    return FeedbackProvenance(escrow: _escrow, jobs: jobs, owner: owner);
+    return FeedbackProvenance(
+      escrows: trustedEscrows,
+      jobs: jobs,
+      owner: owner,
+    );
   }
 
   /// Keeps a job read in a final state, so it still counts once its entry
   /// archives. Returns whether it is kept (true when no store is used). A
   /// store that fails does not hide a job the chain just answered: the job
   /// counts now and is offered to the store again on the next read.
-  Future<bool> _remember(int id, ReferencedJob job) async {
+  Future<bool> _remember(PaidJobReference job, ReferencedJob fact) async {
     final facts = _facts;
     if (facts == null) return true;
     try {
-      await facts.save(_escrow, id, job);
+      await facts.save(job.escrow, job.jobId, fact);
       return true;
     } on Exception {
       return false;
     }
   }
 
-  /// Job [id], or null when the escrow has no such job, or its entry is
-  /// archived and no fact was kept of it.
+  /// [reference]'s job, or null when its escrow has no such job, or its entry
+  /// is archived and no fact was kept of it.
   ///
   /// A readable job is always the chain's answer. A stored fact stands in
   /// only for an archived entry, which cannot be read; a store that fails
   /// there is an error for the whole read, never "no rating".
-  Future<ReferencedJob?> _job(int id) async {
+  Future<ReferencedJob?> _job(PaidJobReference reference) async {
     final EscrowJob? job;
     try {
-      job = await _jobs.escrowJob(id);
+      // `referencedJobs` only names trusted escrows, so a reader exists.
+      job = await _readers[reference.escrow]!.escrowJob(reference.jobId);
     } on LedgerUnavailable catch (e) {
-      if (e.archived) return _facts?.find(_escrow, id);
+      if (e.archived) return _facts?.find(reference.escrow, reference.jobId);
       rethrow;
     }
     if (job == null) return null;

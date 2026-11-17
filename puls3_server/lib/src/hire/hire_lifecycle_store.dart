@@ -44,6 +44,7 @@ final class HireRow {
     required this.requestId,
     required this.input,
     required this.jobId,
+    this.escrow,
     required this.paymentTransaction,
     required this.status,
   });
@@ -63,6 +64,11 @@ final class HireRow {
 
   /// The escrow job id, bound once the `create_job` is confirmed.
   final int? jobId;
+
+  /// The StrKey of the escrow contract that holds [jobId], bound with it
+  /// (#273). Null for a hire without a job, and for a hire that predates the
+  /// column: it then means the escrow configured at that moment (#307).
+  final String? escrow;
 
   /// The `fund` transaction hash, once the hire is funded.
   final String? paymentTransaction;
@@ -127,12 +133,18 @@ abstract interface class HireLifecycleStore {
   /// caller must roll back.
   Future<HireRow> insertHire(NewHire hire, {Transaction? transaction});
 
-  /// Binds [jobId] and the job's [expiredAt] to hire [hireId] unless the
-  /// hire has a job. One conditional write, so applying it twice, or from
-  /// two trackers, binds once.
+  /// Binds [jobId], the job's [expiredAt] and the StrKey of the [escrow] that
+  /// holds it to hire [hireId] unless the hire has a job. One conditional
+  /// write, so applying it twice, or from two trackers, binds once, and the
+  /// first escrow stays. Without [escrow] the hire keeps none (#273).
   ///
   /// Throws [StateError] when the hire does not exist.
-  Future<JobBinding> bindJob(int hireId, int jobId, {required int expiredAt});
+  Future<JobBinding> bindJob(
+    int hireId,
+    int jobId, {
+    required int expiredAt,
+    String? escrow,
+  });
 
   /// Hires that already have an escrow job and an id above [afterId],
   /// oldest first (by id), at most [limit]. A hire without a job is not a

@@ -209,6 +209,7 @@ void main() {
         ledger: stack.ledger,
         jobs: stack.ledger,
         usdc: StellarConfig.testnet.usdcSac,
+        escrow: StellarConfig.testnet.escrow,
       );
       final preparedRow = (await stack.preparations.findByPreparationId(
         prepared.preparationId,

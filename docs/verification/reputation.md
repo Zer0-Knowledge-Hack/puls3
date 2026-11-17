@@ -27,7 +27,8 @@ backend could tell.
 **Amended by #201:** a record also needs a paid job. puls3 now writes the
 hire's escrow job in `tag2` and `feedback_uri` (`puls3:job:v1:<escrow>:<job
 id>`) and a commitment in `feedback_hash`, and the reader counts a record only
-when the configured escrow's `get_job` says that job is `Completed` for the same
+when the `get_job` of the configured escrow, or of one it replaced
+(`PULS3_STELLAR_PREVIOUS_ESCROWS`, #273), says that job is `Completed` for the same
 client and agent, once per job. The full list of reasons is in
 [`docs/domain/reputation.md`](../domain/reputation.md); the evidence below
 predates #201 (its record has no job reference, so it no longer counts). See

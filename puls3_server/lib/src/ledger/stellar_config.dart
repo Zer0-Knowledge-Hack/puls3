@@ -12,6 +12,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 /// | `PULS3_STELLAR_USDC_SAC` | [usdcSac] |
 /// | `PULS3_STELLAR_IDENTITY_REGISTRY` | [identityRegistry] |
 /// | `PULS3_STELLAR_ESCROW` | [escrow] |
+/// | `PULS3_STELLAR_PREVIOUS_ESCROWS` | [previousEscrows] (comma-separated) |
 /// | `PULS3_STELLAR_REPUTATION_REGISTRY` | [reputationRegistry] |
 /// | `PULS3_STELLAR_SIMULATION_SOURCE` | [simulationSource] |
 /// | `PULS3_STELLAR_RPC_TIMEOUT_SECONDS` | [rpcTimeout] |
@@ -23,6 +24,7 @@ final class StellarConfig {
     required this.identityRegistry,
     required this.escrow,
     required this.simulationSource,
+    this.previousEscrows = const [],
     this.reputationRegistry,
     this.rpcTimeout = defaultRpcTimeout,
   });
@@ -60,7 +62,14 @@ final class StellarConfig {
     }
 
     final rpcUrl = read('PULS3_STELLAR_RPC_URL');
+    final previous = read('PULS3_STELLAR_PREVIOUS_ESCROWS');
     return StellarConfig(
+      previousEscrows: previous == null
+          ? const []
+          : [
+              for (final part in previous.split(','))
+                if (part.trim().isNotEmpty) StellarAddress.parse(part.trim()),
+            ],
       rpcUrl: rpcUrl == null ? testnet.rpcUrl : Uri.parse(rpcUrl),
       networkPassphrase:
           read('PULS3_STELLAR_NETWORK_PASSPHRASE') ?? testnet.networkPassphrase,
@@ -122,6 +131,15 @@ final class StellarConfig {
   /// feedback and reputation features stay unwired (`UnwiredReputationCalls`).
   final StellarAddress? reputationRegistry;
 
+  /// The escrow contracts [escrow] replaced, newest first or in any order.
+  /// Ratings written for a job on one of them still count (#273); nothing new
+  /// is created on them. Empty until an escrow is rotated.
+  final List<StellarAddress> previousEscrows;
+
+  /// Every escrow whose completed jobs make a rating count: [escrow] and
+  /// [previousEscrows], each once.
+  Set<StellarAddress> get trustedEscrows => {escrow, ...previousEscrows};
+
   /// An existing account used only as the source of unsigned simulations.
   final StellarAddress simulationSource;
 
@@ -137,6 +155,7 @@ final class StellarConfig {
       other.usdcSac == usdcSac &&
       other.identityRegistry == identityRegistry &&
       other.escrow == escrow &&
+      _sameAddresses(other.previousEscrows, previousEscrows) &&
       other.simulationSource == simulationSource &&
       other.reputationRegistry == reputationRegistry &&
       other.rpcTimeout == rpcTimeout;
@@ -148,8 +167,17 @@ final class StellarConfig {
     usdcSac,
     identityRegistry,
     escrow,
+    Object.hashAll(previousEscrows),
     simulationSource,
     reputationRegistry,
     rpcTimeout,
   );
+}
+
+bool _sameAddresses(List<StellarAddress> a, List<StellarAddress> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

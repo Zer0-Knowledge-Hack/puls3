@@ -27,12 +27,15 @@ final class ContractCall {
 /// configured registry the wiring falls back to [UnwiredReputationCalls].
 abstract interface class ReputationCalls {
   /// The call by which [client] leaves [feedback] about [agent] for the
-  /// escrow job [jobId] of the hire (#201).
+  /// escrow job [jobId] of the hire (#201). The job lives on [escrow], the
+  /// escrow the hire was funded on, or on the configured one when null: a
+  /// hire that predates the escrow column has none of its own (#273, #307).
   ContractCall giveFeedback({
     required StellarAddress client,
     required AgentId agent,
     required Feedback feedback,
     required int jobId,
+    StellarAddress? escrow,
   });
 }
 
@@ -88,8 +91,9 @@ final class SorobanReputationCalls implements ReputationCalls {
     required AgentId agent,
     required Feedback feedback,
     required int jobId,
+    StellarAddress? escrow,
   }) {
-    final job = PaidJobReference(escrow: escrow, jobId: jobId);
+    final job = PaidJobReference(escrow: escrow ?? this.escrow, jobId: jobId);
     final commitment = feedbackCommitment(
       job: job,
       agent: agent,
@@ -131,6 +135,7 @@ final class UnwiredReputationCalls implements ReputationCalls {
     required AgentId agent,
     required Feedback feedback,
     required int jobId,
+    StellarAddress? escrow,
   }) => throw HireConfigurationMissing(setting: setting);
 }
 
