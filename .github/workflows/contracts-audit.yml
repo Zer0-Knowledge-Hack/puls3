@@ -1,0 +1,39 @@
+name: Contracts audit
+
+# Audit P-1 (#206), follow-ups #281. The RustSec check reads a live advisory DB,
+# so it must not gate unrelated PRs: it is not part of the `gate` job in ci.yml.
+# It runs on contracts changes, weekly against `main`, and on demand, so a new
+# advisory is reported even when nobody touches contracts/.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts-audit.yml'
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: taiki-e/install-action@cf39a74df4a72510be4e5b63348d61067f11e64a # v2.75.0
+        with:
+          tool: cargo-audit@0.23.0
+      # Warnings (unmaintained, unsound, yanked) fail too: cargo audit exits 0 on them.
+      - name: Audit dependencies (RustSec)
+        run: cargo audit --deny warnings
