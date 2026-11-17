@@ -69,7 +69,7 @@ puls3 is in **early development**. What exists today:
 - ✅ The pure Dart domain model ([`puls3_domain/`](puls3_domain/))
 - ✅ A Dart SDK for the catalog ([`puls3_sdk/`](puls3_sdk/), [quickstart](docs/sdk/quickstart.md)); hire and Studio calls are next ([#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259))
 - 📘 Build, test-run and deploy your own agent on testnet: [Agent Studio builder guide](docs/studio/builder-guide.md)
-- ✅ A `puls3` command line that reads the catalog ([`puls3_cli/`](puls3_cli/), [reference](docs/cli/reference.md)); it never signs
+- ✅ A `puls3` command line: the catalog, your hires (with a session copied from the app), Studio test runs and local agent runs ([`puls3_cli/`](puls3_cli/), [reference](docs/cli/reference.md)); it never signs or submits
 - ✅ An MCP server for Cursor and Claude Desktop that reads the catalog ([`puls3_mcp/`](puls3_mcp/), [setup](docs/mcp/setup.md)); it never signs
 - 🚧 Reputation Registry contract
 - 🚧 Backend, the app wired to the chain, and agent execution
