@@ -15,3 +15,8 @@ fields:
   ### The consumer must act: approve or reject a submitted hire before its
   ### deadline, or reject a funded hire whose run failed to get a refund.
   needsAction: bool
+  ### The registry id of the user's Studio agent that hired and paid from its
+  ### own wallet; null for the session wallet's own hires.
+  paidByAgentId: int?
+  ### That agent's name, for "Paid by your agent X".
+  paidByAgentName: String?
