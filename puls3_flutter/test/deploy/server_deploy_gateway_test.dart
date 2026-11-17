@@ -67,6 +67,122 @@ void main() {
     expect(prepared.unsignedTransaction, 'unsigned-xdr');
   });
 
+  test('a first deploy is not a resumed one', () async {
+    final prepared = await _gateway().prepare(_draft, builder: 'G');
+
+    expect(prepared.registered, isNull);
+    expect(prepared.active, isFalse);
+  });
+
+  group('resume after registration (#321)', () {
+    test('a confirmed registration resumes at the wallet step', () async {
+      final gateway = _gateway(
+        prepareDeploy: (draftId, builder) async => _session(
+          state: 'awaitingWalletAuthorization',
+          hash: _hash,
+          agentId: 30,
+          entry: 'entry-xdr',
+        ),
+      );
+
+      final prepared = await gateway.prepare(_draft, builder: 'G');
+
+      expect(prepared.registered?.agentId, 30);
+      expect(prepared.registered?.transactionHash, _hash);
+      expect(prepared.active, isFalse);
+      // The wallet step of the resumed deploy uses the same draft.
+      expect(
+        await gateway.walletAuthorization(prepared.registered!),
+        'entry-xdr',
+      );
+    });
+
+    test('a submitted registration is polled until confirmed', () async {
+      var reads = 0;
+      final gateway = _gateway(
+        prepareDeploy: (draftId, builder) async => _session(
+          state: 'registrationSubmitted',
+          unsigned: 'unsigned-xdr',
+          hash: _hash,
+        ),
+        getDeploySession: (draftId) async {
+          reads += 1;
+          return reads < 2
+              ? _session(state: 'registrationSubmitted', hash: _hash)
+              : _session(
+                  state: 'awaitingWalletAuthorization',
+                  hash: _hash,
+                  agentId: 30,
+                );
+        },
+      );
+
+      final prepared = await gateway.prepare(_draft, builder: 'G');
+
+      expect(reads, 2);
+      expect(prepared.registered?.agentId, 30);
+      expect(prepared.active, isFalse);
+    });
+
+    test('an active agent resumes straight to live', () async {
+      final gateway = _gateway(
+        prepareDeploy: (draftId, builder) async => _session(
+          state: 'active',
+          hash: _hash,
+          agentId: 30,
+          wallet: _wallet,
+          entry: 'entry-xdr',
+        ),
+      );
+
+      final prepared = await gateway.prepare(_draft, builder: 'G');
+
+      expect(prepared.registered?.agentId, 30);
+      expect(prepared.active, isTrue);
+    });
+
+    test('a submitted wallet authorization is polled until active', () async {
+      var reads = 0;
+      final gateway = _gateway(
+        prepareDeploy: (draftId, builder) async => _session(
+          state: 'walletAuthorizationSubmitted',
+          hash: _hash,
+          agentId: 30,
+          entry: 'entry-xdr',
+        ),
+        getDeploySession: (draftId) async {
+          reads += 1;
+          return _session(
+            state: 'active',
+            hash: _hash,
+            agentId: 30,
+            wallet: _wallet,
+          );
+        },
+      );
+
+      final prepared = await gateway.prepare(_draft, builder: 'G');
+
+      expect(reads, 1);
+      expect(prepared.active, isTrue);
+    });
+
+    test('a registered session without its hash is refused', () async {
+      final gateway = _gateway(
+        prepareDeploy: (draftId, builder) async => _session(
+          state: 'awaitingWalletAuthorization',
+          agentId: 30,
+          entry: 'entry-xdr',
+        ),
+      );
+
+      await expectLater(
+        gateway.prepare(_draft, builder: 'G'),
+        throwsA(isA<DeployBackendError>()),
+      );
+    });
+  });
+
   test('submit waits for the agent id and keeps the real hash', () async {
     var reads = 0;
     final gateway = _gateway(
@@ -97,11 +213,10 @@ void main() {
 
   test('a typed error the browser client could not decode is mapped', () async {
     final gateway = _gateway(
-      prepareDeploy: (draftId, builder) async =>
-          throw api.ServerpodClientBadRequest(
-            '{"className":"Puls3ApiException","data":{"code":"PreparationExpired",'
-            '"message":"That signature expired.","details":{"purpose":"deploy"}}}',
-          ),
+      prepareDeploy: (draftId, builder) async => throw api.ServerpodClientBadRequest(
+        '{"className":"Puls3ApiException","data":{"code":"PreparationExpired",'
+        '"message":"That signature expired.","details":{"purpose":"deploy"}}}',
+      ),
     );
     await expectLater(
       gateway.prepare(_draft, builder: 'G'),
@@ -143,73 +258,77 @@ void main() {
     );
   });
 
-  test('the wallet step confirms and activate returns the custodied wallet',
-      () async {
-    String? signedEntry;
-    final gateway = _gateway(
-      submitWalletAuthorization: (draftId, preparationId, signed) async {
-        expect(draftId, 7);
-        expect(preparationId, 'prep-wallet');
-        signedEntry = signed;
-        return _session(
-          state: 'walletAuthorizationSubmitted',
+  test(
+    'the wallet step confirms and activate returns the custodied wallet',
+    () async {
+      String? signedEntry;
+      final gateway = _gateway(
+        submitWalletAuthorization: (draftId, preparationId, signed) async {
+          expect(draftId, 7);
+          expect(preparationId, 'prep-wallet');
+          signedEntry = signed;
+          return _session(
+            state: 'walletAuthorizationSubmitted',
+            hash: _hash,
+            agentId: 42,
+            wallet: _wallet,
+            entry: 'entry-xdr',
+          );
+        },
+        getDeploySession: (_) async => _session(
+          state: 'active',
           hash: _hash,
           agentId: 42,
           wallet: _wallet,
           entry: 'entry-xdr',
-        );
-      },
-      getDeploySession: (_) async => _session(
-        state: 'active',
-        hash: _hash,
-        agentId: 42,
-        wallet: _wallet,
-        entry: 'entry-xdr',
-      ),
-    );
-    await gateway.prepare(_draft, builder: 'G');
-    const registration = Registration(agentId: 42, transactionHash: _hash);
+        ),
+      );
+      await gateway.prepare(_draft, builder: 'G');
+      const registration = Registration(agentId: 42, transactionHash: _hash);
 
-    expect(await gateway.walletAuthorization(registration), 'entry-xdr');
-    await gateway.submitWalletAuthorization(registration, 'signed-entry');
-    expect(signedEntry, 'signed-entry');
-    expect(await gateway.activate(registration), _wallet);
-  });
+      expect(await gateway.walletAuthorization(registration), 'entry-xdr');
+      await gateway.submitWalletAuthorization(registration, 'signed-entry');
+      expect(signedEntry, 'signed-entry');
+      expect(await gateway.activate(registration), _wallet);
+    },
+  );
 
-  test('a version update waits out registrationSubmitted even with an agent id',
-      () async {
-    var reads = 0;
-    final gateway = _gateway(
-      submitRegistration: (draftId, preparationId, signed) async => _session(
-        state: 'registrationSubmitted',
-        hash: _hash,
-        agentId: 42,
-      ),
-      getDeploySession: (draftId) async {
-        reads += 1;
-        return _session(
-          state: 'awaitingWalletAuthorization',
+  test(
+    'a version update waits out registrationSubmitted even with an agent id',
+    () async {
+      var reads = 0;
+      final gateway = _gateway(
+        submitRegistration: (draftId, preparationId, signed) async => _session(
+          state: 'registrationSubmitted',
           hash: _hash,
           agentId: 42,
-          purpose: 'setMetadata',
-          unsigned: 'version-tx',
-        );
-      },
-    );
-    await gateway.prepare(_draft, builder: 'G');
+        ),
+        getDeploySession: (draftId) async {
+          reads += 1;
+          return _session(
+            state: 'awaitingWalletAuthorization',
+            hash: _hash,
+            agentId: 42,
+            purpose: 'setMetadata',
+            unsigned: 'version-tx',
+          );
+        },
+      );
+      await gateway.prepare(_draft, builder: 'G');
 
-    final registration = await gateway.submitRegistration(
-      const PreparedDeploy(
-        preparationId: 'prep-1',
-        unsignedTransaction: 'unsigned-xdr',
-      ),
-      'signed-xdr',
-    );
+      final registration = await gateway.submitRegistration(
+        const PreparedDeploy(
+          preparationId: 'prep-1',
+          unsignedTransaction: 'unsigned-xdr',
+        ),
+        'signed-xdr',
+      );
 
-    expect(reads, 1);
-    expect(registration.agentId, 42);
-    expect(registration.transactionHash, _hash);
-  });
+      expect(reads, 1);
+      expect(registration.agentId, 42);
+      expect(registration.transactionHash, _hash);
+    },
+  );
 
   test('the second version step returns the metadata envelope', () async {
     final gateway = _gateway(

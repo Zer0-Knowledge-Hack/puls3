@@ -283,6 +283,26 @@ void main() {
     expect(index.checkpoint, 900);
   });
 
+  test('rehydrateAll refreshes an indexed agent that has no new event',
+      () async {
+    // The first pass after a start uses it, so an event the index missed
+    // (for example a wallet change) is recovered on the next deploy.
+    final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
+    final index = _InMemoryIndex()
+      ..rows[0] = _stale(0, 'Stale name')
+      ..rows[1] = _stale(1, 'Agent 2')
+      ..checkpoint = 500;
+    final events = _FakeEvents(latest: 600);
+
+    final summary =
+        await indexer(registry, events, index).pass(rehydrateAll: true);
+
+    expect(summary.recoveredAll, isTrue);
+    expect(summary.hydrated, 2);
+    expect(index.rows[0]!.name, 'Agent 1', reason: 'refreshed from state');
+    expect(index.checkpoint, 600);
+  });
+
   test('a truncated event batch re-hydrates every indexed agent', () async {
     final registry = _FakeRegistry({0: _metadata(1), 1: _metadata(2)});
     final index = _InMemoryIndex()

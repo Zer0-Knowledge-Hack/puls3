@@ -707,7 +707,17 @@ per project.
 
 ### Redeploy
 
-Anyone with access to the project, on a machine where steps 1 and 2 are done:
+**Automatic.** `.github/workflows/deploy-server.yml` deploys `main` to
+Serverpod Cloud every time the CI workflow passes on a push to `main`, one
+deploy at a time, and fails unless `health/check` then reports
+`1.0.0+<commit>`. It needs the repository secret `SERVERPOD_CLOUD_TOKEN`
+(`scloud auth create-token`, then `gh secret set SERVERPOD_CLOUD_TOKEN`). It does
+not set variables or passwords: set new ones (step 2 below) before merging the
+code that needs them. Run it by hand from the Actions tab
+(`workflow_dispatch`) to redeploy `main`.
+
+**Manual**, when Actions is unavailable. Anyone with access to the project, on
+a machine where steps 1 and 2 are done:
 
 1. Update `main`: `git switch main && git pull`.
 2. Compare `scloud variable list` and `scloud password list` with step 5 and

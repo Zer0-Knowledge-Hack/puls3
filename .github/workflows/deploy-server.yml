@@ -1,0 +1,88 @@
+name: Deploy server
+
+# Continuous delivery of puls3_server to Serverpod Cloud.
+#
+# The web app already deploys itself (Cloudflare Pages builds every push to
+# main). The server did not: production ran a manual `scloud deploy` and drifted
+# behind main. This workflow deploys main after the CI workflow passes on that
+# exact commit, so nothing that failed CI reaches production.
+#
+# Contracts are not deployed here on purpose: the escrow has no upgrade entry
+# point, so a deploy changes contract ids and needs a human decision
+# (`scripts/deploy-escrow-testnet.sh --redeploy`).
+#
+# Needs the repository secret SERVERPOD_CLOUD_TOKEN (`scloud auth create-token`).
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer main waits for the running one instead of
+# cancelling it halfway through a rollout.
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+env:
+  API_URL: https://puls3-hub-on-stellar.api.serverpod.space
+
+jobs:
+  deploy:
+    name: deploy to Serverpod Cloud
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The commit CI passed on, not whatever main is now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: {flutter-version: '3.44.4', cache: true}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+      - name: Resolve packages
+        run: |
+          flutter pub get --enforce-lockfile
+          # pub get regenerates the Flutter app's desktop plugin registrants.
+          # They are not part of the server; restoring them keeps the deployed
+          # version free of a "-dirty" suffix.
+          git restore --worktree -- puls3_flutter
+          git diff --exit-code
+      - run: dart pub global activate serverpod_cloud_cli 1.3.1
+      - name: Deploy
+        working-directory: puls3_server
+        env:
+          SERVERPOD_CLOUD_TOKEN: ${{ secrets.SERVERPOD_CLOUD_TOKEN }}
+        run: |
+          if [ -z "$SERVERPOD_CLOUD_TOKEN" ]; then
+            echo "::error::SERVERPOD_CLOUD_TOKEN is not set (scloud auth create-token, then gh secret set)."
+            exit 1
+          fi
+          scloud deploy --non-interactive
+      - name: Verify the running version
+        shell: bash
+        run: |
+          want="1.0.0+$(git rev-parse --short HEAD)"
+          for attempt in $(seq 1 30); do
+            got="$(curl -fsS --max-time 20 -X POST "$API_URL/health/check" \
+              -H 'content-type: application/json' -d '{}' \
+              | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+            echo "attempt $attempt: running ${got:-unknown}, want $want"
+            [ "$got" = "$want" ] && exit 0
+            sleep 10
+          done
+          echo "::error::production does not report $want after the deploy"
+          exit 1
