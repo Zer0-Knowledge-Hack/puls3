@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_server/src/ledger/classic_asset.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
@@ -86,6 +87,38 @@ void main() {
       });
 
       expect(configured, isNot(StellarConfig.testnet));
+    });
+
+    group('usdc asset', () {
+      const name = 'PULS3_STELLAR_USDC_ASSET';
+
+      test('unset keeps the Circle testnet USDC', () {
+        final asset = StellarConfig.fromEnvironment(const {}).usdcAsset;
+
+        expect(asset.code, 'USDC');
+        expect(
+          asset.issuer,
+          'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+        );
+      });
+
+      test('CODE:ISSUER overrides it', () {
+        final config = StellarConfig.fromEnvironment(const {
+          name: 'EURC:$_alice',
+        });
+
+        expect(config.usdcAsset, ClassicAsset.parse('EURC:$_alice'));
+        expect(config, isNot(StellarConfig.testnet));
+      });
+
+      for (final bad in ['USDC', 'USDC:nope', 'TOO-LONG-CODE1:$_alice']) {
+        test('"$bad" throws', () {
+          expect(
+            () => StellarConfig.fromEnvironment({name: bad}),
+            throwsA(anything),
+          );
+        });
+      }
     });
 
     group('rpc timeout', () {

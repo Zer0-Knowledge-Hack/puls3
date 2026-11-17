@@ -12,6 +12,7 @@ import 'src/generated/protocol.dart';
 import 'src/health/health_endpoint.dart';
 import 'src/runtime/agent_runtime_wiring.dart';
 import 'src/studio/registration_route.dart';
+import 'src/studio/studio_deploy_wiring.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -117,6 +118,11 @@ void run(List<String> args) async {
   if (indexer != null) {
     pod.experimental.shutdownTasks.addTask('catalog-indexer', indexer.stop);
   }
+
+  // Add the missing USDC trustline of every custodied agent wallet, once, in
+  // the background, when the custody key is set. Escrow `complete` pays the
+  // agent wallet in USDC and fails without it.
+  startTrustlineBackfill(pod, Platform.environment);
 
   // Run the agent of every funded hire, when PULS3_RUNTIME_ENABLED=true and
   // at least one model provider has credentials (#20, see README).
