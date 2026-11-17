@@ -1,5 +1,6 @@
 # cargo-audit configuration for the Soroban workspace (audit P-1, #206).
 # Every ignore needs a reason and a way out. Remove it once the way out lands.
+# Both ignores below are tracked in #295 (bump soroban-sdk).
 
 [advisories]
 ignore = [
