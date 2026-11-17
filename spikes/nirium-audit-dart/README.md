@@ -77,5 +77,37 @@ dart run bin/receipt.dart queue-run --key-file attester.secret   # verifies
 `queue-run` exits 1 when a receipt failed in that pass. Run it from a loop or
 a scheduler to act as the timer.
 
+## The sandbox (#296)
+
+`bin/sandbox.dart` runs the queue end to end with **no call to Nirium**. It
+starts a Nirium node on `localhost` (`lib/src/local_node.dart`): the same two
+requests as the real node, documents kept in memory, and each CID computed
+from the bytes it serves. The queue, `NiriumAuditClient` and `IpfsReader` are
+the real ones and talk HTTP to it. The chain is only read (Horizon and Soroban
+RPC, testnet by default).
+
+```bash
+dart run bin/sandbox.dart                      # job 3 of the spike, every scenario
+dart run bin/sandbox.dart --tx <hash> --scenario happy --scenario restart
+dart run bin/sandbox.dart --mode hash          # anchor only the hash
+dart run bin/sandbox.dart --horizon http://localhost:8000/ \
+  --rpc http://localhost:8000/rpc --network stellar:standalone --tx <hash>
+```
+
+Without `--key-file` it signs with a key made for that run and never written.
+The queue's waits are not slept through: the clock jumps to the moment a
+receipt is due, so a run takes seconds. It exits 0 when every scenario ended
+in the state it expects:
+
+| Scenario | What the local node does | Must end |
+|---|---|---|
+| `happy` | nothing unusual | verified |
+| `rateLimit` | answers 429 to the first two anchors | verified |
+| `outage` | answers 503 to the first anchor | verified |
+| `slowIpfs` | serves 404 for the first two reads | verified |
+| `restart` | (a new queue over the same file after the anchor) | verified |
+| `otherBytes` | serves bytes that do not hash to the CID | failed |
+| `otherKey` | (the receipt is anchored by another key) | failed |
+
 `verify` exits 0 for a trusted receipt. Otherwise it exits 1 and prints each
 reason on stderr.

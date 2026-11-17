@@ -162,6 +162,76 @@ These items are for a follow-up issue, not this spike.
 - Fees: free during the beta. After the beta, a per-request fee over x402 is
   to be agreed with Nirium beforehand (letter of intent).
 
+## Sandbox run (#296, 2026-11-17)
+
+This section lives on the branch `sandbox/nirium` only. It is the evidence for
+the go / no-go on #274, and nothing here is in `puls3_server`.
+
+**What was added to the spike**
+
+- A receipt queue (`lib/src/queue.dart`). A hire only queues its `complete`
+  transaction. A pass anchors it, and retries a 429, a 5xx and a network error
+  with a pause that doubles from 30 seconds to one hour. A later pass verifies
+  it from IPFS and the chain. The state is one file that survives a restart
+  and never holds the attesting key.
+- A local Nirium node (`lib/src/local_node.dart`) and `bin/sandbox.dart`,
+  which runs the queue against it. No request goes to Nirium, so a run
+  publishes nothing.
+
+**What ran**
+
+`dart run bin/sandbox.dart` with job 3's `complete`
+(`ee6dfb52…50c4`), read from Horizon and Soroban RPC on testnet, and a key
+made for the run:
+
+| Scenario | Passes | Requests to the local node | Ended |
+|---|---|---|---|
+| `happy` | 2 | 2 | verified |
+| `rateLimit` (429 twice) | 4 | 4 | verified |
+| `outage` (503 once) | 3 | 3 | verified |
+| `slowIpfs` (404 twice) | 4 | 4 | verified |
+| `restart` | 2 | 2 | verified |
+| `otherBytes` | 13 | 13 | failed |
+| `otherKey` | 2 | 2 | failed |
+
+All seven ended as expected. `dart test` has 87 tests and makes no call
+outside `localhost`.
+
+**What it showed**
+
+1. The queue keeps the hire out of it: `enqueue` writes one row and calls
+   nothing, and every Nirium or chain failure ends up in the receipt's own
+   state, never in the hire.
+2. A receipt is `verified` only after the document was read back, its CID
+   recomputed, puls3's signature checked, and the record matched against the
+   `complete` transaction and the escrow job. A wrong document never gets
+   there.
+3. From the reader's side, a document that has not reached the gateway and a
+   gateway that serves other bytes look the same until the tries run out.
+   With the default pauses that is about five hours before `otherBytes`
+   fails. It is safe, since it is never shown as verified, but slow to
+   report. A real integration should read from more than one gateway, as the
+   spike's `IpfsReader` already can.
+4. Job 3's escrow entry was still live on Soroban RPC on 2026-11-17, 44 days
+   after its `complete`. Once it archives (about 60 days), this same run fails
+   at the job read until the entry is restored. That is the open decision
+   below, now with a date on it.
+5. TIA anchors on the same Audit Trail and chose to anchor **only the hash**
+   of each paid answer (`Edgadafi/remesa-liquidez`). Our record holds only
+   public chain data, so the full record is still an option for us; `--mode
+   hash` shows the other one working.
+
+**Open for the decision**
+
+- Full record or hash only.
+- How long escrow job entries stay live, or who restores them (same question
+  as #273).
+- Fees after Nirium's beta.
+- The attesting key: who creates it, where it is kept, and where its public
+  key is published.
+- If it is a go: the queue moves into `puls3_server` with a database table in
+  place of the file, and a timer in place of the sandbox's clock.
+
 ## Not tried
 
 - The spending policy: experimental in `nirium` 0.16.0, with an open gap where
