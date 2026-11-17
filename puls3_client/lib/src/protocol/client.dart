@@ -372,6 +372,15 @@ class EndpointHire extends _isc.EndpointRef {
     },
   );
 
+  /// The unsigned `claim_refund` of a funded hire past `expired_at`, so the
+  /// consumer can recover the USDC without the server's relay key.
+  _ida.Future<_iy6q6dct.PreparedTransaction> prepareClaimRefund(int hireId) =>
+      caller.callServerEndpoint<_iy6q6dct.PreparedTransaction>(
+        'hire',
+        'prepareClaimRefund',
+        {'hireId': hireId},
+      );
+
   /// The hire [hireId] as its [consumer] sees it: escrow status, run
   /// progress and result (F6). Read-only, so the app polls it.
   _ida.Future<_iytku71p.HireDetail> getHire(

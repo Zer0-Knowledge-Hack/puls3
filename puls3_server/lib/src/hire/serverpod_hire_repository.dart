@@ -185,6 +185,7 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       jobId: record.jobId,
       escrow: record.escrow,
       paymentTransaction: payment?.transactionHash,
+      payee: payment?.payee,
       status: payment != null
           ? await _settlement(record.id!, transaction: transaction) ??
                 HireStatus.funded

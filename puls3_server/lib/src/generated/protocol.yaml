@@ -24,6 +24,7 @@ hire:
   - prepareFund:
   - prepareComplete:
   - prepareReject:
+  - prepareClaimRefund:
   - getHire:
   - listMyHires:
   - submitEscrowCall:

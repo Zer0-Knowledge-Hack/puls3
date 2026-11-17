@@ -30,12 +30,14 @@ abstract class HireDetail
     this.jobId,
     this.expiresAt,
     this.approvalDeadline,
+    bool? runFinished,
+    this.submitErrorCode,
     this.rejectReason,
     this.escrowSubmission,
     this.feedbackSubmission,
     this.feedbackScore,
     this.paymentExplorerUrl,
-  });
+  }) : runFinished = runFinished ?? false;
 
   factory HireDetail({
     required _ibbrviw7.Hire hire,
@@ -46,6 +48,8 @@ abstract class HireDetail
     int? jobId,
     DateTime? expiresAt,
     DateTime? approvalDeadline,
+    bool? runFinished,
+    String? submitErrorCode,
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
@@ -77,6 +81,10 @@ abstract class HireDetail
           : _isc.DateTimeJsonExtension.fromJson(
               jsonSerialization['approvalDeadline'],
             ),
+      runFinished: jsonSerialization['runFinished'] == null
+          ? null
+          : _isc.BoolJsonExtension.fromJson(jsonSerialization['runFinished']),
+      submitErrorCode: jsonSerialization['submitErrorCode'] as String?,
       rejectReason: jsonSerialization['rejectReason'] as String?,
       escrowSubmission: jsonSerialization['escrowSubmission'] == null
           ? null
@@ -113,6 +121,17 @@ abstract class HireDetail
   /// The job's approval_deadline, set once the job is submitted.
   DateTime? approvalDeadline;
 
+  /// Whether the agent run succeeded, even while its result is still hidden
+  /// before the escrow `submit`. The app uses it to say the agent finished
+  /// while the result is being recorded (#277).
+  bool runFinished;
+
+  /// While the hire is funded, why the agent's `submit` cannot happen:
+  /// `AgentCannotDeliver` (payee not custodied), `SubmitSimulationRejected`,
+  /// `EscrowCallFailed` or `OutcomeUnknown`. Null when no submit is needed or
+  /// one may still land. The result stays hidden until `submit` confirms.
+  String? submitErrorCode;
+
   String? rejectReason;
 
   /// The hire's latest escrow submission, any purpose.
@@ -138,6 +157,8 @@ abstract class HireDetail
     int? jobId,
     DateTime? expiresAt,
     DateTime? approvalDeadline,
+    bool? runFinished,
+    String? submitErrorCode,
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
@@ -157,6 +178,8 @@ abstract class HireDetail
       if (expiresAt != null) 'expiresAt': expiresAt?.toJson(),
       if (approvalDeadline != null)
         'approvalDeadline': approvalDeadline?.toJson(),
+      'runFinished': runFinished,
+      if (submitErrorCode != null) 'submitErrorCode': submitErrorCode,
       if (rejectReason != null) 'rejectReason': rejectReason,
       if (escrowSubmission != null)
         'escrowSubmission': escrowSubmission?.toJson(),
@@ -180,6 +203,8 @@ abstract class HireDetail
       if (expiresAt != null) 'expiresAt': expiresAt?.toJson(),
       if (approvalDeadline != null)
         'approvalDeadline': approvalDeadline?.toJson(),
+      'runFinished': runFinished,
+      if (submitErrorCode != null) 'submitErrorCode': submitErrorCode,
       if (rejectReason != null) 'rejectReason': rejectReason,
       if (escrowSubmission != null)
         'escrowSubmission': escrowSubmission?.toJsonForProtocol(),
@@ -208,6 +233,8 @@ class _HireDetailImpl extends HireDetail {
     int? jobId,
     DateTime? expiresAt,
     DateTime? approvalDeadline,
+    bool? runFinished,
+    String? submitErrorCode,
     String? rejectReason,
     _iz6hnyrm.ChainSubmission? escrowSubmission,
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
@@ -222,6 +249,8 @@ class _HireDetailImpl extends HireDetail {
          jobId: jobId,
          expiresAt: expiresAt,
          approvalDeadline: approvalDeadline,
+         runFinished: runFinished,
+         submitErrorCode: submitErrorCode,
          rejectReason: rejectReason,
          escrowSubmission: escrowSubmission,
          feedbackSubmission: feedbackSubmission,
@@ -242,6 +271,8 @@ class _HireDetailImpl extends HireDetail {
     Object? jobId = _Undefined,
     Object? expiresAt = _Undefined,
     Object? approvalDeadline = _Undefined,
+    bool? runFinished,
+    Object? submitErrorCode = _Undefined,
     Object? rejectReason = _Undefined,
     Object? escrowSubmission = _Undefined,
     Object? feedbackSubmission = _Undefined,
@@ -261,6 +292,10 @@ class _HireDetailImpl extends HireDetail {
       approvalDeadline: approvalDeadline is DateTime?
           ? approvalDeadline
           : this.approvalDeadline,
+      runFinished: runFinished ?? this.runFinished,
+      submitErrorCode: submitErrorCode is String?
+          ? submitErrorCode
+          : this.submitErrorCode,
       rejectReason: rejectReason is String? ? rejectReason : this.rejectReason,
       escrowSubmission: escrowSubmission is _iz6hnyrm.ChainSubmission?
           ? escrowSubmission

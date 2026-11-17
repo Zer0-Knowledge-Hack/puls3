@@ -36,14 +36,15 @@ void main() {
       }
     });
 
-    test('only submit, release and claimRefund are server-signed', () {
+    test('only submit and release are server-signed; claimRefund is '
+        'permissionless', () {
       expect(
         SubmissionPurpose.values.where((p) => p.isServerSigned),
-        [
-          SubmissionPurpose.submit,
-          SubmissionPurpose.release,
-          SubmissionPurpose.claimRefund,
-        ],
+        [SubmissionPurpose.submit, SubmissionPurpose.release],
+      );
+      expect(
+        SubmissionPurpose.values.where((p) => p.isPermissionless),
+        [SubmissionPurpose.claimRefund],
       );
     });
   });

@@ -107,6 +107,7 @@ Future<void> _journey(WidgetTester tester, List<String> trace) async {
             logged('prepareFund', () => client.hire.prepareFund(a)),
         prepareComplete: client.hire.prepareComplete,
         prepareReject: client.hire.prepareReject,
+        prepareClaimRefund: client.hire.prepareClaimRefund,
         submitEscrowCall: (a, b, c) => logged(
           'submitEscrowCall',
           () => client.hire.submitEscrowCall(a, b, c),

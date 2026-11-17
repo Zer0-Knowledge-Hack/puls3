@@ -1253,6 +1253,35 @@ class AppLocalizationsPt extends AppLocalizations {
   String get hireRejectRefund => 'Rejeitar e reembolsar';
 
   @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
+
+  @override
   String get hireRejectReasonHint => 'Motivo (opcional)';
 
   @override
@@ -2847,6 +2876,35 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
 
   @override
   String get hireRejectReasonHint => 'Motivo (opcional)';
@@ -4447,6 +4505,35 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
 
   @override
   String get hireRejectReasonHint => 'Motivo (opcional)';

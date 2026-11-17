@@ -61,12 +61,13 @@ abstract class ChainSubmission
   int? id;
 
   /// The PreparedTransaction this submission came from. Null for
-  /// server-signed purposes (submit, release, claimRefund).
+  /// server-signed purposes (submit, release), and for a relay-signed
+  /// claimRefund. Set when the consumer prepared a claimRefund.
   String? preparationId;
 
   /// One of registerFull, setAgentWallet, createJob, fund, complete, reject,
-  /// giveFeedback (wallet-signed), or submit, release, claimRefund
-  /// (server-signed).
+  /// giveFeedback, claimRefund (wallet-signed), or submit, release (also
+  /// claimRefund when the relay signs the automatic refund).
   String purpose;
 
   /// Domain TransactionHash of the one envelope this record ever sends,

@@ -18,10 +18,12 @@ enum SubmissionPurpose {
 
   String get wireName => name;
 
-  /// Signed by the server, never prepared for a wallet, so it has no
-  /// preparation id.
-  bool get isServerSigned =>
-      this == submit || this == release || this == claimRefund;
+  /// Signed by the server itself and never prepared for a wallet.
+  bool get isServerSigned => this == submit || this == release;
+
+  /// Permissionless: the server signs it for the automatic refund and the
+  /// consumer may prepare the same contract call for their own signature.
+  bool get isPermissionless => this == claimRefund;
 
   /// The purpose whose [wireName] is exactly [wire], or `null`.
   static SubmissionPurpose? tryParse(String wire) => _byWire(values, wire);

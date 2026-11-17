@@ -509,6 +509,25 @@ class Endpoints extends _is.EndpointDispatch {
                     params['reason'],
                   ),
         ),
+        'prepareClaimRefund': _is.MethodConnector(
+          name: 'prepareClaimRefund',
+          params: {
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _icdhibuq.HireEndpoint)
+                  .prepareClaimRefund(
+                    session,
+                    params['hireId'],
+                  ),
+        ),
         'getHire': _is.MethodConnector(
           name: 'getHire',
           params: {

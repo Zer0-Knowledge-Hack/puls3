@@ -159,7 +159,8 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
       _session,
       where: (t) =>
           t.state.equals(SubmissionState.submitted.wireName) &
-          t.purpose.inSet({for (final p in purposes) p.wireName}),
+          t.purpose.inSet({for (final p in purposes) p.wireName}) &
+          t.preparationId.equals(null),
     );
     return count > 0;
   }

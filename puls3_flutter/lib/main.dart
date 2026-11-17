@@ -52,6 +52,7 @@ HireGateway? _createHireGateway(Client client, WalletSession session) =>
         prepareFund: client.hire.prepareFund,
         prepareComplete: client.hire.prepareComplete,
         prepareReject: client.hire.prepareReject,
+        prepareClaimRefund: client.hire.prepareClaimRefund,
         submitEscrowCall: client.hire.submitEscrowCall,
         getHire: client.hire.getHire,
         listMyHires: client.hire.listMyHires,

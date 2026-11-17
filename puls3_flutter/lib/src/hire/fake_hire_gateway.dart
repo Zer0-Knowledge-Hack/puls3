@@ -70,6 +70,12 @@ class FakeHireGateway implements HireGateway {
   }
 
   @override
+  Future<EscrowPreparation> prepareClaimRefund(int hireId) async {
+    await Future<void>.delayed(delay);
+    return _prepare(hireId, 'claimRefund');
+  }
+
+  @override
   Future<EscrowPreparation> prepareFeedback(
     int hireId,
     int score,
@@ -120,6 +126,8 @@ class FakeHireGateway implements HireGateway {
           status: 'rejected',
           rejectedFrom: current.status ?? 'submitted',
         );
+      } else if (preparation.purpose == 'claimRefund') {
+        _progress[hireId] = _copy(current, status: 'expired');
       }
     }
     // Nothing is sent: no hash, no explorer link.
@@ -241,6 +249,9 @@ class FakeHireGateway implements HireGateway {
     paymentTransaction: hire.paymentTransaction,
     paymentExplorerUrl: hire.paymentExplorerUrl,
     approvalDeadline: hire.approvalDeadline,
+    expiresAt: hire.expiresAt,
+    runFinished: hire.runFinished,
+    submitErrorCode: hire.submitErrorCode,
     decisionTransaction: hire.decisionTransaction,
     decisionExplorerUrl: hire.decisionExplorerUrl,
     feedbackTransaction: feedbackTransaction ?? hire.feedbackTransaction,
