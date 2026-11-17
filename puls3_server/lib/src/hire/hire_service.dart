@@ -26,8 +26,10 @@ class HireService {
     required this.catalog,
     required this.custody,
     required this.config,
+    AgentSummaryLookup? agentOf,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  }) : _agentOf = agentOf,
+       _now = now ?? DateTime.now;
 
   final HireLifecycleStore hires;
   final EscrowPreparationStore preparations;
@@ -39,6 +41,18 @@ class HireService {
   final CustodyLookup custody;
   final HireRelayConfig config;
   final DateTime Function() _now;
+
+  /// Finds the hired agent by registry id. The wiring passes the catalog
+  /// index (`hireAgentLookup`); without it, the whole [catalog] is read.
+  final AgentSummaryLookup? _agentOf;
+
+  Future<AgentSummary?> _agent(int registryId) async {
+    final lookup = _agentOf;
+    if (lookup != null) return lookup(registryId);
+    return (await catalog.list())
+        .where((a) => a.registryId == registryId)
+        .firstOrNull;
+  }
 
   /// Creates the hire of [requestId], or returns the one it already
   /// created, with the `create_job` envelope to sign.
@@ -79,19 +93,24 @@ class HireService {
     final durationSeconds = config.jobDurationSeconds;
 
     final AgentSummary? agent;
+    final StellarAddress? liveWallet;
     try {
-      agent = (await catalog.list())
-          .where((a) => a.registryId == agentId)
-          .firstOrNull;
+      agent = await _agent(agentId);
+      // The payee is read live, never from the catalog or its index: a stale
+      // wallet would make a job the funding check rejects, and the payment
+      // would sit in the escrow until expiry.
+      liveWallet = agent == null
+          ? null
+          : await registry.agentWallet(AgentId(agentId));
     } on AgentCatalogUnavailable catch (e) {
       throw HireLedgerUnavailable(message: e.message);
     } on LedgerException catch (e) {
       throw HireLedgerUnavailable(message: e.message);
     }
-    final agentWallet = agent?.wallet;
-    if (agent == null || agentWallet == null) {
+    if (agent == null || liveWallet == null) {
       throw AgentUnavailable(agentId: agentId);
     }
+    final agentWallet = liveWallet.value;
     final custodied = await custody({agentWallet});
     if (!custodied.contains(agentWallet)) {
       // The server would never send this agent's `submit`, so the escrow would

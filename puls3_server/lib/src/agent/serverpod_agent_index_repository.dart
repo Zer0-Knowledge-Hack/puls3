@@ -44,6 +44,21 @@ class ServerpodAgentIndexRepository implements AgentIndexRepository {
   }
 
   @override
+  Future<AgentSummary?> findByRegistryId(int registryId) async {
+    final row = await AgentRecord.db.findFirstRow(
+      session,
+      where: (t) => t.registryId.equals(registryId),
+    );
+    if (row == null) return null;
+    final newer = await AgentRecord.db.findFirstRow(
+      session,
+      where: (t) =>
+          t.agentId.equals(row.agentId) & (t.registryId > registryId),
+    );
+    return newer == null ? _summary(row) : null;
+  }
+
+  @override
   Future<Set<int>> registryIds() async {
     final rows = await AgentRecord.db.find(session);
     return {for (final row in rows) row.registryId};
