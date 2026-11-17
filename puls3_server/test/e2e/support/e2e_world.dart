@@ -19,6 +19,7 @@ import 'package:puls3_server/src/ledger/stellar_envelope_codec.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
 import 'package:serverpod/serverpod.dart' show Serverpod, Session;
 
+import 'agent_custody.dart';
 import 'local_sandbox.dart';
 
 /// Price of the agent every suite hires, in stroops of the sandbox token.
@@ -88,6 +89,7 @@ final class E2eWorld {
     );
     await pod.start();
     final session = await pod.createSession();
+    await custodyAgentKey(session, agent.account);
     final tracker = startChainTracker(pod, sandbox.environment);
     if (tracker == null) {
       await session.close();
