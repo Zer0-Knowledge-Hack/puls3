@@ -43,6 +43,7 @@ import 'hire_detail.dart' as _ipbsq2gs;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_exception.dart' as _i5rj3edu;
+import 'studio/agent_hire_started.dart' as _i3ggywhi;
 import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
 import 'studio/manifest_model.dart' as _ihtr58tu;
 import 'studio/manifest_price.dart' as _iyhnvuqa;
@@ -71,6 +72,7 @@ export 'hire_detail.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_exception.dart';
+export 'studio/agent_hire_started.dart';
 export 'studio/agent_manifest_draft.dart';
 export 'studio/manifest_model.dart';
 export 'studio/manifest_price.dart';
@@ -178,6 +180,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _i5rj3edu.Puls3ApiException) {
       return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
+    }
+    if (t == _i3ggywhi.AgentHireStarted) {
+      return _i3ggywhi.AgentHireStarted.fromJson(data) as T;
     }
     if (t == _i1fcn02s.AgentManifestDraft) {
       return _i1fcn02s.AgentManifestDraft.fromJson(data) as T;
@@ -288,6 +293,10 @@ class Protocol extends _isc.SerializationManager {
       return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
           as T;
     }
+    if (t == _isc.getType<_i3ggywhi.AgentHireStarted?>()) {
+      return (data != null ? _i3ggywhi.AgentHireStarted.fromJson(data) : null)
+          as T;
+    }
     if (t == _isc.getType<_i1fcn02s.AgentManifestDraft?>()) {
       return (data != null ? _i1fcn02s.AgentManifestDraft.fromJson(data) : null)
           as T;
@@ -385,6 +394,7 @@ class Protocol extends _isc.SerializationManager {
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
+      _i3ggywhi.AgentHireStarted => 'AgentHireStarted',
       _i1fcn02s.AgentManifestDraft => 'AgentManifestDraft',
       _ihtr58tu.ManifestModel => 'ManifestModel',
       _iyhnvuqa.ManifestPrice => 'ManifestPrice',
@@ -449,6 +459,8 @@ class Protocol extends _isc.SerializationManager {
         return 'PreparedTransaction';
       case _i5rj3edu.Puls3ApiException():
         return 'Puls3ApiException';
+      case _i3ggywhi.AgentHireStarted():
+        return 'AgentHireStarted';
       case _i1fcn02s.AgentManifestDraft():
         return 'AgentManifestDraft';
       case _ihtr58tu.ManifestModel():
@@ -548,6 +560,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'Puls3ApiException') {
       return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);
+    }
+    if (dataClassName == 'AgentHireStarted') {
+      return deserialize<_i3ggywhi.AgentHireStarted>(data['data']);
     }
     if (dataClassName == 'AgentManifestDraft') {
       return deserialize<_i1fcn02s.AgentManifestDraft>(data['data']);

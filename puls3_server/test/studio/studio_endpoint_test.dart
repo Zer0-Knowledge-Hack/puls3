@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart' hide AgentManifestDraft;
 import 'package:puls3_server/src/generated/protocol.dart';
+import 'package:puls3_server/src/hire/agent_hire_service.dart';
 import 'package:puls3_server/src/hire/session_wallet.dart';
 import 'package:puls3_server/src/runtime/runtime_task.dart';
 import 'package:puls3_server/src/studio/builder_credential.dart';
 import 'package:puls3_server/src/studio/memory_studio_draft_store.dart';
+import 'package:puls3_server/src/studio/studio_deploy_store.dart';
 import 'package:puls3_server/src/studio/studio_draft_service.dart';
 import 'package:puls3_server/src/studio/studio_endpoint.dart';
 import 'package:puls3_server/src/studio/studio_model_policy.dart';
@@ -471,5 +473,140 @@ void main() {
           ? 'PULS3_AGENT_WALLET_SECRET_KEY is set in this environment'
           : false,
     );
+  });
+
+  group('hireAgentAs (#312)', () {
+    const agentWallet =
+        'GCJOMHOLKJJUMFCBC56ZIZTINBAFARFQIWNM4MA4GJ6RJZQI4KH3RIB3';
+    const stranger = 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY';
+    late MemoryStudioDeployStore deploys;
+    late List<String> launched;
+
+    Future<void> deployed({
+      int registryAgentId = 7,
+      String by = owner,
+      String state = 'active',
+    }) => deploys.save(
+      StudioDeployRow(
+        draftId: registryAgentId,
+        owner: by,
+        state: state,
+        agentWallet: agentWallet,
+        registrationUri: 'https://puls3.test/registry/abc',
+        registryAgentId: registryAgentId,
+        updatedAt: DateTime.utc(2026),
+      ),
+    );
+
+    setUp(() {
+      deploys = MemoryStudioDeployStore();
+      launched = [];
+      StudioEndpoint.deployStores = (_) => deploys;
+      StudioEndpoint.agentHires =
+          ({
+            required session,
+            required hiringWallet,
+            required agentId,
+            required input,
+            required budgetUsdcStroops,
+            required requestId,
+          }) async {
+            launched.add(
+              '${hiringWallet.value} $agentId $input $budgetUsdcStroops',
+            );
+            return 31;
+          };
+    });
+
+    tearDown(() {
+      StudioEndpoint.deployStores = null;
+      StudioEndpoint.agentHires = null;
+    });
+
+    Matcher refused(String code) =>
+        throwsA(isA<Puls3ApiException>().having((e) => e.code, 'code', code));
+
+    test('the owner starts the hire with the hiring agent wallet', () async {
+      await deployed();
+      final started = await endpoint.hireAgentAs(
+        session,
+        7,
+        42,
+        'Summarise this.',
+        2000000,
+      );
+
+      expect(started.hireId, 31);
+      expect(started.hiringWallet, agentWallet);
+      expect(started.state, 'started');
+      expect(launched, ['$agentWallet 42 Summarise this. 2000000']);
+    });
+
+    test('another wallet\'s agent is HiringAgentNotOwned', () async {
+      await deployed(by: stranger);
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, 'x', 2000000),
+        refused('HiringAgentNotOwned'),
+      );
+      expect(launched, isEmpty);
+    });
+
+    test('an agent that is not active is HiringAgentNotOwned', () async {
+      await deployed(state: 'walletAuthorizationSubmitted');
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, 'x', 2000000),
+        refused('HiringAgentNotOwned'),
+      );
+      expect(launched, isEmpty);
+    });
+
+    test('an unknown hiring agent is HiringAgentNotOwned', () async {
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, 'x', 2000000),
+        refused('HiringAgentNotOwned'),
+      );
+    });
+
+    test('an agent cannot hire itself', () async {
+      await deployed();
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 7, 'x', 2000000),
+        refused('SelfHireNotAllowed'),
+      );
+      expect(launched, isEmpty);
+    });
+
+    test('an empty input or a non-positive budget is InvalidHire', () async {
+      await deployed();
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, '  ', 2000000),
+        refused('InvalidHire'),
+      );
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, 'x', 0),
+        refused('InvalidHire'),
+      );
+      expect(launched, isEmpty);
+    });
+
+    test('a price over the budget is BudgetExceeded', () async {
+      await deployed();
+      StudioEndpoint.agentHires =
+          ({
+            required session,
+            required hiringWallet,
+            required agentId,
+            required input,
+            required budgetUsdcStroops,
+            required requestId,
+          }) async => throw const AgentHireOverBudget(
+            priceUsdcStroops: 3000000,
+            budgetUsdcStroops: 2000000,
+          );
+      await expectLater(
+        endpoint.hireAgentAs(session, 7, 42, 'x', 2000000),
+        refused('BudgetExceeded'),
+      );
+    });
   });
 }

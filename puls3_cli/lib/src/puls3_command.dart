@@ -343,7 +343,9 @@ _Parsed _callOf(
     case ('hire', 'prepare-complete'):
       final completeId = _positiveId(rest);
       if (completeId == null) {
-        return _Invalid('`hire prepare-complete` takes one hire id, 1 or more.');
+        return _Invalid(
+          '`hire prepare-complete` takes one hire id, 1 or more.',
+        );
       }
       return _Call((sdk, out, err, json) async {
         _printPrepared(out, await sdk.prepareComplete(completeId), json: json);
@@ -384,8 +386,55 @@ _Parsed _callOf(
         _printTestRun(out, await sdk.testRun(draftId, input), json: json);
         return ExitCodes.ok;
       });
+
+    case ('studio', 'hire-as'):
+      const usage =
+          '`studio hire-as` needs --as <agentId> --agent <agentId> '
+          '--input <text> --budget <usdc>.';
+      if (rest.isNotEmpty) return _Invalid(usage);
+      final hiringAgentId = _registryId(action.option('as'));
+      final agentId = _registryId(action.option('agent'));
+      final input = action.option('input') ?? '';
+      final budget = _usdcStroops(action.option('budget'));
+      if (hiringAgentId == null ||
+          agentId == null ||
+          input.trim().isEmpty ||
+          budget == null) {
+        return _Invalid(usage);
+      }
+      if (hiringAgentId == agentId) {
+        return _Invalid('`studio hire-as`: an agent cannot hire itself.');
+      }
+      return _Call((sdk, out, err, json) async {
+        final started = await sdk.hireAgentAs(
+          hiringAgentId,
+          agentId,
+          input,
+          budget,
+        );
+        _printHireStarted(out, started, agentId, json: json);
+        return ExitCodes.ok;
+      });
   }
   return _Invalid('Unknown command.');
+}
+
+/// [value] as a registry agent id (the contract's u32, from 0), or null.
+int? _registryId(String? value) {
+  final id = int.tryParse((value ?? '').trim());
+  return id != null && id >= 0 && id <= 0xFFFFFFFF ? id : null;
+}
+
+/// [value] in USDC (up to 7 decimals) as USDC stroops of 1 or more, or null.
+int? _usdcStroops(String? value) {
+  final match = RegExp(r'^(\d+)(?:\.(\d{1,7}))?$').firstMatch(
+    (value ?? '').trim(),
+  );
+  if (match == null) return null;
+  final stroops =
+      int.parse(match.group(1)!) * 10000000 +
+      int.parse((match.group(2) ?? '').padRight(7, '0'));
+  return stroops >= 1 ? stroops : null;
 }
 
 /// The single argument of [rest] as an id of 1 or more, or null.
@@ -463,12 +512,33 @@ ArgParser _parser() {
     )
     ..addCommand(
       'studio',
-      withHelp()..addCommand(
-        'test-run',
-        withHelp()
-          ..addOption('draft', valueHelp: 'id', help: 'The saved draft.')
-          ..addOption('input', valueHelp: 'text', help: 'The test input.'),
-      ),
+      withHelp()
+        ..addCommand(
+          'test-run',
+          withHelp()
+            ..addOption('draft', valueHelp: 'id', help: 'The saved draft.')
+            ..addOption('input', valueHelp: 'text', help: 'The test input.'),
+        )
+        ..addCommand(
+          'hire-as',
+          withHelp()
+            ..addOption(
+              'as',
+              valueHelp: 'agentId',
+              help: 'Your live Studio agent that hires and pays.',
+            )
+            ..addOption(
+              'agent',
+              valueHelp: 'agentId',
+              help: 'The catalog agent to hire.',
+            )
+            ..addOption('input', valueHelp: 'text', help: 'The hire input.')
+            ..addOption(
+              'budget',
+              valueHelp: 'usdc',
+              help: 'The most the hiring agent may pay, in USDC.',
+            ),
+        ),
     );
 }
 
@@ -485,6 +555,10 @@ Commands:
                                       The unsigned reject of a hire.
   studio test-run --draft <id> --input <text>
                                       Runs a saved draft once.
+  studio hire-as --as <agentId> --agent <agentId> --input <text> --budget <usdc>
+                                      Your live Studio agent hires and pays
+                                      another agent with its custodied
+                                      wallet. The server signs and runs it.
   run --manifest <file.json> (--input <text> | --input-file <path>)
                                       Runs an agent locally with your own
                                       model credential (CLOUDFLARE_ACCOUNT_ID
@@ -646,6 +720,32 @@ Map<String, Object?> _preparedJson(PreparedTransaction prepared) => {
   'unsignedTransactionXdr': prepared.unsignedTransactionXdr,
   'expiresAt': _isoOrNull(prepared.expiresAt),
 };
+
+void _printHireStarted(
+  StringSink out,
+  AgentHireStarted started,
+  int agentId, {
+  required bool json,
+}) {
+  if (json) {
+    out.writeln(
+      jsonEncode({
+        'hireId': started.hireId,
+        'hiringWallet': started.hiringWallet,
+        'state': started.state,
+      }),
+    );
+    return;
+  }
+  out
+    ..writeln('Hire ${started.hireId} of agent $agentId ${started.state}.')
+    ..writeln('Paid by ${started.hiringWallet} (custodied, server-signed).')
+    ..writeln(
+      'create_job, fund, the agent\'s submit and complete follow on the '
+      'server; their tx hashes are in the server log ([agent-hire]) and on '
+      'stellar.expert for ${started.hiringWallet}.',
+    );
+}
 
 void _printTestRun(StringSink out, TestRunResult run, {required bool json}) {
   if (json) {

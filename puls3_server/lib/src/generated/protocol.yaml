@@ -37,3 +37,4 @@ studio:
   - getDeploySession:
   - prepareWalletAuthorization:
   - submitWalletAuthorization:
+  - hireAgentAs:

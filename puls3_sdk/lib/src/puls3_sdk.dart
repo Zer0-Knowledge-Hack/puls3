@@ -125,6 +125,40 @@ final class Puls3Sdk {
     return studio.testRun(draftId, input);
   }
 
+  /// Makes the session wallet's live Studio agent [hiringAgentId] hire
+  /// [agentId] on [input], paying at most [budgetUsdcStroops] from the
+  /// agent's custodied wallet (`StudioEndpoint.hireAgentAs`, #312). The
+  /// server signs `create_job`, `fund` and `complete`; this SDK still signs
+  /// nothing. Returns once the hire exists.
+  ///
+  /// Throws [ArgumentError] for a negative id, a blank [input] or a budget
+  /// below 1, and [SessionRequired] without a session, without calling the
+  /// server.
+  Future<AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) {
+    if (hiringAgentId < 0) {
+      throw ArgumentError.value(hiringAgentId, 'hiringAgentId', 'negative');
+    }
+    if (agentId < 0) throw ArgumentError.value(agentId, 'agentId', 'negative');
+    if (input.trim().isEmpty) {
+      throw ArgumentError.value(input, 'input', 'must not be blank');
+    }
+    if (budgetUsdcStroops < 1) {
+      throw ArgumentError.value(
+        budgetUsdcStroops,
+        'budgetUsdcStroops',
+        'must be 1 or more',
+      );
+    }
+    final studio = _studio;
+    if (studio == null) throw const SessionRequired('hireAgentAs');
+    return studio.hireAgentAs(hiringAgentId, agentId, input, budgetUsdcStroops);
+  }
+
   /// Closes the connection. The SDK is unusable afterwards.
   void close() => _close();
 

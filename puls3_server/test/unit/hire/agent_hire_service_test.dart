@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/agent_hire_service.dart';
+import 'package:puls3_server/src/hire/agent_hire_wiring.dart';
+import 'package:serverpod/serverpod.dart' show Session;
 import 'package:test/test.dart';
 
 const _hiring = 'GCJOMHOLKJJUMFCBC56ZIZTINBAFARFQIWNM4MA4GJ6RJZQI4KH3RIB3';
@@ -227,4 +231,101 @@ void main() {
       expect(escrow.calls, isEmpty);
     });
   });
+
+  group('backgroundAgentHire', () {
+    final session = _ClosableSession();
+
+    AgentHireLauncher launcherWith(
+      AgentHireChain chain,
+      List<String> lines, {
+      _FakeEscrow? on,
+      AgentSummary? agent,
+    }) => backgroundAgentHire(
+      (_, log) => AgentHireService(
+        escrow: on ?? _FakeEscrow(),
+        chain: chain,
+        agentOf: (id) async => agent ?? _agent(),
+        sign: (xdr, signer) async => 'signed($xdr)',
+        log: log,
+      ),
+      sessionFor: (_) async => session,
+      write: lines.add,
+    );
+
+    Future<int> start(AgentHireLauncher launch, {int budget = 1000000}) =>
+        launch(
+          session: session,
+          hiringWallet: StellarAddress.parse(_hiring),
+          agentId: 42,
+          input: 'Summarise this.',
+          budgetUsdcStroops: budget,
+          requestId: 'a2a-bg',
+        );
+
+    test('returns the hire id before the hired agent delivers and logs '
+        'every tx hash of the receipt', () async {
+      final lines = <String>[];
+      final chain = _GatedChain();
+      final hireId = await start(launcherWith(chain, lines));
+
+      expect(hireId, 9);
+      chain.deliver.complete('hash-submit');
+      await chain.finished.future;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(lines, everyElement(startsWith('[agent-hire] ')));
+      expect(lines.last, contains('hire 9 done'));
+      expect(lines.last, contains('complete hash-complete'));
+      expect(lines.join('\n'), contains('fund confirmed: tx hash-fund'));
+    });
+
+    test('a refusal before the hire exists reaches the caller', () async {
+      final lines = <String>[];
+      await expectLater(
+        start(
+          launcherWith(_GatedChain(), lines, agent: _agent(price: 5000000)),
+        ),
+        throwsA(isA<AgentHireOverBudget>()),
+      );
+      expect(lines.last, contains('failed'));
+    });
+
+    test('a failure after the hire exists is logged, not thrown', () async {
+      final lines = <String>[];
+      final chain = _GatedChain();
+      expect(await start(launcherWith(chain, lines)), 9);
+      await chain.asked.future;
+      chain.deliver.completeError(const AgentHireFailed('submit failed'));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(lines.last, contains('failed: AgentHireFailed: submit failed'));
+    });
+  });
+}
+
+final class _ClosableSession implements Session {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => invocation.memberName == #close
+      ? Future<int?>.value()
+      : throw UnimplementedError('${invocation.memberName}');
+}
+
+/// Confirms every escrow call at once and waits for [deliver] for the
+/// hired agent's `submit`.
+final class _GatedChain implements AgentHireChain {
+  final deliver = Completer<String>();
+  final finished = Completer<void>();
+  final asked = Completer<void>();
+
+  @override
+  Future<String> confirmed(String preparationId) async {
+    if (preparationId == 'prep-complete') finished.complete();
+    return 'hash-${preparationId.substring('prep-'.length)}';
+  }
+
+  @override
+  Future<String> delivered(int hireId) {
+    asked.complete();
+    return deliver.future;
+  }
 }
