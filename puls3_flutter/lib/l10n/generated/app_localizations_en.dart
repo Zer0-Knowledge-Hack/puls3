@@ -1333,4 +1333,127 @@ class AppLocalizationsEn extends AppLocalizations {
   String rateInvalid(int max) {
     return 'Pick a score from 1 to 5 and keep the comment to $max characters.';
   }
+
+  @override
+  String get collabTitle => 'Collaborate: hire another agent';
+
+  @override
+  String get collabLead =>
+      'Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.';
+
+  @override
+  String get collabWalletLabel => 'Your agent\'s wallet';
+
+  @override
+  String get collabWalletHint =>
+      'This agent pays from its own wallet. Fund it with testnet USDC first.';
+
+  @override
+  String get collabWalletUnknown =>
+      'The wallet address shows up once your agent is listed in the marketplace.';
+
+  @override
+  String get collabFaucet => 'Get testnet USDC';
+
+  @override
+  String get collabCopyWallet => 'Copy address';
+
+  @override
+  String get collabWalletCopied => 'Address copied';
+
+  @override
+  String get collabAgentLabel => 'Agent to hire';
+
+  @override
+  String get collabNoAgents => 'No other agent can be hired right now.';
+
+  @override
+  String get collabInstructionsLabel => 'What should it do?';
+
+  @override
+  String get collabInstructionsHint =>
+      'For example: summarize this article in three bullet points.';
+
+  @override
+  String get collabBudgetLabel => 'Maximum budget (USDC)';
+
+  @override
+  String get collabBudgetInvalid =>
+      'Enter an amount above zero, for example 1.50.';
+
+  @override
+  String get collabHire => 'Hire';
+
+  @override
+  String get collabHiring => 'Starting the hire…';
+
+  @override
+  String collabProgressTitle(int hireId) {
+    return 'Hire #$hireId';
+  }
+
+  @override
+  String get collabStepFunded => 'Payment locked in escrow';
+
+  @override
+  String get collabStepWorking => 'The hired agent is working';
+
+  @override
+  String get collabStepDelivered => 'Work delivered';
+
+  @override
+  String get collabStepCompleted => 'Payment released to the hired agent';
+
+  @override
+  String get collabViewTransaction => 'View transaction';
+
+  @override
+  String get collabResultLabel => 'Result';
+
+  @override
+  String collabStopped(String reason) {
+    return 'The hire stopped: $reason';
+  }
+
+  @override
+  String get collabRefunded =>
+      'This hire was cancelled and the money went back to your agent.';
+
+  @override
+  String get collabHireAnother => 'Hire again';
+
+  @override
+  String get collabErrorNotOwned =>
+      'Only the owner of this live agent can make it hire others.';
+
+  @override
+  String get collabErrorSelfHire =>
+      'An agent cannot hire itself. Pick another agent.';
+
+  @override
+  String get collabErrorInvalid =>
+      'Write what the agent should do and a budget above zero.';
+
+  @override
+  String get collabErrorBudget =>
+      'The budget is lower than this agent\'s price. Raise it and try again.';
+
+  @override
+  String get collabErrorWallet =>
+      'Your agent\'s wallet cannot pay right now. Try again later.';
+
+  @override
+  String get collabErrorChain =>
+      'The Stellar network could not be reached. Try again in a moment.';
+
+  @override
+  String get collabErrorAgent =>
+      'This agent cannot be hired right now. Pick another one.';
+
+  @override
+  String get collabErrorHireNotOwned =>
+      'This hire does not belong to your agent.';
+
+  @override
+  String get collabErrorGeneric => 'Something went wrong. Try again.';
 }

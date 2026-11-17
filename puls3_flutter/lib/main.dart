@@ -100,6 +100,8 @@ StudioGateway? _createStudioGateway(
     saveProviderCredential: client.studio.saveProviderCredential,
     wallet: wallet,
     session: session,
+    hireAgentAs: client.studio.hireAgentAs,
+    getAgentHire: client.studio.getAgentHire,
   ),
   _ => throw StateError(
     'Unknown STUDIO "$_studioKind": use "demo" or "server".',

@@ -545,5 +545,54 @@
         "type": "int"
       }
     }
-  }
+  },
+  "collabTitle": "Collaborate: hire another agent",
+  "collabLead": "Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.",
+  "collabWalletLabel": "Your agent's wallet",
+  "collabWalletHint": "This agent pays from its own wallet. Fund it with testnet USDC first.",
+  "collabWalletUnknown": "The wallet address shows up once your agent is listed in the marketplace.",
+  "collabFaucet": "Get testnet USDC",
+  "collabCopyWallet": "Copy address",
+  "collabWalletCopied": "Address copied",
+  "collabAgentLabel": "Agent to hire",
+  "collabNoAgents": "No other agent can be hired right now.",
+  "collabInstructionsLabel": "What should it do?",
+  "collabInstructionsHint": "For example: summarize this article in three bullet points.",
+  "collabBudgetLabel": "Maximum budget (USDC)",
+  "collabBudgetInvalid": "Enter an amount above zero, for example 1.50.",
+  "collabHire": "Hire",
+  "collabHiring": "Starting the hire…",
+  "collabProgressTitle": "Hire #{hireId}",
+  "@collabProgressTitle": {
+    "placeholders": {
+      "hireId": {
+        "type": "int"
+      }
+    }
+  },
+  "collabStepFunded": "Payment locked in escrow",
+  "collabStepWorking": "The hired agent is working",
+  "collabStepDelivered": "Work delivered",
+  "collabStepCompleted": "Payment released to the hired agent",
+  "collabViewTransaction": "View transaction",
+  "collabResultLabel": "Result",
+  "collabStopped": "The hire stopped: {reason}",
+  "@collabStopped": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "collabRefunded": "This hire was cancelled and the money went back to your agent.",
+  "collabHireAnother": "Hire again",
+  "collabErrorNotOwned": "Only the owner of this live agent can make it hire others.",
+  "collabErrorSelfHire": "An agent cannot hire itself. Pick another agent.",
+  "collabErrorInvalid": "Write what the agent should do and a budget above zero.",
+  "collabErrorBudget": "The budget is lower than this agent's price. Raise it and try again.",
+  "collabErrorWallet": "Your agent's wallet cannot pay right now. Try again later.",
+  "collabErrorChain": "The Stellar network could not be reached. Try again in a moment.",
+  "collabErrorAgent": "This agent cannot be hired right now. Pick another one.",
+  "collabErrorHireNotOwned": "This hire does not belong to your agent.",
+  "collabErrorGeneric": "Something went wrong. Try again."
 }

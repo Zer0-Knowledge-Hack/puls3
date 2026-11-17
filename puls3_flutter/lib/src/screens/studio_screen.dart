@@ -17,6 +17,7 @@ import '../ui/atoms/section_label.dart';
 import '../ui/molecules/agent_card.dart';
 import '../ui/organisms/agent_form.dart';
 import '../ui/organisms/site_footer.dart';
+import 'agent_collaboration.dart';
 import 'playground.dart';
 import 'studio_deploy.dart';
 import 'wallet_sheet.dart';
@@ -73,6 +74,10 @@ class _StudioScreenState extends State<StudioScreen> {
 
   /// The live version an edit replaces (F10), for the banner.
   int? _replacesVersion;
+
+  /// The registry id of the opened draft's live agent: it can hire other
+  /// agents (#312).
+  int? _liveAgentId;
 
   bool _loadingDraft = false;
   bool _saving = false;
@@ -178,6 +183,9 @@ class _StudioScreenState extends State<StudioScreen> {
           _draftId = draft.draftId;
           _revision = draft.revision;
           _savedJson = _json(draft.manifest);
+          _liveAgentId = draft.deployState == DraftDeployState.live
+              ? int.tryParse(draft.agentId ?? '')
+              : null;
         }
         _loadingDraft = false;
       });
@@ -541,6 +549,13 @@ class _StudioScreenState extends State<StudioScreen> {
           form,
           const SizedBox(height: Puls3Spacing.xl),
           preview,
+        ],
+        if ((_liveAgentId, owner) case (final agentId?, final wallet?)) ...[
+          const SizedBox(height: Puls3Spacing.xxl),
+          AgentCollaborationSection(
+            hiringAgentId: agentId,
+            owner: wallet,
+          ),
         ],
         const SizedBox(height: Puls3Spacing.xxl),
       ],

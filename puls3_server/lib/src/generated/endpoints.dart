@@ -854,6 +854,31 @@ class Endpoints extends _is.EndpointDispatch {
                     params['budgetUsdcStroops'],
                   ),
         ),
+        'getAgentHire': _is.MethodConnector(
+          name: 'getAgentHire',
+          params: {
+            'hiringAgentId': _is.ParameterDescription(
+              name: 'hiringAgentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .getAgentHire(
+                    session,
+                    params['hiringAgentId'],
+                    params['hireId'],
+                  ),
+        ),
       },
     );
     modules['serverpod_auth_idp'] = _iais.Endpoints()

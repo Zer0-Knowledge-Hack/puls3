@@ -1358,4 +1358,128 @@ class AppLocalizationsEs extends AppLocalizations {
   String rateInvalid(int max) {
     return 'Elige un puntaje de 1 a 5 y deja el comentario en $max caracteres como máximo.';
   }
+
+  @override
+  String get collabTitle => 'Colaborar: contrata a otro agente';
+
+  @override
+  String get collabLead =>
+      'Tu agente publicado puede contratar a otro agente del marketplace y pagarle por su cuenta. Cada pago es una transacción real en testnet que puedes comprobar.';
+
+  @override
+  String get collabWalletLabel => 'Billetera de tu agente';
+
+  @override
+  String get collabWalletHint =>
+      'Este agente paga desde su propia billetera. Primero cárgala con USDC de testnet.';
+
+  @override
+  String get collabWalletUnknown =>
+      'La dirección de la billetera aparece cuando tu agente ya está listado en el marketplace.';
+
+  @override
+  String get collabFaucet => 'Conseguir USDC de testnet';
+
+  @override
+  String get collabCopyWallet => 'Copiar dirección';
+
+  @override
+  String get collabWalletCopied => 'Dirección copiada';
+
+  @override
+  String get collabAgentLabel => 'Agente a contratar';
+
+  @override
+  String get collabNoAgents =>
+      'Ahora mismo no hay otro agente que se pueda contratar.';
+
+  @override
+  String get collabInstructionsLabel => '¿Qué debe hacer?';
+
+  @override
+  String get collabInstructionsHint =>
+      'Por ejemplo: resume este artículo en tres puntos.';
+
+  @override
+  String get collabBudgetLabel => 'Presupuesto máximo (USDC)';
+
+  @override
+  String get collabBudgetInvalid =>
+      'Escribe un monto mayor que cero, por ejemplo 1.50.';
+
+  @override
+  String get collabHire => 'Contratar';
+
+  @override
+  String get collabHiring => 'Iniciando la contratación…';
+
+  @override
+  String collabProgressTitle(int hireId) {
+    return 'Contratación #$hireId';
+  }
+
+  @override
+  String get collabStepFunded => 'Pago bloqueado en el escrow';
+
+  @override
+  String get collabStepWorking => 'El agente contratado está trabajando';
+
+  @override
+  String get collabStepDelivered => 'Trabajo entregado';
+
+  @override
+  String get collabStepCompleted => 'Pago liberado al agente contratado';
+
+  @override
+  String get collabViewTransaction => 'Ver transacción';
+
+  @override
+  String get collabResultLabel => 'Resultado';
+
+  @override
+  String collabStopped(String reason) {
+    return 'La contratación se detuvo: $reason';
+  }
+
+  @override
+  String get collabRefunded =>
+      'Esta contratación se canceló y el dinero volvió a tu agente.';
+
+  @override
+  String get collabHireAnother => 'Contratar de nuevo';
+
+  @override
+  String get collabErrorNotOwned =>
+      'Solo el dueño de este agente publicado puede hacer que contrate a otros.';
+
+  @override
+  String get collabErrorSelfHire =>
+      'Un agente no puede contratarse a sí mismo. Elige otro agente.';
+
+  @override
+  String get collabErrorInvalid =>
+      'Escribe qué debe hacer el agente y un presupuesto mayor que cero.';
+
+  @override
+  String get collabErrorBudget =>
+      'El presupuesto es menor que el precio de este agente. Súbelo y vuelve a intentarlo.';
+
+  @override
+  String get collabErrorWallet =>
+      'La billetera de tu agente no puede pagar ahora. Inténtalo más tarde.';
+
+  @override
+  String get collabErrorChain =>
+      'No se pudo conectar con la red Stellar. Inténtalo en un momento.';
+
+  @override
+  String get collabErrorAgent =>
+      'Ahora no se puede contratar a este agente. Elige otro.';
+
+  @override
+  String get collabErrorHireNotOwned =>
+      'Esta contratación no pertenece a tu agente.';
+
+  @override
+  String get collabErrorGeneric => 'Algo salió mal. Inténtalo de nuevo.';
 }
