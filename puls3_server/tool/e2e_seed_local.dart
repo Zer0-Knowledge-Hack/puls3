@@ -1,8 +1,9 @@
 // Seeds the local sandbox for the browser E2E (#256).
 //
-// It registers one agent, creates and funds the consumer wallet and generates
-// the server's wallet-auth signing key, then writes two files into the
-// directory in its first argument:
+// It registers one agent, stores the agent's key in server custody (one
+// `agent_wallet` row, as a Studio deploy leaves it, so the agent is hireable),
+// creates and funds the consumer wallet and generates the server's wallet-auth
+// signing key, then writes two files into the directory in its first argument:
 //
 //   server.env    environment of the server (sourced by the run script)
 //   defines.json  `--dart-define-from-file` for `flutter drive`
@@ -10,10 +11,19 @@
 // Every key is ephemeral and belongs to the local standalone network. Nothing
 // secret is printed; the run script deletes the directory when it ends.
 //
+// The custody row goes to the database of the Serverpod environment
+// (`SERVERPOD_DATABASE_*`), which the run script points at the run's database.
+// Migrations are applied first, so an empty database works.
+//
 //   dart run tool/e2e_seed_local.dart <output-dir>
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:puls3_server/src/generated/endpoints.dart';
+import 'package:puls3_server/src/generated/protocol.dart';
+import 'package:serverpod/serverpod.dart' show Serverpod;
+
+import '../test/e2e/support/agent_custody.dart';
 import '../test/e2e/support/local_sandbox.dart';
 
 /// Price of the seeded agent, in stroops of the sandbox token.
@@ -42,6 +52,7 @@ Future<void> main(List<String> args) async {
     name: agentName,
   );
   await sandbox.cleanup();
+  await _custody(agent);
 
   final serverEnv = {
     ...sandbox.environment,
@@ -68,4 +79,22 @@ Future<void> main(List<String> args) async {
     }),
   );
   stdout.writeln('Seeded agent ${agent.id} for the browser E2E.');
+}
+
+/// Stores [agent]'s key in custody through a Serverpod started only for that,
+/// and shut down before the run script starts the real server.
+Future<void> _custody(RegisteredAgent agent) async {
+  final pod = Serverpod(
+    ['--mode', 'development', '--apply-migrations'],
+    Protocol(),
+    Endpoints(),
+  );
+  await pod.start();
+  final session = await pod.createSession();
+  try {
+    await custodyAgentKey(session, agent.account);
+  } finally {
+    await session.close();
+    await pod.shutdown(exitProcess: false);
+  }
 }
