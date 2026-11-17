@@ -562,6 +562,26 @@ class EndpointStudio extends _isc.EndpointRef {
       'budgetUsdcStroops': budgetUsdcStroops,
     },
   );
+
+  /// The hire [hireId] that the caller's live Studio agent [hiringAgentId]
+  /// made with [hireAgentAs] (#312), as the hire detail screen shows it:
+  /// escrow status, the `fund` and latest escrow transactions and, once
+  /// delivered, the hired agent's result. Read-only, so the app polls it.
+  ///
+  /// The caller must own the active agent, as for [hireAgentAs]
+  /// (`HiringAgentNotOwned`), and the hire's client must be that agent's
+  /// wallet (`HireNotOwned`).
+  _ida.Future<_iytku71p.HireDetail> getAgentHire(
+    int hiringAgentId,
+    int hireId,
+  ) => caller.callServerEndpoint<_iytku71p.HireDetail>(
+    'studio',
+    'getAgentHire',
+    {
+      'hiringAgentId': hiringAgentId,
+      'hireId': hireId,
+    },
+  );
 }
 
 class Modules {

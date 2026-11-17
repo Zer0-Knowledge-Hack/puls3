@@ -1381,4 +1381,39 @@ class _StudioEndpoint {
       }
     });
   }
+
+  _ida.Future<_i0z7bvay.HireDetail> getAgentHire(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hiringAgentId,
+    int hireId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'studio',
+            method: 'getAgentHire',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'studio',
+          methodName: 'getAgentHire',
+          parameters: _ist.testObjectToJson({
+            'hiringAgentId': hiringAgentId,
+            'hireId': hireId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_i0z7bvay.HireDetail>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
 }

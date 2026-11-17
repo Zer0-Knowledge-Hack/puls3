@@ -59,6 +59,116 @@ abstract interface class StudioGateway {
     required DraftDeployState state,
     String? agentId,
   });
+
+  /// Makes [owner]'s live agent [hiringAgentId] hire the catalog agent
+  /// [agentId] on [input], paying at most [budgetUsdcStroops] from its own
+  /// wallet (#312). The rest of the hire runs on the server: follow it with
+  /// [getAgentHire]. Refusals are [StudioAgentHireRefused].
+  Future<AgentHireStart> hireAgentAs({
+    required int hiringAgentId,
+    required int agentId,
+    required String input,
+    required int budgetUsdcStroops,
+    required String owner,
+  });
+
+  /// Where the hire [hireId] of [owner]'s agent [hiringAgentId] is.
+  /// Read-only, so the app polls it.
+  Future<AgentHireProgress> getAgentHire({
+    required int hiringAgentId,
+    required int hireId,
+    required String owner,
+  });
+}
+
+/// A hire one agent started as the client of another (`AgentHireStarted`).
+class AgentHireStart {
+  const AgentHireStart({required this.hireId, required this.hiringWallet});
+
+  final int hireId;
+
+  /// The hiring agent's wallet: it pays the hire.
+  final String hiringWallet;
+}
+
+/// One read of an agent-to-agent hire (`HireDetail`, reduced to what the
+/// Studio shows).
+class AgentHireProgress {
+  const AgentHireProgress({
+    required this.hireId,
+    this.status,
+    this.runtimeStatus,
+    this.failureReason,
+    this.result,
+    this.fundTransaction,
+    this.lastPurpose,
+    this.lastTransaction,
+    this.lastFailed = false,
+  });
+
+  final int hireId;
+
+  /// Escrow state: open, funded, submitted, completed, rejected, expired.
+  final String? status;
+
+  /// queued, running or failed while the hire is funded.
+  final String? runtimeStatus;
+  final String? failureReason;
+
+  /// The hired agent's answer, once it delivered it.
+  final String? result;
+
+  /// The confirmed `fund` transaction hash: the payment into the escrow.
+  final String? fundTransaction;
+
+  /// The latest escrow submission: its purpose (createJob, fund, submit,
+  /// complete...) and transaction hash.
+  final String? lastPurpose;
+  final String? lastTransaction;
+  final bool lastFailed;
+
+  /// No later read can change it.
+  bool get isFinal =>
+      status == 'completed' ||
+      status == 'rejected' ||
+      status == 'expired' ||
+      runtimeStatus == 'failed' ||
+      lastFailed;
+}
+
+/// Why the server refused an agent-to-agent hire or its read.
+enum AgentHireRefusal {
+  /// `HiringAgentNotOwned`: not the caller's live agent.
+  notOwned,
+
+  /// `SelfHireNotAllowed`.
+  selfHire,
+
+  /// `InvalidHire`: empty instructions or a budget that is not positive.
+  invalid,
+
+  /// `BudgetExceeded`: the hired agent costs more than the budget.
+  budgetExceeded,
+
+  /// `AgentWalletUnavailable`: the agent wallet cannot sign right now.
+  walletUnavailable,
+
+  /// `ChainUnavailable`: the Stellar network or its settings.
+  chainUnavailable,
+
+  /// `AgentNotFound`, `AgentCannotDeliver`, `AgentHireRefused`.
+  agentUnavailable,
+
+  /// `HireNotOwned`, `HireNotFound`: the hire is not this agent's.
+  hireNotOwned,
+}
+
+/// The server refused an agent-to-agent hire; the UI words [reason].
+final class StudioAgentHireRefused extends StudioGatewayException {
+  const StudioAgentHireRefused(this.reason)
+    : super('The server refused this hire.');
+
+  final AgentHireRefusal reason;
 }
 
 /// Where a draft is in its life (`StudioDraft.deployState`).

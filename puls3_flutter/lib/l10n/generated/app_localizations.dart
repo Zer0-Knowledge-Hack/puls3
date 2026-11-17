@@ -2441,6 +2441,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick a score from 1 to 5 and keep the comment to {max} characters.'**
   String rateInvalid(int max);
+
+  /// No description provided for @collabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaborate: hire another agent'**
+  String get collabTitle;
+
+  /// No description provided for @collabLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.'**
+  String get collabLead;
+
+  /// No description provided for @collabWalletLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent\'s wallet'**
+  String get collabWalletLabel;
+
+  /// No description provided for @collabWalletHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent pays from its own wallet. Fund it with testnet USDC first.'**
+  String get collabWalletHint;
+
+  /// No description provided for @collabWalletUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'The wallet address shows up once your agent is listed in the marketplace.'**
+  String get collabWalletUnknown;
+
+  /// No description provided for @collabFaucet.
+  ///
+  /// In en, this message translates to:
+  /// **'Get testnet USDC'**
+  String get collabFaucet;
+
+  /// No description provided for @collabCopyWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy address'**
+  String get collabCopyWallet;
+
+  /// No description provided for @collabWalletCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Address copied'**
+  String get collabWalletCopied;
+
+  /// No description provided for @collabAgentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent to hire'**
+  String get collabAgentLabel;
+
+  /// No description provided for @collabNoAgents.
+  ///
+  /// In en, this message translates to:
+  /// **'No other agent can be hired right now.'**
+  String get collabNoAgents;
+
+  /// No description provided for @collabInstructionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'What should it do?'**
+  String get collabInstructionsLabel;
+
+  /// No description provided for @collabInstructionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For example: summarize this article in three bullet points.'**
+  String get collabInstructionsHint;
+
+  /// No description provided for @collabBudgetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum budget (USDC)'**
+  String get collabBudgetLabel;
+
+  /// No description provided for @collabBudgetInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount above zero, for example 1.50.'**
+  String get collabBudgetInvalid;
+
+  /// No description provided for @collabHire.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire'**
+  String get collabHire;
+
+  /// No description provided for @collabHiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the hire…'**
+  String get collabHiring;
+
+  /// No description provided for @collabProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire #{hireId}'**
+  String collabProgressTitle(int hireId);
+
+  /// No description provided for @collabStepFunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment locked in escrow'**
+  String get collabStepFunded;
+
+  /// No description provided for @collabStepWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'The hired agent is working'**
+  String get collabStepWorking;
+
+  /// No description provided for @collabStepDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Work delivered'**
+  String get collabStepDelivered;
+
+  /// No description provided for @collabStepCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment released to the hired agent'**
+  String get collabStepCompleted;
+
+  /// No description provided for @collabViewTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'View transaction'**
+  String get collabViewTransaction;
+
+  /// No description provided for @collabResultLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get collabResultLabel;
+
+  /// No description provided for @collabStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'The hire stopped: {reason}'**
+  String collabStopped(String reason);
+
+  /// No description provided for @collabRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'This hire was cancelled and the money went back to your agent.'**
+  String get collabRefunded;
+
+  /// No description provided for @collabHireAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire again'**
+  String get collabHireAnother;
+
+  /// No description provided for @collabErrorNotOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the owner of this live agent can make it hire others.'**
+  String get collabErrorNotOwned;
+
+  /// No description provided for @collabErrorSelfHire.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent cannot hire itself. Pick another agent.'**
+  String get collabErrorSelfHire;
+
+  /// No description provided for @collabErrorInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what the agent should do and a budget above zero.'**
+  String get collabErrorInvalid;
+
+  /// No description provided for @collabErrorBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'The budget is lower than this agent\'s price. Raise it and try again.'**
+  String get collabErrorBudget;
+
+  /// No description provided for @collabErrorWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent\'s wallet cannot pay right now. Try again later.'**
+  String get collabErrorWallet;
+
+  /// No description provided for @collabErrorChain.
+  ///
+  /// In en, this message translates to:
+  /// **'The Stellar network could not be reached. Try again in a moment.'**
+  String get collabErrorChain;
+
+  /// No description provided for @collabErrorAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent cannot be hired right now. Pick another one.'**
+  String get collabErrorAgent;
+
+  /// No description provided for @collabErrorHireNotOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'This hire does not belong to your agent.'**
+  String get collabErrorHireNotOwned;
+
+  /// No description provided for @collabErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Try again.'**
+  String get collabErrorGeneric;
 }
 
 class _AppLocalizationsDelegate
