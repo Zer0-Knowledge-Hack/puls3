@@ -40,5 +40,9 @@ Since #279 (#276), `createHire` refuses an agent whose payee wallet has no `agen
 - T1 + T1b committed in `c5eb3bc`. Checks: `scripts/tests/local-soroban.test.sh` 30/30, `dart analyze --fatal-infos` clean, server E2E `+2` on a reused ledger.
 - Fresh ledger (recreated `soroban_standalone`, setup with `--skip-build`): the setup deploys the SAC; the relay suite passes; the feedback suite fails with `InvalidAgentId` because its agent got registry id 0. Third finding: the identity registry numbers agents from 0 (`NextId` starts at `0u32`), and `HireEndpoint.createHire` refuses `agentId < 1`, so agent 0 of any registry can never be hired. Production code, outside #290.
 
+- Agent id 0 moved to its own issue #291, fixed in #293 (`ff152e6`, merged). This branch is rebased on it.
+- [x] **T1c** (fourth finding) `setup-local-soroban.sh` called Friendbot once and went on when it failed, so on a fresh ledger the deploy hit `Account not found` for the admin. It now retries until Friendbot answers 200, accepts 400 (already funded), and fails before deploying when it never funds. Route: inline. Checks: `scripts/tests/local-soroban.test.sh` 36/36 (6 new cases, RED observed first).
+- Fresh ledger + reset `postgres_test`, after rebase on `ff152e6`: setup exit 0, server E2E `+2: All tests passed!`.
+
 ## Next step
-Decide how agent id 0 is handled, then T2.
+Push and open the PR for T1/T1b/T1c (`Refs #290`, T2 still open), then T2 (needs `chromedriver`).
