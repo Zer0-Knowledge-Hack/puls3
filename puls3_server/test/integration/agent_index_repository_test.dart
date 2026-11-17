@@ -67,6 +67,23 @@ void main() {
         expect(stored.name, 'Second');
       });
 
+      test('findByRegistryId reads one row, the newest only (#206)', () async {
+        final session = sessionBuilder.build();
+        final repo = ServerpodAgentIndexRepository(session, network: 'it-5');
+
+        await repo.upsertAll([
+          _agent(registryId: 9401, id: 'it-reg', name: 'Superseded'),
+          _agent(registryId: 9402, id: 'it-reg', name: 'Current'),
+          _agent(registryId: 9403, id: 'it-other'),
+        ]);
+
+        expect((await repo.findByRegistryId(9402))!.name, 'Current');
+        expect((await repo.findByRegistryId(9403))!.id, 'it-other');
+        // A superseded registration is not hireable, as in the catalog.
+        expect(await repo.findByRegistryId(9401), isNull);
+        expect(await repo.findByRegistryId(9499), isNull);
+      });
+
       test('the resume cursor round-trips per network', () async {
         final session = sessionBuilder.build();
         final repo = ServerpodAgentIndexRepository(session, network: 'it-4');

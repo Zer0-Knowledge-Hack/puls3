@@ -88,6 +88,78 @@ void main() {
       service = serviceOn(rig, env);
     });
 
+    group('the agent and its payee (#206, I-2)', () {
+      HireService withLookup(AgentSummary? Function(int) found) => HireService(
+        hires: rig.hires,
+        preparations: rig.preparations,
+        relay: rig.service,
+        registry: rig.ledger,
+        catalog: AgentCatalogService(rig.ledger),
+        custody: rig.custodyOf,
+        config: HireRelayConfig(env),
+        agentOf: (id) async => found(id),
+        now: () => rig.clock,
+      );
+
+      test('the agent comes from the lookup, not the whole catalog', () async {
+        // The lookup answers a price the chain does not have: the hire takes
+        // it, so the lookup answered and the catalog was not read.
+        final fromIndex = agentSummary.copyWith(priceUsdcStroops: 7000000);
+
+        final result = await create(withLookup((_) => fromIndex));
+
+        expect(result.hire.agentId, 7);
+        expect(result.hire.price, 7000000);
+      });
+
+      test('the payee is read live, not taken from the catalog', () async {
+        // The index still has an old wallet; the chain has the current one.
+        final stale = agentSummary.copyWith(wallet: stranger);
+
+        await create(withLookup((_) => stale));
+
+        final provider = rig.codec.built.single.spec.args[1];
+        String xdr(ScArg arg) => base64Encode(
+          encodeInvokeHostFunction(
+            contract: StellarConfig.testnet.escrow,
+            function: 'create_job',
+            args: [arg],
+          ),
+        );
+        expect(
+          xdr(provider),
+          xdr(ScArg.address(StellarAddress.parse(agentWallet))),
+        );
+      });
+
+      test('an agent with no wallet on chain is AgentUnavailable', () async {
+        rig.ledger.wallets.remove(7);
+
+        await expectLater(
+          create(withLookup((_) => agentSummary)),
+          throwsA(isA<AgentUnavailable>()),
+        );
+        expect(rig.hires.all, isEmpty);
+      });
+
+      test('an agent the lookup does not know is AgentUnavailable', () async {
+        await expectLater(
+          create(withLookup((_) => null)),
+          throwsA(isA<AgentUnavailable>()),
+        );
+        expect(rig.hires.all, isEmpty);
+      });
+
+      test('a chain outage reading the payee is HireLedgerUnavailable', () async {
+        rig.ledger.walletError = const LedgerUnavailable('RPC down');
+
+        await expectLater(
+          create(withLookup((_) => agentSummary)),
+          throwsA(isA<HireLedgerUnavailable>()),
+        );
+      });
+    });
+
     group('a new request', () {
       test(
         'stores a hire with no status and prepares its create_job',

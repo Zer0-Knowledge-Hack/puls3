@@ -14,6 +14,11 @@ abstract interface class AgentIndexRepository {
   /// there is none.
   Future<AgentSummary?> findByAgentId(String agentId);
 
+  /// The indexed agent with registry id [registryId], or `null` when there
+  /// is none or a newer registration has the same metadata id (as in
+  /// [list]). One row, whatever the size of the catalog (#206, I-2).
+  Future<AgentSummary?> findByRegistryId(int registryId);
+
   /// The registry ids already indexed, so the indexer re-reads only what is
   /// missing or changed.
   Future<Set<int>> registryIds();
