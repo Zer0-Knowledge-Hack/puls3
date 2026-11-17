@@ -142,6 +142,7 @@ CatalogReader buildAgentCatalogReader(
         fallback: fallback,
       ),
       custody: custodyOn(session),
+      unpublished: publicationOn(session),
     ),
     cache: _reputation(config),
   );

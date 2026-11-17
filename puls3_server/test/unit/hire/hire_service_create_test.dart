@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
+import 'package:puls3_server/src/agent/custodied_wallets.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
@@ -439,6 +440,38 @@ void main() {
         expect(rig.codec.built, isEmpty);
       },
     );
+
+    HireService withPublication(PublicationLookup unpublished) => HireService(
+      hires: rig.hires,
+      preparations: rig.preparations,
+      relay: rig.service,
+      registry: rig.ledger,
+      catalog: AgentCatalogService(rig.ledger),
+      custody: rig.custodyOf,
+      unpublished: unpublished,
+      config: HireRelayConfig(env),
+      now: () => rig.clock,
+    );
+
+    test(
+      'AgentCannotDeliver when the agent is an unpublished Studio agent',
+      () async {
+        await expectLater(
+          create(withPublication((ids) async => ids)),
+          throwsA(
+            isA<AgentCannotDeliver>().having((e) => e.agentId, 'id', 7),
+          ),
+        );
+        expect(rig.hires.all, isEmpty);
+        expect(rig.preparations.all, isEmpty);
+      },
+    );
+
+    test('a published Studio agent is hired', () async {
+      await create(withPublication((ids) async => const {}));
+
+      expect(rig.hires.all, hasLength(1));
+    });
 
     test(
       'HireRequestInvalid when the manifest version is missing or invalid',
