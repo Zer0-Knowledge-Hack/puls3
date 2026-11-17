@@ -30,8 +30,24 @@ case "$url" in
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"status":"healthy"}}'
     ;;
   */friendbot*)
-    [ "${STUB_FRIENDBOT_FAIL:-0}" = 1 ] && exit 22
-    printf '%s\n' '{}'
+    # STUB_FRIENDBOT_NOT_READY=N answers 502 to the first N calls (Friendbot
+    # still starting); STUB_FRIENDBOT_FAIL=1 answers 400 (already funded).
+    calls=$(($(cat "$STUB_LOG.friendbot" 2>/dev/null || echo 0) + 1))
+    echo "$calls" >"$STUB_LOG.friendbot"
+    if [ "$calls" -le "${STUB_FRIENDBOT_NOT_READY:-0}" ]; then
+      code=502
+    elif [ "${STUB_FRIENDBOT_FAIL:-0}" = 1 ]; then
+      code=400
+    else
+      code=200
+    fi
+    case " $* " in
+      *" -w "*) printf '%s' "$code" ;;
+      *)
+        [ "$code" = 200 ] || exit 22
+        printf '%s\n' '{}'
+        ;;
+    esac
     ;;
   *) printf '%s\n' '{}' ;;
 esac
@@ -165,6 +181,44 @@ if grep -q "Friendbot did not fund" "$LOG2.out"; then
   ok "the refused re-fund is explained"
 else
   bad "the refused re-fund is explained" "$(cat "$LOG2.out")"
+fi
+
+echo "# Friendbot not ready yet on a fresh ledger"
+LOG5="$WORK/friendbot-late.log"
+ENV5="$WORK/friendbot-late.env"
+if run_setup "$LOG5" "$ENV5" STUB_FRIENDBOT_NOT_READY=2 PULS3_LOCAL_TIMEOUT_SECONDS=10; then
+  ok "a Friendbot that starts late is retried"
+else
+  bad "a Friendbot that starts late is retried" "$(cat "$LOG5.out")"
+fi
+if [ "$(cat "$LOG5.friendbot" 2>/dev/null)" = 3 ]; then
+  ok "Friendbot is called until it funds"
+else
+  bad "Friendbot is called until it funds" "calls: $(cat "$LOG5.friendbot" 2>/dev/null)"
+fi
+
+echo "# Friendbot never ready"
+LOG6="$WORK/friendbot-down.log"
+ENV6="$WORK/friendbot-down.env"
+if run_setup "$LOG6" "$ENV6" STUB_FRIENDBOT_NOT_READY=999; then
+  bad "an unfunded admin exits non-zero" "exit 0"
+else
+  ok "an unfunded admin exits non-zero"
+fi
+if grep -q "Friendbot .* did not fund" "$LOG6.out"; then
+  ok "the unfunded admin is explained"
+else
+  bad "the unfunded admin is explained" "$(cat "$LOG6.out")"
+fi
+if grep -q "contract deploy" "$LOG6"; then
+  bad "nothing is deployed without a funded admin" "deploy ran"
+else
+  ok "nothing is deployed without a funded admin"
+fi
+if [ -e "$ENV6" ]; then
+  bad "an unfunded admin writes no env file" "env file exists"
+else
+  ok "an unfunded admin writes no env file"
 fi
 
 echo "# RPC never healthy"

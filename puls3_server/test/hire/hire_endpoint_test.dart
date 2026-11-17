@@ -278,13 +278,34 @@ void main() {
       expect(rig.hires.all, isEmpty);
     });
 
-    test('a non-positive agent id is InvalidAgentId', () async {
+    test('agent 0, the registry first id, can be hired (#291)', () async {
+      // Its own metadata id: a newer registration with the same id would
+      // supersede it in the catalog.
+      rig.ledger.metadata[0] = {
+        ...rig.ledger.metadata[7]!,
+        'id': _bytes('agt-000'),
+      };
+      rig.ledger.wallets[0] = rig.ledger.wallets[7]!;
+
+      final result = await endpoint.createHire(
+        session,
+        0,
+        alice,
+        'hi',
+        'req-1',
+      );
+
+      expect(result.hire.agentId, 0);
+      expect(result.preparedCreateJob?.purpose, 'createJob');
+    });
+
+    test('an agent id outside the contract u32 is InvalidAgentId', () async {
       await expectLater(
-        endpoint.createHire(session, 0, alice, 'hi', 'req-1'),
+        endpoint.createHire(session, -1, alice, 'hi', 'req-1'),
         throwsA(api('InvalidAgentId')),
       );
       await expectLater(
-        endpoint.createHire(session, -3, alice, 'hi', 'req-1'),
+        endpoint.createHire(session, 4294967296, alice, 'hi', 'req-1'),
         throwsA(api('InvalidAgentId')),
       );
       expect(events, ['requireLogin', 'requireLogin']);
