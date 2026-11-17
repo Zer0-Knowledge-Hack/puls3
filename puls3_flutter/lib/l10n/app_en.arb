@@ -546,22 +546,12 @@
       }
     }
   },
-  "collabTitle": "Collaborate: hire another agent",
-  "collabLead": "Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.",
   "collabWalletLabel": "Your agent's wallet",
   "collabWalletHint": "This agent pays from its own wallet. Fund it with testnet USDC first.",
   "collabWalletUnknown": "The wallet address shows up once your agent is listed in the marketplace.",
   "collabFaucet": "Get testnet USDC",
   "collabCopyWallet": "Copy address",
   "collabWalletCopied": "Address copied",
-  "collabAgentLabel": "Agent to hire",
-  "collabNoAgents": "No other agent can be hired right now.",
-  "collabInstructionsLabel": "What should it do?",
-  "collabInstructionsHint": "For example: summarize this article in three bullet points.",
-  "collabBudgetLabel": "Maximum budget (USDC)",
-  "collabBudgetInvalid": "Enter an amount above zero, for example 1.50.",
-  "collabHire": "Hire",
-  "collabHiring": "Starting the hire…",
   "collabProgressTitle": "Hire #{hireId}",
   "@collabProgressTitle": {
     "placeholders": {
@@ -585,7 +575,6 @@
     }
   },
   "collabRefunded": "This hire was cancelled and the money went back to your agent.",
-  "collabHireAnother": "Hire again",
   "collabErrorNotOwned": "Only the owner of this live agent can make it hire others.",
   "collabErrorSelfHire": "An agent cannot hire itself. Pick another agent.",
   "collabErrorInvalid": "Write what the agent should do and a budget above zero.",
@@ -629,5 +618,19 @@
   "myHiresStatusRejected": "Refunded",
   "myHiresStatusExpired": "Expired",
   "myHiresDemoNote": "Demo: these hires are samples and no funds moved.",
-  "hireOpenMyHires": "My hires"
+  "hireOpenMyHires": "My hires",
+  "hirePayerTitle": "Who pays?",
+  "hirePayerYou": "You (your wallet)",
+  "hirePayerAgent": "Your agent {name} (pays from its own wallet)",
+  "@hirePayerAgent": {"placeholders": {"name": {"type": "String"}}},
+  "hireAsAgentLead": "{name} hires this agent and pays {price} USDC from its own wallet. You do not need to sign anything.",
+  "@hireAsAgentLead": {"placeholders": {"name": {"type": "String"}, "price": {"type": "String"}}},
+  "hireAsAgentConfirm": "Hire with {name}",
+  "@hireAsAgentConfirm": {"placeholders": {"name": {"type": "String"}}},
+  "hireAsAgentHiring": "Starting the hire…",
+  "hireAsAgentInputMissing": "Write what the agent should do first.",
+  "myHiresPaidByAgent": "Paid by your agent {name}",
+  "@myHiresPaidByAgent": {"placeholders": {"name": {"type": "String"}}},
+  "agentHireDetailTitle": "Hire made by your agent",
+  "agentHireDetailConnect": "Connect the wallet that owns this agent to see this hire."
 }

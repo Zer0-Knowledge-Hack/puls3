@@ -1353,13 +1353,6 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get collabTitle => 'Colaborar: contrate outro agente';
-
-  @override
-  String get collabLead =>
-      'O seu agente publicado pode contratar outro agente do marketplace e pagar por conta própria. Cada pagamento é uma transação real na testnet que você pode conferir.';
-
-  @override
   String get collabWalletLabel => 'Carteira do seu agente';
 
   @override
@@ -1378,32 +1371,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get collabWalletCopied => 'Endereço copiado';
-
-  @override
-  String get collabAgentLabel => 'Agente a contratar';
-
-  @override
-  String get collabNoAgents => 'Nenhum outro agente pode ser contratado agora.';
-
-  @override
-  String get collabInstructionsLabel => 'O que ele deve fazer?';
-
-  @override
-  String get collabInstructionsHint =>
-      'Por exemplo: resuma este artigo em três tópicos.';
-
-  @override
-  String get collabBudgetLabel => 'Orçamento máximo (USDC)';
-
-  @override
-  String get collabBudgetInvalid =>
-      'Informe um valor acima de zero, por exemplo 1.50.';
-
-  @override
-  String get collabHire => 'Contratar';
-
-  @override
-  String get collabHiring => 'Iniciando a contratação…';
 
   @override
   String collabProgressTitle(int hireId) {
@@ -1436,9 +1403,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get collabRefunded =>
       'Esta contratação foi cancelada e o dinheiro voltou para o seu agente.';
-
-  @override
-  String get collabHireAnother => 'Contratar de novo';
 
   @override
   String get collabErrorNotOwned =>
@@ -1575,6 +1539,46 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hireOpenMyHires => 'Minhas contratações';
+
+  @override
+  String get hirePayerTitle => 'Quem paga?';
+
+  @override
+  String get hirePayerYou => 'Você (sua carteira)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'Seu agente $name (paga com a própria carteira)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name contrata este agente e paga $price USDC com a própria carteira. Você não precisa assinar nada.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Contratar com $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'Iniciando a contratação…';
+
+  @override
+  String get hireAsAgentInputMissing =>
+      'Primeiro escreva o que o agente deve fazer.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Pago pelo seu agente $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Contratação feita pelo seu agente';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Conecte a carteira dona deste agente para ver esta contratação.';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -2926,13 +2930,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get collabTitle => 'Colaborar: contrate outro agente';
-
-  @override
-  String get collabLead =>
-      'O seu agente publicado pode contratar outro agente do marketplace e pagar por conta própria. Cada pagamento é uma transação real na testnet que você pode conferir.';
-
-  @override
   String get collabWalletLabel => 'Carteira do seu agente';
 
   @override
@@ -2951,32 +2948,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get collabWalletCopied => 'Endereço copiado';
-
-  @override
-  String get collabAgentLabel => 'Agente a contratar';
-
-  @override
-  String get collabNoAgents => 'Nenhum outro agente pode ser contratado agora.';
-
-  @override
-  String get collabInstructionsLabel => 'O que ele deve fazer?';
-
-  @override
-  String get collabInstructionsHint =>
-      'Por exemplo: resuma este artigo em três tópicos.';
-
-  @override
-  String get collabBudgetLabel => 'Orçamento máximo (USDC)';
-
-  @override
-  String get collabBudgetInvalid =>
-      'Informe um valor acima de zero, por exemplo 1.50.';
-
-  @override
-  String get collabHire => 'Contratar';
-
-  @override
-  String get collabHiring => 'Iniciando a contratação…';
 
   @override
   String collabProgressTitle(int hireId) {
@@ -3009,9 +2980,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get collabRefunded =>
       'Esta contratação foi cancelada e o dinheiro voltou para o seu agente.';
-
-  @override
-  String get collabHireAnother => 'Contratar de novo';
 
   @override
   String get collabErrorNotOwned =>
@@ -3148,6 +3116,46 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get hireOpenMyHires => 'Minhas contratações';
+
+  @override
+  String get hirePayerTitle => 'Quem paga?';
+
+  @override
+  String get hirePayerYou => 'Você (sua carteira)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'Seu agente $name (paga com a própria carteira)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name contrata este agente e paga $price USDC com a própria carteira. Você não precisa assinar nada.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Contratar com $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'Iniciando a contratação…';
+
+  @override
+  String get hireAsAgentInputMissing =>
+      'Primeiro escreva o que o agente deve fazer.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Pago pelo seu agente $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Contratação feita pelo seu agente';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Conecte a carteira dona deste agente para ver esta contratação.';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -4502,13 +4510,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   }
 
   @override
-  String get collabTitle => 'Colaborar: contrate outro agente';
-
-  @override
-  String get collabLead =>
-      'O seu agente publicado pode contratar outro agente do marketplace e pagar por conta própria. Cada pagamento é uma transação real na testnet que você pode conferir.';
-
-  @override
   String get collabWalletLabel => 'Carteira do seu agente';
 
   @override
@@ -4527,32 +4528,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get collabWalletCopied => 'Endereço copiado';
-
-  @override
-  String get collabAgentLabel => 'Agente a contratar';
-
-  @override
-  String get collabNoAgents => 'Nenhum outro agente pode ser contratado agora.';
-
-  @override
-  String get collabInstructionsLabel => 'O que ele deve fazer?';
-
-  @override
-  String get collabInstructionsHint =>
-      'Por exemplo: resuma este artigo em três tópicos.';
-
-  @override
-  String get collabBudgetLabel => 'Orçamento máximo (USDC)';
-
-  @override
-  String get collabBudgetInvalid =>
-      'Informe um valor acima de zero, por exemplo 1.50.';
-
-  @override
-  String get collabHire => 'Contratar';
-
-  @override
-  String get collabHiring => 'Iniciando a contratação…';
 
   @override
   String collabProgressTitle(int hireId) {
@@ -4585,9 +4560,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get collabRefunded =>
       'Esta contratação foi cancelada e o dinheiro voltou para o seu agente.';
-
-  @override
-  String get collabHireAnother => 'Contratar de novo';
 
   @override
   String get collabErrorNotOwned =>
@@ -4725,4 +4697,44 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get hireOpenMyHires => 'As minhas contratações';
+
+  @override
+  String get hirePayerTitle => 'Quem paga?';
+
+  @override
+  String get hirePayerYou => 'Você (a sua carteira)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'O seu agente $name (paga com a própria carteira)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name contrata este agente e paga $price USDC com a própria carteira. Não precisa de assinar nada.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Contratar com $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'A iniciar a contratação…';
+
+  @override
+  String get hireAsAgentInputMissing =>
+      'Escreva primeiro o que o agente deve fazer.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Pago pelo seu agente $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Contratação feita pelo seu agente';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Ligue a carteira dona deste agente para ver esta contratação.';
 }

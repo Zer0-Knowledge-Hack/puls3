@@ -9,6 +9,10 @@ import '../runtime/hire_run_store.dart';
 import 'escrow_preparation_store.dart';
 import 'hire_lifecycle_store.dart';
 
+/// One of the caller's active Studio agents, which pays hires from its own
+/// custodied [wallet].
+typedef PayingAgent = ({int registryId, String wallet});
+
 /// Reads one hire for its consumer: `HireEndpoint.getHire` (api.md, F5-5,
 /// F6-2, F6-3). It never writes, so polling it is safe. Reading the escrow
 /// job for `approvalDeadline` is a chain read, not a submission.
@@ -47,12 +51,36 @@ final class HireQueryService {
   /// app shows so the consumer can get back to any of them. An agent the
   /// catalog cannot name keeps a generic name, so one missing agent never
   /// hides the whole list.
-  Future<List<HireSummary>> listMyHires(StellarAddress wallet) async {
-    final rows = await _hires.listByConsumer(wallet.value, limit: listLimit);
+  ///
+  /// [agents] are the caller's active Studio agents (the caller checked the
+  /// ownership): the hires they made from their own wallet are listed too,
+  /// each naming the agent that paid.
+  Future<List<HireSummary>> listMyHires(
+    StellarAddress wallet, {
+    Iterable<PayingAgent> agents = const [],
+  }) async {
+    final rows = <(HireRow, PayingAgent?)>[
+      for (final hire in await _hires.listByConsumer(
+        wallet.value,
+        limit: listLimit,
+      ))
+        (hire, null),
+    ];
+    for (final agent in agents) {
+      if (agent.wallet == wallet.value) continue;
+      for (final hire in await _hires.listByConsumer(
+        agent.wallet,
+        limit: listLimit,
+      )) {
+        rows.add((hire, agent));
+      }
+    }
+    rows.sort((a, b) => b.$1.id.compareTo(a.$1.id));
+    if (rows.length > listLimit) rows.removeRange(listLimit, rows.length);
     final names = <int, String>{};
     final now = _now().toUtc();
     final summaries = <HireSummary>[];
-    for (final hire in rows) {
+    for (final (hire, payer) in rows) {
       final name = names[hire.agentId] ??= await _agentName(hire.agentId);
       final status = hire.status;
       // Only a submitted hire waits on its approval window; a completed one
@@ -70,6 +98,12 @@ final class HireQueryService {
           inputPreview: _preview(hire.input ?? ''),
           approvalDeadline: deadline,
           needsAction: await _needsAction(hire, deadline, now),
+          paidByAgentId: payer?.registryId,
+          paidByAgentName: payer == null
+              ? null
+              : names[payer.registryId] ??= await _agentName(
+                  payer.registryId,
+                ),
         ),
       );
     }

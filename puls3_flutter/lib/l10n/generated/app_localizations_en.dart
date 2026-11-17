@@ -1335,13 +1335,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get collabTitle => 'Collaborate: hire another agent';
-
-  @override
-  String get collabLead =>
-      'Your live agent can hire another agent from the marketplace and pay it by itself. Every payment is a real testnet transaction you can check.';
-
-  @override
   String get collabWalletLabel => 'Your agent\'s wallet';
 
   @override
@@ -1360,32 +1353,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get collabWalletCopied => 'Address copied';
-
-  @override
-  String get collabAgentLabel => 'Agent to hire';
-
-  @override
-  String get collabNoAgents => 'No other agent can be hired right now.';
-
-  @override
-  String get collabInstructionsLabel => 'What should it do?';
-
-  @override
-  String get collabInstructionsHint =>
-      'For example: summarize this article in three bullet points.';
-
-  @override
-  String get collabBudgetLabel => 'Maximum budget (USDC)';
-
-  @override
-  String get collabBudgetInvalid =>
-      'Enter an amount above zero, for example 1.50.';
-
-  @override
-  String get collabHire => 'Hire';
-
-  @override
-  String get collabHiring => 'Starting the hire…';
 
   @override
   String collabProgressTitle(int hireId) {
@@ -1418,9 +1385,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get collabRefunded =>
       'This hire was cancelled and the money went back to your agent.';
-
-  @override
-  String get collabHireAnother => 'Hire again';
 
   @override
   String get collabErrorNotOwned =>
@@ -1555,4 +1519,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hireOpenMyHires => 'My hires';
+
+  @override
+  String get hirePayerTitle => 'Who pays?';
+
+  @override
+  String get hirePayerYou => 'You (your wallet)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'Your agent $name (pays from its own wallet)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name hires this agent and pays $price USDC from its own wallet. You do not need to sign anything.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Hire with $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'Starting the hire…';
+
+  @override
+  String get hireAsAgentInputMissing => 'Write what the agent should do first.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Paid by your agent $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Hire made by your agent';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Connect the wallet that owns this agent to see this hire.';
 }

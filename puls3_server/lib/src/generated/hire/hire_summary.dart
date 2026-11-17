@@ -24,6 +24,8 @@ abstract class HireSummary
     required this.inputPreview,
     this.approvalDeadline,
     required this.needsAction,
+    this.paidByAgentId,
+    this.paidByAgentName,
   });
 
   factory HireSummary({
@@ -35,6 +37,8 @@ abstract class HireSummary
     required String inputPreview,
     DateTime? approvalDeadline,
     required bool needsAction,
+    int? paidByAgentId,
+    String? paidByAgentName,
   }) = _HireSummaryImpl;
 
   factory HireSummary.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -53,6 +57,8 @@ abstract class HireSummary
       needsAction: _is.BoolJsonExtension.fromJson(
         jsonSerialization['needsAction'],
       ),
+      paidByAgentId: jsonSerialization['paidByAgentId'] as int?,
+      paidByAgentName: jsonSerialization['paidByAgentName'] as String?,
     );
   }
 
@@ -78,6 +84,13 @@ abstract class HireSummary
   /// deadline, or reject a funded hire whose run failed to get a refund.
   bool needsAction;
 
+  /// The registry id of the user's Studio agent that hired and paid from its
+  /// own wallet; null for the session wallet's own hires.
+  int? paidByAgentId;
+
+  /// That agent's name, for "Paid by your agent X".
+  String? paidByAgentName;
+
   /// Returns a shallow copy of this [HireSummary]
   /// with some or all fields replaced by the given arguments.
   @_is.useResult
@@ -90,6 +103,8 @@ abstract class HireSummary
     String? inputPreview,
     DateTime? approvalDeadline,
     bool? needsAction,
+    int? paidByAgentId,
+    String? paidByAgentName,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -104,6 +119,8 @@ abstract class HireSummary
       if (approvalDeadline != null)
         'approvalDeadline': approvalDeadline?.toJson(),
       'needsAction': needsAction,
+      if (paidByAgentId != null) 'paidByAgentId': paidByAgentId,
+      if (paidByAgentName != null) 'paidByAgentName': paidByAgentName,
     };
   }
 
@@ -120,6 +137,8 @@ abstract class HireSummary
       if (approvalDeadline != null)
         'approvalDeadline': approvalDeadline?.toJson(),
       'needsAction': needsAction,
+      if (paidByAgentId != null) 'paidByAgentId': paidByAgentId,
+      if (paidByAgentName != null) 'paidByAgentName': paidByAgentName,
     };
   }
 
@@ -141,6 +160,8 @@ class _HireSummaryImpl extends HireSummary {
     required String inputPreview,
     DateTime? approvalDeadline,
     required bool needsAction,
+    int? paidByAgentId,
+    String? paidByAgentName,
   }) : super._(
          id: id,
          agentId: agentId,
@@ -150,6 +171,8 @@ class _HireSummaryImpl extends HireSummary {
          inputPreview: inputPreview,
          approvalDeadline: approvalDeadline,
          needsAction: needsAction,
+         paidByAgentId: paidByAgentId,
+         paidByAgentName: paidByAgentName,
        );
 
   /// Returns a shallow copy of this [HireSummary]
@@ -165,6 +188,8 @@ class _HireSummaryImpl extends HireSummary {
     String? inputPreview,
     Object? approvalDeadline = _Undefined,
     bool? needsAction,
+    Object? paidByAgentId = _Undefined,
+    Object? paidByAgentName = _Undefined,
   }) {
     return HireSummary(
       id: id ?? this.id,
@@ -177,6 +202,10 @@ class _HireSummaryImpl extends HireSummary {
           ? approvalDeadline
           : this.approvalDeadline,
       needsAction: needsAction ?? this.needsAction,
+      paidByAgentId: paidByAgentId is int? ? paidByAgentId : this.paidByAgentId,
+      paidByAgentName: paidByAgentName is String?
+          ? paidByAgentName
+          : this.paidByAgentName,
     );
   }
 }
