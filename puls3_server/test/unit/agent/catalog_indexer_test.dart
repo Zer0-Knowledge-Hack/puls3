@@ -112,6 +112,14 @@ final class _InMemoryIndex implements AgentIndexRepository {
   }
 
   @override
+  Future<AgentSummary?> findByRegistryId(int registryId) async {
+    final agent = rows[registryId];
+    if (agent == null) return null;
+    final newest = await findByAgentId(agent.id);
+    return newest?.registryId == registryId ? agent : null;
+  }
+
+  @override
   Future<Set<int>> registryIds() async => rows.keys.toSet();
 
   @override
