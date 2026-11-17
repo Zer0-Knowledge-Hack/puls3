@@ -2,7 +2,7 @@
 
 `puls3` is the command line for the puls3 API. It is a client of [`puls3_sdk`](../../puls3_sdk/) ([ADR-0007](../adr/0007-developer-sdk.md)), so it uses the same calls and the same errors as the SDK.
 
-**It never signs or submits a transaction.** It reads the catalog today. The hire and Studio commands (`hire get`, `hire prepare-complete` and the rest) wait for the wallet session decision in ADR-0007 and for [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259). To deploy an agent, or to approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
+**It never signs or submits a transaction.** It reads the catalog, and runs an agent manifest locally with your own model credential ([`run`](run-locally.md)). The hire and Studio commands (`hire get`, `hire prepare-complete` and the rest) wait for the wallet session decision in ADR-0007 and for [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259). To deploy an agent, or to approve or reject a hire, use the app at [puls3.org](https://puls3.org/).
 
 ## Run it
 
@@ -19,7 +19,7 @@ The examples below write `puls3` for `dart run bin/puls3.dart`, run from `puls3_
 
 ## Server URL
 
-Every command needs the puls3 server URL. `--api` wins over the environment variable.
+Every catalog command needs the puls3 server URL (`run` does not). `--api` wins over the environment variable.
 
 | Source | Example |
 |---|---|
@@ -78,6 +78,18 @@ An unknown id exits 3 with `error: NotFound: no agent with id <id>`. With `--jso
 
 The JSON fields are fixed: `id`, `registryId`, `name`, `description`, `skills`, `priceUsdcStroops`, `wallet`, `model`, `rating`, `paidHireCount`. Prices are integer stroops (7 decimals); `wallet` and `model` can be `null`.
 
+### `run --manifest <file.json> --input <text>`
+
+Runs an agent from its manifest on your machine, with your own model credential, without the puls3 server and without any transaction. The input can also come from `--input-file <path>` or stdin (`--input -`).
+
+```bash
+export CLOUDFLARE_ACCOUNT_ID=<your account id>
+export CLOUDFLARE_API_TOKEN=<your Workers AI token>
+puls3 run --manifest example/soroban_pre_audit.json --input "pub fn withdraw(...) { ... }"
+```
+
+It prints the agent's output; `--json` prints `{output, model, inputChars, outputChars, elapsedMs}`. See [Run an agent locally](run-locally.md) for the manifest, credentials, limits and its own exit codes (65 invalid manifest or input, 66 unreadable file, 78 missing credential).
+
 ## Output and exit codes
 
 A result goes to stdout. A failure writes one `error: <code>: <message>` line to stderr, plus the usage for a usage error, and nothing to stdout.
@@ -90,6 +102,7 @@ A result goes to stdout. A failure writes one `error: <code>: <message>` line to
 | 64 | `Usage` | Unknown command, missing or extra argument, no server URL, or a URL that is not absolute `http`/`https`. Nothing is sent. |
 | 69 | `Unreachable` | The server did not answer in 20 seconds, or the connection failed (DNS, TLS, socket). |
 | 69 | `AgentCatalogUnavailable` | The server is up but cannot read the catalog. It is never shown as an empty list. |
+| 1, 65, 66, 69, 78 | see [run-locally.md](run-locally.md#errors-and-exit-codes) | `run` failures: provider error, invalid manifest or input, unreadable file, unreachable provider, missing credential. |
 
 A server that was idle can take more than 20 seconds to answer the first call, so one `Unreachable` right after a pause is worth one retry.
 
