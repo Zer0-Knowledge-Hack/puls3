@@ -430,11 +430,40 @@ CHROMEDRIVER=/path/to/chromedriver bash scripts/e2e-flutter-local.sh
 
 The script seeds an agent and a funded consumer wallet
 (`puls3_server/tool/e2e_seed_local.dart`), starts the server on a database of
-its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. Every key is
+its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. The seed
+also stores the agent's key in custody in that database, as a Studio deploy
+does, because the server refuses to hire an agent without it. Every key is
 ephemeral and lives in a temp directory the script removes. The wallet is
 `AutomatedKeyWallet`, a test fixture next to the test. The USDC balance check
 (Horizon on testnet) is stood in for, because the sandbox pays in its native
 token.
+
+#### Browser E2E in Docker (needed on Windows)
+
+On native Windows the run above cannot sign in: Dart's `Platform.environment`
+upper-cases variable names there, so the server never finds
+`SERVERPOD_PASSWORD_walletAuthSigningKey` and the hire fails with "Your wallet
+session ended". Production and CI run Linux, so the journey runs in a Linux
+container instead:
+
+```bash
+# Same services and setup as above; no Flutter, Stellar CLI or Chrome needed.
+bash scripts/e2e-flutter-docker.sh
+```
+
+- The image (`docker/e2e-browser/Dockerfile`) pins Flutter 3.44.4 (Dart
+  3.12.2), Stellar CLI 28.1.0 and Chrome for Testing with its chromedriver,
+  each checked against its SHA-256. It holds no secret.
+- The container joins the compose network and reaches `soroban_standalone`
+  and `postgres_test` by name; it sees a copy of `.env.local-soroban` whose
+  URLs name the service. Only `POSTGRES_TEST_PASSWORD` is passed in.
+- The repository is mounted read-write, but every `.dart_tool/`, `build/` and
+  Flutter `ephemeral/` directory and the pub cache live in named volumes
+  (`puls3-e2e-browser-*`), so the Windows workspace keeps its own artifacts
+  and later runs reuse the Linux ones. Remove them with
+  `docker volume ls -q --filter name=puls3-e2e-browser | xargs docker volume rm`.
+- The scripts run from a copy with `\r` stripped, so a CRLF checkout works.
+- The first run builds the image and compiles the web app (several minutes).
 
 ## Regenerate Serverpod code
 
