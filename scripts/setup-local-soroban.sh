@@ -166,6 +166,18 @@ if [ -z "$SAC_ID" ]; then
   echo "error: could not derive the native SAC id." >&2
   exit 1
 fi
+# A fresh quickstart ledger has no SAC for the native asset: its id can be
+# derived, but `fund` traps with Error(Storage, MissingValue) until the
+# contract is deployed. Deploy it once per ledger.
+if stellar contract info interface --id "$SAC_ID" --network "$NETWORK" >/dev/null 2>&1; then
+  echo "The native SAC is already deployed."
+else
+  echo "Deploying the native SAC..."
+  stellar contract asset deploy \
+    --asset native \
+    --source-account "$IDENTITY" \
+    --network "$NETWORK" >/dev/null
+fi
 
 echo "Allow-listing the native SAC on the escrow..."
 stellar contract invoke \
