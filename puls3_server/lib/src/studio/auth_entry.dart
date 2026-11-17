@@ -72,6 +72,33 @@ AuthEntryView readAuthEntry(String entryXdr) {
   );
 }
 
+/// [entryXdr] with its signature expiration ledger set to [ledger] and every
+/// other byte unchanged.
+///
+/// Simulation in recording mode returns address entries with an expiration
+/// of 0; the signer must set one before signing. Throws [FormatException]
+/// for a source-account entry, a malformed entry or a [ledger] outside u32.
+String withExpirationLedger(String entryXdr, int ledger) {
+  if (ledger < 0 || ledger > 0xFFFFFFFF) {
+    throw FormatException('expiration ledger $ledger is not a uint32');
+  }
+  final bytes = base64Decode(entryXdr);
+  final reader = XdrReader(bytes);
+  if (reader.uint32() == 0) {
+    throw const FormatException('a source-account entry has no expiration');
+  }
+  _accountKey(reader);
+  reader.int64();
+  // The expiration is the next four bytes, big-endian like all XDR.
+  final offset = reader.at;
+  reader.need(4);
+  final copy = Uint8List.fromList(bytes);
+  ByteData.sublistView(copy).setUint32(offset, ledger);
+  // Validate that the rewritten entry still reads as a whole entry.
+  readAuthEntry(base64Encode(copy));
+  return base64Encode(copy);
+}
+
 /// The index of the first address credential in [auth], or null.
 int? addressAuthIndex(List<String> auth) {
   for (var i = 0; i < auth.length; i++) {

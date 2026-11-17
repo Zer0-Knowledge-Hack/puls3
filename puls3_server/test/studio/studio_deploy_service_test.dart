@@ -32,6 +32,12 @@ import '../support/fake_envelope_codec.dart';
 const _owner = 'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H';
 const _agent = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
 
+/// The `latestLedger` the fake simulation reports.
+const _latestLedger = 1000;
+
+/// [_latestLedger] plus 300 s of validity at 5 s a ledger plus 60 ledgers.
+const _expirationLedger = _latestLedger + 60 + 60;
+
 void main() {
   late _Rig rig;
 
@@ -114,12 +120,13 @@ void main() {
 
   test('prepareWalletAuthorization returns the builder auth entry', () async {
     final draftId = await rig.registered();
-    final entry = _addressEntry(rig.owner);
+    final entry = _addressEntry(rig.owner, expiration: 0);
 
     rig.accounts.simulation = SimulationData(
       transactionData: base64Encode(const [1, 2, 3, 4]),
       minResourceFee: 50,
       auth: [_sourceEntry(), entry],
+      latestLedger: _latestLedger,
     );
 
     final row = await rig.service.prepareWalletAuthorization(
@@ -128,11 +135,63 @@ void main() {
     );
 
     expect(row.state, 'awaitingWalletAuthorization');
-    expect(row.authorizationEntryXdr, entry);
-    expect(row.signatureExpirationLedger, 100);
-    expect(readAuthEntry(entry).covers(rig.owner), isTrue);
+    final expected = withExpirationLedger(entry, _expirationLedger);
+    expect(row.authorizationEntryXdr, expected);
+    expect(row.signatureExpirationLedger, _expirationLedger);
+    expect(readAuthEntry(expected).covers(rig.owner), isTrue);
+    final draft = WalletAuthDraft.parse(row.walletAuthJson!);
+    expect(draft.auth, [_sourceEntry(), expected]);
+    expect(draft.builderIndex, 1);
     expect(rig.accounts.simulated.last.function, 'set_agent_wallet');
     expect(rig.accounts.simulated.last.source.value, _agent);
+  });
+
+  test(
+    'the simulated zero expiration becomes the latest ledger plus the window',
+    () async {
+      final draftId = await rig.registered();
+      rig.accounts.simulation = SimulationData(
+        transactionData: base64Encode(const [1, 2, 3, 4]),
+        minResourceFee: 50,
+        auth: [_addressEntry(rig.owner, expiration: 0)],
+        latestLedger: 5000,
+      );
+
+      final row = await rig.service.prepareWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+      );
+
+      // 300 s of validity at 5 s per ledger, plus a 60-ledger margin.
+      expect(row.signatureExpirationLedger, 5000 + 60 + 60);
+      expect(
+        readAuthEntry(row.authorizationEntryXdr!).expirationLedger,
+        5120,
+      );
+    },
+  );
+
+  test('a simulation without the latest ledger is a chain error', () async {
+    final draftId = await rig.registered();
+    rig.accounts.simulation = SimulationData(
+      transactionData: base64Encode(const [1, 2, 3, 4]),
+      minResourceFee: 50,
+      auth: [_addressEntry(rig.owner, expiration: 0)],
+    );
+
+    await expectLater(
+      rig.service.prepareWalletAuthorization(
+        owner: rig.owner,
+        draftId: draftId,
+      ),
+      throwsA(
+        isA<Puls3ApiException>().having(
+          (e) => e.code,
+          'code',
+          'ChainUnavailable',
+        ),
+      ),
+    );
   });
 
   test('a changed invocation is rejected before it is signed', () async {
@@ -142,6 +201,7 @@ void main() {
       transactionData: base64Encode(const [1, 2, 3, 4]),
       minResourceFee: 50,
       auth: [entry],
+      latestLedger: _latestLedger,
     );
     final prepared = await rig.service.prepareWalletAuthorization(
       owner: rig.owner,
@@ -153,7 +213,11 @@ void main() {
         owner: rig.owner,
         draftId: draftId,
         preparationId: prepared.preparationId!,
-        signedAuthorizationEntryXdr: _addressEntry(rig.owner, invocation: 7),
+        signedAuthorizationEntryXdr: _addressEntry(
+          rig.owner,
+          invocation: 7,
+          expiration: _expirationLedger,
+        ),
       ),
       throwsA(
         isA<Puls3ApiException>().having(
@@ -175,6 +239,7 @@ void main() {
         transactionData: base64Encode(const [1, 2, 3, 4]),
         minResourceFee: 50,
         auth: [entry],
+        latestLedger: _latestLedger,
       );
       final prepared = await rig.service.prepareWalletAuthorization(
         owner: rig.owner,
@@ -186,10 +251,18 @@ void main() {
         owner: rig.owner,
         draftId: draftId,
         preparationId: prepared.preparationId!,
-        signedAuthorizationEntryXdr: _signedAddressEntry(rig.owner),
+        signedAuthorizationEntryXdr: _signedAddressEntry(
+          rig.owner,
+          expiration: _expirationLedger,
+        ),
       );
 
       expect(row.state, 'active');
+      expect(rig.assembler.specs.last.function, 'set_agent_wallet');
+      expect(
+        rig.codec.built.last.sim.auth,
+        contains(_signedAddressEntry(rig.owner, expiration: _expirationLedger)),
+      );
       final document = jsonEncode(registrationDocument(rig.validated));
       expect(document.contains(rig.validated.systemPrompt), isFalse);
       expect(document, contains('https://puls3.org'));
@@ -336,27 +409,34 @@ void main() {
 
 String _sourceEntry() => base64Encode((XdrWriter()..uint32(0)).bytes);
 
-String _addressEntry(StellarAddress account, {int invocation = 0x10}) {
+String _addressEntry(
+  StellarAddress account, {
+  int invocation = 0x10,
+  int expiration = 100,
+}) {
   final out = XdrWriter()
     ..uint32(1)
     ..uint32(0)
     ..uint32(0)
     ..opaque(rawKey(account))
     ..int64(9)
-    ..uint32(100)
+    ..uint32(expiration)
     ..uint32(1)
     ..uint32(invocation);
   return base64Encode(out.bytes);
 }
 
-String _signedAddressEntry(StellarAddress account) {
+String _signedAddressEntry(
+  StellarAddress account, {
+  int expiration = 100,
+}) {
   final out = XdrWriter()
     ..uint32(1)
     ..uint32(0)
     ..uint32(0)
     ..opaque(rawKey(account))
     ..int64(9)
-    ..uint32(100)
+    ..uint32(expiration)
     ..uint32(3)
     ..uint32(1)
     ..uint32(0x10);
@@ -457,6 +537,7 @@ final class _Rig {
       transactionData: base64Encode(const [1, 2, 3, 4]),
       minResourceFee: 50,
       auth: [entry],
+      latestLedger: _latestLedger,
     );
     final prepared = await service.prepareWalletAuthorization(
       owner: owner,
@@ -467,7 +548,10 @@ final class _Rig {
       owner: owner,
       draftId: draftId,
       preparationId: prepared.preparationId!,
-      signedAuthorizationEntryXdr: _signedAddressEntry(owner),
+      signedAuthorizationEntryXdr: _signedAddressEntry(
+        owner,
+        expiration: _expirationLedger,
+      ),
     );
     transactions.next = const ChainTx(ChainTxStatus.pending);
     return draftId;

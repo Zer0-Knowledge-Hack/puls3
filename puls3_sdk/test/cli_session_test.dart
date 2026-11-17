@@ -213,6 +213,12 @@ void main() {
     });
   });
 
+  test('close is safe on a session that opened no connection', () async {
+    final session = (await load(seed: 'seed-token'))!;
+    session.close();
+    expect(await session.authHeaderValue, 'Bearer access-1');
+  });
+
   test('a damaged file is no session, not a crash', () async {
     file.writeAsStringSync('not json');
     expect(await load(), isNull);

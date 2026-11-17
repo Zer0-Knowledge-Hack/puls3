@@ -413,6 +413,56 @@ void main() {
       expect(page.events.first.topicJson, hasLength(3));
     });
 
+    test(
+      'an event without inSuccessfulContractCall counts as successful',
+      () async {
+        // Stellar RPC stopped sending the key in 2026-11 (it only returns
+        // events of successful calls). An explicit false is still honored.
+        final client = _client(
+          MockClient(
+            (_) async => _json({
+              'jsonrpc': '2.0',
+              'id': 1,
+              'result': {
+                'latestLedger': 5777565,
+                'cursor': 'c',
+                'events': [
+                  {
+                    'type': 'contract',
+                    'ledger': 5777533,
+                    'contractId':
+                        'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
+                    'topicJson': [
+                      {'symbol': 'metadata_set'},
+                      {'u32': 30},
+                      {'string': 'agentWallet'},
+                    ],
+                    'valueJson': null,
+                  },
+                  {
+                    'type': 'contract',
+                    'ledger': 5777534,
+                    'contractId':
+                        'CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ',
+                    'inSuccessfulContractCall': false,
+                    'topicJson': [
+                      {'symbol': 'metadata_set'},
+                    ],
+                    'valueJson': null,
+                  },
+                ],
+              },
+            }),
+          ),
+        );
+
+        final page = await client.getEvents(startLedger: 5777530);
+
+        expect(page.events.first.inSuccessfulContractCall, isTrue);
+        expect(page.events.last.inSuccessfulContractCall, isFalse);
+      },
+    );
+
     test('a cursor is sent without a startLedger', () async {
       late Map<String, Object?> body;
       final client = _client(

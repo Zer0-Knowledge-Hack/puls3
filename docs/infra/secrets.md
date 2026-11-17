@@ -79,7 +79,11 @@ Access roles: **each developer** (own machine only), **maintainers** (GitHub rep
 | `emailSecretHashPepper`, `jwtHmacSha512PrivateKey`, `jwtRefreshTokenHashPepper`, `serverSideSessionKeyHashPepper` (`SERVERPOD_PASSWORD_<key>`) | Email sign-in hashing and JWT signing (`serverpod_auth_idp`) | `passwords.yaml` / Serverpod Cloud | Developer, maintainers | New random value. Rotating the JWT key logs every user out. Rotating a pepper invalidates pending codes and stored hashes |
 | `mySharedPassword` | Unused Serverpod template entry | `passwords.yaml` (`shared`) | Developer | Not used by the code. Safe to remove |
 
-CI needs no GitHub secret today: `.github/workflows/ci.yml` writes throwaway test passwords, and the gitleaks scan needs none. When a deploy workflow is added, its secrets go into GitHub Actions secrets and are listed here.
+CI needs no GitHub secret: `.github/workflows/ci.yml` writes throwaway test passwords, and the gitleaks scan needs none. The deploy workflow needs one:
+
+| Secret | Purpose | Where it is stored | Who has access | How to rotate |
+|---|---|---|---|---|
+| `SERVERPOD_CLOUD_TOKEN` | `.github/workflows/deploy-server.yml` runs `scloud deploy` for `main` after CI passes | GitHub Actions repository secret. Created with `scloud auth create-token` by a maintainer | GitHub Actions, maintainers | `scloud auth revoke-token`, create a new one and `gh secret set SERVERPOD_CLOUD_TOKEN` |
 
 ### Not secrets
 
