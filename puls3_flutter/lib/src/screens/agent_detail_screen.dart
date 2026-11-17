@@ -78,7 +78,13 @@ class _AgentDetailScreenState extends State<AgentDetailScreen> {
       _agent ??= catalog.byId(id);
     });
     try {
-      final agent = await catalog.fetchAgent(id);
+      var agent = await catalog.fetchAgent(id);
+      // A purely numeric id is the on-chain registry id when no agent has it
+      // as its catalog id (a Studio agent's catalog id is `studio-<draftId>`).
+      final registryId = int.tryParse(id);
+      if (agent == null && registryId != null) {
+        agent = await catalog.agentByRegistryId(registryId);
+      }
       if (!mounted || request != _request) return;
       setState(() {
         _agent = agent;

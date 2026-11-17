@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puls3_flutter/src/data/agent_repository.dart';
+import 'package:puls3_flutter/src/domain/agent.dart';
+import 'package:puls3_flutter/src/screens/agent_detail_screen.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/wallet/mock_wallet.dart';
@@ -19,6 +22,7 @@ void main() {
     Iterable<StudioDraft> drafts = const [],
     StudioGatewayException? listError,
     Size size = const Size(1440, 1000),
+    AgentRepository repository = const InMemoryAgentRepository(testAgents),
   }) async {
     final owner = wallet?.address;
     final studio = FakeStudioGateway(
@@ -34,6 +38,7 @@ void main() {
       wallet: wallet,
       studioGateway: studio,
       size: size,
+      repository: repository,
     );
     return studio;
   }
@@ -119,17 +124,35 @@ void main() {
     expect(find.text('Edit'), findsOneWidget);
   });
 
-  testWidgets('View opens the agent in the Marketplace', (tester) async {
+  testWidgets('View opens the agent by its catalog id, not its registry id', (
+    tester,
+  ) async {
+    // The draft records the on-chain registry id (32); the catalog lists the
+    // agent as `studio-<draftId>`.
     await pumpMyAgents(
       tester,
       wallet: connected(),
+      repository: const InMemoryAgentRepository([
+        Agent(
+          id: 'studio-3',
+          registryId: 32,
+          name: 'Ledger Scout',
+          description: 'Monitors Stellar accounts for you.',
+          skills: ['stellar'],
+          priceUsdcStroops: 5000000,
+          rating: 0,
+          stellarAddress:
+              'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+          model: 'test-model',
+        ),
+      ]),
       drafts: [
         savedDraft(
           3,
           name: 'Ledger Scout',
           state: DraftDeployState.live,
           liveVersion: 1,
-          agentId: 'agt-001',
+          agentId: '32',
         ),
       ],
     );
@@ -137,6 +160,11 @@ void main() {
     await tester.tap(find.byKey(const Key('my-agents-view-3')));
     await advance(tester, const Duration(milliseconds: 400));
 
+    final detail = tester.widget<AgentDetailScreen>(
+      find.byType(AgentDetailScreen),
+    );
+    expect(detail.agentId, 'studio-3');
+    expect(find.text('Agent not found'), findsNothing);
     expect(find.text('Ledger Scout'), findsWidgets);
     expect(find.textContaining('Monitors Stellar accounts'), findsWidgets);
   });
