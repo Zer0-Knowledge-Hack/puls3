@@ -66,3 +66,11 @@ appends the line).
   lookup is not filtered so funded jobs keep settling.
 - 2026-11-17: T2 done (inline): README "Hidden agents" section; `.env.example`
   line appended by the user. `env-inventory.test.sh`: passed 100, failed 0.
+- 2026-11-17: commit 266b32e assessed medium (`slice_budget_reached`);
+  consent granted; native review (reliability lens) approved and acknowledged
+  (`gentle-ai.review-acknowledged/v1`). Advisory follow-ups: no test for the
+  registration-route 404; HireWiring parses the list when built (README says
+  "fails the request"); no test pins the idempotent-repeat order; wiring test
+  does not check a valid list filters the composed reader.
+- Next: T3 needs push + PR + merge, then `scloud variable set
+  PULS3_HIDDEN_AGENT_IDS "15,16"` and redeploy (user decisions).
