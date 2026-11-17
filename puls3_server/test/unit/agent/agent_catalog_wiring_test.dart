@@ -60,4 +60,16 @@ void main() {
 
     expect(reputationCacheBuilds, 1);
   });
+
+  test('the hide list is read from the same environment', () {
+    // A malformed list fails while building, so the reader honors the
+    // injected environment's PULS3_HIDDEN_AGENT_IDS.
+    expect(
+      () => buildAgentCatalogReader(
+        _UnusedSession(),
+        environment: const {'PULS3_HIDDEN_AGENT_IDS': '15,oops'},
+      ),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
 }

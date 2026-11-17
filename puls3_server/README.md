@@ -42,6 +42,22 @@ With no indexed rows and a chain that cannot be read, the on-chain fallback
 throws the serializable `AgentCatalogUnavailable` exception; an outage is never
 an empty list, and an unknown id is never reported as an outage.
 
+## Hidden agents
+
+The Identity Registry has no delete, and anyone can register an agent on
+chain, so the catalog would otherwise show every registered agent. Maintainers
+hide one by listing its registry id:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_HIDDEN_AGENT_IDS` | unset | Comma-separated registry ids, e.g. `15,16`. Unset or blank hides nothing; a malformed id fails the request instead of being ignored |
+
+A hidden agent is left out of `agent.list`, `agent.get` returns `null` for it,
+`createHire` refuses it as `AgentUnavailable`, and its `/registry/<hash>` file
+is a 404. Jobs already funded are not touched: they settle or refund as usual.
+On Serverpod Cloud, change it with
+`scloud variable set PULS3_HIDDEN_AGENT_IDS "15,16"` and redeploy.
+
 ## Agent catalog indexer
 
 A background loop keeps the `agent_record` index in sync with the identity

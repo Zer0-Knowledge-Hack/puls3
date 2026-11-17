@@ -5,6 +5,7 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../agent/agent_catalog_service.dart';
 import '../agent/custodied_wallets.dart';
+import '../agent/hidden_agents.dart';
 import '../agent/registry_reader.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
@@ -27,6 +28,7 @@ class HireService {
     required this.custody,
     required this.config,
     AgentSummaryLookup? agentOf,
+    this.hidden = HiddenAgents.none,
     DateTime Function()? now,
   }) : _agentOf = agentOf,
        _now = now ?? DateTime.now;
@@ -40,6 +42,11 @@ class HireService {
   /// The one custody rule: which payment wallets the server can sign for.
   final CustodyLookup custody;
   final HireRelayConfig config;
+
+  /// The agents maintainers hid. A new hire of one is refused; the lookup
+  /// itself is not filtered, because the relay and `getHire` share it and a
+  /// job already funded must still settle or refund.
+  final HiddenAgents hidden;
   final DateTime Function() _now;
 
   /// Finds the hired agent by registry id. The wiring passes the catalog
@@ -67,6 +74,8 @@ class HireService {
   /// An agent whose payment wallet is not custodied is refused with
   /// [AgentCannotDeliver] before anything is stored: the server could never
   /// sign its `submit`, so the payment would sit in the escrow until expiry.
+  /// A [hidden] agent is refused as [AgentUnavailable], like one the catalog
+  /// does not have.
   Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
@@ -89,6 +98,8 @@ class HireService {
     if (existing != null) {
       return _repeat(existing, consumerAddress, agentId, input);
     }
+
+    if (hidden.contains(agentId)) throw AgentUnavailable(agentId: agentId);
 
     final durationSeconds = config.jobDurationSeconds;
 
