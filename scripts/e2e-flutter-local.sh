@@ -20,20 +20,30 @@
 #   CHROMEDRIVER             chromedriver binary (default: chromedriver on PATH)
 #   PULS3_ENV_FILE           file with POSTGRES_TEST_PASSWORD (default puls3_server/.env)
 #   PULS3_E2E_TIMEOUT_SECONDS  server readiness timeout (default 180)
+#   PULS3_E2E_DB_HOST        test PostgreSQL host (default localhost)
+#   PULS3_E2E_DB_PORT        test PostgreSQL port (default 9090)
+#   PULS3_E2E_DB_CLIENT      compose (default: psql inside postgres_test) or psql
+#                            (a local psql at PULS3_E2E_DB_HOST:PULS3_E2E_DB_PORT)
+#   PULS3_REPO_ROOT          repository root (default: the parent of scripts/)
+#
+# In Docker (Linux toolchain, needed on Windows): scripts/e2e-flutter-docker.sh
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="${PULS3_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SERVER_DIR="$REPO_ROOT/puls3_server"
 FLUTTER_DIR="$REPO_ROOT/puls3_flutter"
 ENV_FILE="${PULS3_ENV_FILE:-$SERVER_DIR/.env}"
 CHROMEDRIVER="${CHROMEDRIVER:-chromedriver}"
 TIMEOUT_SECONDS="${PULS3_E2E_TIMEOUT_SECONDS:-180}"
+DB_HOST="${PULS3_E2E_DB_HOST:-localhost}"
+DB_PORT="${PULS3_E2E_DB_PORT:-9090}"
+DB_CLIENT="${PULS3_E2E_DB_CLIENT:-compose}"
 API_URL="http://localhost:8180/"
 DRIVER_PORT=4444
 
 case "${1:-}" in
   -h | --help)
-    sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   "") ;;
@@ -43,7 +53,15 @@ case "${1:-}" in
     ;;
 esac
 
-for command in dart flutter curl "$CHROMEDRIVER"; do
+case "$DB_CLIENT" in
+  compose) DB_TOOL=docker ;;
+  psql) DB_TOOL=psql ;;
+  *)
+    echo "error: PULS3_E2E_DB_CLIENT is '$DB_CLIENT', not compose or psql." >&2
+    exit 1
+    ;;
+esac
+for command in dart flutter curl "$CHROMEDRIVER" "$DB_TOOL"; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "error: '$command' not found. Install it first (see --help)." >&2
     exit 1
@@ -62,7 +80,15 @@ done
 E2E_DB=puls3_e2e
 COMPOSE=(docker compose -f "$SERVER_DIR/docker-compose.yaml" --env-file "$ENV_FILE")
 db() {
-  "${COMPOSE[@]}" exec -T postgres_test     psql -U postgres -v ON_ERROR_STOP=1 -c "$1" >/dev/null
+  if [ "$DB_CLIENT" = psql ]; then
+    (
+      # shellcheck disable=SC1090
+      . "$ENV_FILE"
+      PGPASSWORD="${POSTGRES_TEST_PASSWORD:?set POSTGRES_TEST_PASSWORD in $ENV_FILE}"         psql -h "$DB_HOST" -p "$DB_PORT" -U postgres -d postgres         -v ON_ERROR_STOP=1 -c "$1" >/dev/null
+    )
+  else
+    "${COMPOSE[@]}" exec -T postgres_test psql -U postgres -v ON_ERROR_STOP=1 -c "$1" >/dev/null
+  fi
 }
 
 WORK="$(mktemp -d)"
@@ -89,8 +115,8 @@ e2e_database_env() {
   # shellcheck disable=SC1090
   . "$ENV_FILE"
   set +a
-  export SERVERPOD_DATABASE_HOST=localhost
-  export SERVERPOD_DATABASE_PORT=9090
+  export SERVERPOD_DATABASE_HOST="$DB_HOST"
+  export SERVERPOD_DATABASE_PORT="$DB_PORT"
   export SERVERPOD_DATABASE_NAME="$E2E_DB"
   export SERVERPOD_DATABASE_USER=postgres
   export SERVERPOD_DATABASE_PASSWORD="${POSTGRES_TEST_PASSWORD:?set POSTGRES_TEST_PASSWORD in $ENV_FILE}"
