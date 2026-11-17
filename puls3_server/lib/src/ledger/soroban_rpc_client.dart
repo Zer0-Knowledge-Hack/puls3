@@ -336,7 +336,9 @@ final class SorobanRpcClient {
           contractId: contractId,
           topicJson: topics,
           valueJson: raw['valueJson'],
-          inSuccessfulContractCall: raw['inSuccessfulContractCall'] == true,
+          // Stellar RPC no longer sends this key (it only returns events of
+          // successful calls), so only an explicit false marks a failure.
+          inSuccessfulContractCall: raw['inSuccessfulContractCall'] != false,
           txHash: raw['txHash'] is String ? raw['txHash'] as String : null,
         ),
       );
