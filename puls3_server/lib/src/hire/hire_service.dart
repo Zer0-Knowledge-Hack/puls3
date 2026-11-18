@@ -73,12 +73,24 @@ class HireService {
   /// sign its `submit`, so the payment would sit in the escrow until expiry.
   /// A Studio agent whose deploy is not `active` (published) is refused the
   /// same way: it has no version the server could run.
+  ///
+  /// [subcontractReserve] (USDC stroops, default 0) is the cap the consumer
+  /// funds beside the price for child jobs (ADR-0011 D1): a hire with one is
+  /// later funded with `fund_with_reserve`, a hire without one with `fund`
+  /// as before. It must be 0 or more and at most the platform ceiling, else
+  /// [HireRequestInvalid]. [allowRelatedParty] (default true) is the
+  /// consumer's related-party choice (D10). Both are part of the request:
+  /// a retry with other values is `IdempotencyKeyReused`.
   Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
     required String input,
     required String requestId,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
   }) async {
+    final reserve = subcontractReserve ?? 0;
+    final relatedParty = allowRelatedParty ?? true;
     final StellarAddress consumerAddress;
     try {
       consumerAddress = StellarAddress.parse(consumer);
@@ -90,10 +102,18 @@ class HireService {
     if (requestId.trim().isEmpty) {
       throw HireRequestInvalid(message: 'requestId must not be blank.');
     }
+    _checkReserve(reserve);
 
     final existing = await hires.findHireByRequest(consumer, requestId);
     if (existing != null) {
-      return _repeat(existing, consumerAddress, agentId, input);
+      return _repeat(
+        existing,
+        consumerAddress,
+        agentId,
+        input,
+        reserve,
+        relatedParty,
+      );
     }
 
     final durationSeconds = config.jobDurationSeconds;
@@ -167,6 +187,8 @@ class HireService {
             expiredAt: expiredAt,
             requestId: requestId,
             input: input,
+            subcontractReserve: reserve,
+            allowRelatedParty: relatedParty,
           ),
           transaction: transaction,
         );
@@ -184,7 +206,33 @@ class HireService {
       // A concurrent call with the same request won the insert.
       final winner = await hires.findHireByRequest(consumer, requestId);
       if (winner == null) rethrow;
-      return _repeat(winner, consumerAddress, agentId, input);
+      return _repeat(
+        winner,
+        consumerAddress,
+        agentId,
+        input,
+        reserve,
+        relatedParty,
+      );
+    }
+  }
+
+  /// Refuses a negative reserve, or one above the platform ceiling. The
+  /// ceiling is read only for a reserve above 0.
+  void _checkReserve(int reserve) {
+    if (reserve < 0) {
+      throw HireRequestInvalid(
+        message: 'subcontractReserve must not be negative.',
+      );
+    }
+    if (reserve == 0) return;
+    final ceiling = config.subcontractReserveMaxStroops;
+    if (reserve > ceiling) {
+      throw HireRequestInvalid(
+        message:
+            'subcontractReserve $reserve is above the platform ceiling '
+            '$ceiling.',
+      );
     }
   }
 
@@ -194,8 +242,13 @@ class HireService {
     StellarAddress consumer,
     int agentId,
     String input,
+    int reserve,
+    bool allowRelatedParty,
   ) async {
-    if (existing.agentId != agentId || existing.input != input) {
+    if (existing.agentId != agentId ||
+        existing.input != input ||
+        existing.subcontractReserve != reserve ||
+        existing.allowRelatedParty != allowRelatedParty) {
       throw Puls3ApiException(code: 'IdempotencyKeyReused');
     }
     return CreateHireResult(

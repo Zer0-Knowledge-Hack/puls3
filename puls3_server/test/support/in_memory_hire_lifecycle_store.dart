@@ -65,6 +65,9 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       escrow: escrow,
       paymentTransaction: row.paymentTransaction,
       status: HireStatus.open,
+      subcontractReserve: row.subcontractReserve,
+      allowRelatedParty: row.allowRelatedParty,
+      parentHireId: row.parentHireId,
     );
     return JobBinding.bound;
   }
@@ -112,6 +115,9 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       escrow: row.escrow,
       paymentTransaction: row.paymentTransaction,
       status: statusOverride[row.id],
+      subcontractReserve: row.subcontractReserve,
+      allowRelatedParty: row.allowRelatedParty,
+      parentHireId: row.parentHireId,
     );
   }
 
@@ -127,5 +133,8 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
     jobId: null,
     paymentTransaction: null,
     status: null,
+    subcontractReserve: hire.subcontractReserve,
+    allowRelatedParty: hire.allowRelatedParty,
+    parentHireId: hire.parentHireId,
   );
 }

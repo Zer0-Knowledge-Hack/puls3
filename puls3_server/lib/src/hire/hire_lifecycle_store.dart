@@ -3,8 +3,9 @@ import 'package:serverpod/serverpod.dart' show Transaction;
 
 import '../generated/protocol.dart' show Hire;
 
-/// A hire to persist. Every field is required: the relay always has an
-/// idempotency key and the consumer's input.
+/// A hire to persist. The relay always has an idempotency key and the
+/// consumer's input. The subcontract fields (ADR-0011) default to a hire
+/// that never subcontracts.
 final class NewHire {
   const NewHire({
     required this.consumer,
@@ -14,6 +15,9 @@ final class NewHire {
     required this.expiredAt,
     required this.requestId,
     required this.input,
+    this.subcontractReserve = 0,
+    this.allowRelatedParty = true,
+    this.parentHireId,
   });
 
   /// StrKey of the session wallet.
@@ -30,6 +34,16 @@ final class NewHire {
   /// Client idempotency key, unique per [consumer].
   final String? requestId;
   final String input;
+
+  /// USDC stroops the consumer funds beside [price] for child jobs
+  /// (`fund_with_reserve`, ADR-0011 D1); 0 never subcontracts.
+  final int subcontractReserve;
+
+  /// Whether the agent may subcontract an agent of the same owner (D10).
+  final bool allowRelatedParty;
+
+  /// The hire whose reserve funds this child hire (D7).
+  final int? parentHireId;
 }
 
 /// A persisted hire as the relay reads it.
@@ -47,6 +61,9 @@ final class HireRow {
     this.escrow,
     required this.paymentTransaction,
     required this.status,
+    this.subcontractReserve = 0,
+    this.allowRelatedParty = true,
+    this.parentHireId,
   });
 
   final int id;
@@ -83,6 +100,16 @@ final class HireRow {
   /// for it.
   final HireStatus? status;
 
+  /// USDC stroops of subcontract reserve (ADR-0011 D1); 0 for a hire that
+  /// never subcontracts, which `fund` pays as before.
+  final int subcontractReserve;
+
+  /// Whether related-party children are allowed (ADR-0011 D10).
+  final bool allowRelatedParty;
+
+  /// The parent hire of a child hire (ADR-0011 D7), or `null`.
+  final int? parentHireId;
+
   /// The client-visible hire: no runtime or feedback fields, which this
   /// store does not track yet.
   Hire toProtocol() => Hire(
@@ -93,6 +120,9 @@ final class HireRow {
     manifestVersion: manifestVersion,
     status: status?.name,
     paymentTransaction: paymentTransaction,
+    subcontractReserve: subcontractReserve,
+    allowRelatedParty: allowRelatedParty,
+    parentHireId: parentHireId,
   );
 }
 

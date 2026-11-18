@@ -45,6 +45,53 @@ void hireLifecycleStoreContract(HireLifecycleStore Function() build) {
     expect(await store.findHire(hire.id), isNotNull);
   });
 
+  test('a hire never subcontracts unless asked (ADR-0011 D1, D10)', () async {
+    final hire = await store.insertHire(_newHire());
+
+    expect(hire.subcontractReserve, 0);
+    expect(hire.allowRelatedParty, isTrue);
+    expect(hire.parentHireId, isNull);
+  });
+
+  test('the subcontract fields survive a bind and a read back', () async {
+    final parent = await store.insertHire(_newHire());
+    final child = await store.insertHire(
+      NewHire(
+        consumer: _bob,
+        agentId: 9,
+        price: 500000,
+        manifestVersion: 1,
+        expiredAt: 1800000000,
+        requestId: 'child-1',
+        input: 'subtask',
+        allowRelatedParty: false,
+        parentHireId: parent.id,
+      ),
+    );
+    final reserved = await store.insertHire(
+      NewHire(
+        consumer: _alice,
+        agentId: 7,
+        price: 5000000,
+        manifestVersion: 1,
+        expiredAt: 1800000000,
+        requestId: 'reserved-1',
+        input: 'summarise this',
+        subcontractReserve: 2000000,
+      ),
+    );
+    await store.bindJob(reserved.id, 41, expiredAt: 1800000000);
+
+    final readChild = (await store.findHire(child.id))!;
+    expect(readChild.parentHireId, parent.id);
+    expect(readChild.allowRelatedParty, isFalse);
+    expect(readChild.subcontractReserve, 0);
+    final readReserved = (await store.findHire(reserved.id))!;
+    expect(readReserved.subcontractReserve, 2000000);
+    expect(readReserved.allowRelatedParty, isTrue);
+    expect(readReserved.jobId, 41);
+  });
+
   test('findHire is null for an unknown hire', () async {
     await store.insertHire(_newHire());
 

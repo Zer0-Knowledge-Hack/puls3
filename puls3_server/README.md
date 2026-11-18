@@ -166,6 +166,7 @@ model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
+| `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS` | none (optional) | The platform ceiling of a hire's subcontract reserve, in USDC stroops (ADR-0011 D1). Read only when `createHire` asks for a reserve above 0: such a hire is funded with `fund_with_reserve` instead of `fund`. A reserve above the ceiling fails with `InvalidHire`; without the setting a reserve fails with `HireConfigurationMissing`, so a deployment without it hires exactly as before. `0` turns subcontracting off. |
 
 The three relay keys have no default, fallback or placeholder. They are read
 when an operation needs them, so a missing, empty, non-integer or out-of-range

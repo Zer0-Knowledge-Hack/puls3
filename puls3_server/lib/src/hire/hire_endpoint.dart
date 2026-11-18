@@ -58,13 +58,19 @@ class HireEndpoint extends Endpoint {
 
   /// Creates the hire of [requestId] for [consumer] and prepares its
   /// `create_job`; repeating the request returns the same hire.
+  ///
+  /// [subcontractReserve] (USDC stroops) and [allowRelatedParty] are the
+  /// consumer's subcontract cap and related-party choice (ADR-0011 D1, D10).
+  /// Left out, the hire never subcontracts, so older clients keep working.
   Future<CreateHireResult> createHire(
     Session session,
     int agentId,
     String consumer,
     String input,
-    String requestId,
-  ) async {
+    String requestId, {
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+  }) async {
     final wallet = await _wallet.requireLogin(session);
     _requireSameWallet(wallet, consumer);
     // Registry ids are the contract's u32 and start at 0 (#291).
@@ -79,6 +85,8 @@ class HireEndpoint extends Endpoint {
         consumer: consumer,
         input: input,
         requestId: requestId,
+        subcontractReserve: subcontractReserve,
+        allowRelatedParty: allowRelatedParty,
       );
     } on AgentUnavailable {
       throw Puls3ApiException(code: 'AgentNotFound');
