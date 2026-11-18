@@ -35,7 +35,6 @@ class Playground extends StatefulWidget {
 class _PlaygroundState extends State<Playground> {
   final _input = TextEditingController();
   final _secret = TextEditingController();
-  final _accountId = TextEditingController();
   PlaygroundStatus _status = PlaygroundStatus.idle;
   TestRunResult? _result;
   String? _error;
@@ -44,7 +43,6 @@ class _PlaygroundState extends State<Playground> {
   void dispose() {
     _input.dispose();
     _secret.dispose();
-    _accountId.dispose();
     super.dispose();
   }
 
@@ -60,14 +58,16 @@ class _PlaygroundState extends State<Playground> {
         if (provider == null) {
           throw StudioUnavailable(l10n.playgroundUnavailable);
         }
-        await widget.gateway.saveProviderCredential(
-          provider: provider,
-          secret: _secret.text,
-          accountId: provider == ModelPolicy.freeProvider
-              ? _accountId.text.trim()
-              : null,
-          owner: widget.owner,
-        );
+        // Free models run on the platform account (#318): no credential is
+        // asked for. Paid providers keep the builder's own key.
+        if (provider != ModelPolicy.freeProvider) {
+          await widget.gateway.saveProviderCredential(
+            provider: provider,
+            secret: _secret.text,
+            accountId: null,
+            owner: widget.owner,
+          );
+        }
       }
       final result = await widget.gateway.testRun(
         widget.draft.draftId,
@@ -144,6 +144,7 @@ class _PlaygroundState extends State<Playground> {
   @override
   Widget build(BuildContext context) {
     final manifest = widget.draft.manifest;
+    final free = manifest.model?.provider == ModelPolicy.freeProvider;
     return PlaygroundPanel(
       inputController: _input,
       inputMaxChars: manifest.inputMaxChars ?? 0,
@@ -155,12 +156,7 @@ class _PlaygroundState extends State<Playground> {
       remainingDailyRuns: _result?.remainingDailyRuns,
       errorMessage: _error,
       isDemo: widget.gateway.isDemo,
-      credentialSecret: widget.gateway.isDemo ? null : _secret,
-      credentialAccountId:
-          widget.gateway.isDemo ||
-              widget.draft.manifest.model?.provider != ModelPolicy.freeProvider
-          ? null
-          : _accountId,
+      credentialSecret: widget.gateway.isDemo || free ? null : _secret,
       onCopy: _copy,
       onClose: widget.onClose,
       onDeploy: widget.onDeploy,

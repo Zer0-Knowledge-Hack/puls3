@@ -1,7 +1,7 @@
-// A hire of a Studio-deployed agent runs the version the builder published,
-// on the builder's own provider credential (#220). The team runner (and with
-// it the team Workers AI token) and the seeded demo manifests are traps here:
-// any call to them fails the test.
+// A hire of a Studio-deployed agent runs the version the builder published.
+// Free `workers-ai` models run on the team account (#318); paid providers run
+// on the builder's own key. The seeded demo manifests are a trap here: any
+// call to them fails the test.
 import 'dart:convert';
 
 import 'package:puls3_domain/puls3_domain.dart';
@@ -28,6 +28,7 @@ const _seededAgent = 13;
 const _workersModel = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const _builderToken = 'builder-cloudflare-token';
 const _builderAccount = 'builderaccount0001';
+const _anthropicKey = 'builder-anthropic-key';
 final _t0 = DateTime.utc(2026, 11, 6, 12);
 
 /// The manifest a seeded demo agent runs. A Studio hire must never get it.
@@ -123,25 +124,32 @@ void main() {
     );
   }
 
-  Future<void> publish(int version, String systemPrompt) => versions.save(
+  Future<void> publish(
+    int version,
+    String systemPrompt, {
+    String provider = 'workers-ai',
+  }) => versions.save(
     AgentVersion(
       registryAgentId: _studioAgent,
       version: version,
       owner: _builder,
-      manifestJson: _published(systemPrompt),
+      manifestJson: _published(systemPrompt, provider: provider),
       updatedAt: _t0,
     ),
   );
 
-  Future<void> saveBuilderCredential({String? accountId = _builderAccount}) =>
-      credentials.save(
-        owner: _builder,
-        credential: BuilderProviderCredential(
-          provider: 'workers-ai',
-          secret: _builderToken,
-          accountId: accountId,
-        ),
-      );
+  Future<void> saveBuilderCredential({
+    String provider = 'anthropic',
+    String secret = _anthropicKey,
+    String? accountId,
+  }) => credentials.save(
+    owner: _builder,
+    credential: BuilderProviderCredential(
+      provider: provider,
+      secret: secret,
+      accountId: accountId,
+    ),
+  );
 
   /// A funded hire of [agentId] pinned to [version], queued for the runner.
   int fundedHire({required int agentId, int version = 1}) {
@@ -189,10 +197,14 @@ void main() {
     clock = _t0;
   });
 
-  test('a Studio hire runs the published version on the builder credential, '
-      'never on the team token or a seed manifest', () async {
+  test('a free-model Studio hire runs the published version on the team '
+      'token, never on a builder credential or a seed manifest', () async {
     await publish(1, 'You rewrite one paragraph in a calmer voice.');
-    await saveBuilderCredential();
+    await saveBuilderCredential(
+      provider: 'workers-ai',
+      secret: _builderToken,
+      accountId: _builderAccount,
+    );
     final id = fundedHire(agentId: _studioAgent);
 
     final summary = await pass();
@@ -200,24 +212,42 @@ void main() {
     expect(summary.succeeded, 1);
     final run = await runs.find(id);
     expect(run!.state, HireRunState.succeeded);
-    expect(run.result, 'answered on the builder account');
+    expect(run.result, 'answered on the team token');
 
-    final (task, credential) = builderCalls.single;
+    final task = team.tasks.single;
     expect(task.systemPrompt, 'You rewrite one paragraph in a calmer voice.');
     expect(task.modelId, _workersModel);
     expect(task.input, 'Make this calmer: WHY IS IT LATE');
-    expect(credential.secret, _builderToken);
-    expect(credential.accountId, _builderAccount);
 
-    expect(team.tasks, isEmpty, reason: 'the team token was used');
+    expect(builderCalls, isEmpty, reason: 'the builder credential was used');
     expect(seeded.lookups, isEmpty, reason: 'a seed manifest was looked up');
+  });
+
+  test('a paid-provider Studio hire runs on the builder credential', () async {
+    await publish(
+      1,
+      'You rewrite one paragraph in a calmer voice.',
+      provider: 'anthropic',
+    );
+    await saveBuilderCredential();
+    final id = fundedHire(agentId: _studioAgent);
+
+    final summary = await pass();
+
+    expect(summary.succeeded, 1);
+    expect((await runs.find(id))!.result, 'answered on the builder account');
+
+    final (task, credential) = builderCalls.single;
+    expect(task.systemPrompt, 'You rewrite one paragraph in a calmer voice.');
+    expect(credential.secret, _anthropicKey);
+    expect(team.tasks, isEmpty, reason: 'the team runner was used');
+    expect(seeded.lookups, isEmpty);
   });
 
   test('each hire runs the version it pinned: a new version does not change '
       'an earlier hire', () async {
     await publish(1, 'You answer as version one of this agent.');
     await publish(2, 'You answer as version two of this agent.');
-    await saveBuilderCredential();
     final before = fundedHire(agentId: _studioAgent, version: 1);
     final after = fundedHire(agentId: _studioAgent, version: 2);
 
@@ -226,13 +256,13 @@ void main() {
     expect((await runs.find(before))!.state, HireRunState.succeeded);
     expect((await runs.find(after))!.state, HireRunState.succeeded);
     expect(
-      builderCalls.map((call) => call.$1.systemPrompt),
+      team.tasks.map((task) => task.systemPrompt),
       [
         'You answer as version one of this agent.',
         'You answer as version two of this agent.',
       ],
     );
-    expect(team.tasks, isEmpty);
+    expect(builderCalls, isEmpty);
   });
 
   /// Runs passes past every retry backoff until the run of [id] is no
@@ -247,9 +277,13 @@ void main() {
     return (await runs.find(id))!;
   }
 
-  test('without a builder credential the run is retried and then fails; the '
-      'team token is never a fallback', () async {
-    await publish(1, 'You rewrite one paragraph in a calmer voice.');
+  test('without a paid-provider credential the run is retried and then '
+      'fails; the team token is never a fallback', () async {
+    await publish(
+      1,
+      'You rewrite one paragraph in a calmer voice.',
+      provider: 'anthropic',
+    );
     final id = fundedHire(agentId: _studioAgent);
 
     final first = await pass();
@@ -270,7 +304,11 @@ void main() {
   test(
     'a credential saved after the first attempt is used on the retry',
     () async {
-      await publish(1, 'You rewrite one paragraph in a calmer voice.');
+      await publish(
+        1,
+        'You rewrite one paragraph in a calmer voice.',
+        provider: 'anthropic',
+      );
       final id = fundedHire(agentId: _studioAgent);
       await pass();
       expect((await runs.find(id))!.state, HireRunState.queued);
@@ -280,31 +318,22 @@ void main() {
 
       expect(run.state, HireRunState.succeeded);
       expect(run.result, 'answered on the builder account');
-      expect(builderCalls.single.$2.secret, _builderToken);
+      expect(builderCalls.single.$2.secret, _anthropicKey);
       expect(team.tasks, isEmpty);
     },
   );
 
-  test('a Workers AI credential without its account id is not used', () async {
-    await publish(1, 'You rewrite one paragraph in a calmer voice.');
-    await saveBuilderCredential(accountId: null);
-    final id = fundedHire(agentId: _studioAgent);
-
-    final run = await runUntilSettled(id);
-
-    expect(run.failureReason, 'unsupported_provider');
-    expect(builderCalls, isEmpty);
-    expect(team.tasks, isEmpty);
-  });
-
   test("another builder's credential is not used", () async {
-    await publish(1, 'You rewrite one paragraph in a calmer voice.');
+    await publish(
+      1,
+      'You rewrite one paragraph in a calmer voice.',
+      provider: 'anthropic',
+    );
     await credentials.save(
       owner: _consumer,
       credential: const BuilderProviderCredential(
-        provider: 'workers-ai',
-        secret: 'someone-else-token',
-        accountId: _builderAccount,
+        provider: 'anthropic',
+        secret: 'someone-else-key',
       ),
     );
     final id = fundedHire(agentId: _studioAgent);

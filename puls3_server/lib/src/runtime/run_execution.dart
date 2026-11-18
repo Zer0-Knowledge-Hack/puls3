@@ -21,12 +21,15 @@ typedef BuilderRun =
       BuilderProviderCredential credential,
     );
 
-/// How [HireRunner] executes a manifest (#220):
+/// How [HireRunner] executes a manifest (#220, #318):
 ///
-/// - an [OwnedRunManifest] (a Studio deploy) runs on its owner's credential
-///   from [credentials], through [builder]. The [team] runner and its team
-///   Workers AI token are never used for it, and a missing or incomplete
-///   credential fails the run as [RuntimeUnsupportedProvider];
+/// - a free-provider (`workers-ai`) manifest runs on [team], the platform's
+///   Workers AI account, whether it is a Studio deploy or a seeded agent. A
+///   builder does not need a Cloudflare account for it;
+/// - any other [OwnedRunManifest] (a paid provider, for example Anthropic)
+///   runs on its owner's credential from [credentials], through [builder];
+///   a missing or incomplete credential fails the run as
+///   [RuntimeUnsupportedProvider];
 /// - any other manifest (a seeded demo agent) runs on [team].
 Future<String> Function(RunManifest manifest, String input) runExecutor({
   required AgentRunner team,
@@ -34,7 +37,10 @@ Future<String> Function(RunManifest manifest, String input) runExecutor({
   BuilderRun builder = runBuilderTask,
 }) {
   return (manifest, input) async {
-    if (manifest is! OwnedRunManifest) return team.run(manifest.task(input));
+    if (manifest is! OwnedRunManifest ||
+        manifest.provider == WorkersAiRuntime.provider) {
+      return team.run(manifest.task(input));
+    }
     final credential = await _ownerCredential(manifest, credentials);
     return builder(manifest.task(input), credential);
   };
@@ -49,15 +55,19 @@ typedef BuilderLease =
 
 /// The [RunnerLease] of the tool loop, with [runExecutor]'s routing: an
 /// [OwnedRunManifest] holds its conversation on its owner's credential
-/// through [builder], and fails as [RuntimeUnsupportedProvider] without
-/// one; any other manifest runs on [team].
+/// through [builder], and fails as [RuntimeUnsupportedProvider] without one;
+/// a free-provider (`workers-ai`) manifest and any other non-owned manifest
+/// run on [team].
 RunnerLease runnerLease({
   required AgentRunner team,
   required BuilderCredentialLookup credentials,
   BuilderLease builder = withBuilderRunner,
 }) {
   return (manifest, body) async {
-    if (manifest is! OwnedRunManifest) return body(team);
+    if (manifest is! OwnedRunManifest ||
+        manifest.provider == WorkersAiRuntime.provider) {
+      return body(team);
+    }
     final credential = await _ownerCredential(manifest, credentials);
     return builder(credential, body);
   };

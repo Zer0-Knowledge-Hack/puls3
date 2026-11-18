@@ -3,6 +3,10 @@ import 'studio_test_errors.dart';
 /// Free test runs per builder per UTC day (ADR-0004 decision 6, spike #33).
 const studioDailyTestRuns = 20;
 
+/// Paid test runs per Studio agent (draft) per UTC day during the SOW testing
+/// phase (#318). It bounds a builder's provider bill.
+const studioDailyPaidRunsPerAgent = 10;
+
 /// Counts test runs. A reservation is spent even when the model then fails,
 /// because the builder's provider may already have been called.
 abstract interface class TestRunQuota {
@@ -28,5 +32,39 @@ final class MemoryTestRunQuota implements TestRunQuota {
     }
     _used[key] = used + 1;
     return studioDailyTestRuns - used - 1;
+  }
+}
+
+/// The paid-run cap of one Studio agent (draft) on one UTC day.
+abstract interface class PaidRunQuota {
+  /// Reserves one paid test run for [owner] and [draftId] on the UTC day of
+  /// [now]. Throws [StudioTestQuotaExceeded] when the agent's day is full.
+  Future<void> reserve({
+    required String owner,
+    required int draftId,
+    required DateTime now,
+  });
+}
+
+/// In-memory [PaidRunQuota]. One server process shares one instance; a
+/// restart clears it, like the free quota.
+final class MemoryPaidRunQuota implements PaidRunQuota {
+  final Map<String, int> _used = {};
+
+  @override
+  Future<void> reserve({
+    required String owner,
+    required int draftId,
+    required DateTime now,
+  }) async {
+    final utc = now.toUtc();
+    final key = '$owner|$draftId|${utc.year}-${utc.month}-${utc.day}';
+    final used = _used[key] ?? 0;
+    if (used >= studioDailyPaidRunsPerAgent) {
+      throw StudioTestQuotaExceeded(
+        DateTime.utc(utc.year, utc.month, utc.day + 1),
+      );
+    }
+    _used[key] = used + 1;
   }
 }

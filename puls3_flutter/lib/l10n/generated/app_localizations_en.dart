@@ -1030,6 +1030,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playgroundLiveLead => 'Test runs are free and limited per day.';
 
   @override
+  String get playgroundAdvanced => 'Advanced';
+
+  @override
   String get playgroundProviderToken => 'Provider token';
 
   @override
@@ -1046,9 +1049,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get playgroundProviderUnsupported =>
       'This provider is not supported. Pick another model.';
-
-  @override
-  String get playgroundAccountId => 'Cloudflare account id';
 
   @override
   String get playgroundRunning => 'Running… It stops at the runtime timeout.';

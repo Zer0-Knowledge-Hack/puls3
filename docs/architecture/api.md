@@ -373,7 +373,7 @@ Every numbered row in [the merged MVP flows](../blueprints/flows.md) appears onc
 | Step | API mapping |
 |---|---|
 | F4-1 | Client validation mirrors ADR-0004; `StudioEndpoint.saveDraft` performs authoritative validation. |
-| F4-2 | `StudioEndpoint.testRun(draftId, input)`. |
+| F4-2 | `StudioEndpoint.testRun(draftId, input)`. A free `workers-ai` draft runs on the platform Workers AI account (#318) and needs no credential; `CredentialMissing` applies to paid providers. |
 | F4-3 | Client-only navigation; if needed, run F1 before continuing. |
 | F4-4 | `StudioEndpoint.prepareDeploy(draftId, builder)` stores the immutable version and hash and creates the agent wallet. `AgentWalletCreationFailed`: retry the same call. |
 | F4-5 | `StudioEndpoint.prepareDeploy` idempotently checks `agent_id_by_uri`: it resumes an owned registration (`awaitingWalletAuthorization`), or rotates a conflicting URI and prepares `register_full` for the new one. |

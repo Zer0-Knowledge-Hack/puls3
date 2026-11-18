@@ -1047,6 +1047,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Las pruebas son gratis y tienen un límite por día.';
 
   @override
+  String get playgroundAdvanced => 'Avanzado';
+
+  @override
   String get playgroundProviderToken => 'Token del proveedor';
 
   @override
@@ -1063,9 +1066,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get playgroundProviderUnsupported =>
       'Este proveedor no es compatible. Elige otro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id de cuenta de Cloudflare';
 
   @override
   String get playgroundRunning =>

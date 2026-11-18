@@ -43,9 +43,10 @@ typedef AgentHireReader =
 /// Drafts and test runs for the signed-in builder (api.md, `StudioEndpoint`).
 ///
 /// The owner is the session wallet. A draft's prompt is returned only to
-/// that wallet. A test run uses the builder's provider credential, never
-/// the team Workers AI token, and it creates no hire. Deploy prepares
-/// `register_full` and `set_agent_wallet` for the same wallet to sign.
+/// that wallet. A test run of a paid provider uses the builder's credential;
+/// a free `workers-ai` run uses the platform account (#318). Neither creates
+/// a hire. Deploy prepares `register_full` and `set_agent_wallet` for the
+/// same wallet to sign.
 class StudioEndpoint extends Endpoint {
   static SessionWallet? _sessionWallet;
   static StudioDraftService Function(Session session)? _services;
@@ -53,6 +54,15 @@ class StudioEndpoint extends Endpoint {
   static StudioDeployService Function(Session session)? _deploys;
   static StudioDeployWiring? _deployWiring;
   static final MemoryTestRunQuota _quota = MemoryTestRunQuota();
+  static final MemoryPaidRunQuota _paidQuota = MemoryPaidRunQuota();
+
+  static StudioTeamTestRunner? _teamTestRunner;
+
+  /// Runs free-model (`workers-ai`) test runs on the platform Workers AI
+  /// account (#318). The composition root sets it from the team account and
+  /// `workersAiApiToken`; null makes a free test run `RuntimeUnavailable`.
+  static set teamTestRunner(StudioTeamTestRunner? runner) =>
+      _teamTestRunner = runner;
   static BuilderCredentialStore Function(Session session)? _credentialStores;
   static SecretCipher? _credentialCipher;
   static StudioDeployStore Function(Session session)? _deployStores;
@@ -127,8 +137,8 @@ class StudioEndpoint extends Endpoint {
   }
 
   /// The builder credentials in [session]'s database (#235), encrypted with
-  /// the custody key. Test runs and every hire of a Studio agent read this
-  /// store, never the team provider token.
+  /// the custody key. Paid test runs and every paid hire of a Studio agent
+  /// read this store. Free `workers-ai` runs use the team account instead.
   ///
   /// Throws [StudioRuntimeUnavailable] when `PULS3_AGENT_WALLET_SECRET_KEY`
   /// is missing or invalid: no credential is stored in plain text or in
@@ -206,9 +216,13 @@ class StudioEndpoint extends Endpoint {
     return StudioTestRunService(
       drafts: _serviceOn(session),
       quota: _quota,
+      paidQuota: _paidQuota,
       credentials: credentialsOn(session),
       policy: studioServerModelPolicy,
       run: runBuilderTask,
+      runTeam:
+          _teamTestRunner ??
+          (_) async => throw const StudioRuntimeUnavailable(),
     );
   }
 
