@@ -42,9 +42,11 @@ services:
   # Ephemeral local Stellar network (#253): core, Horizon, RPC and Friendbot on
   # 8000. `--local` is the current quickstart name for a standalone network;
   # the passphrase is "Standalone Network ; February 2017". Run
-  # scripts/setup-local-soroban.sh after this is healthy.
+  # scripts/setup-local-soroban.sh after this is healthy. The image is pinned by
+  # digest so CI (e2e.yml, #298) and local runs use the same node; refresh it on
+  # purpose with `docker buildx imagetools inspect stellar/quickstart:testing`.
   soroban_standalone:
-    image: stellar/quickstart:testing
+    image: stellar/quickstart:testing@sha256:d66ab2ea3ac665739e595ab0cebca54619c008485fab547d220bc43b082d13d7
     ports:
       - "8000:8000"
     command: ["--local", "--enable", "core,horizon,rpc"]
