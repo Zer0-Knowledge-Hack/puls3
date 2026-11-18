@@ -268,13 +268,17 @@ void main() {
       },
     );
     final credentials = MemoryBuilderCredentialStore();
-    StudioTestRunService runs({StudioTestRunner? run}) => StudioTestRunService(
+    StudioTestRunService runs({
+      StudioTestRunner? run,
+      StudioTeamTestRunner? runTeam,
+    }) => StudioTestRunService(
       drafts: StudioDraftService(drafts),
       quota: MemoryTestRunQuota(),
       credentials: credentials,
       policy: studioServerModelPolicy,
       now: () => DateTime.utc(2026, 10, 14, 15),
       run: run ?? (task, credential) async => 'five bullets',
+      runTeam: runTeam ?? (task) async => 'five bullets',
     );
     StudioEndpoint.testRuns = (_) => runs();
     await runs().saveCredential(
@@ -292,7 +296,7 @@ void main() {
     expect('$result', isNot(contains(secretPrompt)));
 
     StudioEndpoint.testRuns = (_) => runs(
-      run: (task, credential) async {
+      runTeam: (task) async {
         throw const RuntimeProviderFailed(status: 503, errorType: 'down');
       },
     );
@@ -323,8 +327,8 @@ void main() {
           },
         ],
         'model': {
-          'provider': 'workers-ai',
-          'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          'provider': 'anthropic',
+          'id': 'claude-haiku-5-5',
         },
         'system_prompt': prompt,
         'input': {'type': 'text', 'max_chars': 100},
@@ -338,6 +342,7 @@ void main() {
       credentials: MemoryBuilderCredentialStore(),
       policy: studioServerModelPolicy,
       run: (task, credential) async => 'no',
+      runTeam: (task) async => 'no',
     );
     await expectLater(
       () => endpoint.testRun(session, saved.draftId, 'Hi'),
@@ -358,6 +363,7 @@ void main() {
       credentials: MemoryBuilderCredentialStore(),
       policy: studioServerModelPolicy,
       run: (task, credential) async => 'no',
+      runTeam: (task) async => 'no',
     );
     await expectLater(
       () => endpoint.saveProviderCredential(
@@ -383,6 +389,7 @@ void main() {
       credentials: MemoryBuilderCredentialStore(),
       policy: studioServerModelPolicy,
       run: (task, credential) async => 'no',
+      runTeam: (task) async => 'no',
     );
     await expectLater(
       () => endpoint.saveProviderCredential(
@@ -412,8 +419,8 @@ void main() {
             {'id': 'rewrite', 'name': 'Rewrite'},
           ],
           'model': {
-            'provider': 'workers-ai',
-            'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+            'provider': 'anthropic',
+            'id': 'claude-haiku-5-5',
           },
           'system_prompt': prompt,
           'input': {'type': 'text', 'max_chars': 100},
@@ -433,13 +440,14 @@ void main() {
           used = credential;
           return 'ok';
         },
+        runTeam: (task) async => 'ok',
       );
 
       await endpoint.saveProviderCredential(
         session,
-        'workers-ai',
+        'anthropic',
         'builder-token',
-        'builder-account',
+        null,
       );
       await endpoint.testRun(session, saved.draftId, 'Hi');
 
@@ -447,9 +455,9 @@ void main() {
       expect(
         (await credentials.find(
           owner: owner,
-          provider: 'workers-ai',
+          provider: 'anthropic',
         ))!.accountId,
-        'builder-account',
+        isNull,
       );
     });
 

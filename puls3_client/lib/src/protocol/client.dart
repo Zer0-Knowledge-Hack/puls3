@@ -418,9 +418,10 @@ class EndpointHire extends _isc.EndpointRef {
 /// Drafts and test runs for the signed-in builder (api.md, `StudioEndpoint`).
 ///
 /// The owner is the session wallet. A draft's prompt is returned only to
-/// that wallet. A test run uses the builder's provider credential, never
-/// the team Workers AI token, and it creates no hire. Deploy prepares
-/// `register_full` and `set_agent_wallet` for the same wallet to sign.
+/// that wallet. A test run of a paid provider uses the builder's credential;
+/// a free `workers-ai` run uses the platform account (#318). Neither creates
+/// a hire. Deploy prepares `register_full` and `set_agent_wallet` for the
+/// same wallet to sign.
 /// {@category Endpoint}
 class EndpointStudio extends _isc.EndpointRef {
   EndpointStudio(_isc.EndpointCaller caller) : super(caller);

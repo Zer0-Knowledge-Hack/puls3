@@ -107,9 +107,10 @@ final class Puls3Sdk {
     return _hireApi('prepareReject').prepareReject(hireId, reason.trim());
   }
 
-  /// Runs the session wallet's saved draft [draftId] once on [input], with
-  /// the builder's own provider credential (`StudioEndpoint.testRun`). No hire
-  /// and no payment.
+  /// Runs the session wallet's saved draft [draftId] once on [input]
+  /// (`StudioEndpoint.testRun`). A free `workers-ai` model runs on the
+  /// platform account and needs no credential; a paid provider uses the
+  /// builder's own key saved in the Studio. No hire and no payment.
   ///
   /// Throws [ArgumentError] for an id below 1 or a blank [input], and
   /// [SessionRequired] without a session, without calling the server.

@@ -12,9 +12,9 @@ This guide takes a builder from an empty Studio to an agent that a hirer can pay
 |---|---|---|
 | [Freighter](https://www.freighter.app/) set to **Testnet** | It signs the sign-in challenge and both deploy steps. puls3 never sees your secret key | Install the extension, create or import an account, switch the network to Testnet |
 | Testnet XLM on that account | Pays the network fee of the registration transaction | [Friendbot](https://laboratory.stellar.org/#account-creator?network=test), or `stellar keys fund <name> --network testnet` |
-| A Cloudflare account with Workers AI | Your agent runs on **your** Workers AI account, in test runs and in every paid hire. puls3 never uses its own token for your agent | In the Cloudflare dashboard, copy your **account id** and create an **API token** with Workers AI read and run permission |
+| A provider key only for a paid model | The free Llama model runs on **puls3's** Workers AI account, so it needs no provider account or token. Anthropic models use your own key | For Anthropic, create a key in the Anthropic console |
 
-The free model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast` on Workers AI. Anthropic models use your own Anthropic key in the same way.
+The free model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast` on Workers AI. It runs on puls3's account. Anthropic models use your own key.
 
 ## 1. Connect and sign in
 
@@ -39,19 +39,19 @@ The system prompt stays private. It is stored with the draft and never goes on c
 
 Saved drafts appear in **My agents** (`/studio/agents`) under Drafts.
 
-## 3. Store the Workers AI credential and test-run
+## 3. Test-run the draft
 
-**Screen:** the test run panel in the Studio, next to the form. Enter your **Provider token** and your **Cloudflare account id**, write a sample task, and press **Run**.
+**Screen:** the test run panel in the Studio, next to the form. Write a sample task and press **Run**. The free model needs no credential. If you chose a paid provider, enter your key under **Advanced** first; that field only appears for paid models.
 
-- **Endpoints:** `StudioEndpoint.saveProviderCredential` stores the token for your wallet, then `StudioEndpoint.testRun` runs the saved draft once.
-- **What you get:** the model output, labelled "Test run: not paid, nothing on chain", and "N runs left today". Test runs are free and limited to 20 per wallet per UTC day; after that you see "You used today's test runs. They reset at HH:MM."
+- **Endpoints:** `StudioEndpoint.testRun` runs the saved draft once. For a paid provider the app first calls `StudioEndpoint.saveProviderCredential`.
+- **What you get:** the model output, labelled "Test run: not paid, nothing on chain", and "N runs left today". Test runs are limited to 20 per wallet per UTC day; after that you see "You used today's test runs. They reset at HH:MM." A paid agent also stops at 10 paid test runs per UTC day.
 - **The token is write-only.** The server never returns it, and the app does not show it again.
 
-**When the credential is missing or incomplete** (no token, or a Workers AI token without the account id), the server answers `RuntimeUnavailable` and the panel shows **"Save your provider credential, then run the draft again."** Enter both fields and run again. A token that is saved but wrong reaches Cloudflare and comes back as "The test run failed".
+**When a paid credential is missing or invalid**, the server answers `CredentialMissing` or `CredentialInvalid` and the panel says to save a valid provider credential. The free Llama model never asks for one.
 
-> **Known limit ([#249](https://github.com/Zer0-Knowledge-Hack/puls3/issues/249)).** The server sends the same `RuntimeUnavailable` when it rejects the credential you are saving (for example a Workers AI token without the account id), and, once #233 lands, when the server has no key to store credentials. The panel then also asks you to save your credential. If it persists after you entered both fields, the problem is on the server side; report it with the time of the attempt. #249 gives each case its own message.
+> **Known limit ([#249](https://github.com/Zer0-Knowledge-Hack/puls3/issues/249)).** The server sends the same `RuntimeUnavailable` when it cannot store a credential. The panel then also asks you to save your credential. If it persists after you entered it, the problem is on the server side; report it with the time of the attempt. #249 gives each case its own message.
 
-Once [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233) lands, the server stores the token encrypted in its database, with the same key that protects the agents' custodied wallets ([#235](https://github.com/Zer0-Knowledge-Hack/puls3/issues/235)), so it survives restarts and redeploys and you save it once. Until then it is kept in memory: after a server restart or redeploy, save it again. Saving again replaces it.
+Since [#235](https://github.com/Zer0-Knowledge-Hack/puls3/pull/235) the server stores a paid-provider key encrypted in its database, with the same key that protects the agents' custodied wallets, so it survives restarts and redeploys and you save it once. Saving again replaces it.
 
 ## 4. Deploy on testnet
 
@@ -103,11 +103,11 @@ The hire flow is the same for a Studio agent and a demo agent. This guide does n
 - **Submit:** after the run, the server signs `submit` with the agent's custodied wallet. That is [#208](https://github.com/Zer0-Knowledge-Hack/puls3/issues/208).
 - **Complete and rate:** the hirer approves on the hire page (`/hires/<id>`) and can then rate the agent. Rating is [#211](https://github.com/Zer0-Knowledge-Hack/puls3/issues/211).
 
-What is specific to a Studio agent: the paid run uses **your** published version and **your** Workers AI credential, never the team token ([#220](https://github.com/Zer0-Knowledge-Hack/puls3/issues/220); the "What a funded hire runs" section of [`hire-lifecycle.md`](../domain/hire-lifecycle.md) and the test that locks this land with [#233](https://github.com/Zer0-Knowledge-Hack/puls3/pull/233)). If your credential is missing when the hire runs, the run is retried for about ten minutes and then fails as `unsupported_provider`. The hirer then sees a failed run and can reject it for a refund. You are not paid.
+What is specific to a Studio agent: the paid run uses **your** published version. A free `workers-ai` model runs on puls3's Workers AI account; a paid provider (for example Anthropic) uses **your** own key. If a paid credential is missing when the hire runs, the run is retried for about ten minutes and then fails as `unsupported_provider`. The hirer then sees a failed run and can reject it for a refund. You are not paid.
 
 ## Checklist for a reviewer
 
-1. Freighter on Testnet with XLM; a Cloudflare account id and Workers AI token.
+1. Freighter on Testnet with XLM. The free Llama model needs no provider account; an Anthropic key only if you choose a paid model.
 2. Save a draft at [puls3.org/studio](https://puls3.org/studio): "Saved · revision 1".
 3. Run one test run: real model output and "19 runs left today".
 4. Deploy: two Freighter prompts, then "Agent deployed". Note the registration transaction hash.

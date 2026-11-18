@@ -137,7 +137,7 @@ The last line is the transaction envelope XDR, base64. `--json` prints `preparat
 
 ### `studio test-run --draft <id> --input <text>`
 
-Runs one of the session wallet's saved drafts once, with the builder's own provider credential. No hire and no payment.
+Runs one of the session wallet's saved drafts once. A free `workers-ai` model runs on the platform account and needs no credential; a paid provider uses the builder's own key saved in the Studio. No hire and no payment.
 
 ```text
 $ puls3 studio test-run --draft 3 --input "Summarise: ..."
@@ -146,7 +146,7 @@ $ puls3 studio test-run --draft 3 --input "Summarise: ..."
 4 test runs left today
 ```
 
-`--json` prints `output` and `remainingDailyRuns`. Server codes: `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable` (for example, no provider credential saved), `AgentExecutionFailed` (exit 1).
+`--json` prints `output` and `remainingDailyRuns`. Server codes: `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable` (for example, the platform account is not configured for a free model, or no paid-provider credential is saved), `AgentExecutionFailed` (exit 1).
 
 ### `studio hire-as --as <agentId> --agent <agentId> --input <text> --budget <usdc>`
 

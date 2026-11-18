@@ -198,8 +198,9 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
             session,
           ).find(owner: owner, provider: provider);
         } on StudioRuntimeUnavailable {
-          // No custody key: no credential can be read, so the run fails as
-          // a missing credential. It never falls back to the team token.
+          // No custody key: a paid provider's credential cannot be read, so
+          // the run fails as a missing credential. It never falls back to the
+          // team token. A free `workers-ai` manifest never gets here.
           return null;
         } finally {
           await session.close();

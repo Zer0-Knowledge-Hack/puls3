@@ -43,7 +43,6 @@ class PlaygroundPanel extends StatelessWidget {
     this.onClose,
     this.onDeploy,
     this.credentialSecret,
-    this.credentialAccountId,
   });
 
   final TextEditingController inputController;
@@ -72,17 +71,13 @@ class PlaygroundPanel extends StatelessWidget {
   /// Opens the deploy sheet (F4); null hides the action.
   final VoidCallback? onDeploy;
 
-  /// The builder's provider token. Null hides the field (the demo).
+  /// The builder's provider token. Null hides the field (demo or free model).
   final TextEditingController? credentialSecret;
-
-  /// Cloudflare account id. Null hides the field.
-  final TextEditingController? credentialAccountId;
 
   @override
   Widget build(BuildContext context) {
     final running = status == PlaygroundStatus.running;
     final credentialSecret = this.credentialSecret;
-    final credentialAccountId = this.credentialAccountId;
     return Container(
       key: const Key('playground-panel'),
       padding: const EdgeInsets.all(Puls3Spacing.md),
@@ -115,6 +110,8 @@ class PlaygroundPanel extends StatelessWidget {
           ),
           const SizedBox(height: Puls3Spacing.sm),
           if (credentialSecret != null) ...[
+            SectionLabel(context.l10n.playgroundAdvanced),
+            const SizedBox(height: Puls3Spacing.xs),
             TextField(
               key: const Key('playground-credential'),
               controller: credentialSecret,
@@ -145,32 +142,12 @@ class PlaygroundPanel extends StatelessWidget {
             ),
             const SizedBox(height: Puls3Spacing.sm),
           ],
-          if (credentialAccountId != null) ...[
-            TextField(
-              key: const Key('playground-account'),
-              controller: credentialAccountId,
-              enabled: !running,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: context.l10n.playgroundAccountId,
-              ),
-            ),
-            const SizedBox(height: Puls3Spacing.sm),
-          ],
           ListenableBuilder(
-            listenable: Listenable.merge([
-              inputController,
-              credentialSecret,
-              credentialAccountId,
-            ]),
+            listenable: Listenable.merge([inputController, credentialSecret]),
             builder: (context, _) {
               final secret = credentialSecret;
-              final account = credentialAccountId;
               final credentialsReady =
-                  secret == null ||
-                  (secret.text.trim().isNotEmpty &&
-                      (account == null || account.text.trim().isNotEmpty));
+                  secret == null || secret.text.trim().isNotEmpty;
               return _InputAndRun(
                 controller: inputController,
                 maxChars: inputMaxChars,
