@@ -80,9 +80,21 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   accounting against the parent reserve, parent completion refunding unspent reserve, events.
   Rust tests including the invariant (sum of children ≤ reserve, child expiry ≤ parent). Route:
   delegated writer.
-- [ ] **T3** Server domain and persistence: hire subcontract cap and related-party opt-out,
+- [x] **T3** Server domain and persistence: hire subcontract cap and related-party opt-out,
   `parentHireId`, receipt line items, migrations, ledger bindings for the new entrypoints. Route:
-  delegated writer.
+  delegated writer (trigger: 2+ non-trivial files across domain, server, ledger and migrations,
+  mapped first by a read-only explorer). Done 2026-11-18 on branch `feat/334-server-subcontract`:
+  `74d03a7` source and tests, `2a7941e` regenerated protocol and migration
+  `20261118221650421-hire-subcontract`. Checks: domain `dart test` 309 passed; server
+  `dart analyze --fatal-infos` clean and `dart test test/unit test/hire` 1075 passed; client
+  `dart analyze` clean; a second `serverpod generate` changed no content. Integration tests skipped
+  because Docker was not running. Native review: medium risk, granted, one reliability lens,
+  approved and acknowledged (lineage `review-f955cb3b83a47254`, source commit only). Notes:
+  `fund_with_reserve` stays under purpose `fund` (the tracker only funds on `fund`), and the wire
+  function name now comes from `SubmissionPurpose.contractFunction`. `createChildJob` is untracked
+  by `chain_submission_tracker.dart` until T6. `allowRelatedParty` defaults to true (D10) and is
+  stored only. The reserve ceiling comes from `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`. The slice is
+  about 1,450 authored lines, over the 400-line guide.
 - [ ] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
   related-party flag, excluding self and cycles, ranked objectively. Route: delegated writer.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
@@ -114,3 +126,5 @@ StellarExpert.
 ## Progress
 
 - 2026-11-18: research done (code map, agentic-payments landscape) and decisions recorded. Next: T1.
+- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (branch `feat/334-server-subcontract`, not yet a
+  PR) done. Next: open the T3 slice PR stacked on #358, then T4.
