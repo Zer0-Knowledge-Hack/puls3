@@ -766,11 +766,19 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get studioDescription => 'Descrição';
+  String get studioWhatItDoes =>
+      'O que o seu agente faz e como deve trabalhar?';
+
+  @override
+  String get studioWhatItDoesHint =>
+      'Descreva o trabalho e como o agente deve abordá-lo. Transformamos isso na descrição pública e nas instruções.';
+
+  @override
+  String get studioDescription => 'Descrição pública';
 
   @override
   String get studioDescriptionHint =>
-      'O que o agente faz, em uma ou duas frases';
+      'Aparece no Marketplace, em uma ou duas frases';
 
   @override
   String get studioModel => 'Modelo';
@@ -803,13 +811,25 @@ class AppLocalizationsPt extends AppLocalizations {
       'As instruções que o agente segue em cada hire';
 
   @override
-  String get studioAddSkill => 'Adicionar uma habilidade';
+  String get studioCategories => 'Categorias';
+
+  @override
+  String get studioAddSkill => 'Adicionar uma categoria';
 
   @override
   String get studioAddSkillHint => 'Digite e pressione Enter';
 
   @override
-  String get studioAddSkillTooltip => 'Adicionar habilidade';
+  String get studioAddSkillTooltip => 'Adicionar categoria';
+
+  @override
+  String get studioAdvanced => 'Avançado';
+
+  @override
+  String get studioAdvancedHide => 'Ocultar avançado';
+
+  @override
+  String get studioAdvancedDetails => 'Descrição, prompt, modelo e limites';
 
   @override
   String get studioSectionIo => 'Entrada e saída';
@@ -905,11 +925,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get studioErrSkillLetters =>
-      'Use letras ou números em cada nome de habilidade.';
+      'Use letras ou números em cada nome de categoria.';
 
   @override
-  String get studioErrSkillTooLong =>
-      'O nome de uma habilidade é longo demais.';
+  String get studioErrSkillTooLong => 'O nome de uma categoria é longo demais.';
 
   @override
   String get studioErrNameMissing => 'Dê um nome ao seu agente.';
@@ -936,16 +955,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get studioErrDescCheck => 'Confira a descrição.';
 
   @override
-  String get studioErrSkillsMissing => 'Adicione pelo menos uma habilidade.';
+  String get studioErrSkillsMissing => 'Adicione pelo menos uma categoria.';
 
   @override
-  String get studioErrSkillsTooMany => 'Habilidades demais: remova algumas.';
+  String get studioErrSkillsTooMany => 'Categorias demais: remova algumas.';
 
   @override
-  String get studioErrSkillDuplicate => 'Duas habilidades têm o mesmo nome.';
+  String get studioErrSkillDuplicate => 'Duas categorias têm o mesmo nome.';
 
   @override
-  String get studioErrSkillCheck => 'Confira os nomes das habilidades.';
+  String get studioErrSkillCheck => 'Confira os nomes das categorias.';
 
   @override
   String get studioErrModelMissing => 'Escolha um modelo.';
@@ -2343,11 +2362,19 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get studioDescription => 'Descrição';
+  String get studioWhatItDoes =>
+      'O que o seu agente faz e como deve trabalhar?';
+
+  @override
+  String get studioWhatItDoesHint =>
+      'Descreva o trabalho e como o agente deve abordá-lo. Transformamos isso na descrição pública e nas instruções.';
+
+  @override
+  String get studioDescription => 'Descrição pública';
 
   @override
   String get studioDescriptionHint =>
-      'O que o agente faz, em uma ou duas frases';
+      'Aparece no Marketplace, em uma ou duas frases';
 
   @override
   String get studioModel => 'Modelo';
@@ -2380,13 +2407,25 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'As instruções que o agente segue em cada hire';
 
   @override
-  String get studioAddSkill => 'Adicionar uma habilidade';
+  String get studioCategories => 'Categorias';
+
+  @override
+  String get studioAddSkill => 'Adicionar uma categoria';
 
   @override
   String get studioAddSkillHint => 'Digite e pressione Enter';
 
   @override
-  String get studioAddSkillTooltip => 'Adicionar habilidade';
+  String get studioAddSkillTooltip => 'Adicionar categoria';
+
+  @override
+  String get studioAdvanced => 'Avançado';
+
+  @override
+  String get studioAdvancedHide => 'Ocultar avançado';
+
+  @override
+  String get studioAdvancedDetails => 'Descrição, prompt, modelo e limites';
 
   @override
   String get studioSectionIo => 'Entrada e saída';
@@ -2482,11 +2521,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get studioErrSkillLetters =>
-      'Use letras ou números em cada nome de habilidade.';
+      'Use letras ou números em cada nome de categoria.';
 
   @override
-  String get studioErrSkillTooLong =>
-      'O nome de uma habilidade é longo demais.';
+  String get studioErrSkillTooLong => 'O nome de uma categoria é longo demais.';
 
   @override
   String get studioErrNameMissing => 'Dê um nome ao seu agente.';
@@ -2513,16 +2551,16 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get studioErrDescCheck => 'Confira a descrição.';
 
   @override
-  String get studioErrSkillsMissing => 'Adicione pelo menos uma habilidade.';
+  String get studioErrSkillsMissing => 'Adicione pelo menos uma categoria.';
 
   @override
-  String get studioErrSkillsTooMany => 'Habilidades demais: remova algumas.';
+  String get studioErrSkillsTooMany => 'Categorias demais: remova algumas.';
 
   @override
-  String get studioErrSkillDuplicate => 'Duas habilidades têm o mesmo nome.';
+  String get studioErrSkillDuplicate => 'Duas categorias têm o mesmo nome.';
 
   @override
-  String get studioErrSkillCheck => 'Confira os nomes das habilidades.';
+  String get studioErrSkillCheck => 'Confira os nomes das categorias.';
 
   @override
   String get studioErrModelMissing => 'Escolha um modelo.';
@@ -3921,10 +3959,19 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   }
 
   @override
-  String get studioDescription => 'Descrição';
+  String get studioWhatItDoes =>
+      'O que é que o seu agente faz e como deve trabalhar?';
 
   @override
-  String get studioDescriptionHint => 'O que o agente faz, numa ou duas frases';
+  String get studioWhatItDoesHint =>
+      'Descreva o trabalho e como o agente deve abordá-lo. Transformamos isso na descrição pública e nas instruções.';
+
+  @override
+  String get studioDescription => 'Descrição pública';
+
+  @override
+  String get studioDescriptionHint =>
+      'Aparece no Marketplace, numa ou duas frases';
 
   @override
   String get studioModel => 'Modelo';
@@ -3958,13 +4005,25 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
       'As instruções que o agente segue em cada hire';
 
   @override
-  String get studioAddSkill => 'Adicionar uma competência';
+  String get studioCategories => 'Categorias';
+
+  @override
+  String get studioAddSkill => 'Adicionar uma categoria';
 
   @override
   String get studioAddSkillHint => 'Escreva e prima Enter';
 
   @override
-  String get studioAddSkillTooltip => 'Adicionar competência';
+  String get studioAddSkillTooltip => 'Adicionar categoria';
+
+  @override
+  String get studioAdvanced => 'Avançado';
+
+  @override
+  String get studioAdvancedHide => 'Ocultar avançado';
+
+  @override
+  String get studioAdvancedDetails => 'Descrição, prompt, modelo e limites';
 
   @override
   String get studioSectionIo => 'Entrada e saída';
@@ -4061,11 +4120,11 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get studioErrSkillLetters =>
-      'Use letras ou números em cada nome de competência.';
+      'Use letras ou números em cada nome de categoria.';
 
   @override
   String get studioErrSkillTooLong =>
-      'O nome de uma competência é demasiado longo.';
+      'O nome de uma categoria é demasiado longo.';
 
   @override
   String get studioErrNameMissing => 'Dê um nome ao seu agente.';
@@ -4092,17 +4151,16 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   String get studioErrDescCheck => 'Verifique a descrição.';
 
   @override
-  String get studioErrSkillsMissing => 'Adicione pelo menos uma competência.';
+  String get studioErrSkillsMissing => 'Adicione pelo menos uma categoria.';
 
   @override
-  String get studioErrSkillsTooMany =>
-      'Demasiadas competências: remova algumas.';
+  String get studioErrSkillsTooMany => 'Demasiadas categorias: remova algumas.';
 
   @override
-  String get studioErrSkillDuplicate => 'Duas competências têm o mesmo nome.';
+  String get studioErrSkillDuplicate => 'Duas categorias têm o mesmo nome.';
 
   @override
-  String get studioErrSkillCheck => 'Verifique os nomes das competências.';
+  String get studioErrSkillCheck => 'Verifique os nomes das categorias.';
 
   @override
   String get studioErrModelMissing => 'Escolha um modelo.';
