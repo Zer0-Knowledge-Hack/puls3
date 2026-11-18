@@ -1,0 +1,22 @@
+### One row of the consumer's hire list (`HireEndpoint.listMyHires`).
+class: HireSummary
+fields:
+  id: int
+  ### The on-chain registry id of the hired agent.
+  agentId: int
+  agentName: String
+  ### `HireStatus` name; null until the create_job is confirmed.
+  status: String?
+  priceUsdcStroops: int
+  ### The first characters of the hire input.
+  inputPreview: String
+  ### The job's approval_deadline, set once the agent submitted.
+  approvalDeadline: DateTime?
+  ### The consumer must act: approve or reject a submitted hire before its
+  ### deadline, or reject a funded hire whose run failed to get a refund.
+  needsAction: bool
+  ### The registry id of the user's Studio agent that hired and paid from its
+  ### own wallet; null for the session wallet's own hires.
+  paidByAgentId: int?
+  ### That agent's name, for "Paid by your agent X".
+  paidByAgentName: String?

@@ -1,3 +1,8 @@
+/// The catalog id of the agent deployed from Studio draft [draftId], as the
+/// server catalog lists it (`StudioDeployService`). It is not the on-chain
+/// registry id.
+String studioCatalogId(int draftId) => 'studio-$draftId';
+
 /// Immutable snapshot of the Studio form, handed to the deploy flow.
 class AgentDraft {
   const AgentDraft({

@@ -151,6 +151,10 @@ melos run test:integration
 melos run test:e2e
 ```
 
+CI runs the server E2E suites in `.github/workflows/e2e.yml` (#298). It is
+non-gating until it is stable on `main`; the Flutter browser suite (#256) stays
+manual for now.
+
 The per-package detail:
 
 ```bash

@@ -82,6 +82,21 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
     return bound.sublist(0, limit);
   }
 
+  @override
+  Future<List<HireRow>> listByConsumer(
+    String consumer, {
+    int limit = 100,
+  }) async {
+    if (limit < 1) {
+      throw ArgumentError.value(limit, 'limit', 'must be at least 1');
+    }
+    final mine = [
+      for (final row in _rows.values)
+        if (row.consumer == consumer) _view(row)!,
+    ]..sort((a, b) => b.id.compareTo(a.id));
+    return mine.take(limit).toList();
+  }
+
   HireRow? _view(HireRow? row) {
     if (row == null || !statusOverride.containsKey(row.id)) return row;
     return HireRow(

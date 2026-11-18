@@ -1,5 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
+import '../domain/agent_draft.dart';
+
 /// Backend side of the Studio drafts, test runs and "My agents" (#35), shaped
 /// after `StudioEndpoint` in docs/architecture/api.md and flows F8, F9 and
 /// F11. The server owns drafts per wallet session (#136) and validates the
@@ -208,8 +210,12 @@ class StudioDraft {
   /// The deployed manifest version, once live.
   final int? liveVersion;
 
-  /// The catalog id of the deployed agent, when it is listed.
+  /// The registry id of the deployed agent, once registered. Link to the
+  /// agent with [catalogId], not with this.
   final String? agentId;
+
+  /// The catalog id of the agent deployed from this draft, for `/agent/:id`.
+  String get catalogId => studioCatalogId(draftId);
 
   /// The deploy step to resume from, when a deploy is in progress or failed
   /// (`DeploySession.retryFromStep`).

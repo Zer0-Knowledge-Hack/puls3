@@ -26,6 +26,7 @@ import 'package:puls3_client/src/protocol/feedback/feedback_eligibility.dart'
 import 'package:puls3_client/src/protocol/greetings/greeting.dart' as _igee0kk1;
 import 'package:puls3_client/src/protocol/health/backend_health.dart'
     as _iur07860;
+import 'package:puls3_client/src/protocol/hire/hire_summary.dart' as _i295g4r8;
 import 'package:puls3_client/src/protocol/hire_detail.dart' as _iytku71p;
 import 'package:puls3_client/src/protocol/prepared_transaction.dart'
     as _iy6q6dct;
@@ -306,8 +307,6 @@ class EndpointHealth extends _isc.EndpointRef {
 /// (`WalletMismatch`), and ownership of a hire is checked against the session
 /// wallet by the services.
 ///
-/// `listHires` is not part of this endpoint yet.
-///
 /// Follow-ups: `InputTooLong` has no documented limit, so the input length is
 /// not checked here; `PersistenceUnavailable` is not mapped, so a database
 /// failure surfaces as Serverpod's own internal error.
@@ -386,6 +385,19 @@ class EndpointHire extends _isc.EndpointRef {
       'consumer': consumer,
     },
   );
+
+  /// The session wallet's hires, newest first and capped, so the app can
+  /// list them (My hires). The consumer is always the session wallet: there
+  /// is no wallet parameter to ask for anyone else's. The hires its active
+  /// Studio agents made from their own wallets (`hireAgentAs`) are included,
+  /// with the paying agent set; ownership is the Studio deploy's owner, the
+  /// same rule as `StudioEndpoint.hireAgentAs`.
+  _ida.Future<List<_i295g4r8.HireSummary>> listMyHires() =>
+      caller.callServerEndpoint<List<_i295g4r8.HireSummary>>(
+        'hire',
+        'listMyHires',
+        {},
+      );
 
   /// Verifies the wallet-signed envelope of [preparationId] and relays it.
   _ida.Future<_iytku71p.HireDetail> submitEscrowCall(

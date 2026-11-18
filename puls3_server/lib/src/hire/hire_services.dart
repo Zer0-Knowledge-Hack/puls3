@@ -133,6 +133,7 @@ final class HireWiring {
         registry: ledger,
         catalog: catalog,
         custody: custodyOn(session),
+        unpublished: publicationOn(session),
         config: config,
         agentOf: agentOf,
       ),

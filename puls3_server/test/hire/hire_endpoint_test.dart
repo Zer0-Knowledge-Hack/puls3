@@ -13,6 +13,8 @@ import 'package:puls3_server/src/hire/hire_service.dart';
 import 'package:puls3_server/src/hire/hire_services.dart';
 import 'package:puls3_server/src/hire/session_wallet.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
+import 'package:puls3_server/src/studio/studio_deploy_store.dart';
+import 'package:puls3_server/src/studio/studio_endpoint.dart';
 import 'package:serverpod/serverpod.dart' show Session;
 import 'package:test/test.dart';
 
@@ -398,6 +400,73 @@ void main() {
         );
       },
     );
+  });
+
+  group('listMyHires', () {
+    // A second custodied wallet, for an agent the caller does not own.
+    const otherAgentWallet =
+        'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ';
+    late MemoryStudioDeployStore deploys;
+
+    Future<void> deploy({
+      required int registryAgentId,
+      required String owner,
+      required String wallet,
+      String state = 'active',
+    }) => deploys.save(
+      StudioDeployRow(
+        draftId: registryAgentId,
+        owner: owner,
+        state: state,
+        agentWallet: wallet,
+        registrationUri: 'https://puls3.test/registry/$registryAgentId',
+        registryAgentId: registryAgentId,
+        updatedAt: DateTime.utc(2026),
+      ),
+    );
+
+    setUp(() {
+      deploys = MemoryStudioDeployStore();
+      StudioEndpoint.deployStores = (_) => deploys;
+    });
+
+    tearDown(() => StudioEndpoint.deployStores = null);
+
+    test('lists the hires of the caller and of its active agents', () async {
+      await deploy(registryAgentId: 11, owner: alice, wallet: agentWallet);
+      await deploy(
+        registryAgentId: 12,
+        owner: stranger,
+        wallet: otherAgentWallet,
+      );
+      final own = await rig.hire(status: HireStatus.completed);
+      final byAgent = await rig.hire(
+        status: HireStatus.funded,
+        consumer: agentWallet,
+      );
+      await rig.hire(status: HireStatus.funded, consumer: otherAgentWallet);
+      await rig.hire(status: HireStatus.funded, consumer: stranger);
+
+      final hires = await endpoint.listMyHires(session);
+
+      expect(hires.map((h) => h.id), [byAgent.id, own.id]);
+      expect(hires.first.paidByAgentId, 11);
+      expect(hires.first.paidByAgentName, 'Test Agent');
+      expect(hires.last.paidByAgentId, isNull);
+      expect(hires.last.paidByAgentName, isNull);
+    });
+
+    test('an agent that is not active adds no hires', () async {
+      await deploy(
+        registryAgentId: 11,
+        owner: alice,
+        wallet: agentWallet,
+        state: 'failed',
+      );
+      await rig.hire(status: HireStatus.funded, consumer: agentWallet);
+
+      expect(await endpoint.listMyHires(session), isEmpty);
+    });
   });
 
   group('getHire', () {
