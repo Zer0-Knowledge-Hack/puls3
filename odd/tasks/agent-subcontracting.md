@@ -83,18 +83,24 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
 - [x] **T3** Server domain and persistence: hire subcontract cap and related-party opt-out,
   `parentHireId`, receipt line items, migrations, ledger bindings for the new entrypoints. Route:
   delegated writer (trigger: 2+ non-trivial files across domain, server, ledger and migrations,
-  mapped first by a read-only explorer). Done 2026-11-18 on branch `feat/334-server-subcontract`:
-  `74d03a7` source and tests, `2a7941e` regenerated protocol and migration
-  `20261118221650421-hire-subcontract`. Checks: domain `dart test` 309 passed; server
-  `dart analyze --fatal-infos` clean and `dart test test/unit test/hire` 1075 passed; client
-  `dart analyze` clean; a second `serverpod generate` changed no content. Integration tests skipped
-  because Docker was not running. Native review: medium risk, granted, one reliability lens,
-  approved and acknowledged (lineage `review-f955cb3b83a47254`, source commit only). Notes:
+  mapped first by a read-only explorer). Done 2026-11-18, split by the user's choice into two
+  stacked slices with the same final tree as the unsplit work (`backup/334-t3-unsplit`):
+  - Slice A `feat/334-ledger-subcontract`: `2386ef4` ledger bindings (events, v0.2.0 job decoder,
+    errors 124-127, `contractFunction`, `draftCreateChildJob`), +748/-20.
+  - Slice B `feat/334-server-subcontract`: `ec44b71` domain, persistence and hire creation with a
+    reserve (+673/-12), `7cbe47a` regenerated protocol and migration
+    `20261118221650421-hire-subcontract`.
+  Checks at A: server `dart analyze --fatal-infos` clean, `dart test test/unit test/hire` 1063
+  passed, domain 301 passed. Checks at B: domain 309 passed, server analyze clean,
+  `dart test test/unit test/hire` 1077 passed, `dart test test/integration` 185 passed, client
+  analyze clean; a second `serverpod generate` changed no content. Native review of the unsplit
+  source: medium risk, granted, one reliability lens, approved and acknowledged (lineage
+  `review-f955cb3b83a47254`); the split slices are new review targets. Notes:
   `fund_with_reserve` stays under purpose `fund` (the tracker only funds on `fund`), and the wire
   function name now comes from `SubmissionPurpose.contractFunction`. `createChildJob` is untracked
   by `chain_submission_tracker.dart` until T6. `allowRelatedParty` defaults to true (D10) and is
-  stored only. The reserve ceiling comes from `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`. The slice is
-  about 1,450 authored lines, over the 400-line guide.
+  stored only. The reserve ceiling comes from `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`. The
+  `fund_with_reserve` encoding lives in slice B because it reads `HireRow.subcontractReserve`.
 - [ ] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
   related-party flag, excluding self and cycles, ranked objectively. Route: delegated writer.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
@@ -126,5 +132,5 @@ StellarExpert.
 ## Progress
 
 - 2026-11-18: research done (code map, agentic-payments landscape) and decisions recorded. Next: T1.
-- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (branch `feat/334-server-subcontract`, not yet a
-  PR) done. Next: open the T3 slice PR stacked on #358, then T4.
+- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slices A and B, not yet PRs) done. Next: review
+  each slice, open PR A stacked on #358 and PR B stacked on A, then T4.
