@@ -68,7 +68,15 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   and refund to the reserve, parent close releasing unspent reserve, receipt events, depth limit and
   cycles, related-party rules, the runtime tool loop and run phases, and the amendments to ADR-0005
   D9/D10 and ADR-0006 D6. Route: delegated writer (ADR needs preparation reads of 0004/0005/0006).
-- [ ] **T2** Escrow contract: reserve at `fund`, `create_child_job`, child settle/reject/expire
+- [x] **T2** (done 2026-11-18. Route: delegated writer, trigger 2+ non-trivial files plus preparation
+  reads. RED: 86 compile errors. GREEN: `cargo test -p escrow` 179/179 (149 existing, 30 new);
+  clippy, fmt and the WASM build (rustup 1.98.1, 37,168 B) are clean. Version bumped to 0.2.0.
+  Commits `ac63a7b` (source and tests, ~1,430 authored lines) and `6365e02` (generated snapshots).
+  Native review: risk high, granted. The first attempt with snapshots hit
+  `lens_context_budget_exceeded`, so the commit was split. The re-run had 4 lenses, came back
+  approved and was acknowledged (lineage `review-efe2486d9d0ef315`).
+  Known local flake: Windows `Os 1224` while writing snapshots, which is environmental. CI on Linux
+  is the authority.) Escrow contract: reserve at `fund`, `create_child_job`, child settle/reject/expire
   accounting against the parent reserve, parent completion refunding unspent reserve, events.
   Rust tests including the invariant (sum of children ≤ reserve, child expiry ≤ parent). Route:
   delegated writer.
