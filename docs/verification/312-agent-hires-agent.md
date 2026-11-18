@@ -1,13 +1,26 @@
-# #312 verification: one agent hires and pays another on testnet
+# #312 verification, part 1: the payment rail between custodied agent wallets
 
-This record shows that the acceptance criteria of #312 hold on Stellar Testnet. It covers two runs of
+This record covers the **payment rail** of #312 on Stellar Testnet. It contains two runs of
 `puls3_server/tool/a2a_hire_testnet.dart`, made on 2026-11-18 from `main` at `64a6793`.
 
-| Criterion (#312) | Evidence |
-| --- | --- |
-| One agent hires and pays another on testnet with no human signing in the loop. | [Run 1](#run-1-a-hires-and-pays-b): A's custodied key signs `create_job`, `fund` and `complete`, and B's custodied key signs `submit`. Nobody signs from a wallet app or the CLI. |
-| The payment and the result are linked to the calling hire and visible on stellar.expert. | Run 1: the four escrow transactions belong to hire 6 / escrow job 36. Each one links to stellar.expert below. |
-| Spending is bounded (per-run budget) so an agent cannot drain its wallet. | [Run 2](#run-2-the-per-run-budget-refuses-an-over-budget-hire): when the price is above the budget, the hire is refused before anything is signed. A's USDC balance stays the same. |
+> **Scope: this is not yet evidence of agents working.** In these runs, A and B are custodied
+> wallets registered on the Identity Registry. Neither runs a model:
+>
+> - **A:** the tool decides to hire, not A's model.
+> - **B:** its output is a deterministic function in the tool, not a model run by the hire runtime.
+>
+> What the runs prove is the rest of the path: server-side custody, the escrow calls, the chain
+> tracker, B's `submit` signed through the runtime path (#208) and the per-run budget, all with
+> no human signature. Payments go through the puls3 escrow, not x402 (#275).
+>
+> A run with real Studio agents, where B's output comes from a model, is still pending. #312 stays
+> open until that run is recorded.
+
+| Criterion (#312) | What this record shows | Still missing |
+| --- | --- | --- |
+| One agent hires and pays another on testnet with no human signing in the loop. | [Run 1](#run-1-a-hires-and-pays-b): A's custodied key signs `create_job`, `fund` and `complete`, and B's custodied key signs `submit`. No human signs. | A and B as deployed Studio agents, with B's work done by its model. |
+| The payment and the result are linked to the calling hire and visible on stellar.expert. | Run 1: the four escrow transactions belong to hire 6 / escrow job 36. Each one links to stellar.expert below. | The same, with a model-produced result. |
+| Spending is bounded (per-run budget) so an agent cannot drain its wallet. | [Run 2](#run-2-the-per-run-budget-refuses-an-over-budget-hire): when the price is above the budget, the hire is refused before anything is signed. A's USDC balance stays the same. | — |
 
 ## How the runs were made
 
@@ -75,5 +88,6 @@ The budget is checked twice. The first check uses the catalog price, before the 
 
 ## Not covered here
 
-- **A model-backed agent B.** B's work in these runs is deterministic. A hire whose provider runs a model goes through the same escrow path, and the hire runtime covers it.
+- **Real agents.** A and B have no manifest and no model, and B's work is deterministic. A run with deployed Studio agents is pending (see the scope note at the top).
+- **An agent deciding to hire.** In the product, the owner of the hiring agent starts the hire (CLI `studio hire-as`, the web Studio or the hire sheet). No runtime tool lets a model decide to subcontract. That is #334.
 - **A daily or cumulative cap.** The budget bounds each run. Nothing on the server caps the budget an owner passes, or how many runs happen per day. #312 asks only for a per-run budget.
