@@ -614,6 +614,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "depth"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "description"
                     },
                     "val": {
@@ -646,10 +654,40 @@
                   },
                   {
                     "key": {
+                      "symbol": "open_children"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "parent_job_id"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
                       "symbol": "provider"
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "reserve"
+                    },
+                    "val": {
+                      "i128": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "reserve_funded"
+                    },
+                    "val": {
+                      "i128": "0"
                     }
                   },
                   {
