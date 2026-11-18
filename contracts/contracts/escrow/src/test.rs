@@ -318,6 +318,55 @@ fn constructor_rejects_zero_approval_window() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #111)")]
+fn constructor_rejects_max_expiry_above_the_ceiling() {
+    let env = Env::default();
+    let a = Address::generate(&env);
+    env.register(
+        EscrowContract,
+        (
+            &a,
+            &a,
+            &None::<Address>,
+            &0u32,
+            &(MAX_EXPIRY_CEILING + 1),
+            &3_600u64,
+        ),
+    );
+}
+
+#[test]
+fn constructor_accepts_max_expiry_at_the_ceiling() {
+    let env = Env::default();
+    let a = Address::generate(&env);
+    let id = env.register(
+        EscrowContract,
+        (
+            &a,
+            &a,
+            &None::<Address>,
+            &0u32,
+            &MAX_EXPIRY_CEILING,
+            &3_600u64,
+        ),
+    );
+    assert_eq!(
+        EscrowContractClient::new(&env, &id).max_expiry(),
+        MAX_EXPIRY_CEILING
+    );
+}
+
+#[test]
+fn the_expiry_ceiling_fits_the_ttl_with_room_to_spare() {
+    // 30 days: the testnet escrow's current max_expiry is exactly this value.
+    assert_eq!(MAX_EXPIRY_CEILING, 2_592_000);
+    // A job never sits below TTL_THRESHOLD after a write, so it outlives the
+    // longest deadline; TTL_BUMP leaves it twice that much.
+    assert!(MAX_EXPIRY_CEILING <= TTL_THRESHOLD as u64 * LEDGER_SECONDS);
+    assert!(TTL_BUMP as u64 * LEDGER_SECONDS >= 2 * MAX_EXPIRY_CEILING);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #111)")]
 fn constructor_rejects_window_not_below_max_expiry() {
     let env = Env::default();
     let a = Address::generate(&env);
@@ -2426,6 +2475,47 @@ fn age_ledger(ctx: &Ctx) {
     ctx.env
         .ledger()
         .set_sequence_number(info.sequence_number + (TTL_BUMP - TTL_THRESHOLD) + 100);
+}
+
+#[test]
+fn the_admin_cannot_raise_max_expiry_past_the_ceiling() {
+    let ctx = setup();
+    assert_eq!(
+        err(ctx
+            .escrow()
+            .try_set_max_expiry(&ctx.admin, &(MAX_EXPIRY_CEILING + 1))),
+        EscrowError::InvalidDuration
+    );
+    ctx.escrow().set_max_expiry(&ctx.admin, &MAX_EXPIRY_CEILING);
+    assert_eq!(ctx.escrow().max_expiry(), MAX_EXPIRY_CEILING);
+}
+
+#[test]
+fn a_funded_job_at_the_longest_deadline_is_still_live_to_refund() {
+    // Audit E-5: the longest job the escrow allows is refundable at its
+    // deadline without restoring archived state.
+    let ctx = setup();
+    ctx.escrow().set_max_expiry(&ctx.admin, &MAX_EXPIRY_CEILING);
+    let expired_at = NOW + MAX_EXPIRY_CEILING;
+    let id = ctx.funded(expired_at);
+    let before = ctx.balance(&ctx.client);
+
+    // The whole lifetime passes, in time and in ledgers.
+    let info = ctx.env.ledger().get();
+    ctx.env
+        .ledger()
+        .set_sequence_number(info.sequence_number + (MAX_EXPIRY_CEILING / LEDGER_SECONDS) as u32);
+    ctx.set_time(expired_at);
+
+    // The job was last written at `fund`, so at its deadline it still has the
+    // rest of its TTL_BUMP, with TTL_THRESHOLD of it to spare. Checked as a
+    // number: the test host restores archived entries on read, so reading the
+    // job alone would prove nothing.
+    let lifetime = (MAX_EXPIRY_CEILING / LEDGER_SECONDS) as u32;
+    assert_eq!(job_ttl(&ctx, id), TTL_BUMP - lifetime);
+    assert!(TTL_BUMP - lifetime >= TTL_THRESHOLD);
+    ctx.escrow().claim_refund(&id);
+    assert_eq!(ctx.balance(&ctx.client), before + BUDGET);
 }
 
 #[test]

@@ -6,6 +6,7 @@ import 'package:puls3_domain/puls3_domain.dart'
 import '../domain/usdc.dart';
 import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
+import '../studio/studio_brief.dart';
 import '../studio/studio_form_check.dart';
 import '../studio/studio_gateway.dart';
 import '../studio/studio_models.dart';
@@ -49,6 +50,7 @@ class _StudioScreenState extends State<StudioScreen> {
   ];
 
   final _name = TextEditingController();
+  final _brief = TextEditingController();
   final _description = TextEditingController();
   final _prompt = TextEditingController();
   final _inputMax = TextEditingController();
@@ -59,6 +61,22 @@ class _StudioScreenState extends State<StudioScreen> {
   StudioModelOption? _model;
   OutputType _outputType = OutputType.text;
   final List<String> _skills = [];
+
+  /// Whether the builder has edited the generated description or prompt.
+  /// While false, each follows the brief.
+  bool _descriptionEdited = false;
+  bool _promptEdited = false;
+
+  /// Set while the brief regenerates the description and prompt, so their
+  /// listeners do not mistake the generated text for a builder edit.
+  bool _syncingFromBrief = false;
+
+  /// Whether the explain-it-once field has been edited, so its problem is not
+  /// shown before the builder touches it.
+  bool _briefTouched = false;
+
+  /// Whether the Advanced section is open.
+  bool _advancedOpen = false;
 
   /// Fields the builder has edited: only their problems are shown, so an
   /// empty form does not open as a wall of errors.
@@ -95,12 +113,22 @@ class _StudioScreenState extends State<StudioScreen> {
     _price: StudioField.price,
   };
 
+  /// The default limits for a new agent: a non-technical builder never has to
+  /// touch Advanced to deploy.
+  static const _defaultInputMax = '8000';
+  static const _defaultOutputMax = '2000';
+
   @override
   void initState() {
     super.initState();
+    _inputMax.text = _defaultInputMax;
+    _outputMax.text = _defaultOutputMax;
+    _outputType = OutputType.markdown;
+    _model = studioModelOptions.first;
     for (final MapEntry(key: controller, value: field) in _fieldOf.entries) {
-      controller.addListener(() => _touch(field));
+      controller.addListener(() => _onFieldChanged(controller, field));
     }
+    _brief.addListener(_onBriefChanged);
     final draftId = widget.draftId;
     if (draftId != null) {
       _loadingDraft = true;
@@ -110,20 +138,62 @@ class _StudioScreenState extends State<StudioScreen> {
 
   @override
   void dispose() {
-    for (final c in [..._fieldOf.keys, _skillInput]) {
+    for (final c in [..._fieldOf.keys, _brief, _skillInput]) {
       c.dispose();
     }
     super.dispose();
   }
 
+  void _onFieldChanged(TextEditingController controller, StudioField field) {
+    if (_syncingFromBrief) return;
+    setState(() {
+      if (controller == _description) _descriptionEdited = true;
+      if (controller == _prompt) _promptEdited = true;
+      if (controller == _name && !_promptEdited) _syncPromptFromBrief();
+      _touched.add(field);
+      _serverErrors.remove(field);
+    });
+  }
+
+  void _onBriefChanged() {
+    if (_syncingFromBrief) return;
+    setState(() {
+      _briefTouched = true;
+      _serverErrors.remove(StudioField.description);
+      _serverErrors.remove(StudioField.systemPrompt);
+      _syncFromBrief();
+    });
+  }
+
+  /// Generates the description and prompt from the brief, unless the builder
+  /// edited that field under Advanced.
+  void _syncFromBrief() {
+    _syncingFromBrief = true;
+    try {
+      if (!_descriptionEdited) {
+        _description.text = descriptionFromBrief(_brief.text);
+      }
+      if (!_promptEdited) {
+        _prompt.text = systemPromptFromBrief(_brief.text, name: _name.text);
+      }
+    } finally {
+      _syncingFromBrief = false;
+    }
+  }
+
+  void _syncPromptFromBrief() {
+    if (_promptEdited) return;
+    _syncingFromBrief = true;
+    try {
+      _prompt.text = systemPromptFromBrief(_brief.text, name: _name.text);
+    } finally {
+      _syncingFromBrief = false;
+    }
+  }
+
   String? get _owner => AppScope.of(context).wallet.address;
 
   StudioGateway get _gateway => AppScope.of(context).studioGateway;
-
-  void _touch(StudioField field) => setState(() {
-    _touched.add(field);
-    _serverErrors.remove(field);
-  });
 
   StudioFormValues get _values => StudioFormValues(
     name: _name.text,
@@ -152,7 +222,11 @@ class _StudioScreenState extends State<StudioScreen> {
   });
 
   /// Shows every remaining problem, for "What is missing?".
-  void _revealAll() => setState(() => _touched.addAll(StudioField.values));
+  void _revealAll() => setState(() {
+    _touched.addAll(StudioField.values);
+    _briefTouched = true;
+    _advancedOpen = true;
+  });
 
   /// Loads a saved draft into the form (F8 "Continue editing", F10 "Edit").
   Future<void> _open(int draftId) async {
@@ -197,13 +271,27 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   void _fill(StudioFormValues values) {
-    _name.text = values.name;
-    _description.text = values.description;
-    _prompt.text = values.systemPrompt;
-    _inputMax.text = values.inputMaxChars;
-    _outputMax.text = values.outputMaxChars;
+    _syncingFromBrief = true;
+    try {
+      _name.text = values.name;
+      _brief.text = values.description;
+      _description.text = values.description;
+      _prompt.text = values.systemPrompt;
+    } finally {
+      _syncingFromBrief = false;
+    }
+    _descriptionEdited = true;
+    _promptEdited = true;
+    _briefTouched = true;
+    _advancedOpen = false;
+    _inputMax.text = values.inputMaxChars.isEmpty
+        ? _defaultInputMax
+        : values.inputMaxChars;
+    _outputMax.text = values.outputMaxChars.isEmpty
+        ? _defaultOutputMax
+        : values.outputMaxChars;
     _price.text = values.price;
-    _model = values.model;
+    _model = values.model ?? studioModelOptions.first;
     _outputType = values.outputType;
     _skills
       ..clear()
@@ -279,9 +367,20 @@ class _StudioScreenState extends State<StudioScreen> {
       _saveError = error;
       _serverErrors.addAll(problems);
       _touched.addAll(StudioField.values);
+      _briefTouched = true;
+      if (problems.keys.any(_isAdvancedField)) _advancedOpen = true;
     });
     return null;
   }
+
+  static bool _isAdvancedField(StudioField field) => switch (field) {
+    StudioField.description ||
+    StudioField.model ||
+    StudioField.systemPrompt ||
+    StudioField.input ||
+    StudioField.output => true,
+    _ => false,
+  };
 
   /// "Reload" after a conflict: the newer saved revision replaces the edits.
   Future<void> _reload() async {
@@ -364,11 +463,31 @@ class _StudioScreenState extends State<StudioScreen> {
     for (final MapEntry(key: field, value: message) in _serverErrors.entries) {
       shown.putIfAbsent(field, () => message);
     }
+    // While a field is generated from the brief, its problem belongs under the
+    // brief, not under a field the builder has not opened.
+    final descriptionError =
+        !_descriptionEdited &&
+        check.errors.containsKey(StudioField.description);
+    final promptError =
+        !_promptEdited && check.errors.containsKey(StudioField.systemPrompt);
+    final generatedError = descriptionError || promptError;
+    final briefError = generatedError && _briefTouched
+        ? (!_descriptionEdited
+                  ? check.errors[StudioField.description]
+                  : null) ??
+              (!_promptEdited ? check.errors[StudioField.systemPrompt] : null)
+        : null;
+    final remaining =
+        check.errors.length -
+        (descriptionError ? 1 : 0) -
+        (promptError ? 1 : 0) +
+        (generatedError ? 1 : 0);
     final wide =
         MediaQuery.sizeOf(context).width >= Puls3Breakpoints.studioTwoColumn;
 
     final form = AgentForm(
       nameController: _name,
+      briefController: _brief,
       descriptionController: _description,
       promptController: _prompt,
       inputMaxController: _inputMax,
@@ -387,6 +506,11 @@ class _StudioScreenState extends State<StudioScreen> {
       suggestedSkills: _suggestedSkills,
       onAddSkill: _addSkill,
       onRemoveSkill: _removeSkill,
+      advancedOpen: _advancedOpen,
+      onToggleAdvanced: () => setState(() => _advancedOpen = !_advancedOpen),
+      descriptionEdited: _descriptionEdited,
+      promptEdited: _promptEdited,
+      briefError: briefError,
       errors: shown,
     );
 
@@ -414,7 +538,7 @@ class _StudioScreenState extends State<StudioScreen> {
         ),
         const SizedBox(height: Puls3Spacing.md),
         _ReadyPanel(
-          remaining: check.errors.length,
+          remaining: remaining,
           onShowMissing: _revealAll,
         ),
         const SizedBox(height: Puls3Spacing.md),

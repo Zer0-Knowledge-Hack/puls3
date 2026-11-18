@@ -17,6 +17,7 @@ Provides administrative controls, parameter configuration, token allow-listing, 
 - `fee_bps > 0` requires `treasury` to be `Some`, else `TreasuryNotSet`.
 - `max_expiry > 0` and `approval_window > 0`, else `InvalidDuration`.
 - `approval_window < max_expiry`, else `InvalidDuration` (otherwise no job could ever be submitted).
+- `max_expiry <= MAX_EXPIRY_CEILING` (2 592 000 s, 30 days), else `InvalidDuration` (audit E-5, #206). The ceiling is `TTL_THRESHOLD` ledgers at `LEDGER_SECONDS` (5 s): a job is never left below `TTL_THRESHOLD` after a write and lives at most `max_expiry` after creation, so an open, funded or submitted job cannot archive before its own deadline, and `TTL_BUMP` leaves it twice that room. The same check applies to `set_max_expiry`.
 - Default for the MVP is `fee_bps = 0`. The concrete values of `max_expiry` and `approval_window` are deployment parameters (ADR-0005 D3 deferred; see Open items). The contract MUST NOT hard-code defaults.
 
 #### Scenario: valid construction
@@ -36,7 +37,7 @@ Provides administrative controls, parameter configuration, token allow-listing, 
 - **THEN** deployment fails with `TreasuryNotSet`
 
 #### Scenario: invalid durations
-- **WHEN** `max_expiry = 0`, or `approval_window = 0`, or `approval_window >= max_expiry`
+- **WHEN** `max_expiry = 0`, or `approval_window = 0`, or `approval_window >= max_expiry`, or `max_expiry > MAX_EXPIRY_CEILING`
 - **THEN** deployment fails with `InvalidDuration`
 
 ### Requirement: A2. token allow-list
