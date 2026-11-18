@@ -52,7 +52,15 @@ pub const REGISTRY_TIMELOCK_LEDGERS: u32 = 51_840;
 /// (about 7 days). After that it has expired and must be proposed again.
 pub const REGISTRY_EXECUTION_WINDOW: u32 = 120_960;
 
-const CONTRACT_VERSION: &str = "0.1.0";
+/// Seconds a child job must expire before its parent beyond the approval window
+/// (ADR-0011 D2): room for the parent's run to resume with the child's result and
+/// `submit`, with the parent's own approval window still closing before it expires.
+pub const CHILD_EXPIRY_MARGIN: u64 = 600;
+/// Deepest job in a subcontract tree (ADR-0011 D5): consumer -> A (0) -> B (1) -> C (2).
+/// A job at this depth cannot have children, so it never holds a reserve.
+pub const MAX_DEPTH: u32 = 2;
+
+const CONTRACT_VERSION: &str = "0.2.0";
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -104,6 +112,14 @@ pub enum EscrowError {
     RegistryTimelockNotExpired = 122,
     /// The proposed identity registry was not executed in time; propose it again.
     RegistryChangeExpired = 123,
+    /// `create_child_job`: `budget + reserve` exceeds the parent's unspent reserve.
+    ReserveExceeded = 124,
+    /// `submit`: the job still has open child jobs (ADR-0011 D4).
+    ChildrenOpen = 125,
+    /// `create_child_job`: the child would be deeper than `MAX_DEPTH` (ADR-0011 D5).
+    DepthExceeded = 126,
+    /// `create_child_job`: the provider or agent is already in the ancestor chain.
+    SubcontractCycle = 127,
 }
 
 #[contracttype]
@@ -135,6 +151,18 @@ pub struct Job {
     pub submitted_at: u64,
     pub approval_deadline: u64,
     pub deliverable: Option<BytesN<32>>,
+    /// puls3 (ADR-0011 D1): unspent subcontract reserve. It decreases on each child
+    /// draw, grows when a child returns funds, and is 0 once the job is closed.
+    pub reserve: i128,
+    /// What was put into the reserve at funding (by the client, or drawn from the
+    /// parent for a child job). Never changes afterwards; kept for receipts.
+    pub reserve_funded: i128,
+    /// Child jobs created from this job that have not settled yet.
+    pub open_children: u32,
+    /// The job whose reserve funded this one; `None` for a consumer's job.
+    pub parent_job_id: Option<u64>,
+    /// 0 for a consumer's job, `parent.depth + 1` for a child.
+    pub depth: u32,
 }
 
 #[contracttype]
@@ -243,6 +271,58 @@ pub struct JobCompleted {
     pub fee: i128,
     /// True when settled by the permissionless `release`.
     pub auto_released: bool,
+}
+
+/// `fund_with_reserve` put a non-zero subcontract reserve on a job (ADR-0011 D6).
+#[contractevent]
+#[derive(Clone)]
+pub struct ReserveFunded {
+    #[topic]
+    pub job_id: u64,
+    pub client: Address,
+    pub reserve: i128,
+}
+
+/// A child job was drawn from its parent's reserve (ADR-0011 D6). The child also
+/// emits the usual `JobCreated` and `JobFunded`.
+#[contractevent]
+#[derive(Clone)]
+pub struct ChildJobCreated {
+    #[topic]
+    pub parent_job_id: u64,
+    pub child_job_id: u64,
+    pub provider: Address,
+    pub agent_id: u32,
+    pub budget: i128,
+    pub reserve: i128,
+    pub depth: u32,
+    pub parent_reserve_left: i128,
+}
+
+/// A closing child sent funds back up its tree (ADR-0011 D3). With
+/// `to_client == false`, `amount` was added to the reserve of `parent_job_id`, the
+/// nearest ancestor still `Funded`. With `to_client == true` no ancestor was, and
+/// `amount` went to the client of the root job `parent_job_id` (paid or deferred).
+#[contractevent]
+#[derive(Clone)]
+pub struct ReserveReturned {
+    #[topic]
+    pub parent_job_id: u64,
+    pub child_job_id: u64,
+    pub amount: i128,
+    pub to_client: bool,
+}
+
+/// A consumer's job closed and its unspent reserve went back to the client
+/// (ADR-0011 D4). `deferred` is true when it was credited as a claimable balance.
+#[contractevent]
+#[derive(Clone)]
+pub struct ReserveRefunded {
+    #[topic]
+    pub job_id: u64,
+    pub client: Address,
+    pub amount: i128,
+    pub deferred: bool,
 }
 
 /// A payout transfer failed (for example no trustline), so the amount was credited to
@@ -628,6 +708,11 @@ impl EscrowContract {
             submitted_at: 0,
             approval_deadline: 0,
             deliverable: None,
+            reserve: 0,
+            reserve_funded: 0,
+            open_children: 0,
+            parent_job_id: None,
+            depth: 0,
         };
         save_job(e, job_id, &job);
         JobCreated {
@@ -655,52 +740,161 @@ impl EscrowContract {
         expected_budget: i128,
         max_fee_bps: u32,
     ) -> Result<(), EscrowError> {
+        fund_job(e, caller, job_id, expected_budget, 0, max_fee_bps)
+    }
+
+    /// puls3 (ADR-0011 D1). Client only. `fund` plus a subcontract `reserve`, pulled
+    /// in the same transfer: the job's provider may draw child jobs from it with
+    /// `create_child_job`, and whatever is unspent returns to the client when the job
+    /// closes. A `reserve` of 0 is exactly `fund`. No fee is ever taken on the reserve.
+    pub fn fund_with_reserve(
+        e: &Env,
+        caller: Address,
+        job_id: u64,
+        expected_budget: i128,
+        reserve: i128,
+        max_fee_bps: u32,
+    ) -> Result<(), EscrowError> {
+        fund_job(e, caller, job_id, expected_budget, reserve, max_fee_bps)
+    }
+
+    /// puls3 (ADR-0011 D2). Parent provider only. Creates a `Funded` child job whose
+    /// client is the caller, paid from the parent's reserve with no transfer: the
+    /// caller's wallet never pays. The token is inherited and there is no hook.
+    /// `reserve` is the child's own sub-reserve, only possible below `MAX_DEPTH`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_child_job(
+        e: &Env,
+        caller: Address,
+        parent_job_id: u64,
+        provider: Address,
+        evaluator: Address,
+        expired_at: u64,
+        description: String,
+        agent_id: u32,
+        budget: i128,
+        reserve: i128,
+    ) -> Result<u64, EscrowError> {
         caller.require_auth();
-        let mut job = load_job(e, job_id)?;
-        if caller != job.client {
-            return Err(EscrowError::NotClient);
+        let mut parent = load_job(e, parent_job_id)?;
+        if caller != parent.provider {
+            return Err(EscrowError::NotProvider);
         }
-        if job.state != JobState::Open {
+        if parent.state != JobState::Funded {
             return Err(EscrowError::InvalidState);
         }
-        if e.ledger().timestamp() >= job.expired_at {
+        let now = e.ledger().timestamp();
+        if now >= parent.expired_at {
             return Err(EscrowError::JobExpired);
         }
-        if expected_budget != job.budget {
-            return Err(EscrowError::BudgetMismatch);
+        let depth = parent.depth + 1;
+        if depth > MAX_DEPTH || (depth == MAX_DEPTH && reserve > 0) {
+            return Err(EscrowError::DepthExceeded);
         }
+        if budget <= 0 || reserve < 0 {
+            return Err(EscrowError::InvalidAmount);
+        }
+        let drawn = budget
+            .checked_add(reserve)
+            .ok_or(EscrowError::ArithmeticOverflow)?;
+        if drawn > parent.reserve {
+            return Err(EscrowError::ReserveExceeded);
+        }
+        if description.len() > MAX_DESCRIPTION_LEN {
+            return Err(EscrowError::DescriptionTooLong);
+        }
+        let latest = parent
+            .expired_at
+            .saturating_sub(Self::approval_window(e))
+            .saturating_sub(CHILD_EXPIRY_MARGIN);
+        if expired_at <= now
+            || expired_at > now.saturating_add(Self::max_expiry(e))
+            || expired_at > latest
+        {
+            return Err(EscrowError::InvalidExpiry);
+        }
+        require_no_cycle(e, &parent, &provider, agent_id)?;
+        if caller == provider {
+            return Err(EscrowError::ClientIsProvider);
+        }
+        if evaluator == provider {
+            return Err(EscrowError::EvaluatorIsProvider);
+        }
+        require_token_allowed(e, &parent.token)?;
+        verify_provider(e, agent_id, &provider)?;
+        // The fee the consumer accepted at funding binds the whole tree (D6).
         let fee_bps = Self::fee_bps(e);
-        if fee_bps > max_fee_bps {
+        if fee_bps > parent.fee_bps {
             return Err(EscrowError::FeeExceedsMax);
         }
-        require_token_allowed(e, &job.token)?;
-        job.fee_bps = fee_bps;
-        job.state = JobState::Funded;
-        save_job(e, job_id, &job);
-        // A later `set_treasury` must not redirect this job's fee (audit E-3).
+
+        // `drawn <= parent.reserve`, so this cannot go below zero.
+        parent.reserve -= drawn;
+        parent.open_children = parent
+            .open_children
+            .checked_add(1)
+            .ok_or(EscrowError::ArithmeticOverflow)?;
+        save_job(e, parent_job_id, &parent);
+        let child_job_id = next_job_id(e);
+        let child = Job {
+            client: caller.clone(),
+            provider: provider.clone(),
+            evaluator: evaluator.clone(),
+            agent_id,
+            token: parent.token.clone(),
+            budget,
+            fee_bps,
+            expired_at,
+            description,
+            state: JobState::Funded,
+            submitted_at: 0,
+            approval_deadline: 0,
+            deliverable: None,
+            reserve,
+            reserve_funded: reserve,
+            open_children: 0,
+            parent_job_id: Some(parent_job_id),
+            depth,
+        };
+        save_job(e, child_job_id, &child);
         if fee_bps > 0 {
-            let treasury = Self::treasury(e).ok_or(EscrowError::TreasuryNotSet)?;
-            let key = DataKey::JobTreasury(job_id);
-            e.storage().persistent().set(&key, &treasury);
-            extend_persistent(e, &key);
+            snapshot_treasury(e, child_job_id)?;
         }
-        TokenClient::new(e, &job.token).transfer(
-            &job.client,
-            e.current_contract_address(),
-            &job.budget,
-        );
+        JobCreated {
+            job_id: child_job_id,
+            client: caller.clone(),
+            provider: provider.clone(),
+            evaluator,
+            agent_id,
+            token: parent.token,
+            budget,
+            expired_at,
+        }
+        .publish(e);
         JobFunded {
-            job_id,
-            client: job.client,
-            amount: job.budget,
-            fee_bps: job.fee_bps,
+            job_id: child_job_id,
+            client: caller,
+            amount: budget,
+            fee_bps,
+        }
+        .publish(e);
+        ChildJobCreated {
+            parent_job_id,
+            child_job_id,
+            provider,
+            agent_id,
+            budget,
+            reserve,
+            depth,
+            parent_reserve_left: parent.reserve,
         }
         .publish(e);
         extend_instance(e);
-        Ok(())
+        Ok(child_job_id)
     }
 
     /// Provider only. Starts the approval window; it must close before the job expires.
+    /// puls3 (ADR-0011 D4): refused with `ChildrenOpen` while a child job is open.
     pub fn submit(
         e: &Env,
         caller: Address,
@@ -714,6 +908,9 @@ impl EscrowContract {
         }
         if job.state != JobState::Funded {
             return Err(EscrowError::InvalidState);
+        }
+        if job.open_children > 0 {
+            return Err(EscrowError::ChildrenOpen);
         }
         let now = e.ledger().timestamp();
         if now >= job.expired_at {
@@ -808,10 +1005,11 @@ impl EscrowContract {
             _ => return Err(EscrowError::InvalidState),
         };
         job.state = JobState::Rejected;
+        let reserve = take_reserve(&mut job);
         save_job(e, job_id, &job);
         drop_job_treasury(e, job_id);
         if refunded > 0 {
-            refund_client(e, &job);
+            refund_exit(e, job_id, &job, reserve)?;
         }
         JobRejected {
             job_id,
@@ -837,9 +1035,10 @@ impl EscrowContract {
             return Err(EscrowError::NotExpired);
         }
         job.state = JobState::Expired;
+        let reserve = take_reserve(&mut job);
         save_job(e, job_id, &job);
         drop_job_treasury(e, job_id);
-        refund_client(e, &job);
+        refund_exit(e, job_id, &job, reserve)?;
         JobExpired {
             job_id,
             client: job.client,
@@ -1079,12 +1278,28 @@ fn settle(
     };
     drop_job_treasury(e, job_id);
     job.state = JobState::Completed;
+    let reserve = take_reserve(&mut job);
     save_job(e, job_id, &job);
     if payout > 0 {
         pay_or_defer(e, job_id, &job.token, &job.provider, payout)?;
     }
     if let Some(treasury) = treasury {
         pay_or_defer(e, job_id, &job.token, &treasury, fee)?;
+    }
+    // ADR-0011 D3/D4: the budget is paid; only the unspent reserve goes back. A
+    // child's goes up its tree and is final for its provider; a consumer's job
+    // refunds it to the client with the same pull-payment fallback as payouts.
+    if job.parent_job_id.is_some() {
+        close_child(e, job_id, &job, reserve)?;
+    } else if reserve > 0 {
+        let deferred = pay_or_defer(e, job_id, &job.token, &job.client, reserve)?;
+        ReserveRefunded {
+            job_id,
+            client: job.client.clone(),
+            amount: reserve,
+            deferred,
+        }
+        .publish(e);
     }
     JobCompleted {
         job_id,
@@ -1101,17 +1316,18 @@ fn settle(
 
 /// Pays `recipient` from the escrow. Both failure layers of the token call (host error
 /// and contract error) fall back to a claimable credit and a `PayoutDeferred` event.
+/// Returns true when the amount was deferred.
 fn pay_or_defer(
     e: &Env,
     job_id: u64,
     token: &Address,
     recipient: &Address,
     amount: i128,
-) -> Result<(), EscrowError> {
+) -> Result<bool, EscrowError> {
     let sent =
         TokenClient::new(e, token).try_transfer(&e.current_contract_address(), recipient, &amount);
     if matches!(sent, Ok(Ok(()))) {
-        return Ok(());
+        return Ok(false);
     }
     let key = DataKey::Claimable(recipient.clone(), token.clone());
     let current: i128 = e.storage().persistent().get(&key).unwrap_or(0);
@@ -1127,10 +1343,9 @@ fn pay_or_defer(
         amount,
     }
     .publish(e);
-    Ok(())
+    Ok(true)
 }
 
-/// Returns the full budget to the stored client, never to the caller. No fee.
 /// Removes the treasury snapshotted at `fund`: a settled or refunded job pays no fee
 /// any more.
 fn drop_job_treasury(e: &Env, job_id: u64) {
@@ -1139,12 +1354,210 @@ fn drop_job_treasury(e: &Env, job_id: u64) {
         .remove(&DataKey::JobTreasury(job_id));
 }
 
-fn refund_client(e: &Env, job: &Job) {
-    TokenClient::new(e, &job.token).transfer(
-        &e.current_contract_address(),
-        &job.client,
-        &job.budget,
-    );
+/// Shared by `fund` and `fund_with_reserve`. With `reserve == 0` it is the original
+/// `fund`: the same checks, storage, transfer and single `JobFunded` event.
+fn fund_job(
+    e: &Env,
+    caller: Address,
+    job_id: u64,
+    expected_budget: i128,
+    reserve: i128,
+    max_fee_bps: u32,
+) -> Result<(), EscrowError> {
+    caller.require_auth();
+    let mut job = load_job(e, job_id)?;
+    if caller != job.client {
+        return Err(EscrowError::NotClient);
+    }
+    if job.state != JobState::Open {
+        return Err(EscrowError::InvalidState);
+    }
+    if e.ledger().timestamp() >= job.expired_at {
+        return Err(EscrowError::JobExpired);
+    }
+    if expected_budget != job.budget {
+        return Err(EscrowError::BudgetMismatch);
+    }
+    if reserve < 0 {
+        return Err(EscrowError::InvalidAmount);
+    }
+    let total = job
+        .budget
+        .checked_add(reserve)
+        .ok_or(EscrowError::ArithmeticOverflow)?;
+    let fee_bps = EscrowContract::fee_bps(e);
+    if fee_bps > max_fee_bps {
+        return Err(EscrowError::FeeExceedsMax);
+    }
+    require_token_allowed(e, &job.token)?;
+    job.fee_bps = fee_bps;
+    job.state = JobState::Funded;
+    job.reserve = reserve;
+    job.reserve_funded = reserve;
+    save_job(e, job_id, &job);
+    if fee_bps > 0 {
+        snapshot_treasury(e, job_id)?;
+    }
+    TokenClient::new(e, &job.token).transfer(&job.client, e.current_contract_address(), &total);
+    JobFunded {
+        job_id,
+        client: job.client.clone(),
+        amount: job.budget,
+        fee_bps: job.fee_bps,
+    }
+    .publish(e);
+    if reserve > 0 {
+        ReserveFunded {
+            job_id,
+            client: job.client,
+            reserve,
+        }
+        .publish(e);
+    }
+    extend_instance(e);
+    Ok(())
+}
+
+/// Records the current treasury for a job with a fee: a later `set_treasury` must not
+/// redirect this job's fee (audit E-3).
+fn snapshot_treasury(e: &Env, job_id: u64) -> Result<(), EscrowError> {
+    let treasury = EscrowContract::treasury(e).ok_or(EscrowError::TreasuryNotSet)?;
+    let key = DataKey::JobTreasury(job_id);
+    e.storage().persistent().set(&key, &treasury);
+    extend_persistent(e, &key);
+    Ok(())
+}
+
+/// Zeroes the unspent reserve of a closing job and returns it. `reserve_funded` stays.
+fn take_reserve(job: &mut Job) -> i128 {
+    core::mem::replace(&mut job.reserve, 0)
+}
+
+/// The refund exit of `reject` and `claim_refund`, never to the caller and with no
+/// fee. A consumer's job returns `budget` plus the unspent `reserve` to its client in
+/// one transfer, as `fund` pulled them. A child job returns both up its tree
+/// (ADR-0011 D3): the reserve is never its client's (agent A's) money.
+fn refund_exit(e: &Env, job_id: u64, job: &Job, reserve: i128) -> Result<(), EscrowError> {
+    let amount = job
+        .budget
+        .checked_add(reserve)
+        .ok_or(EscrowError::ArithmeticOverflow)?;
+    if job.parent_job_id.is_some() {
+        return close_child(e, job_id, job, amount);
+    }
+    TokenClient::new(e, &job.token).transfer(&e.current_contract_address(), &job.client, &amount);
+    if reserve > 0 {
+        ReserveRefunded {
+            job_id,
+            client: job.client.clone(),
+            amount: reserve,
+            deferred: false,
+        }
+        .publish(e);
+    }
+    Ok(())
+}
+
+/// A child job reached a terminal state: its parent has one open child less, and
+/// `amount` (refunded budget and unspent sub-reserve) goes back up the tree.
+fn close_child(e: &Env, child_job_id: u64, child: &Job, amount: i128) -> Result<(), EscrowError> {
+    let Some(parent_job_id) = child.parent_job_id else {
+        return Ok(());
+    };
+    let mut parent = load_job(e, parent_job_id)?;
+    parent.open_children = parent
+        .open_children
+        .checked_sub(1)
+        .ok_or(EscrowError::ArithmeticOverflow)?;
+    if amount > 0 && parent.state == JobState::Funded {
+        return credit_reserve(e, child_job_id, parent_job_id, parent, amount);
+    }
+    save_job(e, parent_job_id, &parent);
+    if amount > 0 {
+        return_up_tree(e, child_job_id, parent_job_id, parent, amount)?;
+    }
+    Ok(())
+}
+
+/// Adds `amount` to the reserve of a `Funded` job, which may spend it on another child.
+fn credit_reserve(
+    e: &Env,
+    child_job_id: u64,
+    job_id: u64,
+    mut job: Job,
+    amount: i128,
+) -> Result<(), EscrowError> {
+    job.reserve = job
+        .reserve
+        .checked_add(amount)
+        .ok_or(EscrowError::ArithmeticOverflow)?;
+    save_job(e, job_id, &job);
+    ReserveReturned {
+        parent_job_id: job_id,
+        child_job_id,
+        amount,
+        to_client: false,
+    }
+    .publish(e);
+    Ok(())
+}
+
+/// `job` is closed, so it no longer holds a reserve. `amount` goes to the nearest
+/// ancestor still `Funded`, or, when none is, to the client of the root job with the
+/// pull-payment fallback, so a child's exit never depends on the consumer being able
+/// to receive (ADR-0011 D3, closed parent exception). It walks at most `MAX_DEPTH`
+/// ancestors: parent ids always precede their children's.
+fn return_up_tree(
+    e: &Env,
+    child_job_id: u64,
+    mut job_id: u64,
+    mut job: Job,
+    amount: i128,
+) -> Result<(), EscrowError> {
+    loop {
+        match job.parent_job_id {
+            None => {
+                pay_or_defer(e, job_id, &job.token, &job.client, amount)?;
+                ReserveReturned {
+                    parent_job_id: job_id,
+                    child_job_id,
+                    amount,
+                    to_client: true,
+                }
+                .publish(e);
+                return Ok(());
+            }
+            Some(up) => {
+                let ancestor = load_job(e, up)?;
+                if ancestor.state == JobState::Funded {
+                    return credit_reserve(e, child_job_id, up, ancestor, amount);
+                }
+                job_id = up;
+                job = ancestor;
+            }
+        }
+    }
+}
+
+/// ADR-0011 D5: neither `provider` nor `agent_id` may already be the provider of a
+/// job in the ancestor chain that starts at `parent`, the root included. Reads at
+/// most `MAX_DEPTH` jobs.
+fn require_no_cycle(
+    e: &Env,
+    parent: &Job,
+    provider: &Address,
+    agent_id: u32,
+) -> Result<(), EscrowError> {
+    let mut ancestor = parent.clone();
+    loop {
+        if ancestor.provider == *provider || ancestor.agent_id == agent_id {
+            return Err(EscrowError::SubcontractCycle);
+        }
+        match ancestor.parent_job_id {
+            None => return Ok(()),
+            Some(up) => ancestor = load_job(e, up)?,
+        }
+    }
 }
 
 fn next_job_id(e: &Env) -> u64 {
