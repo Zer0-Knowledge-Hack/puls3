@@ -73,13 +73,13 @@ void main() {
         checkStudioForm(
           _valid(skills: ['A1', 'B2', 'C3', 'D4', 'E5', 'F6']),
         ).errors[StudioField.skills],
-        'Too many skills: remove some.',
+        'Too many categories: remove some.',
       );
       expect(
         checkStudioForm(
           _valid(skills: ['Data cleaning', 'data  cleaning']),
         ).errors[StudioField.skills],
-        'Two skills have the same name.',
+        'Two categories have the same name.',
       );
     });
 

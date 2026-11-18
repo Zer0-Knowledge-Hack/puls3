@@ -1452,16 +1452,28 @@ abstract class AppLocalizations {
   /// **'{count} characters'**
   String studioCharacters(int count);
 
+  /// No description provided for @studioWhatItDoes.
+  ///
+  /// In en, this message translates to:
+  /// **'What does your agent do and how should it work?'**
+  String get studioWhatItDoes;
+
+  /// No description provided for @studioWhatItDoesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the job and how the agent should approach it. We turn it into its public description and instructions.'**
+  String get studioWhatItDoesHint;
+
   /// No description provided for @studioDescription.
   ///
   /// In en, this message translates to:
-  /// **'Description'**
+  /// **'Public description'**
   String get studioDescription;
 
   /// No description provided for @studioDescriptionHint.
   ///
   /// In en, this message translates to:
-  /// **'What the agent does, in one or two sentences'**
+  /// **'Shown in the Marketplace, in one or two sentences'**
   String get studioDescriptionHint;
 
   /// No description provided for @studioModel.
@@ -1512,10 +1524,16 @@ abstract class AppLocalizations {
   /// **'The instructions the agent follows on every hire'**
   String get studioSystemPromptHint;
 
+  /// No description provided for @studioCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get studioCategories;
+
   /// No description provided for @studioAddSkill.
   ///
   /// In en, this message translates to:
-  /// **'Add a skill'**
+  /// **'Add a category'**
   String get studioAddSkill;
 
   /// No description provided for @studioAddSkillHint.
@@ -1527,8 +1545,26 @@ abstract class AppLocalizations {
   /// No description provided for @studioAddSkillTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Add skill'**
+  /// **'Add category'**
   String get studioAddSkillTooltip;
+
+  /// No description provided for @studioAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get studioAdvanced;
+
+  /// No description provided for @studioAdvancedHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide advanced'**
+  String get studioAdvancedHide;
+
+  /// No description provided for @studioAdvancedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Description, prompt, model and limits'**
+  String get studioAdvancedDetails;
 
   /// No description provided for @studioSectionIo.
   ///
@@ -1677,13 +1713,13 @@ abstract class AppLocalizations {
   /// No description provided for @studioErrSkillLetters.
   ///
   /// In en, this message translates to:
-  /// **'Use letters or numbers in each skill name.'**
+  /// **'Use letters or numbers in each category name.'**
   String get studioErrSkillLetters;
 
   /// No description provided for @studioErrSkillTooLong.
   ///
   /// In en, this message translates to:
-  /// **'A skill name is too long.'**
+  /// **'A category name is too long.'**
   String get studioErrSkillTooLong;
 
   /// No description provided for @studioErrNameMissing.
@@ -1737,25 +1773,25 @@ abstract class AppLocalizations {
   /// No description provided for @studioErrSkillsMissing.
   ///
   /// In en, this message translates to:
-  /// **'Add at least one skill.'**
+  /// **'Add at least one category.'**
   String get studioErrSkillsMissing;
 
   /// No description provided for @studioErrSkillsTooMany.
   ///
   /// In en, this message translates to:
-  /// **'Too many skills: remove some.'**
+  /// **'Too many categories: remove some.'**
   String get studioErrSkillsTooMany;
 
   /// No description provided for @studioErrSkillDuplicate.
   ///
   /// In en, this message translates to:
-  /// **'Two skills have the same name.'**
+  /// **'Two categories have the same name.'**
   String get studioErrSkillDuplicate;
 
   /// No description provided for @studioErrSkillCheck.
   ///
   /// In en, this message translates to:
-  /// **'Check the skill names.'**
+  /// **'Check the category names.'**
   String get studioErrSkillCheck;
 
   /// No description provided for @studioErrModelMissing.

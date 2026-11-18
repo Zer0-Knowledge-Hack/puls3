@@ -1,6 +1,6 @@
 # cargo-audit configuration for the Soroban workspace (audit P-1, #206).
 # Every ignore needs a reason and a way out. Remove it once the way out lands.
-# Both ignores below are tracked in #295 (bump soroban-sdk).
+# The ignores below are tracked in #295 (bump soroban-sdk).
 
 [advisories]
 ignore = [
@@ -21,4 +21,11 @@ ignore = [
   # this line when soroban-env-host stops depending on it. CI keeps the
   # wasm-graph claim true (`contracts` job, #281).
   "RUSTSEC-2024-0436",
+  # RUSTSEC-2026-0543: chrono 0.4.45, no longer maintained (a warning). It is
+  # in Cargo.lock only as an optional dependency of serde_with 3.23 (reached
+  # through soroban-ledger-snapshot, the SDK's test snapshots), whose `chrono`
+  # feature nothing enables, so it is never compiled, for any target:
+  # `cargo tree -i chrono --target all -e all` prints nothing. Way out: drop
+  # this line when serde_with or the soroban-sdk bump (#295) stops listing it.
+  "RUSTSEC-2026-0543",
 ]

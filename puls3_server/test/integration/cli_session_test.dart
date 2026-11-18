@@ -106,9 +106,15 @@ void main() {
         // The generated client is what a program can send.
         final client = File(
           '../puls3_client/lib/src/protocol/client.dart',
-        ).readAsStringSync();
+        ).readAsStringSync().replaceAll('\r\n', '\n');
         final start = client.indexOf('class EndpointCliSession');
+        if (start == -1) {
+          fail('class EndpointCliSession not found in the generated client');
+        }
         final end = client.indexOf('\n}\n', start);
+        if (end == -1) {
+          fail('end of class EndpointCliSession not found in the client');
+        }
         final cliSession = client.substring(start, end);
 
         // What each call sends: the argument map of callServerEndpoint.
@@ -147,18 +153,21 @@ void main() {
         expect(await endpoints.cliSession.list(app), hasLength(1));
       });
 
-      test('an access token of a revoked app session cannot create one', () async {
-        final (_, app) = await signedIn();
-        final appSessionId = UuidValue.withValidation(
-          app.build().authenticated!.authId,
-        );
-        await jwt.revokeRefreshToken(
-          sessionBuilder.build(),
-          refreshTokenId: appSessionId,
-        );
+      test(
+        'an access token of a revoked app session cannot create one',
+        () async {
+          final (_, app) = await signedIn();
+          final appSessionId = UuidValue.withValidation(
+            app.build().authenticated!.authId,
+          );
+          await jwt.revokeRefreshToken(
+            sessionBuilder.build(),
+            refreshTokenId: appSessionId,
+          );
 
-        await expectLater(endpoints.cliSession.create(app), notAllowed());
-      });
+          await expectLater(endpoints.cliSession.create(app), notAllowed());
+        },
+      );
 
       test('a login with no session row cannot create one', () async {
         final user = await const AuthUsers().create(sessionBuilder.build());
@@ -263,24 +272,27 @@ void main() {
         );
       });
 
-      test('a CLI token sent as the refresh cookie gets the same limit', () async {
-        final (_, caller) = await signedIn();
-        final grant = await endpoints.cliSession.create(caller);
+      test(
+        'a CLI token sent as the refresh cookie gets the same limit',
+        () async {
+          final (_, caller) = await signedIn();
+          final grant = await endpoints.cliSession.create(caller);
 
-        JwtRefreshEndpoint.debugCookie = (_) => grant.refreshToken;
-        JwtRefreshEndpoint.debugNow = () => grant.expiresAt;
-        await expectLater(
-          endpoints.jwtRefresh.refreshAccessToken(sessionBuilder),
-          throwsA(isA<RefreshTokenExpiredException>()),
-        );
-        expect(
-          await RefreshToken.db.findById(
-            sessionBuilder.build(),
-            UuidValue.withValidation(grant.id),
-          ),
-          isNull,
-        );
-      });
+          JwtRefreshEndpoint.debugCookie = (_) => grant.refreshToken;
+          JwtRefreshEndpoint.debugNow = () => grant.expiresAt;
+          await expectLater(
+            endpoints.jwtRefresh.refreshAccessToken(sessionBuilder),
+            throwsA(isA<RefreshTokenExpiredException>()),
+          );
+          expect(
+            await RefreshToken.db.findById(
+              sessionBuilder.build(),
+              UuidValue.withValidation(grant.id),
+            ),
+            isNull,
+          );
+        },
+      );
 
       test('an app session of the same age still refreshes', () async {
         final (user, caller) = await signedIn();

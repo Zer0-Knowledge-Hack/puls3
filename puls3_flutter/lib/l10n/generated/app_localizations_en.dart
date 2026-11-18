@@ -758,11 +758,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get studioDescription => 'Description';
+  String get studioWhatItDoes =>
+      'What does your agent do and how should it work?';
+
+  @override
+  String get studioWhatItDoesHint =>
+      'Describe the job and how the agent should approach it. We turn it into its public description and instructions.';
+
+  @override
+  String get studioDescription => 'Public description';
 
   @override
   String get studioDescriptionHint =>
-      'What the agent does, in one or two sentences';
+      'Shown in the Marketplace, in one or two sentences';
 
   @override
   String get studioModel => 'Model';
@@ -794,13 +802,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'The instructions the agent follows on every hire';
 
   @override
-  String get studioAddSkill => 'Add a skill';
+  String get studioCategories => 'Categories';
+
+  @override
+  String get studioAddSkill => 'Add a category';
 
   @override
   String get studioAddSkillHint => 'Type and press Enter';
 
   @override
-  String get studioAddSkillTooltip => 'Add skill';
+  String get studioAddSkillTooltip => 'Add category';
+
+  @override
+  String get studioAdvanced => 'Advanced';
+
+  @override
+  String get studioAdvancedHide => 'Hide advanced';
+
+  @override
+  String get studioAdvancedDetails => 'Description, prompt, model and limits';
 
   @override
   String get studioSectionIo => 'Input and output';
@@ -897,10 +917,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get studioErrSkillLetters =>
-      'Use letters or numbers in each skill name.';
+      'Use letters or numbers in each category name.';
 
   @override
-  String get studioErrSkillTooLong => 'A skill name is too long.';
+  String get studioErrSkillTooLong => 'A category name is too long.';
 
   @override
   String get studioErrNameMissing => 'Give your agent a name.';
@@ -927,16 +947,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studioErrDescCheck => 'Check the description.';
 
   @override
-  String get studioErrSkillsMissing => 'Add at least one skill.';
+  String get studioErrSkillsMissing => 'Add at least one category.';
 
   @override
-  String get studioErrSkillsTooMany => 'Too many skills: remove some.';
+  String get studioErrSkillsTooMany => 'Too many categories: remove some.';
 
   @override
-  String get studioErrSkillDuplicate => 'Two skills have the same name.';
+  String get studioErrSkillDuplicate => 'Two categories have the same name.';
 
   @override
-  String get studioErrSkillCheck => 'Check the skill names.';
+  String get studioErrSkillCheck => 'Check the category names.';
 
   @override
   String get studioErrModelMissing => 'Choose a model.';
