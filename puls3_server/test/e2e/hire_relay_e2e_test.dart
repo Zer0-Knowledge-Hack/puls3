@@ -8,9 +8,12 @@ import 'package:puls3_domain/puls3_domain.dart' show HireStatus;
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
+import 'package:puls3_server/src/ledger/sc_val_json.dart';
 import 'package:test/test.dart';
 
+import 'support/contract_event_log.dart';
 import 'support/e2e_world.dart';
+import 'support/local_sandbox.dart' show until;
 
 /// F1 and F5 on the local sandbox (#255): a consumer creates and funds a hire
 /// using only the hire endpoint, and signs the unsigned XDR it receives
@@ -113,15 +116,53 @@ void main() {
       // The database records both relayed transactions as confirmed, and the
       // escrow holds the job as funded.
       final rows = await world.submissions.listByHire(hireId);
-      expect(
-        {
-          for (final row in rows)
-            if (row.state == SubmissionState.confirmed) row.transactionHash,
-        },
-        containsAll([createHash, fundHash]),
-      );
+      expect({
+        for (final row in rows)
+          if (row.state == SubmissionState.confirmed) row.transactionHash,
+      }, containsAll([createHash, fundHash]));
       final fundedJob = (await world.wiring.ledger.escrowJob(jobId))!;
       expect(fundedJob.state, EscrowJobState.funded);
+
+      // The escrow also emitted both events, for this job and these accounts,
+      // in the transactions the server relayed (#287).
+      final escrow = world.wiring.stellar.escrow.value;
+      final events = await until(
+        'the escrow to report both job events',
+        () async {
+          final all = await world.events.read(
+            escrow,
+            startLedger: world.startLedger,
+          );
+          return all.forJob('job_created', jobId).isNotEmpty &&
+                  all.forJob('job_funded', jobId).isNotEmpty
+              ? all
+              : null;
+        },
+      );
+      final created$ = events.forJob('job_created', jobId);
+      expect(created$, hasLength(1));
+      final createdEvent = created$.single;
+      expect(createdEvent.transaction, createHash);
+      expect(readAddress(createdEvent.data['client']), world.consumer.address);
+      expect(
+        readAddress(createdEvent.data['provider']),
+        world.agentAccount.address,
+      );
+      expect(readU32(createdEvent.data['agent_id']), world.agentId);
+      expect(
+        readI128(createdEvent.data['budget']),
+        BigInt.from(e2ePriceStroops),
+      );
+
+      final funded$ = events.forJob('job_funded', jobId);
+      expect(funded$, hasLength(1));
+      final fundedEvent = funded$.single;
+      expect(fundedEvent.transaction, fundHash);
+      expect(readAddress(fundedEvent.data['client']), world.consumer.address);
+      expect(
+        readI128(fundedEvent.data['amount']),
+        BigInt.from(e2ePriceStroops),
+      );
     },
   );
 }
