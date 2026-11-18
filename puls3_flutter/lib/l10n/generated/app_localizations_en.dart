@@ -1333,4 +1333,229 @@ class AppLocalizationsEn extends AppLocalizations {
   String rateInvalid(int max) {
     return 'Pick a score from 1 to 5 and keep the comment to $max characters.';
   }
+
+  @override
+  String get collabWalletLabel => 'Your agent\'s wallet';
+
+  @override
+  String get collabWalletHint =>
+      'This agent pays from its own wallet. Fund it with testnet USDC first.';
+
+  @override
+  String get collabWalletUnknown =>
+      'The wallet address shows up once your agent is listed in the marketplace.';
+
+  @override
+  String get collabFaucet => 'Get testnet USDC';
+
+  @override
+  String get collabCopyWallet => 'Copy address';
+
+  @override
+  String get collabWalletCopied => 'Address copied';
+
+  @override
+  String collabProgressTitle(int hireId) {
+    return 'Hire #$hireId';
+  }
+
+  @override
+  String get collabStepFunded => 'Payment locked in escrow';
+
+  @override
+  String get collabStepWorking => 'The hired agent is working';
+
+  @override
+  String get collabStepDelivered => 'Work delivered';
+
+  @override
+  String get collabStepCompleted => 'Payment released to the hired agent';
+
+  @override
+  String get collabViewTransaction => 'View transaction';
+
+  @override
+  String get collabResultLabel => 'Result';
+
+  @override
+  String collabStopped(String reason) {
+    return 'The hire stopped: $reason';
+  }
+
+  @override
+  String get collabRefunded =>
+      'This hire was cancelled and the money went back to your agent.';
+
+  @override
+  String get collabErrorNotOwned =>
+      'Only the owner of this live agent can make it hire others.';
+
+  @override
+  String get collabErrorSelfHire =>
+      'An agent cannot hire itself. Pick another agent.';
+
+  @override
+  String get collabErrorInvalid =>
+      'Write what the agent should do and a budget above zero.';
+
+  @override
+  String get collabErrorBudget =>
+      'The budget is lower than this agent\'s price. Raise it and try again.';
+
+  @override
+  String get collabErrorWallet =>
+      'Your agent\'s wallet cannot pay right now. Try again later.';
+
+  @override
+  String get collabErrorChain =>
+      'The Stellar network could not be reached. Try again in a moment.';
+
+  @override
+  String get collabErrorAgent =>
+      'This agent cannot be hired right now. Pick another one.';
+
+  @override
+  String get collabErrorHireNotOwned =>
+      'This hire does not belong to your agent.';
+
+  @override
+  String get collabErrorGeneric => 'Something went wrong. Try again.';
+
+  @override
+  String get navMyHires => 'My hires';
+
+  @override
+  String get myHiresTitle => 'My hires';
+
+  @override
+  String get myHiresSubtitle =>
+      'Every agent you hired with this wallet. Open one to see its result, approve it or ask for a refund.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Needs your action';
+
+  @override
+  String get myHiresTabInProgress => 'In progress';
+
+  @override
+  String get myHiresTabFinished => 'Finished';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'Nothing to do right now';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'When an agent delivers, you approve or reject its work here.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'No hires in progress';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'Hires you pay for show up here while the agent works on them.';
+
+  @override
+  String get myHiresEmptyFinishedTitle => 'No finished hires yet';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Approved, refunded and expired hires show up here.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Browse the Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Connect your wallet';
+
+  @override
+  String get myHiresConnectBody =>
+      'Your hires are linked to the wallet that paid for them. Connect it to see them.';
+
+  @override
+  String get myHiresConnectAction => 'Connect wallet';
+
+  @override
+  String get myHiresSignInTitle => 'Sign in to see your hires';
+
+  @override
+  String get myHiresSignInBody =>
+      'Your wallet signs a sign-in message. It only proves the account is yours and moves no funds.';
+
+  @override
+  String get myHiresSignInAction => 'Sign in with wallet';
+
+  @override
+  String get myHiresSigningIn => 'Signing in…';
+
+  @override
+  String get myHiresLoadErrorTitle => 'Could not load your hires';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Approve by $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Waiting for payment';
+
+  @override
+  String get myHiresStatusInProgress => 'In progress';
+
+  @override
+  String get myHiresStatusReview => 'Ready for your review';
+
+  @override
+  String get myHiresStatusCompleted => 'Completed';
+
+  @override
+  String get myHiresStatusRejected => 'Refunded';
+
+  @override
+  String get myHiresStatusExpired => 'Expired';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: these hires are samples and no funds moved.';
+
+  @override
+  String get hireOpenMyHires => 'My hires';
+
+  @override
+  String get hirePayerTitle => 'Who pays?';
+
+  @override
+  String get hirePayerYou => 'You (your wallet)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'Your agent $name (pays from its own wallet)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name hires this agent and pays $price USDC from its own wallet. You do not need to sign anything.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Hire with $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'Starting the hire…';
+
+  @override
+  String get hireAsAgentInputMissing => 'Write what the agent should do first.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Paid by your agent $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Hire made by your agent';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Connect the wallet that owns this agent to see this hire.';
 }

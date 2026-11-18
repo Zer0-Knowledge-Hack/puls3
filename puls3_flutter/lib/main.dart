@@ -54,6 +54,7 @@ HireGateway? _createHireGateway(Client client, WalletSession session) =>
         prepareReject: client.hire.prepareReject,
         submitEscrowCall: client.hire.submitEscrowCall,
         getHire: client.hire.getHire,
+        listMyHires: client.hire.listMyHires,
         prepareFeedback: client.feedback.prepareFeedback,
         submitFeedback: client.feedback.submitFeedback,
         session: session,
@@ -100,6 +101,8 @@ StudioGateway? _createStudioGateway(
     saveProviderCredential: client.studio.saveProviderCredential,
     wallet: wallet,
     session: session,
+    hireAgentAs: client.studio.hireAgentAs,
+    getAgentHire: client.studio.getAgentHire,
   ),
   _ => throw StateError(
     'Unknown STUDIO "$_studioKind": use "demo" or "server".',

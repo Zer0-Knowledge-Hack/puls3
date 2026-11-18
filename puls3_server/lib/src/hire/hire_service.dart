@@ -26,6 +26,7 @@ class HireService {
     required this.catalog,
     required this.custody,
     required this.config,
+    this.unpublished = noStudioAgents,
     AgentSummaryLookup? agentOf,
     DateTime Function()? now,
   }) : _agentOf = agentOf,
@@ -39,6 +40,9 @@ class HireService {
 
   /// The one custody rule: which payment wallets the server can sign for.
   final CustodyLookup custody;
+
+  /// Which agents are Studio agents without a published version.
+  final PublicationLookup unpublished;
   final HireRelayConfig config;
   final DateTime Function() _now;
 
@@ -67,6 +71,8 @@ class HireService {
   /// An agent whose payment wallet is not custodied is refused with
   /// [AgentCannotDeliver] before anything is stored: the server could never
   /// sign its `submit`, so the payment would sit in the escrow until expiry.
+  /// A Studio agent whose deploy is not `active` (published) is refused the
+  /// same way: it has no version the server could run.
   Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
@@ -112,7 +118,15 @@ class HireService {
     }
     final agentWallet = liveWallet.value;
     final custodied = await custody({agentWallet});
-    if (!custodied.contains(agentWallet)) {
+    final deliverable =
+        custodied.contains(agentWallet) &&
+        canDeliver(
+          registryId: agentId,
+          wallet: agentWallet,
+          custodied: custodied,
+          unpublished: await unpublished({agentId}),
+        );
+    if (!deliverable) {
       // The server would never send this agent's `submit`, so the escrow would
       // hold the consumer's payment until the job expires (#276).
       throw AgentCannotDeliver(agentId: agentId);

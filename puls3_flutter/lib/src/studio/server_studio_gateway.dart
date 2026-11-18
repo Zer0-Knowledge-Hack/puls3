@@ -31,6 +31,19 @@ typedef TestRunCall =
 typedef SaveProviderCredentialCall =
     Future<void> Function(String provider, String secret, String? accountId);
 
+/// `client.studio.hireAgentAs`.
+typedef HireAgentAsCall =
+    Future<api.AgentHireStarted> Function(
+      int hiringAgentId,
+      int agentId,
+      String input,
+      int budgetUsdcStroops,
+    );
+
+/// `client.studio.getAgentHire`.
+typedef GetAgentHireCall =
+    Future<api.HireDetail> Function(int hiringAgentId, int hireId);
+
 /// [StudioGateway] over `StudioEndpoint` (#35).
 ///
 /// The session wallet is the owner. [signChallenge] signs the SEP-10
@@ -47,6 +60,8 @@ class ServerStudioGateway implements StudioGateway {
     required this._saveProviderCredential,
     required this._wallet,
     this._session,
+    this._hireAgentAs,
+    this._getAgentHire,
     this.callTimeout = const Duration(seconds: 30),
     this.testRunTimeout = const Duration(seconds: 150),
   });
@@ -58,6 +73,8 @@ class ServerStudioGateway implements StudioGateway {
   final SaveProviderCredentialCall _saveProviderCredential;
   final WalletPort _wallet;
   final WalletSession? _session;
+  final HireAgentAsCall? _hireAgentAs;
+  final GetAgentHireCall? _getAgentHire;
   final Duration callTimeout;
 
   /// Longer than [callTimeout]: a model run may use the 120s runtime limit.
@@ -135,6 +152,52 @@ class ServerStudioGateway implements StudioGateway {
     String? agentId,
   }) async {}
 
+  @override
+  Future<AgentHireStart> hireAgentAs({
+    required int hiringAgentId,
+    required int agentId,
+    required String input,
+    required int budgetUsdcStroops,
+    required String owner,
+  }) async {
+    final call =
+        _hireAgentAs ??
+        (throw const StudioUnavailable('Agent hires are not available.'));
+    await _signedIn(owner);
+    final started = await _call(
+      () => call(hiringAgentId, agentId, input, budgetUsdcStroops),
+    );
+    return AgentHireStart(
+      hireId: started.hireId,
+      hiringWallet: started.hiringWallet,
+    );
+  }
+
+  @override
+  Future<AgentHireProgress> getAgentHire({
+    required int hiringAgentId,
+    required int hireId,
+    required String owner,
+  }) async {
+    final call =
+        _getAgentHire ??
+        (throw const StudioUnavailable('Agent hires are not available.'));
+    await _signedIn(owner);
+    final detail = await _call(() => call(hiringAgentId, hireId));
+    final escrow = detail.escrowSubmission;
+    return AgentHireProgress(
+      hireId: detail.hire.id,
+      status: detail.hire.status,
+      runtimeStatus: detail.hire.runtimeStatus,
+      failureReason: detail.hire.failureReason,
+      result: detail.result,
+      fundTransaction: detail.hire.paymentTransaction,
+      lastPurpose: escrow?.purpose,
+      lastTransaction: escrow?.transaction,
+      lastFailed: escrow?.state == 'failed',
+    );
+  }
+
   Future<void> _signedIn(String owner) async {
     final session = _session;
     if (session == null) return;
@@ -183,6 +246,30 @@ class ServerStudioGateway implements StudioGateway {
         ),
         'AgentExecutionFailed' => StudioRunFailed(
           error.details?['reason'] ?? 'The agent run failed.',
+        ),
+        'HiringAgentNotOwned' => const StudioAgentHireRefused(
+          AgentHireRefusal.notOwned,
+        ),
+        'SelfHireNotAllowed' => const StudioAgentHireRefused(
+          AgentHireRefusal.selfHire,
+        ),
+        'InvalidHire' => const StudioAgentHireRefused(AgentHireRefusal.invalid),
+        'BudgetExceeded' => const StudioAgentHireRefused(
+          AgentHireRefusal.budgetExceeded,
+        ),
+        'AgentWalletUnavailable' => const StudioAgentHireRefused(
+          AgentHireRefusal.walletUnavailable,
+        ),
+        'ChainUnavailable' => const StudioAgentHireRefused(
+          AgentHireRefusal.chainUnavailable,
+        ),
+        'AgentNotFound' ||
+        'AgentCannotDeliver' ||
+        'AgentHireRefused' => const StudioAgentHireRefused(
+          AgentHireRefusal.agentUnavailable,
+        ),
+        'HireNotOwned' || 'HireNotFound' => const StudioAgentHireRefused(
+          AgentHireRefusal.hireNotOwned,
         ),
         'NotAuthenticated' ||
         'AuthenticationUnavailable' => const StudioUnavailable(

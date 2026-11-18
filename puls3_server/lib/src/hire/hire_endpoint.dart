@@ -3,6 +3,7 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
+import '../studio/studio_endpoint.dart';
 import 'escrow_relay_service.dart';
 import 'hire_services.dart';
 import 'session_wallet.dart';
@@ -14,8 +15,6 @@ import 'session_wallet.dart';
 /// store and no chain. Wallet parameters must equal the session wallet
 /// (`WalletMismatch`), and ownership of a hire is checked against the session
 /// wallet by the services.
-///
-/// `listHires` is not part of this endpoint yet.
 ///
 /// Follow-ups: `InputTooLong` has no documented limit, so the input length is
 /// not checked here; `PersistenceUnavailable` is not mapped, so a database
@@ -136,6 +135,30 @@ class HireEndpoint extends Endpoint {
         _servicesOn(session).query ??
         (throw StateError('HireServices has no query service'));
     return query.getHire(wallet, hireId);
+  }
+
+  /// The session wallet's hires, newest first and capped, so the app can
+  /// list them (My hires). The consumer is always the session wallet: there
+  /// is no wallet parameter to ask for anyone else's. The hires its active
+  /// Studio agents made from their own wallets (`hireAgentAs`) are included,
+  /// with the paying agent set; ownership is the Studio deploy's owner, the
+  /// same rule as `StudioEndpoint.hireAgentAs`.
+  Future<List<HireSummary>> listMyHires(Session session) async {
+    final wallet = await _wallet.requireLogin(session);
+    final query =
+        _servicesOn(session).query ??
+        (throw StateError('HireServices has no query service'));
+    final owned = await StudioEndpoint.deployStoreOf(
+      session,
+    ).listActiveByOwner(wallet.value);
+    return query.listMyHires(
+      wallet,
+      agents: [
+        for (final deploy in owned)
+          if (deploy.registryAgentId case final id?)
+            (registryId: id, wallet: deploy.agentWallet),
+      ],
+    );
   }
 
   /// Verifies the wallet-signed envelope of [preparationId] and relays it.
