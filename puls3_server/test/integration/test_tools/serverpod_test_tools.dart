@@ -756,8 +756,10 @@ class _HireEndpoint {
     int agentId,
     String consumer,
     String input,
-    String requestId,
-  ) async {
+    String requestId, {
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+  }) async {
     return _ist.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
@@ -774,6 +776,8 @@ class _HireEndpoint {
             'consumer': consumer,
             'input': input,
             'requestId': requestId,
+            'subcontractReserve': subcontractReserve,
+            'allowRelatedParty': allowRelatedParty,
           }),
           serializationManager: _serializationManager,
         );

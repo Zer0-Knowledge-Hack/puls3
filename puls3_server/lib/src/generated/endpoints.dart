@@ -413,6 +413,16 @@ class Endpoints extends _is.EndpointDispatch {
               type: _is.getType<String>(),
               nullable: false,
             ),
+            'subcontractReserve': _is.ParameterDescription(
+              name: 'subcontractReserve',
+              type: _is.getType<int?>(),
+              nullable: true,
+            ),
+            'allowRelatedParty': _is.ParameterDescription(
+              name: 'allowRelatedParty',
+              type: _is.getType<bool?>(),
+              nullable: true,
+            ),
           },
           call:
               (
@@ -425,6 +435,8 @@ class Endpoints extends _is.EndpointDispatch {
                     params['consumer'],
                     params['input'],
                     params['requestId'],
+                    subcontractReserve: params['subcontractReserve'],
+                    allowRelatedParty: params['allowRelatedParty'],
                   ),
         ),
         'prepareCreateJob': _is.MethodConnector(
