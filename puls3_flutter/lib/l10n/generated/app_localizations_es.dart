@@ -768,10 +768,18 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get studioDescription => 'Descripción';
+  String get studioWhatItDoes => '¿Qué hace tu agente y cómo debe trabajar?';
 
   @override
-  String get studioDescriptionHint => 'Qué hace el agente, en una o dos frases';
+  String get studioWhatItDoesHint =>
+      'Describe el trabajo y cómo debe abordarlo el agente. Lo convertimos en su descripción pública e instrucciones.';
+
+  @override
+  String get studioDescription => 'Descripción pública';
+
+  @override
+  String get studioDescriptionHint =>
+      'Se muestra en el Marketplace, en una o dos frases';
 
   @override
   String get studioModel => 'Modelo';
@@ -805,13 +813,25 @@ class AppLocalizationsEs extends AppLocalizations {
       'Las instrucciones que el agente sigue en cada hire';
 
   @override
-  String get studioAddSkill => 'Agregar una habilidad';
+  String get studioCategories => 'Categorías';
+
+  @override
+  String get studioAddSkill => 'Agregar una categoría';
 
   @override
   String get studioAddSkillHint => 'Escribe y pulsa Enter';
 
   @override
-  String get studioAddSkillTooltip => 'Agregar habilidad';
+  String get studioAddSkillTooltip => 'Agregar categoría';
+
+  @override
+  String get studioAdvanced => 'Avanzado';
+
+  @override
+  String get studioAdvancedHide => 'Ocultar avanzado';
+
+  @override
+  String get studioAdvancedDetails => 'Descripción, prompt, modelo y límites';
 
   @override
   String get studioSectionIo => 'Entrada y salida';
@@ -907,11 +927,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get studioErrSkillLetters =>
-      'Usa letras o números en cada nombre de habilidad.';
+      'Usa letras o números en cada nombre de categoría.';
 
   @override
   String get studioErrSkillTooLong =>
-      'El nombre de una habilidad es demasiado largo.';
+      'El nombre de una categoría es demasiado largo.';
 
   @override
   String get studioErrNameMissing => 'Ponle un nombre a tu agente.';
@@ -938,17 +958,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get studioErrDescCheck => 'Revisa la descripción.';
 
   @override
-  String get studioErrSkillsMissing => 'Agrega al menos una habilidad.';
+  String get studioErrSkillsMissing => 'Agrega al menos una categoría.';
 
   @override
-  String get studioErrSkillsTooMany => 'Demasiadas habilidades: quita algunas.';
+  String get studioErrSkillsTooMany => 'Demasiadas categorías: quita algunas.';
 
   @override
   String get studioErrSkillDuplicate =>
-      'Dos habilidades tienen el mismo nombre.';
+      'Dos categorías tienen el mismo nombre.';
 
   @override
-  String get studioErrSkillCheck => 'Revisa los nombres de las habilidades.';
+  String get studioErrSkillCheck => 'Revisa los nombres de las categorías.';
 
   @override
   String get studioErrModelMissing => 'Elige un modelo.';
@@ -1358,4 +1378,231 @@ class AppLocalizationsEs extends AppLocalizations {
   String rateInvalid(int max) {
     return 'Elige un puntaje de 1 a 5 y deja el comentario en $max caracteres como máximo.';
   }
+
+  @override
+  String get collabWalletLabel => 'Billetera de tu agente';
+
+  @override
+  String get collabWalletHint =>
+      'Este agente paga desde su propia billetera. Primero cárgala con USDC de testnet.';
+
+  @override
+  String get collabWalletUnknown =>
+      'La dirección de la billetera aparece cuando tu agente ya está listado en el marketplace.';
+
+  @override
+  String get collabFaucet => 'Conseguir USDC de testnet';
+
+  @override
+  String get collabCopyWallet => 'Copiar dirección';
+
+  @override
+  String get collabWalletCopied => 'Dirección copiada';
+
+  @override
+  String collabProgressTitle(int hireId) {
+    return 'Contratación #$hireId';
+  }
+
+  @override
+  String get collabStepFunded => 'Pago bloqueado en el escrow';
+
+  @override
+  String get collabStepWorking => 'El agente contratado está trabajando';
+
+  @override
+  String get collabStepDelivered => 'Trabajo entregado';
+
+  @override
+  String get collabStepCompleted => 'Pago liberado al agente contratado';
+
+  @override
+  String get collabViewTransaction => 'Ver transacción';
+
+  @override
+  String get collabResultLabel => 'Resultado';
+
+  @override
+  String collabStopped(String reason) {
+    return 'La contratación se detuvo: $reason';
+  }
+
+  @override
+  String get collabRefunded =>
+      'Esta contratación se canceló y el dinero volvió a tu agente.';
+
+  @override
+  String get collabErrorNotOwned =>
+      'Solo el dueño de este agente publicado puede hacer que contrate a otros.';
+
+  @override
+  String get collabErrorSelfHire =>
+      'Un agente no puede contratarse a sí mismo. Elige otro agente.';
+
+  @override
+  String get collabErrorInvalid =>
+      'Escribe qué debe hacer el agente y un presupuesto mayor que cero.';
+
+  @override
+  String get collabErrorBudget =>
+      'El presupuesto es menor que el precio de este agente. Súbelo y vuelve a intentarlo.';
+
+  @override
+  String get collabErrorWallet =>
+      'La billetera de tu agente no puede pagar ahora. Inténtalo más tarde.';
+
+  @override
+  String get collabErrorChain =>
+      'No se pudo conectar con la red Stellar. Inténtalo en un momento.';
+
+  @override
+  String get collabErrorAgent =>
+      'Ahora no se puede contratar a este agente. Elige otro.';
+
+  @override
+  String get collabErrorHireNotOwned =>
+      'Esta contratación no pertenece a tu agente.';
+
+  @override
+  String get collabErrorGeneric => 'Algo salió mal. Inténtalo de nuevo.';
+
+  @override
+  String get navMyHires => 'Mis contrataciones';
+
+  @override
+  String get myHiresTitle => 'Mis contrataciones';
+
+  @override
+  String get myHiresSubtitle =>
+      'Todos los agentes que contrataste con esta billetera. Abre uno para ver su resultado, aprobarlo o pedir un reembolso.';
+
+  @override
+  String get myHiresTabNeedsAction => 'Requieren tu acción';
+
+  @override
+  String get myHiresTabInProgress => 'En curso';
+
+  @override
+  String get myHiresTabFinished => 'Finalizadas';
+
+  @override
+  String get myHiresEmptyNeedsActionTitle => 'No tienes nada pendiente';
+
+  @override
+  String get myHiresEmptyNeedsActionBody =>
+      'Cuando un agente entregue su trabajo, aquí lo apruebas o lo rechazas.';
+
+  @override
+  String get myHiresEmptyInProgressTitle => 'No hay contrataciones en curso';
+
+  @override
+  String get myHiresEmptyInProgressBody =>
+      'Las contrataciones que pagas aparecen aquí mientras el agente trabaja.';
+
+  @override
+  String get myHiresEmptyFinishedTitle =>
+      'Aún no hay contrataciones finalizadas';
+
+  @override
+  String get myHiresEmptyFinishedBody =>
+      'Aquí aparecen las contrataciones aprobadas, reembolsadas y vencidas.';
+
+  @override
+  String get myHiresBrowseMarketplace => 'Explorar el Marketplace';
+
+  @override
+  String get myHiresConnectTitle => 'Conecta tu billetera';
+
+  @override
+  String get myHiresConnectBody =>
+      'Tus contrataciones están ligadas a la billetera que las pagó. Conéctala para verlas.';
+
+  @override
+  String get myHiresConnectAction => 'Conectar billetera';
+
+  @override
+  String get myHiresSignInTitle => 'Inicia sesión para ver tus contrataciones';
+
+  @override
+  String get myHiresSignInBody =>
+      'Tu billetera firma un mensaje de inicio de sesión. Solo prueba que la cuenta es tuya y no mueve fondos.';
+
+  @override
+  String get myHiresSignInAction => 'Iniciar sesión con la billetera';
+
+  @override
+  String get myHiresSigningIn => 'Iniciando sesión…';
+
+  @override
+  String get myHiresLoadErrorTitle => 'No pudimos cargar tus contrataciones';
+
+  @override
+  String myHiresApproveBy(String date) {
+    return 'Aprueba antes del $date';
+  }
+
+  @override
+  String get myHiresStatusAwaitingPayment => 'Esperando el pago';
+
+  @override
+  String get myHiresStatusInProgress => 'En curso';
+
+  @override
+  String get myHiresStatusReview => 'Lista para tu revisión';
+
+  @override
+  String get myHiresStatusCompleted => 'Completada';
+
+  @override
+  String get myHiresStatusRejected => 'Reembolsada';
+
+  @override
+  String get myHiresStatusExpired => 'Vencida';
+
+  @override
+  String get myHiresDemoNote =>
+      'Demo: estas contrataciones son ejemplos y no se movieron fondos.';
+
+  @override
+  String get hireOpenMyHires => 'Mis contrataciones';
+
+  @override
+  String get hirePayerTitle => '¿Quién paga?';
+
+  @override
+  String get hirePayerYou => 'Tú (tu billetera)';
+
+  @override
+  String hirePayerAgent(String name) {
+    return 'Tu agente $name (paga desde su propia billetera)';
+  }
+
+  @override
+  String hireAsAgentLead(String name, String price) {
+    return '$name contrata a este agente y paga $price USDC desde su propia billetera. No necesitas firmar nada.';
+  }
+
+  @override
+  String hireAsAgentConfirm(String name) {
+    return 'Contratar con $name';
+  }
+
+  @override
+  String get hireAsAgentHiring => 'Iniciando la contratación…';
+
+  @override
+  String get hireAsAgentInputMissing =>
+      'Primero escribe qué debe hacer el agente.';
+
+  @override
+  String myHiresPaidByAgent(String name) {
+    return 'Pagado por tu agente $name';
+  }
+
+  @override
+  String get agentHireDetailTitle => 'Contratación hecha por tu agente';
+
+  @override
+  String get agentHireDetailConnect =>
+      'Conecta la billetera dueña de este agente para ver esta contratación.';
 }

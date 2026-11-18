@@ -276,8 +276,10 @@
       "count": {"type": "int"}
     }
   },
-  "studioDescription": "Description",
-  "studioDescriptionHint": "What the agent does, in one or two sentences",
+  "studioWhatItDoes": "What does your agent do and how should it work?",
+  "studioWhatItDoesHint": "Describe the job and how the agent should approach it. We turn it into its public description and instructions.",
+  "studioDescription": "Public description",
+  "studioDescriptionHint": "Shown in the Marketplace, in one or two sentences",
   "studioModel": "Model",
   "studioModelOwnProvider": "Runs on your own provider account",
   "studioModelFreeTier": "Free tier on your own Workers AI account",
@@ -296,9 +298,13 @@
   "studioSectionBehavior": "Behavior",
   "studioSystemPrompt": "System prompt",
   "studioSystemPromptHint": "The instructions the agent follows on every hire",
-  "studioAddSkill": "Add a skill",
+  "studioCategories": "Categories",
+  "studioAddSkill": "Add a category",
   "studioAddSkillHint": "Type and press Enter",
-  "studioAddSkillTooltip": "Add skill",
+  "studioAddSkillTooltip": "Add category",
+  "studioAdvanced": "Advanced",
+  "studioAdvancedHide": "Hide advanced",
+  "studioAdvancedDetails": "Description, prompt, model and limits",
   "studioSectionIo": "Input and output",
   "studioInputMax": "Longest input (characters)",
   "studioInputMaxHint": "For example, 6000",
@@ -354,8 +360,8 @@
   },
   "studioErrWholeNumber": "Enter a whole number of characters.",
   "studioErrPriceFormat": "Enter an amount like 0.50.",
-  "studioErrSkillLetters": "Use letters or numbers in each skill name.",
-  "studioErrSkillTooLong": "A skill name is too long.",
+  "studioErrSkillLetters": "Use letters or numbers in each category name.",
+  "studioErrSkillTooLong": "A category name is too long.",
   "studioErrNameMissing": "Give your agent a name.",
   "studioErrNameTooShort": "The name is too short.",
   "studioErrNameTooLong": "The name is too long.",
@@ -364,10 +370,10 @@
   "studioErrDescTooShort": "The description is too short.",
   "studioErrDescTooLong": "The description is too long.",
   "studioErrDescCheck": "Check the description.",
-  "studioErrSkillsMissing": "Add at least one skill.",
-  "studioErrSkillsTooMany": "Too many skills: remove some.",
-  "studioErrSkillDuplicate": "Two skills have the same name.",
-  "studioErrSkillCheck": "Check the skill names.",
+  "studioErrSkillsMissing": "Add at least one category.",
+  "studioErrSkillsTooMany": "Too many categories: remove some.",
+  "studioErrSkillDuplicate": "Two categories have the same name.",
+  "studioErrSkillCheck": "Check the category names.",
   "studioErrModelMissing": "Choose a model.",
   "studioErrModelFreeTier": "This model is not available on the free tier.",
   "studioErrModelProvider": "This provider is not enabled yet.",
@@ -545,5 +551,92 @@
         "type": "int"
       }
     }
-  }
+  },
+  "collabWalletLabel": "Your agent's wallet",
+  "collabWalletHint": "This agent pays from its own wallet. Fund it with testnet USDC first.",
+  "collabWalletUnknown": "The wallet address shows up once your agent is listed in the marketplace.",
+  "collabFaucet": "Get testnet USDC",
+  "collabCopyWallet": "Copy address",
+  "collabWalletCopied": "Address copied",
+  "collabProgressTitle": "Hire #{hireId}",
+  "@collabProgressTitle": {
+    "placeholders": {
+      "hireId": {
+        "type": "int"
+      }
+    }
+  },
+  "collabStepFunded": "Payment locked in escrow",
+  "collabStepWorking": "The hired agent is working",
+  "collabStepDelivered": "Work delivered",
+  "collabStepCompleted": "Payment released to the hired agent",
+  "collabViewTransaction": "View transaction",
+  "collabResultLabel": "Result",
+  "collabStopped": "The hire stopped: {reason}",
+  "@collabStopped": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "collabRefunded": "This hire was cancelled and the money went back to your agent.",
+  "collabErrorNotOwned": "Only the owner of this live agent can make it hire others.",
+  "collabErrorSelfHire": "An agent cannot hire itself. Pick another agent.",
+  "collabErrorInvalid": "Write what the agent should do and a budget above zero.",
+  "collabErrorBudget": "The budget is lower than this agent's price. Raise it and try again.",
+  "collabErrorWallet": "Your agent's wallet cannot pay right now. Try again later.",
+  "collabErrorChain": "The Stellar network could not be reached. Try again in a moment.",
+  "collabErrorAgent": "This agent cannot be hired right now. Pick another one.",
+  "collabErrorHireNotOwned": "This hire does not belong to your agent.",
+  "collabErrorGeneric": "Something went wrong. Try again.",
+  "navMyHires": "My hires",
+  "myHiresTitle": "My hires",
+  "myHiresSubtitle": "Every agent you hired with this wallet. Open one to see its result, approve it or ask for a refund.",
+  "myHiresTabNeedsAction": "Needs your action",
+  "myHiresTabInProgress": "In progress",
+  "myHiresTabFinished": "Finished",
+  "myHiresEmptyNeedsActionTitle": "Nothing to do right now",
+  "myHiresEmptyNeedsActionBody": "When an agent delivers, you approve or reject its work here.",
+  "myHiresEmptyInProgressTitle": "No hires in progress",
+  "myHiresEmptyInProgressBody": "Hires you pay for show up here while the agent works on them.",
+  "myHiresEmptyFinishedTitle": "No finished hires yet",
+  "myHiresEmptyFinishedBody": "Approved, refunded and expired hires show up here.",
+  "myHiresBrowseMarketplace": "Browse the Marketplace",
+  "myHiresConnectTitle": "Connect your wallet",
+  "myHiresConnectBody": "Your hires are linked to the wallet that paid for them. Connect it to see them.",
+  "myHiresConnectAction": "Connect wallet",
+  "myHiresSignInTitle": "Sign in to see your hires",
+  "myHiresSignInBody": "Your wallet signs a sign-in message. It only proves the account is yours and moves no funds.",
+  "myHiresSignInAction": "Sign in with wallet",
+  "myHiresSigningIn": "Signing in…",
+  "myHiresLoadErrorTitle": "Could not load your hires",
+  "myHiresApproveBy": "Approve by {date}",
+  "@myHiresApproveBy": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "myHiresStatusAwaitingPayment": "Waiting for payment",
+  "myHiresStatusInProgress": "In progress",
+  "myHiresStatusReview": "Ready for your review",
+  "myHiresStatusCompleted": "Completed",
+  "myHiresStatusRejected": "Refunded",
+  "myHiresStatusExpired": "Expired",
+  "myHiresDemoNote": "Demo: these hires are samples and no funds moved.",
+  "hireOpenMyHires": "My hires",
+  "hirePayerTitle": "Who pays?",
+  "hirePayerYou": "You (your wallet)",
+  "hirePayerAgent": "Your agent {name} (pays from its own wallet)",
+  "@hirePayerAgent": {"placeholders": {"name": {"type": "String"}}},
+  "hireAsAgentLead": "{name} hires this agent and pays {price} USDC from its own wallet. You do not need to sign anything.",
+  "@hireAsAgentLead": {"placeholders": {"name": {"type": "String"}, "price": {"type": "String"}}},
+  "hireAsAgentConfirm": "Hire with {name}",
+  "@hireAsAgentConfirm": {"placeholders": {"name": {"type": "String"}}},
+  "hireAsAgentHiring": "Starting the hire…",
+  "hireAsAgentInputMissing": "Write what the agent should do first.",
+  "myHiresPaidByAgent": "Paid by your agent {name}",
+  "@myHiresPaidByAgent": {"placeholders": {"name": {"type": "String"}}},
+  "agentHireDetailTitle": "Hire made by your agent",
+  "agentHireDetailConnect": "Connect the wallet that owns this agent to see this hire."
 }

@@ -47,6 +47,9 @@ typedef SubmitFeedbackCall =
 /// `client.hire.getHire`.
 typedef GetHireCall = Future<HireDetail> Function(int hireId, String consumer);
 
+/// `HireEndpoint.listMyHires`: the session wallet's hires.
+typedef ListMyHiresCall = Future<List<HireSummary>> Function();
+
 /// [HireGateway] over `HireEndpoint` (api.md, F5-3 to F5-5, F6) and
 /// `FeedbackEndpoint` (F7).
 ///
@@ -65,6 +68,7 @@ class ServerHireGateway implements HireGateway {
     required this._getHire,
     required this._prepareFeedback,
     required this._submitFeedback,
+    this._listMyHires,
     this._session,
     this._readFunds,
     this.callTimeout = const Duration(seconds: 30),
@@ -81,6 +85,10 @@ class ServerHireGateway implements HireGateway {
   final GetHireCall _getHire;
   final PrepareFeedbackCall _prepareFeedback;
   final SubmitFeedbackCall _submitFeedback;
+
+  /// Lists the session wallet's hires. Without it, My hires reports the
+  /// server as unavailable.
+  final ListMyHiresCall? _listMyHires;
 
   /// The wallet session (#136). Without it, the server is called with no
   /// session and answers `NotAuthenticated`.
@@ -258,6 +266,29 @@ class ServerHireGateway implements HireGateway {
       state: submission.state,
       explorerUrl: submission.explorerUrl ?? detail.paymentExplorerUrl,
     );
+  }
+
+  @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async {
+    final list = _listMyHires;
+    if (list == null) {
+      throw const HireBackendUnavailable('Your hires cannot be listed yet.');
+    }
+    final hires = await _call(list);
+    return [
+      for (final hire in hires)
+        HireSummaryItem(
+          hireId: hire.id,
+          agentName: hire.agentName,
+          inputPreview: hire.inputPreview,
+          priceUsdcStroops: hire.priceUsdcStroops,
+          status: hire.status,
+          approvalDeadline: hire.approvalDeadline,
+          needsAction: hire.needsAction,
+          paidByAgentId: hire.paidByAgentId,
+          paidByAgentName: hire.paidByAgentName,
+        ),
+    ];
   }
 
   @override

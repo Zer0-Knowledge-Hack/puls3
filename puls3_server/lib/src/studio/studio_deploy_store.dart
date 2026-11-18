@@ -104,6 +104,10 @@ abstract interface class StudioDeployStore {
 
   /// Inserts [row], or replaces the row of the same draft.
   Future<StudioDeployRow> save(StudioDeployRow row);
+
+  /// The registered, `active` deploys of [owner]: the agents whose custodied
+  /// wallet the owner can make hire others (`hireAgentAs`).
+  Future<List<StudioDeployRow>> listActiveByOwner(String owner);
 }
 
 /// Process-local [StudioDeployStore]. A restart drops in-flight envelopes;
@@ -135,6 +139,15 @@ final class MemoryStudioDeployStore implements StudioDeployStore {
     _rows[row.draftId] = row;
     return row;
   }
+
+  @override
+  Future<List<StudioDeployRow>> listActiveByOwner(String owner) async => [
+    for (final row in _rows.values)
+      if (row.owner == owner &&
+          row.state == 'active' &&
+          row.registryAgentId != null)
+        row,
+  ];
 }
 
 /// The simulated `set_agent_wallet` call, enough to rebuild the envelope

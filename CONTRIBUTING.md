@@ -151,6 +151,10 @@ melos run test:integration
 melos run test:e2e
 ```
 
+CI runs the server E2E suites in `.github/workflows/e2e.yml` (#298). It is
+non-gating until it is stable on `main`; the Flutter browser suite (#256) stays
+manual for now.
+
 The per-package detail:
 
 ```bash
@@ -274,6 +278,7 @@ The repo is **public**. Anything you push can be seen and copied.
 - Local secrets live in git-ignored files (`puls3_server/.env`, `puls3_server/config/passwords.yaml`). Use `scripts/setup-local-secrets.sh` to create them.
 - Read keys from environment variables, and document every new one in the root `.env.example` (and any new secret in [`docs/infra/secrets.md`](docs/infra/secrets.md)). `bash scripts/tests/env-inventory.test.sh` checks both.
 - If you leak a secret, tell the team right away and rotate it. Deleting the commit is not enough.
+- Security findings are listed in [`docs/audits/`](docs/audits/2026-10-25-smart-contract-audit.md). Cite them by date and ID (`audit 2026-10-25, R-1`) in issues, commits and tests.
 
 ---
 

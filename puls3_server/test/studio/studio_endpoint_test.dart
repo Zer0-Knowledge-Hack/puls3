@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:puls3_domain/puls3_domain.dart' hide AgentManifestDraft;
+import 'package:puls3_domain/puls3_domain.dart' hide AgentManifestDraft, Hire;
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/agent_hire_service.dart';
 import 'package:puls3_server/src/hire/session_wallet.dart';
@@ -607,6 +607,72 @@ void main() {
         endpoint.hireAgentAs(session, 7, 42, 'x', 2000000),
         refused('BudgetExceeded'),
       );
+    });
+
+    group('getAgentHire', () {
+      late List<String> reads;
+
+      HireDetail detailFor(String consumer) => HireDetail(
+        hire: Hire(
+          id: 31,
+          agentId: 42,
+          consumer: consumer,
+          price: 2000000,
+          manifestVersion: 1,
+          status: 'completed',
+          paymentTransaction: 'ab' * 32,
+        ),
+        agent: AgentSummary(
+          id: 'agt-042',
+          registryId: 42,
+          name: 'Summarizer',
+          description: 'Summarises text.',
+          skills: const ['summarize'],
+          priceUsdcStroops: 2000000,
+        ),
+        input: 'Summarise this.',
+        result: 'A summary.',
+      );
+
+      void hireOf(String consumer) {
+        StudioEndpoint.agentHireReads = (_, wallet, hireId) async {
+          reads.add('${wallet.value} $hireId');
+          return detailFor(consumer);
+        };
+      }
+
+      setUp(() => reads = []);
+      tearDown(() => StudioEndpoint.agentHireReads = null);
+
+      test('the owner reads the hire of their agent as its wallet', () async {
+        await deployed();
+        hireOf(agentWallet);
+
+        final detail = await endpoint.getAgentHire(session, 7, 31);
+
+        expect(reads, ['$agentWallet 31']);
+        expect(detail.hire.consumer, agentWallet);
+        expect(detail.result, 'A summary.');
+      });
+
+      test('an agent of another wallet is HiringAgentNotOwned', () async {
+        await deployed(by: stranger);
+        hireOf(agentWallet);
+        await expectLater(
+          endpoint.getAgentHire(session, 7, 31),
+          refused('HiringAgentNotOwned'),
+        );
+        expect(reads, isEmpty);
+      });
+
+      test('a hire whose client is another wallet is HireNotOwned', () async {
+        await deployed();
+        hireOf(stranger);
+        await expectLater(
+          endpoint.getAgentHire(session, 7, 31),
+          refused('HireNotOwned'),
+        );
+      });
     });
   });
 }
