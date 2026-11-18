@@ -135,6 +135,74 @@ class FakeHireGateway implements HireGateway {
     return hire;
   }
 
+  /// The wallet's demo hires, newest first. The first listing also adds
+  /// three samples, one per My hires tab, so the screen is never empty in
+  /// the demo; they open like any other demo hire.
+  @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async {
+    await Future<void>.delayed(delay);
+    if (_sampled.add(consumer)) _addSamples(consumer);
+    final mine = [
+      for (final entry in _progress.entries)
+        if (_consumers[entry.key] == consumer) entry.value,
+    ]..sort((a, b) => b.hireId.compareTo(a.hireId));
+    final now = DateTime.now().toUtc();
+    return [
+      for (final hire in mine)
+        HireSummaryItem(
+          hireId: hire.hireId,
+          agentName: hire.agentName,
+          inputPreview: hire.input,
+          priceUsdcStroops: hire.priceUsdcStroops,
+          status: hire.status,
+          approvalDeadline: hire.approvalDeadline,
+          needsAction: hire.showRejectAt(now),
+        ),
+    ];
+  }
+
+  final _sampled = <String>{};
+
+  void _addSamples(String consumer) {
+    final samples = [
+      const HireProgress(
+        hireId: 0,
+        agentName: 'Demo translator',
+        priceUsdcStroops: 5000000,
+        input: 'Translate our onboarding email into Spanish.',
+        status: 'completed',
+        result: 'Demo result. No funds moved.',
+      ),
+      const HireProgress(
+        hireId: 0,
+        agentName: 'Demo researcher',
+        priceUsdcStroops: 20000000,
+        input: 'Summarise three recent papers on stablecoin payments.',
+        status: 'funded',
+        runtimeStatus: 'running',
+      ),
+    ];
+    for (final sample in samples) {
+      final hireId = _nextHire++;
+      _consumers[hireId] = consumer;
+      _progress[hireId] = HireProgress(
+        hireId: hireId,
+        agentName: sample.agentName,
+        priceUsdcStroops: sample.priceUsdcStroops,
+        input: sample.input,
+        status: sample.status,
+        runtimeStatus: sample.runtimeStatus,
+        result: sample.result,
+      );
+    }
+    final submitted = _nextHire++;
+    _consumers[submitted] = consumer;
+    _progress[submitted] = _submitted(
+      submitted,
+      'Triage this customer message and suggest a reply.',
+    );
+  }
+
   EscrowPreparation _prepare(int hireId, String purpose) => EscrowPreparation(
     preparationId: 'demo-${_nextPreparation++}',
     purpose: purpose,

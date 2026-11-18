@@ -2441,6 +2441,390 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick a score from 1 to 5 and keep the comment to {max} characters.'**
   String rateInvalid(int max);
+
+  /// No description provided for @collabWalletLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent\'s wallet'**
+  String get collabWalletLabel;
+
+  /// No description provided for @collabWalletHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent pays from its own wallet. Fund it with testnet USDC first.'**
+  String get collabWalletHint;
+
+  /// No description provided for @collabWalletUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'The wallet address shows up once your agent is listed in the marketplace.'**
+  String get collabWalletUnknown;
+
+  /// No description provided for @collabFaucet.
+  ///
+  /// In en, this message translates to:
+  /// **'Get testnet USDC'**
+  String get collabFaucet;
+
+  /// No description provided for @collabCopyWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy address'**
+  String get collabCopyWallet;
+
+  /// No description provided for @collabWalletCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Address copied'**
+  String get collabWalletCopied;
+
+  /// No description provided for @collabProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire #{hireId}'**
+  String collabProgressTitle(int hireId);
+
+  /// No description provided for @collabStepFunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment locked in escrow'**
+  String get collabStepFunded;
+
+  /// No description provided for @collabStepWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'The hired agent is working'**
+  String get collabStepWorking;
+
+  /// No description provided for @collabStepDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Work delivered'**
+  String get collabStepDelivered;
+
+  /// No description provided for @collabStepCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment released to the hired agent'**
+  String get collabStepCompleted;
+
+  /// No description provided for @collabViewTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'View transaction'**
+  String get collabViewTransaction;
+
+  /// No description provided for @collabResultLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get collabResultLabel;
+
+  /// No description provided for @collabStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'The hire stopped: {reason}'**
+  String collabStopped(String reason);
+
+  /// No description provided for @collabRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'This hire was cancelled and the money went back to your agent.'**
+  String get collabRefunded;
+
+  /// No description provided for @collabErrorNotOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the owner of this live agent can make it hire others.'**
+  String get collabErrorNotOwned;
+
+  /// No description provided for @collabErrorSelfHire.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent cannot hire itself. Pick another agent.'**
+  String get collabErrorSelfHire;
+
+  /// No description provided for @collabErrorInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what the agent should do and a budget above zero.'**
+  String get collabErrorInvalid;
+
+  /// No description provided for @collabErrorBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'The budget is lower than this agent\'s price. Raise it and try again.'**
+  String get collabErrorBudget;
+
+  /// No description provided for @collabErrorWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent\'s wallet cannot pay right now. Try again later.'**
+  String get collabErrorWallet;
+
+  /// No description provided for @collabErrorChain.
+  ///
+  /// In en, this message translates to:
+  /// **'The Stellar network could not be reached. Try again in a moment.'**
+  String get collabErrorChain;
+
+  /// No description provided for @collabErrorAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent cannot be hired right now. Pick another one.'**
+  String get collabErrorAgent;
+
+  /// No description provided for @collabErrorHireNotOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'This hire does not belong to your agent.'**
+  String get collabErrorHireNotOwned;
+
+  /// No description provided for @collabErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Try again.'**
+  String get collabErrorGeneric;
+
+  /// No description provided for @navMyHires.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get navMyHires;
+
+  /// No description provided for @myHiresTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get myHiresTitle;
+
+  /// No description provided for @myHiresSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every agent you hired with this wallet. Open one to see its result, approve it or ask for a refund.'**
+  String get myHiresSubtitle;
+
+  /// No description provided for @myHiresTabNeedsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs your action'**
+  String get myHiresTabNeedsAction;
+
+  /// No description provided for @myHiresTabInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get myHiresTabInProgress;
+
+  /// No description provided for @myHiresTabFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get myHiresTabFinished;
+
+  /// No description provided for @myHiresEmptyNeedsActionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to do right now'**
+  String get myHiresEmptyNeedsActionTitle;
+
+  /// No description provided for @myHiresEmptyNeedsActionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'When an agent delivers, you approve or reject its work here.'**
+  String get myHiresEmptyNeedsActionBody;
+
+  /// No description provided for @myHiresEmptyInProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No hires in progress'**
+  String get myHiresEmptyInProgressTitle;
+
+  /// No description provided for @myHiresEmptyInProgressBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Hires you pay for show up here while the agent works on them.'**
+  String get myHiresEmptyInProgressBody;
+
+  /// No description provided for @myHiresEmptyFinishedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No finished hires yet'**
+  String get myHiresEmptyFinishedTitle;
+
+  /// No description provided for @myHiresEmptyFinishedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved, refunded and expired hires show up here.'**
+  String get myHiresEmptyFinishedBody;
+
+  /// No description provided for @myHiresBrowseMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the Marketplace'**
+  String get myHiresBrowseMarketplace;
+
+  /// No description provided for @myHiresConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your wallet'**
+  String get myHiresConnectTitle;
+
+  /// No description provided for @myHiresConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your hires are linked to the wallet that paid for them. Connect it to see them.'**
+  String get myHiresConnectBody;
+
+  /// No description provided for @myHiresConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect wallet'**
+  String get myHiresConnectAction;
+
+  /// No description provided for @myHiresSignInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your hires'**
+  String get myHiresSignInTitle;
+
+  /// No description provided for @myHiresSignInBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet signs a sign-in message. It only proves the account is yours and moves no funds.'**
+  String get myHiresSignInBody;
+
+  /// No description provided for @myHiresSignInAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with wallet'**
+  String get myHiresSignInAction;
+
+  /// No description provided for @myHiresSigningIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in…'**
+  String get myHiresSigningIn;
+
+  /// No description provided for @myHiresLoadErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your hires'**
+  String get myHiresLoadErrorTitle;
+
+  /// No description provided for @myHiresApproveBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve by {date}'**
+  String myHiresApproveBy(String date);
+
+  /// No description provided for @myHiresStatusAwaitingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for payment'**
+  String get myHiresStatusAwaitingPayment;
+
+  /// No description provided for @myHiresStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get myHiresStatusInProgress;
+
+  /// No description provided for @myHiresStatusReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for your review'**
+  String get myHiresStatusReview;
+
+  /// No description provided for @myHiresStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get myHiresStatusCompleted;
+
+  /// No description provided for @myHiresStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get myHiresStatusRejected;
+
+  /// No description provided for @myHiresStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get myHiresStatusExpired;
+
+  /// No description provided for @myHiresDemoNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Demo: these hires are samples and no funds moved.'**
+  String get myHiresDemoNote;
+
+  /// No description provided for @hireOpenMyHires.
+  ///
+  /// In en, this message translates to:
+  /// **'My hires'**
+  String get hireOpenMyHires;
+
+  /// No description provided for @hirePayerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Who pays?'**
+  String get hirePayerTitle;
+
+  /// No description provided for @hirePayerYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You (your wallet)'**
+  String get hirePayerYou;
+
+  /// No description provided for @hirePayerAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your agent {name} (pays from its own wallet)'**
+  String hirePayerAgent(String name);
+
+  /// No description provided for @hireAsAgentLead.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} hires this agent and pays {price} USDC from its own wallet. You do not need to sign anything.'**
+  String hireAsAgentLead(String name, String price);
+
+  /// No description provided for @hireAsAgentConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire with {name}'**
+  String hireAsAgentConfirm(String name);
+
+  /// No description provided for @hireAsAgentHiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the hire…'**
+  String get hireAsAgentHiring;
+
+  /// No description provided for @hireAsAgentInputMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Write what the agent should do first.'**
+  String get hireAsAgentInputMissing;
+
+  /// No description provided for @myHiresPaidByAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid by your agent {name}'**
+  String myHiresPaidByAgent(String name);
+
+  /// No description provided for @agentHireDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire made by your agent'**
+  String get agentHireDetailTitle;
+
+  /// No description provided for @agentHireDetailConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect the wallet that owns this agent to see this hire.'**
+  String get agentHireDetailConnect;
 }
 
 class _AppLocalizationsDelegate

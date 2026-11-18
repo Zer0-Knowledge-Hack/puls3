@@ -533,6 +533,16 @@ class Endpoints extends _is.EndpointDispatch {
                 params['consumer'],
               ),
         ),
+        'listMyHires': _is.MethodConnector(
+          name: 'listMyHires',
+          params: {},
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['hire'] as _icdhibuq.HireEndpoint)
+                  .listMyHires(session),
+        ),
         'submitEscrowCall': _is.MethodConnector(
           name: 'submitEscrowCall',
           params: {
@@ -815,6 +825,68 @@ class Endpoints extends _is.EndpointDispatch {
                     params['draftId'],
                     params['preparationId'],
                     params['signedAuthorizationEntryXdr'],
+                  ),
+        ),
+        'hireAgentAs': _is.MethodConnector(
+          name: 'hireAgentAs',
+          params: {
+            'hiringAgentId': _is.ParameterDescription(
+              name: 'hiringAgentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'agentId': _is.ParameterDescription(
+              name: 'agentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'input': _is.ParameterDescription(
+              name: 'input',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+            'budgetUsdcStroops': _is.ParameterDescription(
+              name: 'budgetUsdcStroops',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['studio'] as _i442jbsr.StudioEndpoint).hireAgentAs(
+                    session,
+                    params['hiringAgentId'],
+                    params['agentId'],
+                    params['input'],
+                    params['budgetUsdcStroops'],
+                  ),
+        ),
+        'getAgentHire': _is.MethodConnector(
+          name: 'getAgentHire',
+          params: {
+            'hiringAgentId': _is.ParameterDescription(
+              name: 'hiringAgentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+            'hireId': _is.ParameterDescription(
+              name: 'hireId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['studio'] as _i442jbsr.StudioEndpoint)
+                  .getAgentHire(
+                    session,
+                    params['hiringAgentId'],
+                    params['hireId'],
                   ),
         ),
       },

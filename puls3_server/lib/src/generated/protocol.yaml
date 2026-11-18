@@ -25,6 +25,7 @@ hire:
   - prepareComplete:
   - prepareReject:
   - getHire:
+  - listMyHires:
   - submitEscrowCall:
 studio:
   - saveDraft:
@@ -37,3 +38,5 @@ studio:
   - getDeploySession:
   - prepareWalletAuthorization:
   - submitWalletAuthorization:
+  - hireAgentAs:
+  - getAgentHire:

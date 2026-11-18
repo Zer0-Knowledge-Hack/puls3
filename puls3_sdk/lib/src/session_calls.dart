@@ -22,6 +22,16 @@ abstract interface class StudioApi {
   /// Runs the saved draft [draftId] once on [input] (`StudioEndpoint.testRun`).
   /// No hire and no payment.
   Future<TestRunResult> testRun(int draftId, String input);
+
+  /// Makes the caller's live Studio agent [hiringAgentId] hire [agentId] on
+  /// [input] with its custodied wallet, spending at most [budgetUsdcStroops]
+  /// (`StudioEndpoint.hireAgentAs`). The server signs and runs the hire.
+  Future<AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  );
 }
 
 /// [HireApi] over `HireEndpoint` of the generated client.
@@ -52,6 +62,19 @@ final class ClientStudioApi implements StudioApi {
   @override
   Future<TestRunResult> testRun(int draftId, String input) =>
       _client.studio.testRun(draftId, input);
+
+  @override
+  Future<AgentHireStarted> hireAgentAs(
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) => _client.studio.hireAgentAs(
+    hiringAgentId,
+    agentId,
+    input,
+    budgetUsdcStroops,
+  );
 }
 
 /// A hire or Studio call was made on an SDK that has no session. Nothing was

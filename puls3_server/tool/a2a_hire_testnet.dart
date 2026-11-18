@@ -40,16 +40,15 @@ import 'package:puls3_server/src/agent/serverpod_agent_wallet_store.dart';
 import 'package:puls3_server/src/agent/stellar_agent_wallet_custody.dart';
 import 'package:puls3_server/src/agent/wallet_custody_config.dart';
 import 'package:puls3_server/src/chain/agent_submit_sender.dart';
-import 'package:puls3_server/src/chain/chain_submission_store.dart';
 import 'package:puls3_server/src/chain/chain_tracker_wiring.dart';
 import 'package:puls3_server/src/chain/serverpod_chain_submission_store.dart';
-import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/endpoints.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/agent_hire_service.dart';
 import 'package:puls3_server/src/hire/chain_accounts.dart';
 import 'package:puls3_server/src/hire/hire_services.dart';
 import 'package:puls3_server/src/hire/serverpod_hire_repository.dart';
+import 'package:puls3_server/src/hire/tracker_agent_hire_chain.dart';
 import 'package:puls3_server/src/ledger/envelope_codec.dart';
 import 'package:puls3_server/src/ledger/soroban_ledger.dart';
 import 'package:puls3_server/src/ledger/soroban_rpc_client.dart';
@@ -60,7 +59,8 @@ import 'package:serverpod/serverpod.dart' show Serverpod;
 
 const _testnetPassphrase = 'Test SDF Network ; September 2015';
 const _explorer = 'https://stellar.expert/explorer/testnet/tx';
-const _usdcAsset = 'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+const _usdcAsset =
+    'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 const _timeout = Duration(minutes: 4);
 const _inclusionFee = 100000;
 const _validitySeconds = 600;
@@ -151,7 +151,9 @@ Future<void> main(List<String> args) async {
   final custody = WalletCustodyConfig.fromEnvironment(env);
   _ok('network: testnet, rpc ${stellarCfg.rpcUrl}');
   _ok('escrow ${stellarCfg.escrow.value}, token ${stellarCfg.usdcSac.value}');
-  _ok('serverpod mode: $mode, custody key: ${reuse ? 'provided' : 'throwaway'}');
+  _ok(
+    'serverpod mode: $mode, custody key: ${reuse ? 'provided' : 'throwaway'}',
+  );
   _ok('mode: ${direct ? 'direct transfer' : 'escrow hire'}');
 
   final pod = Serverpod(
@@ -453,22 +455,37 @@ Future<void> main(List<String> args) async {
     final services = wiring.servicesOn(session);
     final hires = ServerpodHireRepository(session);
     final submissions = ServerpodChainSubmissionStore(session);
-    final chain = _TrackerChain(
+    final sender = AgentSubmitSender(
+      submissions: submissions,
+      accounts: accounts,
+      codec: codec,
+      sign: envelopeSigner.sign,
+      send: rpc.sendTransaction,
+      escrow: stellarCfg.escrow,
+      inclusionFee: _inclusionFee,
+      validitySeconds: _validitySeconds,
+      now: DateTime.now,
+      log: (level, message) => stdout.writeln('   [$level] $message'),
+    );
+    // B's delivery runs [agentBWork] and sends B's `submit` with the
+    // runtime's sender; the production chain leaves it to the runtime.
+    final chain = TrackerAgentHireChain(
       hires: hires,
       submissions: submissions,
-      sender: AgentSubmitSender(
-        submissions: submissions,
-        accounts: accounts,
-        codec: codec,
-        sign: envelopeSigner.sign,
-        send: rpc.sendTransaction,
-        escrow: stellarCfg.escrow,
-        inclusionFee: _inclusionFee,
-        validitySeconds: _validitySeconds,
-        now: DateTime.now,
-        log: (level, message) => stdout.writeln('   [$level] $message'),
-      ),
-      provider: b,
+      confirmationTimeout: _timeout,
+      deliveryTimeout: _timeout,
+      deliver: (hire) async {
+        final output = agentBWork(hire.input ?? '');
+        _ok('agent B ran: $output');
+        await sender.send(
+          DueSubmit(
+            hireId: hire.id,
+            jobId: hire.jobId!,
+            provider: b,
+            result: output,
+          ),
+        );
+      },
     );
     final service = AgentHireService(
       escrow: HireServicesEscrow(services),
@@ -507,75 +524,4 @@ Future<void> main(List<String> args) async {
     await pod.shutdown(exitProcess: false);
   }
   exit(0);
-}
-
-/// [AgentHireChain] over the chain tracker's submission rows. B's delivery
-/// runs [agentBWork] and sends B's `submit` with the runtime's sender.
-final class _TrackerChain implements AgentHireChain {
-  _TrackerChain({
-    required this.hires,
-    required this.submissions,
-    required this.sender,
-    required this.provider,
-  });
-
-  final ServerpodHireRepository hires;
-  final ChainSubmissionStore submissions;
-  final AgentSubmitSender sender;
-  final StellarAddress provider;
-
-  @override
-  Future<String> confirmed(String preparationId) async {
-    final stored = await _until('submission $preparationId', () async {
-      final row = await submissions.findByPreparation(preparationId);
-      if (row?.state == SubmissionState.failed) {
-        throw AgentHireFailed('$preparationId failed: ${row!.errorCode}');
-      }
-      return row?.state == SubmissionState.confirmed ? row : null;
-    });
-    // Wait for the escrow effects the next step depends on.
-    final hireId = stored.hireId!;
-    await _until('hire $hireId to reflect ${stored.purpose.name}', () async {
-      final hire = await hires.findHire(hireId);
-      return switch (stored.purpose) {
-        SubmissionPurpose.createJob => hire?.jobId,
-        SubmissionPurpose.fund =>
-          hire?.status == HireStatus.funded ? true : null,
-        SubmissionPurpose.complete =>
-          hire?.status == HireStatus.completed ? true : null,
-        _ => true,
-      };
-    });
-    return stored.transactionHash;
-  }
-
-  @override
-  Future<String> delivered(int hireId) async {
-    final hire = (await hires.findHire(hireId))!;
-    final output = agentBWork(hire.input ?? '');
-    _ok('agent B ran: $output');
-    await sender.send(
-      DueSubmit(
-        hireId: hireId,
-        jobId: hire.jobId!,
-        provider: provider,
-        result: output,
-      ),
-    );
-    final submit = await _until('B submit of hire $hireId', () async {
-      final rows = await submissions.listByHire(hireId);
-      final row = rows
-          .where((r) => r.purpose == SubmissionPurpose.submit)
-          .lastOrNull;
-      if (row?.state == SubmissionState.failed) {
-        throw AgentHireFailed('submit failed: ${row!.errorCode}');
-      }
-      return row?.state == SubmissionState.confirmed ? row : null;
-    });
-    await _until('hire $hireId to be submitted', () async {
-      final row = await hires.findHire(hireId);
-      return row?.status == HireStatus.submitted ? true : null;
-    });
-    return submit.transactionHash;
-  }
 }

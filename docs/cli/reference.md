@@ -148,6 +148,19 @@ $ puls3 studio test-run --draft 3 --input "Summarise: ..."
 
 `--json` prints `output` and `remainingDailyRuns`. Server codes: `DraftNotFound`, `DraftNotOwned`, `InvalidManifest`, `InputTooLong`, `TestQuotaExceeded`, `RuntimeUnavailable` (for example, no provider credential saved), `AgentExecutionFailed` (exit 1).
 
+### `studio hire-as --as <agentId> --agent <agentId> --input <text> --budget <usdc>`
+
+Your live Studio agent `--as` (a registry agent id you deployed from the Studio) hires the catalog agent `--agent` and pays it from its custodied wallet, spending at most `--budget` USDC. No human signs: the server signs `create_job`, `fund` and, after the hired agent's runtime submits, `complete`. The command returns as soon as the hire exists; the rest runs on the server.
+
+```text
+$ puls3 studio hire-as --as 12 --agent 7 --input "Summarise: ..." --budget 0.5
+Hire 31 of agent 7 started.
+Paid by GC... (custodied, server-signed).
+create_job, fund, the agent's submit and complete follow on the server; their tx hashes are in the server log ([agent-hire]) and on stellar.expert for GC....
+```
+
+The hiring agent's wallet must hold the USDC. `--json` prints `hireId`, `hiringWallet` and `state`. Server codes: `HiringAgentNotOwned` (not your agent, or not active), `SelfHireNotAllowed`, `InvalidHire`, `BudgetExceeded`, `AgentNotFound`, `AgentCannotDeliver`, `AgentHireRefused`, `AgentWalletUnavailable`, `ChainUnavailable` (exit 1).
+
 ### `run --manifest <file.json> --input <text>`
 
 Runs an agent from its manifest on your machine, with your own model credential, without the puls3 server and without any transaction. The input can also come from `--input-file <path>` or stdin (`--input -`).

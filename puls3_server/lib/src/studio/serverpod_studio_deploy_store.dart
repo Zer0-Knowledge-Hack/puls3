@@ -37,6 +37,18 @@ final class ServerpodStudioDeployStore implements StudioDeployStore {
   }
 
   @override
+  Future<List<StudioDeployRow>> listActiveByOwner(String owner) async {
+    final rows = await StudioDeployRecord.db.find(
+      _session,
+      where: (t) =>
+          t.owner.equals(owner) &
+          t.state.equals('active') &
+          t.registryAgentId.notEquals(null),
+    );
+    return [for (final row in rows) _row(row)];
+  }
+
+  @override
   Future<StudioDeployRow> save(StudioDeployRow row) async {
     final current = await StudioDeployRecord.db.findFirstRow(
       _session,

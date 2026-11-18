@@ -176,24 +176,33 @@ final class AgentHireService {
     required AgentHireChain chain,
     required AgentSummaryLookup agentOf,
     required UnsignedEnvelopeSigner sign,
+    void Function(String message)? log,
   }) : _escrow = escrow,
        _chain = chain,
        _agentOf = agentOf,
-       _sign = sign;
+       _sign = sign,
+       _log = log ?? _silent;
 
   final AgentHireEscrow _escrow;
   final AgentHireChain _chain;
   final AgentSummaryLookup _agentOf;
   final UnsignedEnvelopeSigner _sign;
+  final void Function(String message) _log;
+
+  static void _silent(String message) {}
 
   /// Hires [agentId] on [input] for [hiringWallet], spending at most
   /// [budgetUsdcStroops], and returns every transaction hash.
+  ///
+  /// [onCreated] receives the hire id as soon as the hire is stored and
+  /// within budget, before anything is signed.
   Future<AgentHireReceipt> hire({
     required StellarAddress hiringWallet,
     required int agentId,
     required String input,
     required int budgetUsdcStroops,
     required String requestId,
+    void Function(int hireId)? onCreated,
   }) async {
     final agent = await _agentOf(agentId);
     if (agent == null) {
@@ -213,19 +222,29 @@ final class AgentHireService {
     if (createJob == null) {
       throw AgentHireRefused('hire $hireId has no create_job to sign');
     }
+    _log(
+      'hire $hireId created: ${hiringWallet.value} hires agent $agentId '
+      'for ${created.hire.price} USDC stroops',
+    );
+    onCreated?.call(hireId);
 
     final createJobHash = await _signAndSend(hiringWallet, hireId, createJob);
+    _log('hire $hireId create_job confirmed: tx $createJobHash');
     final fundHash = await _signAndSend(
       hiringWallet,
       hireId,
       await _escrow.prepareFund(hiringWallet, hireId),
     );
+    _log('hire $hireId fund confirmed: tx $fundHash');
+    _log('hire $hireId waiting for agent $agentId to deliver');
     final submitHash = await _chain.delivered(hireId);
+    _log('hire $hireId submit confirmed: tx $submitHash');
     final completeHash = await _signAndSend(
       hiringWallet,
       hireId,
       await _escrow.prepareComplete(hiringWallet, hireId),
     );
+    _log('hire $hireId complete confirmed: tx $completeHash');
     return AgentHireReceipt(
       hireId: hireId,
       priceUsdcStroops: created.hire.price,

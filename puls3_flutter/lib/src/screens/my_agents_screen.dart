@@ -143,7 +143,7 @@ class _MyAgentsScreenState extends State<MyAgentsScreen> {
                     onNewAgent: () => context.go('/studio'),
                     onContinue: (d) => context.go('/studio?draft=${d.draftId}'),
                     onResume: _resume,
-                    onView: (d) => context.go('/agent/${d.agentId}'),
+                    onView: (d) => context.go('/agent/${d.catalogId}'),
                     onEdit: (d) =>
                         context.go('/studio?draft=${d.draftId}&edit=1'),
                   ),

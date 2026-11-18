@@ -79,6 +79,69 @@ abstract interface class HireGateway {
   /// [consumer] who created it can read it: any other hire is
   /// [HireNotFound].
   Future<HireProgress> getHire(int hireId, String consumer);
+
+  /// The hires of [consumer], the connected wallet, newest first
+  /// (`HireEndpoint.listMyHires`). The server lists the session wallet's
+  /// hires only, so [consumer] never reaches anyone else's.
+  Future<List<HireSummaryItem>> listMyHires(String consumer);
+}
+
+/// Where a hire sits in My hires.
+enum HireListTab {
+  /// The client must approve or reject it, or can get a refund.
+  needsAction,
+
+  /// Still moving: being paid, worked on, or delivered.
+  inProgress,
+
+  /// Nothing changes any more: completed, rejected or expired.
+  finished,
+}
+
+/// One row of My hires (api.md `HireSummary`).
+class HireSummaryItem {
+  const HireSummaryItem({
+    required this.hireId,
+    required this.agentName,
+    required this.inputPreview,
+    required this.priceUsdcStroops,
+    this.status,
+    this.approvalDeadline,
+    this.needsAction = false,
+    this.paidByAgentId,
+    this.paidByAgentName,
+  });
+
+  final int hireId;
+  final String agentName;
+
+  /// The registry id of the user's Studio agent that hired and paid from its
+  /// own wallet; null when the user's wallet paid.
+  final int? paidByAgentId;
+
+  /// That agent's name, for "Paid by your agent".
+  final String? paidByAgentName;
+
+  /// The first characters of the task the client gave the agent.
+  final String inputPreview;
+  final int priceUsdcStroops;
+
+  /// `HireStatus` name; null until the `create_job` is confirmed.
+  final String? status;
+
+  /// The job's `approval_deadline`, once the agent submitted.
+  final DateTime? approvalDeadline;
+
+  /// The server found something for the client to do on this hire.
+  final bool needsAction;
+
+  HireListTab get tab {
+    if (needsAction) return HireListTab.needsAction;
+    return switch (status) {
+      'completed' || 'rejected' || 'expired' => HireListTab.finished,
+      _ => HireListTab.inProgress,
+    };
+  }
 }
 
 /// Where a hire is, as S06 shows it: the escrow job state (#10, ADR-0005)

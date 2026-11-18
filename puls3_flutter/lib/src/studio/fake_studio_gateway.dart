@@ -34,6 +34,16 @@ class FakeStudioGateway implements StudioGateway {
   StudioGatewayException? nextSaveError;
   StudioGatewayException? nextListError;
   StudioGatewayException? nextRunError;
+  StudioGatewayException? nextHireError;
+
+  /// Every [hireAgentAs] call, for tests: hiring agent, hired agent, input
+  /// and budget in stroops.
+  final List<({int hiringAgentId, int agentId, String input, int budget})>
+  agentHires = [];
+
+  /// How many reads each demo hire has had: every read moves it one step.
+  final Map<int, int> _hireReads = {};
+  int _nextHireId = 1;
 
   final Map<int, ({String owner, StudioDraft draft})> _drafts = {};
   final Map<String, int> _runsUsed = {};
@@ -148,6 +158,76 @@ class FakeStudioGateway implements StudioGateway {
       ),
     );
   }
+
+  @override
+  Future<AgentHireStart> hireAgentAs({
+    required int hiringAgentId,
+    required int agentId,
+    required String input,
+    required int budgetUsdcStroops,
+    required String owner,
+  }) async {
+    await Future<void>.delayed(delay);
+    _throwIfSet(nextHireError, () => nextHireError = null);
+    agentHires.add((
+      hiringAgentId: hiringAgentId,
+      agentId: agentId,
+      input: input,
+      budget: budgetUsdcStroops,
+    ));
+    final hireId = _nextHireId++;
+    _hireReads[hireId] = 0;
+    return AgentHireStart(hireId: hireId, hiringWallet: demoAgentWallet);
+  }
+
+  @override
+  Future<AgentHireProgress> getAgentHire({
+    required int hiringAgentId,
+    required int hireId,
+    required String owner,
+  }) async {
+    await Future<void>.delayed(delay);
+    final reads = _hireReads[hireId];
+    if (reads == null) {
+      throw const StudioAgentHireRefused(AgentHireRefusal.hireNotOwned);
+    }
+    _hireReads[hireId] = reads + 1;
+    const fund = 'demo-fund-transaction';
+    return switch (reads) {
+      0 => AgentHireProgress(
+        hireId: hireId,
+        status: 'funded',
+        runtimeStatus: 'running',
+        fundTransaction: fund,
+        lastPurpose: 'fund',
+        lastTransaction: fund,
+      ),
+      1 => AgentHireProgress(
+        hireId: hireId,
+        status: 'submitted',
+        fundTransaction: fund,
+        result: _demoResult,
+        lastPurpose: 'submit',
+        lastTransaction: 'demo-submit-transaction',
+      ),
+      _ => AgentHireProgress(
+        hireId: hireId,
+        status: 'completed',
+        fundTransaction: fund,
+        result: _demoResult,
+        lastPurpose: 'complete',
+        lastTransaction: 'demo-complete-transaction',
+      ),
+    };
+  }
+
+  /// The wallet the demo shows for a hiring agent.
+  static const demoAgentWallet =
+      'GCJOMHOLKJJUMFCBC56ZIZTINBAFARFQIWNM4MA4GJ6RJZQI4KH3RIB3';
+
+  static const _demoResult =
+      'Demo result: the hired agent answers here once the Studio server is '
+      'live.';
 
   StudioDraft _owned(int draftId, String owner) {
     final entry = _drafts[draftId];

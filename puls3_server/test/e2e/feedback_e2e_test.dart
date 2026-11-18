@@ -7,8 +7,10 @@ import 'package:puls3_server/src/agent/agent_endpoint.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/feedback/feedback_endpoint.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
+import 'package:puls3_server/src/ledger/sc_val_json.dart';
 import 'package:test/test.dart';
 
+import 'support/contract_event_log.dart';
 import 'support/e2e_world.dart';
 import 'support/local_sandbox.dart';
 
@@ -51,6 +53,36 @@ void main() {
       await world.hireIn(hire.hireId, HireStatus.completed);
       final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
       expect(job.state, EscrowJobState.completed);
+
+      // The escrow emitted JobSubmitted and JobCompleted for this job (#287).
+      final escrow = world.wiring.stellar.escrow.value;
+      final escrowEvents = await until(
+        'the escrow to report the job events',
+        () async {
+          final all = await world.events.read(
+            escrow,
+            startLedger: world.startLedger,
+          );
+          return all.forJob('job_submitted', hire.jobId).isNotEmpty &&
+                  all.forJob('job_completed', hire.jobId).isNotEmpty
+              ? all
+              : null;
+        },
+      );
+      final submittedEvent = escrowEvents
+          .forJob('job_submitted', hire.jobId)
+          .single;
+      expect(
+        readAddress(submittedEvent.data['provider']),
+        world.agentAccount.address,
+      );
+      final completedEvent = escrowEvents
+          .forJob('job_completed', hire.jobId)
+          .single;
+      expect(readAddress(completedEvent.data['evaluator']), job.evaluator);
+      expect(readI128(completedEvent.data['payout']), job.budget);
+      expect(readI128(completedEvent.data['fee']), BigInt.zero);
+      expect(readBool(completedEvent.data['auto_released']), isFalse);
 
       // The completed hire is not rated yet and its consumer may rate it.
       final feedback = FeedbackEndpoint();
@@ -99,6 +131,22 @@ void main() {
         return current.hire.feedbackReference == null ? null : current;
       });
       expect(rated.hire.feedbackReference, feedbackHash);
+
+      // The reputation registry emitted NewFeedback for this agent and this
+      // consumer, in the relayed give_feedback transaction (#287).
+      final registry = world.wiring.stellar.reputationRegistry!.value;
+      final feedbackEvents = await world.events.read(
+        registry,
+        startLedger: world.startLedger,
+      );
+      final given = feedbackEvents
+          .where((event) => event.name == 'new_feedback')
+          .where((event) => readU32(event.topics[0]) == world.agentId)
+          .toList();
+      expect(given, hasLength(1));
+      expect(given.single.transaction, feedbackHash);
+      expect(readAddress(given.single.topics[1]), world.consumer.address);
+      expect(readI128(given.single.data['value']), BigInt.from(5));
 
       // The agent catalog counts the new rating.
       final after = await until('the catalog to count the rating', () async {
