@@ -48,11 +48,13 @@ void main() {
       int score = 5,
       String comment = '',
       int jobId = _jobId,
+      StellarAddress? escrow,
     }) => calls.giveFeedback(
       client: client ?? _client,
       agent: AgentId(7),
       feedback: _feedback(score: score, comment: comment),
       jobId: jobId,
+      escrow: escrow,
     );
 
     test('targets the Reputation Registry `give_feedback`', () {
@@ -113,6 +115,63 @@ void main() {
         PaidJobReference.tryParse(reference),
         PaidJobReference(escrow: _escrow, jobId: _jobId),
       );
+    });
+
+    group('a job on another escrow (#273)', () {
+      final previous = StellarConfig.testnet.usdcSac;
+
+      test('names that escrow in tag2 and feedback_uri', () {
+        final reference = PaidJobReference(escrow: previous, jobId: _jobId);
+
+        final call = build(escrow: previous);
+
+        expect(
+          _xdr(call),
+          isNot(_xdr(build())),
+          reason: 'the same job id on another escrow is another call',
+        );
+        expect(
+          _xdr(
+            ContractCall(
+              contract: call.contract,
+              function: call.function,
+              args: call.args.sublist(0, 8),
+            ),
+          ),
+          _xdr(
+            ContractCall(
+              contract: fakeReputationRegistry,
+              function: 'give_feedback',
+              args: [
+                ScArg.address(_client),
+                const ScArg.u32(7),
+                const ScArg.i128(5),
+                const ScArg.u32(0),
+                const ScArg.string(''),
+                ScArg.string(reference.text),
+                const ScArg.string(''),
+                ScArg.string(reference.text),
+              ],
+            ),
+          ),
+        );
+      });
+
+      test('commits to that escrow in feedback_hash', () {
+        Uint8List hashOf(ContractCall call) => _xdr(
+          ContractCall(
+            contract: call.contract,
+            function: call.function,
+            args: [call.args[8]],
+          ),
+        );
+
+        expect(hashOf(build(escrow: previous)), isNot(hashOf(build())));
+      });
+
+      test('the configured escrow is the default', () {
+        expect(_xdr(build(escrow: _escrow)), _xdr(build()));
+      });
     });
 
     test('the score is the value with no decimals, for every score', () {

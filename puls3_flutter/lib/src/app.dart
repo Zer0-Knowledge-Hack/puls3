@@ -16,10 +16,12 @@ import 'l10n/locale_store.dart';
 import 'screens/agent_detail_screen.dart';
 import 'screens/app_shell.dart';
 import 'screens/brand_screen.dart';
+import 'screens/agent_hire_detail_screen.dart';
 import 'screens/hire_detail_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/market_screen.dart';
 import 'screens/my_agents_screen.dart';
+import 'screens/my_hires_screen.dart';
 import 'screens/studio_screen.dart';
 import 'state/agent_catalog.dart';
 import 'state/app_scope.dart';
@@ -70,9 +72,23 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                 AgentDetailScreen(agentId: state.pathParameters['id']!),
           ),
           GoRoute(
+            path: '/hires',
+            builder: (context, state) => const MyHiresScreen(),
+          ),
+          GoRoute(
             path: '/hires/:id',
-            builder: (context, state) =>
-                HireDetailScreen(hireId: state.pathParameters['id']!),
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              // A hire one of the user's agents paid: read as that agent.
+              final agentId = int.tryParse(
+                state.uri.queryParameters['as'] ?? '',
+              );
+              final hireId = int.tryParse(id);
+              if (agentId != null && hireId != null) {
+                return AgentHireDetailScreen(hireId: hireId, agentId: agentId);
+              }
+              return HireDetailScreen(hireId: id);
+            },
           ),
         ],
       ),

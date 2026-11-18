@@ -81,7 +81,27 @@ class ServerDeployGateway implements DeployGateway {
     }
     _draftId = draftId;
     await _signedIn(builder);
-    final session = await _call(() => _prepareDeploy(draftId, builder));
+    var session = await _call(() => _prepareDeploy(draftId, builder));
+    // Resuming a deploy (#321): the server returns the draft's existing
+    // session. Once the registration is on chain there is nothing to sign
+    // again; the flow continues at the wallet step.
+    if (session.state == 'registrationSubmitted' && session.agentId == null) {
+      session = await _untilConfirmed(session, draftId, _registrationSettled);
+    }
+    if (session.state == 'walletAuthorizationSubmitted' ||
+        session.state == 'publishing') {
+      session = await _untilConfirmed(
+        session,
+        draftId,
+        (current) => current.state == 'active',
+      );
+    }
+    if (_registrationSettled(session) && session.agentId != null) {
+      return PreparedDeploy.registered(
+        _registrationOf(session),
+        active: session.state == 'active',
+      );
+    }
     final unsigned = session.preparation?.unsignedTransactionXdr;
     final preparationId = session.preparation?.preparationId;
     if (unsigned == null || unsigned.isEmpty || preparationId == null) {
@@ -106,15 +126,21 @@ class ServerDeployGateway implements DeployGateway {
         signedTransaction,
       ),
     );
-    session = await _untilConfirmed(
-      session,
-      draftId,
-      (current) =>
-          current.failureCode != null ||
-          (current.agentId != null &&
-              current.state != 'registrationSubmitted' &&
-              current.state != 'awaitingRegistrationSignature'),
-    );
+    session = await _untilConfirmed(session, draftId, _registrationSettled);
+    return _registrationOf(session);
+  }
+
+  /// The chain answered the registration: it failed, or `register_full` is
+  /// confirmed and no new registration (a version update) awaits a signature.
+  static bool _registrationSettled(api.DeploySession session) =>
+      session.failureCode != null ||
+      (session.agentId != null &&
+          session.state != 'registrationSubmitted' &&
+          session.state != 'awaitingRegistrationSignature');
+
+  /// The confirmed registration in [session]. The `register_full` hash stays
+  /// on `preparation.transaction` through the wallet step.
+  static Registration _registrationOf(api.DeploySession session) {
     final agentId = session.agentId;
     final hash = session.preparation?.transaction;
     if (agentId == null || hash == null) {
@@ -244,15 +270,17 @@ class ServerDeployGateway implements DeployGateway {
     }
   }
 
-  DeployGatewayException _map(api.Puls3ApiException error) => switch (error.code) {
-    'PreparationExpired' || 'AuthorizationExpired' => DeployPreparationExpired(
-      error.message ?? 'That signature expired. Deploy again.',
-    ),
-    'TransactionFailed' || 'SubmissionRejected' => DeployTransactionFailed(
-      error.message ?? 'The chain rejected the transaction.',
-    ),
-    _ => DeployBackendError(
-      error.message ?? 'The server could not deploy this agent.',
-    ),
-  };
+  DeployGatewayException _map(api.Puls3ApiException error) =>
+      switch (error.code) {
+        'PreparationExpired' ||
+        'AuthorizationExpired' => DeployPreparationExpired(
+          error.message ?? 'That signature expired. Deploy again.',
+        ),
+        'TransactionFailed' || 'SubmissionRejected' => DeployTransactionFailed(
+          error.message ?? 'The chain rejected the transaction.',
+        ),
+        _ => DeployBackendError(
+          error.message ?? 'The server could not deploy this agent.',
+        ),
+      };
 }

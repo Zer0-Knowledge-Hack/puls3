@@ -66,17 +66,24 @@ final class HireEscrowEffects implements EscrowEffects {
     required LedgerPort ledger,
     required EscrowJobReader jobs,
     required StellarAddress usdc,
+    required StellarAddress escrow,
   }) : _repositories = repositories,
        _lifecycle = lifecycle,
        _ledger = ledger,
        _jobs = jobs,
-       _usdc = usdc;
+       _usdc = usdc,
+       _escrow = escrow;
 
   final HireRepositoryScope _repositories;
   final HireLifecycleScope _lifecycle;
   final LedgerPort _ledger;
   final EscrowJobReader _jobs;
   final StellarAddress _usdc;
+
+  /// The escrow contract the tracker reads the `JobCreated` events from, so
+  /// the contract a job id belongs to. It is bound to the hire with the job
+  /// (#273).
+  final StellarAddress _escrow;
 
   @override
   Future<EffectResult> onJobCreated(
@@ -116,6 +123,7 @@ final class HireEscrowEffects implements EscrowEffects {
         hireId,
         matches.single.jobId,
         expiredAt: expiredAt,
+        escrow: _escrow.value,
       );
       return switch (binding) {
         JobBinding.bound || JobBinding.alreadyBound => const EffectResult.ok(),

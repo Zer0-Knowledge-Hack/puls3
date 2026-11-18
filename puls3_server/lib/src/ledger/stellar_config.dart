@@ -1,5 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
+import 'classic_asset.dart';
+
 /// The network values the Soroban adapter needs (ADR-0001 §5).
 ///
 /// Every value is public, so it is read from `PULS3_STELLAR_*` environment
@@ -10,8 +12,10 @@ import 'package:puls3_domain/puls3_domain.dart';
 /// | `PULS3_STELLAR_RPC_URL` | [rpcUrl] |
 /// | `PULS3_STELLAR_NETWORK_PASSPHRASE` | [networkPassphrase] |
 /// | `PULS3_STELLAR_USDC_SAC` | [usdcSac] |
+/// | `PULS3_STELLAR_USDC_ASSET` | [usdcAsset] (`CODE:ISSUER`) |
 /// | `PULS3_STELLAR_IDENTITY_REGISTRY` | [identityRegistry] |
 /// | `PULS3_STELLAR_ESCROW` | [escrow] |
+/// | `PULS3_STELLAR_PREVIOUS_ESCROWS` | [previousEscrows] (comma-separated) |
 /// | `PULS3_STELLAR_REPUTATION_REGISTRY` | [reputationRegistry] |
 /// | `PULS3_STELLAR_SIMULATION_SOURCE` | [simulationSource] |
 /// | `PULS3_STELLAR_RPC_TIMEOUT_SECONDS` | [rpcTimeout] |
@@ -23,8 +27,10 @@ final class StellarConfig {
     required this.identityRegistry,
     required this.escrow,
     required this.simulationSource,
+    this.previousEscrows = const [],
     this.reputationRegistry,
     this.rpcTimeout = defaultRpcTimeout,
+    this.usdcAsset = ClassicAsset.circleTestnetUsdc,
   });
 
   /// Builds the configuration from [env] (normally `Platform.environment`).
@@ -32,7 +38,8 @@ final class StellarConfig {
   /// An unset or empty variable keeps its [testnet] value. A set variable
   /// overrides it. An invalid address throws [InvalidStellarAddress]. A
   /// timeout that is not a positive whole number of seconds throws
-  /// [ArgumentError].
+  /// [ArgumentError]. An asset that is not `CODE:ISSUER` throws a
+  /// [FormatException].
   factory StellarConfig.fromEnvironment(Map<String, String> env) {
     String? read(String name) {
       final value = env[name];
@@ -60,7 +67,14 @@ final class StellarConfig {
     }
 
     final rpcUrl = read('PULS3_STELLAR_RPC_URL');
+    final previous = read('PULS3_STELLAR_PREVIOUS_ESCROWS');
     return StellarConfig(
+      previousEscrows: previous == null
+          ? const []
+          : [
+              for (final part in previous.split(','))
+                if (part.trim().isNotEmpty) StellarAddress.parse(part.trim()),
+            ],
       rpcUrl: rpcUrl == null ? testnet.rpcUrl : Uri.parse(rpcUrl),
       networkPassphrase:
           read('PULS3_STELLAR_NETWORK_PASSPHRASE') ?? testnet.networkPassphrase,
@@ -79,6 +93,10 @@ final class StellarConfig {
         null => testnet.reputationRegistry,
       },
       rpcTimeout: timeout(),
+      usdcAsset: switch (read('PULS3_STELLAR_USDC_ASSET')) {
+        final value? => ClassicAsset.parse(value),
+        null => testnet.usdcAsset,
+      },
     );
   }
 
@@ -112,6 +130,10 @@ final class StellarConfig {
 
   /// The Stellar Asset Contract of the accepted USDC.
   final StellarAddress usdcSac;
+
+  /// The classic asset behind [usdcSac]. A custodied agent wallet needs a
+  /// trustline to it before the escrow can pay the agent.
+  final ClassicAsset usdcAsset;
   final StellarAddress identityRegistry;
   final StellarAddress escrow;
 
@@ -121,6 +143,15 @@ final class StellarConfig {
   /// `PULS3_STELLAR_REPUTATION_REGISTRY` overrides it. Without any id the
   /// feedback and reputation features stay unwired (`UnwiredReputationCalls`).
   final StellarAddress? reputationRegistry;
+
+  /// The escrow contracts [escrow] replaced, newest first or in any order.
+  /// Ratings written for a job on one of them still count (#273); nothing new
+  /// is created on them. Empty until an escrow is rotated.
+  final List<StellarAddress> previousEscrows;
+
+  /// Every escrow whose completed jobs make a rating count: [escrow] and
+  /// [previousEscrows], each once.
+  Set<StellarAddress> get trustedEscrows => {escrow, ...previousEscrows};
 
   /// An existing account used only as the source of unsigned simulations.
   final StellarAddress simulationSource;
@@ -137,9 +168,11 @@ final class StellarConfig {
       other.usdcSac == usdcSac &&
       other.identityRegistry == identityRegistry &&
       other.escrow == escrow &&
+      _sameAddresses(other.previousEscrows, previousEscrows) &&
       other.simulationSource == simulationSource &&
       other.reputationRegistry == reputationRegistry &&
-      other.rpcTimeout == rpcTimeout;
+      other.rpcTimeout == rpcTimeout &&
+      other.usdcAsset == usdcAsset;
 
   @override
   int get hashCode => Object.hash(
@@ -148,8 +181,18 @@ final class StellarConfig {
     usdcSac,
     identityRegistry,
     escrow,
+    Object.hashAll(previousEscrows),
     simulationSource,
     reputationRegistry,
     rpcTimeout,
+    usdcAsset,
   );
+}
+
+bool _sameAddresses(List<StellarAddress> a, List<StellarAddress> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

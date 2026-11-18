@@ -9,6 +9,10 @@ import '../agent/aes_gcm_secret_cipher.dart';
 import '../agent/agent_wallet_custody.dart';
 import '../agent/secret_cipher.dart';
 import '../agent/wallet_custody_config.dart';
+import '../hire/agent_hire_service.dart';
+import '../hire/agent_hire_wiring.dart';
+import '../hire/hire_endpoint.dart';
+import '../hire/hire_query_service.dart';
 import '../hire/session_wallet.dart';
 import '../ledger/stellar_config.dart';
 import 'builder_credential.dart';
@@ -18,6 +22,7 @@ import 'studio_deploy_transport.dart';
 import 'studio_deploy_wiring.dart';
 import 'builder_task_runner.dart';
 import 'serverpod_builder_credential_store.dart';
+import 'serverpod_studio_deploy_store.dart';
 import 'serverpod_studio_draft_store.dart';
 import 'studio_draft_errors.dart';
 import 'studio_draft_service.dart';
@@ -26,6 +31,14 @@ import 'studio_model_policy.dart';
 import 'studio_test_errors.dart';
 import 'studio_test_run_service.dart';
 import 'test_run_quota.dart';
+
+/// Reads a hire as its client [consumer], for [StudioEndpoint.getAgentHire].
+typedef AgentHireReader =
+    Future<HireDetail> Function(
+      Session session,
+      domain.StellarAddress consumer,
+      int hireId,
+    );
 
 /// Drafts and test runs for the signed-in builder (api.md, `StudioEndpoint`).
 ///
@@ -42,6 +55,76 @@ class StudioEndpoint extends Endpoint {
   static final MemoryTestRunQuota _quota = MemoryTestRunQuota();
   static BuilderCredentialStore Function(Session session)? _credentialStores;
   static SecretCipher? _credentialCipher;
+  static StudioDeployStore Function(Session session)? _deployStores;
+  static AgentHireLauncher? _agentHires;
+  static AgentHireReader? _agentHireReads;
+  static AgentHireWiring? _agentHireWiring;
+
+  /// Replaces where deploys are read for [hireAgentAs], for tests. `null`
+  /// restores the Postgres store.
+  @visibleForTesting
+  static set deployStores(
+    StudioDeployStore Function(Session session)? builder,
+  ) => _deployStores = builder;
+
+  /// Replaces how [hireAgentAs] starts a hire, for tests. `null` restores
+  /// the background hire on the custodied wallet.
+  @visibleForTesting
+  static set agentHires(AgentHireLauncher? launcher) => _agentHires = launcher;
+
+  /// Replaces how [getAgentHire] reads a hire, for tests. `null` restores
+  /// the hire query service of `HireEndpoint`.
+  @visibleForTesting
+  static set agentHireReads(AgentHireReader? reader) =>
+      _agentHireReads = reader;
+
+  static Future<HireDetail> _readHire(
+    Session session,
+    domain.StellarAddress consumer,
+    int hireId,
+  ) {
+    final override = _agentHireReads;
+    if (override != null) return override(session, consumer, hireId);
+    final HireQueryService? query;
+    try {
+      query = HireEndpoint.servicesOf(session).query;
+    } on HireConfigurationMissing catch (missing) {
+      throw Puls3ApiException(
+        code: 'ChainUnavailable',
+        details: {'reason': missing.setting},
+      );
+    }
+    if (query == null) throw Puls3ApiException(code: 'ChainUnavailable');
+    return query.getHire(consumer, hireId);
+  }
+
+  /// Where deploys are read, honouring [deployStores]: `HireEndpoint`
+  /// lists the hires of the caller's active agents with it.
+  static StudioDeployStore deployStoreOf(Session session) =>
+      _deployStoreOn(session);
+
+  static StudioDeployStore _deployStoreOn(Session session) {
+    final builder = _deployStores;
+    if (builder != null) return builder(session);
+    return ServerpodStudioDeployStore(session);
+  }
+
+  static AgentHireLauncher _agentHireLauncher() {
+    final override = _agentHires;
+    if (override != null) return override;
+    try {
+      return (_agentHireWiring ??= AgentHireWiring.fromEnvironment()).launcher;
+    } on AgentWalletCustodyUnavailable {
+      throw Puls3ApiException(code: 'AgentWalletUnavailable');
+    } on ArgumentError {
+      throw Puls3ApiException(code: 'AgentWalletUnavailable');
+    } on HireConfigurationMissing catch (missing) {
+      throw Puls3ApiException(
+        code: 'ChainUnavailable',
+        details: {'reason': missing.setting},
+      );
+    }
+  }
 
   /// The builder credentials in [session]'s database (#235), encrypted with
   /// the custody key. Test runs and every hire of a Studio agent read this
@@ -340,6 +423,109 @@ class StudioEndpoint extends Endpoint {
         signedAuthorizationEntryXdr: signedAuthorizationEntryXdr,
       ),
     );
+  }
+
+  /// Makes the caller's live Studio agent [hiringAgentId] hire [agentId] on
+  /// [input], spending at most [budgetUsdcStroops] (#312, SOW week 2).
+  ///
+  /// The hiring agent's custodied wallet signs `create_job`, `fund` and
+  /// `complete`; no human signs. Returns once the hire exists; the rest runs
+  /// on the server and every tx hash is logged with `[agent-hire]`.
+  Future<AgentHireStarted> hireAgentAs(
+    Session session,
+    int hiringAgentId,
+    int agentId,
+    String input,
+    int budgetUsdcStroops,
+  ) async {
+    final wallet = await _wallet.requireLogin(session);
+    if (hiringAgentId == agentId) {
+      throw Puls3ApiException(code: 'SelfHireNotAllowed');
+    }
+    if (input.trim().isEmpty) {
+      throw Puls3ApiException(code: 'InvalidHire', message: 'input is empty');
+    }
+    if (budgetUsdcStroops <= 0) {
+      throw Puls3ApiException(
+        code: 'InvalidHire',
+        message: 'budget must be positive',
+      );
+    }
+    final deploy = await _deployStoreOn(
+      session,
+    ).findByRegistryAgent(hiringAgentId);
+    if (deploy == null ||
+        deploy.owner != wallet.value ||
+        deploy.state != 'active') {
+      throw Puls3ApiException(code: 'HiringAgentNotOwned');
+    }
+    final hiringWallet = domain.StellarAddress.parse(deploy.agentWallet);
+    final launch = _agentHireLauncher();
+    try {
+      final hireId = await launch(
+        session: session,
+        hiringWallet: hiringWallet,
+        agentId: agentId,
+        input: input,
+        budgetUsdcStroops: budgetUsdcStroops,
+        requestId:
+            'agent-$hiringAgentId-hires-$agentId-'
+            '${DateTime.now().toUtc().microsecondsSinceEpoch}',
+      );
+      return AgentHireStarted(
+        hireId: hireId,
+        hiringWallet: hiringWallet.value,
+        state: 'started',
+      );
+    } on AgentHireOverBudget catch (e) {
+      throw Puls3ApiException(
+        code: 'BudgetExceeded',
+        details: {
+          'priceUsdcStroops': '${e.priceUsdcStroops}',
+          'budgetUsdcStroops': '${e.budgetUsdcStroops}',
+        },
+      );
+    } on AgentHireRefused catch (e) {
+      throw Puls3ApiException(code: 'AgentHireRefused', message: e.message);
+    } on AgentUnavailable {
+      throw Puls3ApiException(code: 'AgentNotFound');
+    } on AgentCannotDeliver {
+      throw Puls3ApiException(code: 'AgentCannotDeliver');
+    } on HireRequestInvalid catch (e) {
+      throw Puls3ApiException(code: 'InvalidHire', message: e.message);
+    } on HireLedgerUnavailable {
+      throw Puls3ApiException(code: 'ChainUnavailable');
+    }
+  }
+
+  /// The hire [hireId] that the caller's live Studio agent [hiringAgentId]
+  /// made with [hireAgentAs] (#312), as the hire detail screen shows it:
+  /// escrow status, the `fund` and latest escrow transactions and, once
+  /// delivered, the hired agent's result. Read-only, so the app polls it.
+  ///
+  /// The caller must own the active agent, as for [hireAgentAs]
+  /// (`HiringAgentNotOwned`), and the hire's client must be that agent's
+  /// wallet (`HireNotOwned`).
+  Future<HireDetail> getAgentHire(
+    Session session,
+    int hiringAgentId,
+    int hireId,
+  ) async {
+    final wallet = await _wallet.requireLogin(session);
+    final deploy = await _deployStoreOn(
+      session,
+    ).findByRegistryAgent(hiringAgentId);
+    if (deploy == null ||
+        deploy.owner != wallet.value ||
+        deploy.state != 'active') {
+      throw Puls3ApiException(code: 'HiringAgentNotOwned');
+    }
+    final hiringWallet = domain.StellarAddress.parse(deploy.agentWallet);
+    final detail = await _readHire(session, hiringWallet, hireId);
+    if (detail.hire.consumer != hiringWallet.value) {
+      throw Puls3ApiException(code: 'HireNotOwned');
+    }
+    return detail;
   }
 
   Future<DeploySession> _deploy(

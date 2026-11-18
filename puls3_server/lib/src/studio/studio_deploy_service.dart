@@ -6,6 +6,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 
 import '../agent/agent_wallet_custody.dart';
 import '../agent/stellar_agent_wallet_custody.dart';
+import '../agent/usdc_trustline.dart';
 import '../chain/submission_ledger.dart';
 import '../generated/protocol.dart' hide AgentManifestDraft;
 import '../hire/chain_accounts.dart';
@@ -42,6 +43,7 @@ final class StudioDeployService {
     required SubmissionLedger sender,
     required ChainTxReader transactions,
     required AccountFunder funder,
+    required TrustlineEnsurer trustlines,
     required AgentEnvelopeSigner signer,
     required StellarConfig stellar,
     required Uri registrationBase,
@@ -60,6 +62,7 @@ final class StudioDeployService {
        _sender = sender,
        _transactions = transactions,
        _funder = funder,
+       _trustlines = trustlines,
        _signer = signer,
        _stellar = stellar,
        _registrationBase = registrationBase,
@@ -79,10 +82,14 @@ final class StudioDeployService {
   final SubmissionLedger _sender;
   final ChainTxReader _transactions;
   final AccountFunder _funder;
+  final TrustlineEnsurer _trustlines;
   final AgentEnvelopeSigner _signer;
   final StellarConfig _stellar;
   final Uri _registrationBase;
   final int _validitySeconds;
+
+  /// Ledgers added past the preparation window to the auth entry expiration.
+  static const _expirationMarginLedgers = 60;
   final int _inclusionFee;
   final ModelPolicy _policy;
   final DateTime Function() _now;
@@ -183,7 +190,9 @@ final class StudioDeployService {
     if (row.state == 'walletAuthorizationSubmitted' || row.state == 'active') {
       return row;
     }
+    // A row prepared with the simulated expiration of 0 is never reused.
     if (row.authorizationEntryXdr != null &&
+        (row.signatureExpirationLedger ?? 0) > 0 &&
         row.state == 'awaitingWalletAuthorization' &&
         _fresh(row)) {
       return row;
@@ -195,6 +204,14 @@ final class StudioDeployService {
       } on LedgerException {
         throw _chain();
       }
+    }
+    // The escrow pays the agent in USDC, which the SAC only credits to an
+    // account with a trustline. Its ChangeTrust uses a sequence number, so it
+    // runs before the sequence below is read.
+    try {
+      await _trustlines.ensure(wallet);
+    } on LedgerException {
+      throw _chain();
     }
     final sequence = await _accounts.sequenceOf(wallet);
     final validUntil = _nowSeconds + _validitySeconds;
@@ -214,28 +231,42 @@ final class StudioDeployService {
     final simulation = await _simulate(spec);
     final index = addressAuthIndex(simulation.auth);
     if (index == null) throw _chain();
+    final latestLedger = simulation.latestLedger;
+    if (latestLedger == null) throw _chain();
+    // Recording-mode simulation returns the address entry with an expiration
+    // of 0, which no wallet signs and no ledger accepts. Ledgers close about
+    // every 5 s, so the signature must outlive the preparation window in
+    // ledgers, plus a margin for slow closes and the wallet prompt.
+    final expirationLedger =
+        latestLedger + (_validitySeconds / 5).ceil() + _expirationMarginLedgers;
+    final String entryXdr;
     final AuthEntryView entry;
     try {
-      entry = readAuthEntry(simulation.auth[index]);
+      entryXdr = withExpirationLedger(simulation.auth[index], expirationLedger);
+      entry = readAuthEntry(entryXdr);
     } on FormatException {
       throw _chain();
     }
-    if (!entry.covers(owner) || entry.expirationLedger == null) {
+    if (!entry.covers(owner) ||
+        entry.expirationLedger == null ||
+        entry.expirationLedger! <= latestLedger) {
       throw _chain();
     }
+    final auth = [...simulation.auth];
+    auth[index] = entryXdr;
     final draft = WalletAuthDraft(
       accountSequence: sequence,
       validUntil: validUntil,
       inclusionFee: _inclusionFee,
       minResourceFee: simulation.minResourceFee,
       transactionData: simulation.transactionData,
-      auth: simulation.auth,
+      auth: auth,
       builderIndex: index,
     );
     return _deploys.save(
       row.copy(
         state: 'awaitingWalletAuthorization',
-        authorizationEntryXdr: simulation.auth[index],
+        authorizationEntryXdr: entryXdr,
         signatureExpirationLedger: entry.expirationLedger,
         expiresAt: _expiry(validUntil),
         walletAuthJson: draft.toJson(),
@@ -420,7 +451,10 @@ final class StudioDeployService {
         state: 'awaitingRegistrationSignature',
         preparationId: _newPreparationId(),
         unsignedEnvelopeXdr: envelope.envelopeXdr,
-        walletAuthJson: versionUpdateJson(version: next, manifestJson: snapshot),
+        walletAuthJson: versionUpdateJson(
+          version: next,
+          manifestJson: snapshot,
+        ),
         expiresAt: _expiry(validUntil),
         clearAuthorization: true,
         clearFailure: true,
@@ -636,7 +670,11 @@ final class StudioDeployService {
     }
   }
 
-  void _requireSignedEntry(String prepared, String signed, StellarAddress owner) {
+  void _requireSignedEntry(
+    String prepared,
+    String signed,
+    StellarAddress owner,
+  ) {
     if (prepared == signed) throw _api('InvalidAuthorizationEntry');
     final AuthEntryView preparedView;
     final AuthEntryView signedView;
@@ -668,7 +706,9 @@ final class StudioDeployService {
     if (row.state == 'failed' && row.retryFromStep == 6) {
       throw _api('PreparationExpired', {'reason': 'timeBounds'});
     }
-    if (!_fresh(row)) throw _api('PreparationExpired', {'reason': 'timeBounds'});
+    if (!_fresh(row)) {
+      throw _api('PreparationExpired', {'reason': 'timeBounds'});
+    }
   }
 
   Future<StudioDeployRow> _requireRow(int draftId) async {

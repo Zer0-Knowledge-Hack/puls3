@@ -82,25 +82,29 @@ final class ReferencedJob {
 
 /// What a reader knows about paid jobs when it decides which ratings count.
 ///
-/// [escrow] is the escrow contract the reader trusts. It comes from the
-/// reader's configuration, never from a record, so a reference to another
-/// contract (one that could answer anything) never counts.
+/// [escrows] are the escrow contracts the reader trusts: the configured one
+/// and the ones it replaced, so ratings given on a rotated escrow still count
+/// (#273). They come from the reader's configuration, never from a record, so
+/// a reference to another contract (one that could answer anything) never
+/// counts.
 ///
-/// [jobs] holds the jobs read from [escrow] by id. A referenced job that is
-/// not in it could not be read (it does not exist, or is archived).
+/// [jobs] holds the jobs read from those escrows, by the reference that names
+/// them: a job id alone means nothing once there are several escrows. A
+/// referenced job that is not in it could not be read (it does not exist, or
+/// is archived).
 ///
 /// [owner] is the rated agent's owner on the identity registry, or null when
 /// the reader could not learn it. A rating from the owner never counts, as
 /// the server already refuses to build one (`FeedbackFromAgentOwner`).
 final class FeedbackProvenance {
   const FeedbackProvenance({
-    required this.escrow,
+    required this.escrows,
     this.jobs = const {},
     this.owner,
   });
 
-  final StellarAddress escrow;
-  final Map<int, ReferencedJob> jobs;
+  final Set<StellarAddress> escrows;
+  final Map<PaidJobReference, ReferencedJob> jobs;
   final StellarAddress? owner;
 }
 

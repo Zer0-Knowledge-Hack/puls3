@@ -1,6 +1,16 @@
-/// The `puls3` command. It reads through `puls3_sdk` and never signs or
-/// submits a transaction.
+/// The `puls3` command. It reads through `puls3_sdk`, runs agents locally
+/// with the builder's own model credential, and never signs or submits a
+/// transaction.
 library;
 
+export 'src/local_run.dart' show CredentialVariables, localModelPolicy;
 export 'src/puls3_command.dart'
-    show ExitCodes, SdkConnector, apiUrlVariable, runPuls3;
+    show
+        ExitCodes,
+        FileReader,
+        SdkConnector,
+        StdinReader,
+        apiUrlVariable,
+        printable,
+        runPuls3,
+        walletVariable;

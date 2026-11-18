@@ -26,7 +26,9 @@ submits a transaction.
 The chain is read from the testnet values unless these variables override
 them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_USDC_SAC`, `PULS3_STELLAR_IDENTITY_REGISTRY`,
-`PULS3_STELLAR_ESCROW` and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
+`PULS3_STELLAR_ESCROW`, `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated: the
+escrows `PULS3_STELLAR_ESCROW` replaced, whose jobs still make a rating count)
+and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
 times out after 8 seconds.
 
 `PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
@@ -428,11 +430,40 @@ CHROMEDRIVER=/path/to/chromedriver bash scripts/e2e-flutter-local.sh
 
 The script seeds an agent and a funded consumer wallet
 (`puls3_server/tool/e2e_seed_local.dart`), starts the server on a database of
-its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. Every key is
+its own (`puls3_e2e`, dropped afterwards) and runs `flutter drive`. The seed
+also stores the agent's key in custody in that database, as a Studio deploy
+does, because the server refuses to hire an agent without it. Every key is
 ephemeral and lives in a temp directory the script removes. The wallet is
 `AutomatedKeyWallet`, a test fixture next to the test. The USDC balance check
 (Horizon on testnet) is stood in for, because the sandbox pays in its native
 token.
+
+#### Browser E2E in Docker (needed on Windows)
+
+On native Windows the run above cannot sign in: Dart's `Platform.environment`
+upper-cases variable names there, so the server never finds
+`SERVERPOD_PASSWORD_walletAuthSigningKey` and the hire fails with "Your wallet
+session ended". Production and CI run Linux, so the journey runs in a Linux
+container instead:
+
+```bash
+# Same services and setup as above; no Flutter, Stellar CLI or Chrome needed.
+bash scripts/e2e-flutter-docker.sh
+```
+
+- The image (`docker/e2e-browser/Dockerfile`) pins Flutter 3.44.4 (Dart
+  3.12.2), Stellar CLI 28.1.0 and Chrome for Testing with its chromedriver,
+  each checked against its SHA-256. It holds no secret.
+- The container joins the compose network and reaches `soroban_standalone`
+  and `postgres_test` by name; it sees a copy of `.env.local-soroban` whose
+  URLs name the service. Only `POSTGRES_TEST_PASSWORD` is passed in.
+- The repository is mounted read-write, but every `.dart_tool/`, `build/` and
+  Flutter `ephemeral/` directory and the pub cache live in named volumes
+  (`puls3-e2e-browser-*`), so the Windows workspace keeps its own artifacts
+  and later runs reuse the Linux ones. Remove them with
+  `docker volume ls -q --filter name=puls3-e2e-browser | xargs docker volume rm`.
+- The scripts run from a copy with `\r` stripped, so a CRLF checkout works.
+- The first run builds the image and compiles the web app (several minutes).
 
 ## Regenerate Serverpod code
 
@@ -678,7 +709,17 @@ per project.
 
 ### Redeploy
 
-Anyone with access to the project, on a machine where steps 1 and 2 are done:
+**Automatic.** `.github/workflows/deploy-server.yml` deploys `main` to
+Serverpod Cloud every time the CI workflow passes on a push to `main`, one
+deploy at a time, and fails unless `health/check` then reports
+`1.0.0+<commit>`. It needs the repository secret `SERVERPOD_CLOUD_TOKEN`
+(`scloud auth create-token`, then `gh secret set SERVERPOD_CLOUD_TOKEN`). It does
+not set variables or passwords: set new ones (step 2 below) before merging the
+code that needs them. Run it by hand from the Actions tab
+(`workflow_dispatch`) to redeploy `main`.
+
+**Manual**, when Actions is unavailable. Anyone with access to the project, on
+a machine where steps 1 and 2 are done:
 
 1. Update `main`: `git switch main && git pull`.
 2. Compare `scloud variable list` and `scloud password list` with step 5 and

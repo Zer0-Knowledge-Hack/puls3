@@ -29,6 +29,9 @@ final _stranger = StellarAddress.parse(
 );
 final _usdc = StellarConfig.testnet.usdcSac;
 
+/// The escrow the effects read the `JobCreated` events from.
+final _escrow = StellarConfig.testnet.escrow;
+
 /// The testnet `fund` of escrow job 3.
 const _fundTx =
     '43cd3e8455cafdc08d62a644b8f9dd9174994644b2bdd3e57eaa6893aa5c2437';
@@ -124,6 +127,7 @@ void main() {
     ledger: ledger,
     jobs: ledger,
     usdc: _usdc,
+    escrow: _escrow,
   );
 
   /// The hire in the lifecycle store, with [jobId] bound when not null.
@@ -707,6 +711,17 @@ void main() {
         expect(stored.status, HireStatus.open);
         expect(stored.expiredAt, preparedExpiry);
         expect(repo.recordPaymentCalls, 0);
+      },
+    );
+
+    test(
+      'binds the escrow the job was created on with the job (#273)',
+      () async {
+        final p = await pending();
+
+        await effects(repo).onJobCreated(p.submission, [created(3)]);
+
+        expect((await lifecycle.findHire(p.row.id))!.escrow, _escrow.value);
       },
     );
 

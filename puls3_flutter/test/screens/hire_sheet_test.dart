@@ -5,6 +5,7 @@ import 'package:puls3_flutter/l10n/generated/app_localizations.dart';
 import 'package:puls3_flutter/src/data/agent_repository.dart';
 import 'package:puls3_flutter/src/deploy/fake_deploy_gateway.dart';
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
+import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/domain/agent.dart';
 import 'package:puls3_flutter/src/hire/fake_hire_gateway.dart';
 import 'package:puls3_flutter/src/hire/hire_flow_store.dart';
@@ -20,6 +21,7 @@ import 'package:puls3_flutter/src/theme/puls3_theme.dart';
 import 'package:puls3_flutter/src/wallet/wallet_port.dart';
 
 import '../helpers.dart';
+import '../studio/studio_fixtures.dart';
 
 class TestWallet implements WalletPort {
   TestWallet({this.initialAddress});
@@ -290,6 +292,9 @@ class ScriptedHireGateway implements HireGateway {
   Future<HireProgress> getHire(int hireId, String consumer) async =>
       throw const HireNotFound();
 
+  @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async => const [];
+
   EscrowPreparation _prep(String purpose) => EscrowPreparation(
     preparationId: 'prep-$purpose-${_nextPreparation++}',
     purpose: purpose,
@@ -317,6 +322,7 @@ Future<void> pumpSheet(
   HireGateway? gateway,
   Agent agent = _onChainAgent,
   HireFlowStore? store,
+  StudioGateway? studio,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   opened.clear();
@@ -327,7 +333,7 @@ Future<void> pumpSheet(
         catalog: AgentCatalog(InMemoryAgentRepository([agent])),
         wallet: WalletController(wallet),
         deployGateway: FakeDeployGateway(),
-        studioGateway: FakeStudioGateway(),
+        studioGateway: studio ?? FakeStudioGateway(delay: Duration.zero),
         hireGateway: gateway ?? FakeHireGateway(delay: Duration.zero),
         hireFlowStore: store ?? MemoryHireFlowStore(),
         locale: LocaleController(
@@ -863,6 +869,129 @@ void main() {
       expect(find.byKey(const ValueKey('hire-resume-note')), findsNothing);
       await confirm(tester, input: 'Another task');
       expect(gateway.hireCount, 2);
+    });
+  });
+
+  group('Who pays? (hire as my agent, #312)', () {
+    const owner = 'GOWNERWALLET123';
+
+    FakeStudioGateway studioWith(List<StudioDraft> drafts) => FakeStudioGateway(
+      delay: Duration.zero,
+      seed: [for (final draft in drafts) (owner, draft)],
+    );
+
+    testWidgets('is not offered when the wallet owns no live agent', (
+      tester,
+    ) async {
+      await pumpSheet(
+        tester,
+        wallet: TestWallet(initialAddress: owner),
+        studio: studioWith([savedDraft(1, name: 'Scout', agentId: '5')]),
+      );
+      await settle(tester);
+
+      expect(find.byKey(const Key('hire-payer')), findsNothing);
+      expect(find.text('Confirm & sign'), findsOneWidget);
+    });
+
+    testWidgets('the agent being hired is not offered as its own payer', (
+      tester,
+    ) async {
+      await pumpSheet(
+        tester,
+        wallet: TestWallet(initialAddress: owner),
+        studio: studioWith([
+          savedDraft(
+            1,
+            state: DraftDeployState.live,
+            liveVersion: 1,
+            agentId: '${_onChainAgent.registryId}',
+          ),
+        ]),
+      );
+      await settle(tester);
+
+      expect(find.byKey(const Key('hire-payer')), findsNothing);
+    });
+
+    testWidgets('a live agent of the wallet hires and pays from its wallet', (
+      tester,
+    ) async {
+      final wallet = TestWallet(initialAddress: owner);
+      final studio = studioWith([
+        savedDraft(
+          1,
+          name: 'Scout',
+          state: DraftDeployState.live,
+          liveVersion: 1,
+          agentId: '5',
+        ),
+      ]);
+      await pumpSheet(tester, wallet: wallet, studio: studio);
+      await settle(tester);
+
+      expect(find.text('Who pays?'), findsOneWidget);
+      expect(find.text('You (your wallet)'), findsOneWidget);
+      await tap(tester, 'Your agent Scout (pays from its own wallet)');
+
+      expect(find.byKey(const Key('hire-as-agent')), findsOneWidget);
+      expect(find.text('Get testnet USDC'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('hire-input')),
+        'Audit my token',
+      );
+      await tester.pump();
+      await tap(tester, 'Hire with Scout');
+
+      expect(studio.agentHires, [
+        (
+          hiringAgentId: 5,
+          agentId: 9,
+          input: 'Audit my token',
+          budget: _onChainAgent.priceUsdcStroops,
+        ),
+      ]);
+      // No wallet signature: the agent's custodied wallet pays.
+      expect(wallet.signed, isEmpty);
+      await advance(tester, const Duration(seconds: 8));
+      expect(find.byKey(const Key('collab-progress')), findsOneWidget);
+      expect(find.text('Payment released to the hired agent'), findsOneWidget);
+      expect(find.byKey(const Key('collab-result')), findsOneWidget);
+    });
+
+    testWidgets('a refused agent hire shows a clear message', (tester) async {
+      final studio =
+          studioWith([
+              savedDraft(
+                1,
+                name: 'Scout',
+                state: DraftDeployState.live,
+                liveVersion: 1,
+                agentId: '5',
+              ),
+            ])
+            ..nextHireError = const StudioAgentHireRefused(
+              AgentHireRefusal.walletUnavailable,
+            );
+      await pumpSheet(
+        tester,
+        wallet: TestWallet(initialAddress: owner),
+        studio: studio,
+      );
+      await settle(tester);
+      await tap(tester, 'Your agent Scout (pays from its own wallet)');
+      await tester.enterText(
+        find.byKey(const ValueKey('hire-input')),
+        'Audit my token',
+      );
+      await tester.pump();
+      await tap(tester, 'Hire with Scout');
+
+      expect(
+        find.text("Your agent's wallet cannot pay right now. Try again later."),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('collab-progress')), findsNothing);
     });
   });
 }

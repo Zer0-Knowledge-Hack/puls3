@@ -87,6 +87,22 @@ void main() {
       expect(registry.escrow, _configured.escrow);
     });
 
+    test('also trusts the escrows the configured one replaced (#273)', () {
+      final previous = StellarConfig.testnet.usdcSac;
+      final config = StellarConfig.fromEnvironment({
+        'PULS3_STELLAR_REPUTATION_REGISTRY':
+            StellarConfig.testnet.identityRegistry.value,
+        'PULS3_STELLAR_PREVIOUS_ESCROWS':
+            '${previous.value},${StellarConfig.testnet.escrow.value}',
+      });
+      final registry =
+          reputationRegistryFor(config, _reader(config))
+              as SorobanReputationRegistry;
+
+      expect(registry.escrow, config.escrow);
+      expect(registry.trustedEscrows, {config.escrow, previous});
+    });
+
     test('has no feedback to read while the registry is unset', () async {
       final config = _withoutRegistry();
       final registry = reputationRegistryFor(config, _reader(config));

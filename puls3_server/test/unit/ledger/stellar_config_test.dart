@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart';
+import 'package:puls3_server/src/ledger/classic_asset.dart';
 import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:test/test.dart';
 
@@ -88,6 +89,38 @@ void main() {
       expect(configured, isNot(StellarConfig.testnet));
     });
 
+    group('usdc asset', () {
+      const name = 'PULS3_STELLAR_USDC_ASSET';
+
+      test('unset keeps the Circle testnet USDC', () {
+        final asset = StellarConfig.fromEnvironment(const {}).usdcAsset;
+
+        expect(asset.code, 'USDC');
+        expect(
+          asset.issuer,
+          'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+        );
+      });
+
+      test('CODE:ISSUER overrides it', () {
+        final config = StellarConfig.fromEnvironment(const {
+          name: 'EURC:$_alice',
+        });
+
+        expect(config.usdcAsset, ClassicAsset.parse('EURC:$_alice'));
+        expect(config, isNot(StellarConfig.testnet));
+      });
+
+      for (final bad in ['USDC', 'USDC:nope', 'TOO-LONG-CODE1:$_alice']) {
+        test('"$bad" throws', () {
+          expect(
+            () => StellarConfig.fromEnvironment({name: bad}),
+            throwsA(anything),
+          );
+        });
+      }
+    });
+
     group('rpc timeout', () {
       const name = 'PULS3_STELLAR_RPC_TIMEOUT_SECONDS';
 
@@ -121,6 +154,73 @@ void main() {
           );
         });
       }
+    });
+
+    group('previous escrows (#273)', () {
+      final old = StellarConfig.testnet.identityRegistry.value;
+      final older = StellarConfig.testnet.usdcSac.value;
+
+      test('none by default', () {
+        expect(
+          StellarConfig.fromEnvironment(const {}).previousEscrows,
+          isEmpty,
+        );
+        expect(
+          StellarConfig.fromEnvironment(const {
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': '',
+          }).previousEscrows,
+          isEmpty,
+        );
+      });
+
+      test('a comma-separated list of contracts, in order', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS': '$old, $older ,',
+        });
+
+        expect(config.previousEscrows, [
+          StellarAddress.parse(old),
+          StellarAddress.parse(older),
+        ]);
+      });
+
+      test('trusted escrows are the configured one and the previous ones', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS': old,
+        });
+
+        expect(config.trustedEscrows, {
+          StellarConfig.testnet.escrow,
+          StellarAddress.parse(old),
+        });
+      });
+
+      test('the configured escrow listed again is trusted once', () {
+        final config = StellarConfig.fromEnvironment({
+          'PULS3_STELLAR_PREVIOUS_ESCROWS':
+              '${StellarConfig.testnet.escrow.value},$old',
+        });
+
+        expect(config.trustedEscrows, hasLength(2));
+      });
+
+      test('an invalid address throws', () {
+        expect(
+          () => StellarConfig.fromEnvironment(const {
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': 'not-an-address',
+          }),
+          throwsA(isA<InvalidStellarAddress>()),
+        );
+      });
+
+      test('a list changes the configuration', () {
+        expect(
+          StellarConfig.fromEnvironment({
+            'PULS3_STELLAR_PREVIOUS_ESCROWS': old,
+          }),
+          isNot(StellarConfig.testnet),
+        );
+      });
     });
 
     test('an invalid address throws', () {

@@ -96,6 +96,9 @@ final class FeedbackService {
         agent: AgentId(hire.agentId),
         feedback: feedback,
         jobId: hire.jobId!,
+        // The escrow the hire was funded on; none for a hire that predates
+        // the column, which uses the configured one (#273, #307).
+        escrow: hire.escrow == null ? null : StellarAddress.parse(hire.escrow!),
       );
     } on RangeError {
       // A job id outside what a `PaidJobReference` can name (#201). An

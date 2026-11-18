@@ -198,6 +198,7 @@ void main() {
         expect(data.minResourceFee, 3304282);
         expect(data.auth, auth.cast<String>());
         expect(data.auth, hasLength(1));
+        expect(data.latestLedger, 5079876);
       },
     );
 

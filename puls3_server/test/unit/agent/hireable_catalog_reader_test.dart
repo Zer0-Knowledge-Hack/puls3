@@ -118,4 +118,33 @@ void main() {
     expect(agent!.hireable, isFalse);
     expect(asked, isEmpty);
   });
+
+  group('Studio agents (published deploy only)', () {
+    Future<Set<int>> unpublished(Set<int> ids) async =>
+        ids.where((id) => id == 31).toSet();
+
+    test(
+      'a custodied Studio agent whose deploy failed is not hireable',
+      () async {
+        final reader = HireableCatalogReader(
+          inner: _FakeCatalog([
+            _agent('studio-6', 31, wallet: _custodiedWallet),
+            _agent('studio-7', 32, wallet: _custodiedWallet),
+            _agent('agt-001', 7, wallet: _custodiedWallet),
+          ]),
+          custody: custody,
+          unpublished: unpublished,
+        );
+
+        final agents = await reader.list();
+
+        expect(
+          {for (final agent in agents) agent.id: agent.hireable},
+          {'studio-6': false, 'studio-7': true, 'agt-001': true},
+        );
+        expect((await reader.get('studio-6'))!.hireable, isFalse);
+        expect((await reader.get('studio-7'))!.hireable, isTrue);
+      },
+    );
+  });
 }
