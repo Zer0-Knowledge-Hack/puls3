@@ -133,6 +133,57 @@ docker compose -f puls3_server/docker-compose.yaml up -d
 scripts/setup-local-soroban.sh
 ```
 
+## Working with git worktrees
+
+A new `git worktree` starts without the git-ignored files the tests need:
+`puls3_server/.env`, `puls3_server/config/passwords.yaml`,
+`puls3_server/.env.local-soroban` and the built WASM under `contracts/target/`.
+Prepare each worktree on its own (#327):
+
+1. **Create the secrets in every worktree.** Run `./scripts/setup-local-secrets.sh`
+   from the worktree root. It needs no Docker and never overwrites existing files.
+2. **Never copy `.env` or `passwords.yaml` from another checkout.** Copying
+   spreads one secret across directories. Generate fresh ones instead.
+3. **Use one Compose project per worktree.** `docker-compose.yaml` sets no
+   `name:`, so every checkout shares the project `puls3_server` and its named
+   volumes. Postgres sets its password only when the volume is created, so a
+   second worktree with its own random `.env` fails with
+   `28P01 password authentication failed`. Give each worktree its own project:
+
+   ```bash
+   docker compose -p puls3_wt_<name> -f puls3_server/docker-compose.yaml up -d
+   docker compose -p puls3_wt_<name> -f puls3_server/docker-compose.yaml down -v
+   ```
+
+4. **Run the services of one worktree at a time.** The ports (8000, 9090, 9091,
+   8090) are fixed, so two worktrees cannot run them together. Stop one
+   worktree's project (`down`) before starting another's.
+5. **Get the WASM.** Either build it (run `scripts/setup-local-soroban.sh`
+   without `--skip-build`) or copy the git-ignored `contracts/target/` artifacts
+   from another checkout; they hold no secret.
+6. **Rebuild after contract changes.** `scripts/setup-local-soroban.sh
+   --skip-build` against stale WASM deploys contracts that no longer match
+   `main`, and the E2E then fails with `JobMismatch (job_id)`. Use `--skip-build`
+   only when the WASM was built from the code you are testing.
+
+On Windows, `melos` needs Developer Mode symlinks and its scripts use POSIX
+`case`: run it from Git Bash or WSL, or use `dart pub get` plus `dart test` per
+package (see the README and CONTRIBUTING).
+
+After these steps `git status --short` stays clean: `.env`, `passwords.yaml`,
+`.env.local-soroban` and `contracts/target/` are all git-ignored.
+
+### Decision: stale database volume
+
+Should `setup-local-secrets.sh` refuse to run, or warn, when the test database
+volume already exists with another password? **Print a one-line warning; do not
+refuse.** Creating a new `.env` is harmless and often correct (a first run, or
+a worktree with its own `-p` project), while a refusal would block those cases
+and needs Docker to detect the volume. A warning (for example "volume
+`<project>_puls3_test_data` exists; if you see `28P01`, run `down -v` or use a
+separate `-p` project") covers the failure at no cost. Implementing it is a
+follow-up to the script; this change is documentation only.
+
 ## Troubleshooting
 
 | Symptom | Fix |
