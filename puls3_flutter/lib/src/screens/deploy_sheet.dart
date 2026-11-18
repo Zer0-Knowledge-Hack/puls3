@@ -51,7 +51,8 @@ class DeploySheet extends StatelessWidget {
     if (result.isDemo) return;
     AppScope.of(context).catalog.publish(
       Agent(
-        id: '${result.agentId}',
+        id: _catalogId(result),
+        registryId: result.agentId,
         name: draft.name,
         description: draft.description,
         skills: draft.skills,
@@ -62,6 +63,13 @@ class DeploySheet extends StatelessWidget {
         model: draft.model,
       ),
     );
+  }
+
+  /// The catalog id of the deployed agent: `studio-<draftId>` for a saved
+  /// draft, as the server catalog lists it; the registry id otherwise.
+  String _catalogId(DeployResult result) {
+    final draftId = draft.draftId;
+    return draftId == null ? '${result.agentId}' : studioCatalogId(draftId);
   }
 
   void _close(BuildContext context, {String? goTo}) {
@@ -87,7 +95,7 @@ class DeploySheet extends StatelessWidget {
             wallet: scope.wallet,
             onLive: (result) => _publish(context, result),
             onViewAgent: (result) =>
-                _close(context, goTo: '/agent/${result.agentId}'),
+                _close(context, goTo: '/agent/${_catalogId(result)}'),
             onClose: () => _close(context),
           ),
         ),

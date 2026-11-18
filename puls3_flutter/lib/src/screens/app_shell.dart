@@ -10,8 +10,8 @@ import '../ui/organisms/top_bar.dart';
 import 'wallet_sheet.dart';
 
 /// Shared chrome for landing, Marketplace and Studio: [TopBar] plus, on
-/// phones, a bottom [NavigationBar]. Logo, Marketplace, Studio, language
-/// and wallet stay in the same slots on every route.
+/// phones, a bottom [NavigationBar]. Logo, Marketplace, Studio, My hires,
+/// language and wallet stay in the same slots on every route.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.location, required this.child});
 
@@ -21,9 +21,8 @@ class AppShell extends StatelessWidget {
   static String _destination(String location) {
     if (location == '/') return '/';
     if (location.startsWith('/studio')) return '/studio';
-    if (location.startsWith('/market') ||
-        location.startsWith('/agent') ||
-        location.startsWith('/hires')) {
+    if (location.startsWith('/hires')) return '/hires';
+    if (location.startsWith('/market') || location.startsWith('/agent')) {
       return '/market';
     }
     return location;
@@ -53,6 +52,11 @@ class AppShell extends StatelessWidget {
         label: l10n.navStudio,
         path: '/studio',
         icon: Icons.auto_awesome_outlined,
+      ),
+      TopBarLink(
+        label: l10n.navMyHires,
+        path: '/hires',
+        icon: Icons.receipt_long_outlined,
       ),
     ];
     final compactLinks = [

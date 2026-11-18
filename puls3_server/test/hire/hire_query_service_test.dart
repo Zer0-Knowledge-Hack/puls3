@@ -392,6 +392,89 @@ void main() {
       expect(await rig.submissions.listByHire(hire.id), before);
     },
   );
+
+  group('listMyHires', () {
+    // 1800000100 is after the rig clock (2026-10-07), so the window is open.
+    const openDeadline = 1800000100;
+
+    HireQueryService listing({int deadline = openDeadline}) => HireQueryService(
+      hires: rig.hires,
+      runs: runs,
+      submissions: rig.submissions,
+      preparations: rig.preparations,
+      agents: (id) => agents(id),
+      jobs: _Jobs(deadline),
+      now: () => rig.clock,
+    );
+
+    test('returns only the session wallet hires, newest first', () async {
+      final first = await rig.hire(status: HireStatus.completed);
+      await rig.hire(status: HireStatus.funded, consumer: stranger);
+      final second = await rig.hire(status: HireStatus.open);
+
+      final hires = await listing().listMyHires(rig.wallet);
+
+      expect(hires.map((h) => h.id), [second.id, first.id]);
+      expect(hires.first.agentName, 'Support Relay');
+      expect(hires.first.priceUsdcStroops, price);
+      expect(hires.first.inputPreview, 'summarise this');
+      expect(hires.first.status, 'open');
+    });
+
+    test('a submitted hire within its approval window needs action', () async {
+      final hire = await rig.hire(status: HireStatus.submitted);
+
+      final [summary] = await listing().listMyHires(rig.wallet);
+
+      expect(summary.id, hire.id);
+      expect(summary.needsAction, isTrue);
+      expect(
+        summary.approvalDeadline,
+        DateTime.fromMillisecondsSinceEpoch(openDeadline * 1000, isUtc: true),
+      );
+    });
+
+    test('a submitted hire past its approval window needs none', () async {
+      await rig.hire(status: HireStatus.submitted);
+      final past = rig.clock.millisecondsSinceEpoch ~/ 1000 - 60;
+
+      final [summary] = await listing(deadline: past).listMyHires(rig.wallet);
+
+      expect(summary.needsAction, isFalse);
+    });
+
+    test(
+      'a funded hire whose run failed needs action (reject to refund)',
+      () async {
+        final hire = await rig.hire(status: HireStatus.funded);
+        queue(hire.id);
+        await runs.markRunning(hire.id, rig.clock);
+        await runs.markFailed(hire.id, 'timeout', rig.clock);
+        final healthy = await rig.hire(status: HireStatus.funded);
+        queue(healthy.id);
+
+        final hires = await listing().listMyHires(rig.wallet);
+
+        expect(
+          {for (final h in hires) h.id: h.needsAction},
+          {
+            hire.id: true,
+            healthy.id: false,
+          },
+        );
+      },
+    );
+
+    test('an agent the catalog cannot name keeps the list readable', () async {
+      await rig.hire(status: HireStatus.completed);
+      agents = (_) async => null;
+
+      final [summary] = await listing().listMyHires(rig.wallet);
+
+      expect(summary.agentName, 'Agent #7');
+      expect(summary.needsAction, isFalse);
+    });
+  });
 }
 
 final class _UnavailableJobs implements EscrowJobReader {

@@ -35,6 +35,7 @@ class AgentCatalog extends ChangeNotifier {
   CatalogStatus _status = CatalogStatus.loading;
   bool _loading = false;
   bool _started = false;
+  Future<void>? _inflight;
   Object? _error;
 
   List<Agent> get agents => _agents;
@@ -60,9 +61,9 @@ class AgentCatalog extends ChangeNotifier {
   /// Loads the catalog once; later calls do nothing. Use [retry] after a
   /// failure.
   Future<void> load() {
-    if (_started) return Future.value();
+    if (_started) return _inflight ?? Future.value();
     _started = true;
-    return _fetch();
+    return _inflight = _fetch();
   }
 
   /// Loads the server catalog again, for the Retry action.
@@ -112,6 +113,16 @@ class AgentCatalog extends ChangeNotifier {
   Agent? byId(String id) {
     for (final agent in _agents) {
       if (agent.id == id) return agent;
+    }
+    return null;
+  }
+
+  /// The agent registered on chain as [registryId], loading the catalog
+  /// first when it has not loaded yet; null when no agent has that id.
+  Future<Agent?> agentByRegistryId(int registryId) async {
+    await load();
+    for (final agent in _agents) {
+      if (agent.registryId == registryId) return agent;
     }
     return null;
   }

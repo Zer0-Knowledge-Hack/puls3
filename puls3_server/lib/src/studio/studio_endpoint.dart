@@ -98,6 +98,11 @@ class StudioEndpoint extends Endpoint {
     return query.getHire(consumer, hireId);
   }
 
+  /// Where deploys are read, honouring [deployStores]: `HireEndpoint`
+  /// lists the hires of the caller's active agents with it.
+  static StudioDeployStore deployStoreOf(Session session) =>
+      _deployStoreOn(session);
+
   static StudioDeployStore _deployStoreOn(Session session) {
     final builder = _deployStores;
     if (builder != null) return builder(session);
