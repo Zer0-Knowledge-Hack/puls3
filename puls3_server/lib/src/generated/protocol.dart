@@ -47,6 +47,7 @@ import 'hire/hire.dart' as _ikb6z54u;
 import 'hire/hire_configuration_missing.dart' as _izyyjkbb;
 import 'hire/hire_ledger_unavailable.dart' as _izuscvxu;
 import 'hire/hire_payment.dart' as _i7gyvijy;
+import 'hire/hire_receipt_line.dart' as _iuo7hy2q;
 import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_summary.dart' as _izumcaty;
 import 'hire/hire_view.dart' as _ivruwodq;
@@ -91,6 +92,7 @@ export 'hire/hire.dart';
 export 'hire/hire_configuration_missing.dart';
 export 'hire/hire_ledger_unavailable.dart';
 export 'hire/hire_payment.dart';
+export 'hire/hire_receipt_line.dart';
 export 'hire/hire_request_invalid.dart';
 export 'hire/hire_summary.dart';
 export 'hire/hire_view.dart';
@@ -832,6 +834,26 @@ class Protocol extends _is.DatabaseSerializationManager {
           isNullable: true,
           dartType: 'String?',
         ),
+        _isp.ColumnDefinition(
+          name: 'subcontractReserve',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+          columnDefault: '0',
+        ),
+        _isp.ColumnDefinition(
+          name: 'allowRelatedParty',
+          columnType: _isp.ColumnType.boolean,
+          isNullable: false,
+          dartType: 'bool',
+          columnDefault: 'true',
+        ),
+        _isp.ColumnDefinition(
+          name: 'parentHireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
@@ -863,6 +885,19 @@ class Protocol extends _is.DatabaseSerializationManager {
           ],
           type: 'btree',
           isUnique: true,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'hire_parent_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'parentHireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
           isPrimary: false,
         ),
       ],
@@ -953,6 +988,141 @@ class Protocol extends _is.DatabaseSerializationManager {
             _isp.IndexElementDefinition(
               type: _isp.IndexElementDefinitionType.column,
               definition: 'jobId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _isp.TableDefinition(
+      name: 'hire_receipt_line',
+      dartName: 'HireReceiptLineRecord',
+      schema: 'public',
+      module: 'puls3',
+      columns: [
+        _isp.ColumnDefinition(
+          name: 'id',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'serial',
+        ),
+        _isp.ColumnDefinition(
+          name: 'parentHireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'childHireId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'childJobId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'providerAgentId',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'providerWallet',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'budget',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _isp.ColumnDefinition(
+          name: 'fee',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'payout',
+          columnType: _isp.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'state',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'deliverableHash',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createTransaction',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'settleTransaction',
+          columnType: _isp.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _isp.ColumnDefinition(
+          name: 'relatedParty',
+          columnType: _isp.ColumnType.boolean,
+          isNullable: false,
+          dartType: 'bool',
+        ),
+        _isp.ColumnDefinition(
+          name: 'justification',
+          columnType: _isp.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _isp.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _isp.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _isp.IndexDefinition(
+          indexName: 'hire_receipt_line_parent_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'parentHireId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+        _isp.IndexDefinition(
+          indexName: 'hire_receipt_line_child_job_idx',
+          tableSpace: null,
+          elements: [
+            _isp.IndexElementDefinition(
+              type: _isp.IndexElementDefinitionType.column,
+              definition: 'childJobId',
             ),
           ],
           type: 'btree',
@@ -1691,6 +1861,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _i7gyvijy.HirePaymentRecord) {
       return _i7gyvijy.HirePaymentRecord.fromJson(data) as T;
     }
+    if (t == _iuo7hy2q.HireReceiptLineRecord) {
+      return _iuo7hy2q.HireReceiptLineRecord.fromJson(data) as T;
+    }
     if (t == _i1txwkfs.HireRequestInvalid) {
       return _i1txwkfs.HireRequestInvalid.fromJson(data) as T;
     }
@@ -1848,6 +2021,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _is.getType<_i7gyvijy.HirePaymentRecord?>()) {
       return (data != null ? _i7gyvijy.HirePaymentRecord.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_iuo7hy2q.HireReceiptLineRecord?>()) {
+      return (data != null
+              ? _iuo7hy2q.HireReceiptLineRecord.fromJson(data)
+              : null)
           as T;
     }
     if (t == _is.getType<_i1txwkfs.HireRequestInvalid?>()) {
@@ -2016,6 +2195,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _izyyjkbb.HireConfigurationMissing => 'HireConfigurationMissing',
       _izuscvxu.HireLedgerUnavailable => 'HireLedgerUnavailable',
       _i7gyvijy.HirePaymentRecord => 'HirePaymentRecord',
+      _iuo7hy2q.HireReceiptLineRecord => 'HireReceiptLineRecord',
       _i1txwkfs.HireRequestInvalid => 'HireRequestInvalid',
       _izumcaty.HireSummary => 'HireSummary',
       _ivruwodq.HireView => 'HireView',
@@ -2098,6 +2278,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'HireLedgerUnavailable';
       case _i7gyvijy.HirePaymentRecord():
         return 'HirePaymentRecord';
+      case _iuo7hy2q.HireReceiptLineRecord():
+        return 'HireReceiptLineRecord';
       case _i1txwkfs.HireRequestInvalid():
         return 'HireRequestInvalid';
       case _izumcaty.HireSummary():
@@ -2236,6 +2418,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'HirePaymentRecord') {
       return deserialize<_i7gyvijy.HirePaymentRecord>(data['data']);
     }
+    if (dataClassName == 'HireReceiptLineRecord') {
+      return deserialize<_iuo7hy2q.HireReceiptLineRecord>(data['data']);
+    }
     if (dataClassName == 'HireRequestInvalid') {
       return deserialize<_i1txwkfs.HireRequestInvalid>(data['data']);
     }
@@ -2355,6 +2540,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return _ikb6z54u.HireRecord.t;
       case _i7gyvijy.HirePaymentRecord:
         return _i7gyvijy.HirePaymentRecord.t;
+      case _iuo7hy2q.HireReceiptLineRecord:
+        return _iuo7hy2q.HireReceiptLineRecord.t;
       case _itxj7opn.TerminalJobFact:
         return _itxj7opn.TerminalJobFact.t;
       case _iw9spjs5.HireRunRecord:
