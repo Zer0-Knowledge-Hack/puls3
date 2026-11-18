@@ -196,7 +196,7 @@ final class EscrowRelayService {
         draft = await _draft(
           wallet: wallet,
           purpose: purpose,
-          function: purpose.wireName,
+          function: _functionOf(hire, purpose),
           args: _jobArgs(hire, wallet, purpose, reason),
           rejectReason: reason,
         );
@@ -561,6 +561,13 @@ final class EscrowRelayService {
     );
   }
 
+  /// The contract function of [purpose] on the job of [hire]: a `fund` of a
+  /// hire with a subcontract reserve calls `fund_with_reserve` (ADR-0011 D1).
+  static String _functionOf(HireRow hire, SubmissionPurpose purpose) =>
+      purpose == SubmissionPurpose.fund && hire.subcontractReserve > 0
+      ? fundWithReserveFunction
+      : purpose.contractFunction;
+
   /// The arguments of the calls on an existing job.
   List<ScArg> _jobArgs(
     HireRow hire,
@@ -569,6 +576,7 @@ final class EscrowRelayService {
     String? reason,
   ) {
     final jobId = hire.jobId ?? (throw _invalidTransition(hire, purpose));
+    final fund = purpose == SubmissionPurpose.fund;
     return [
       ScArg.address(wallet),
       ScArg.u64(jobId),
@@ -579,7 +587,11 @@ final class EscrowRelayService {
           Uint8List.fromList(sha256.convert(utf8.encode(reason!)).bytes),
         ),
       },
-      if (purpose == SubmissionPurpose.fund) ScArg.u32(_config.platformFeeBps),
+      // fund_with_reserve(caller, job_id, expected_budget, reserve,
+      // max_fee_bps): the reserve sits before the fee bound.
+      if (fund && hire.subcontractReserve > 0)
+        ScArg.i128(hire.subcontractReserve),
+      if (fund) ScArg.u32(_config.platformFeeBps),
     ];
   }
 

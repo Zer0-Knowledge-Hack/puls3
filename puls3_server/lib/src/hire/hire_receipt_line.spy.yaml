@@ -1,0 +1,45 @@
+### One child job on the itemized receipt of a parent hire (ADR-0011 D6):
+### who was subcontracted, for how much, what it paid and where it is. The
+### server joins the escrow events and the child hire into these lines; every
+### transaction hash links to StellarExpert.
+class: HireReceiptLineRecord
+table: hire_receipt_line
+serverOnly: true
+fields:
+  ### The hire whose reserve funded the child job.
+  parentHireId: int
+  ### The child hire, once it is stored (ADR-0011 D7).
+  childHireId: int?
+  ### Escrow id of the child job, set once create_child_job is confirmed.
+  childJobId: int?
+  ### Registry id of the subcontracted agent.
+  providerAgentId: int
+  ### StrKey of the subcontracted agent's payment wallet.
+  providerWallet: String
+  ### USDC stroops drawn from the parent reserve as the child budget.
+  budget: int
+  ### USDC stroops of platform fee, set when the child completes.
+  fee: int?
+  ### USDC stroops paid to the provider, set when the child completes.
+  payout: int?
+  ### HireStatus name of the child job: open, funded, submitted, completed,
+  ### rejected, expired.
+  state: String
+  ### The child's deliverable hash, lowercase hex, once it is submitted.
+  deliverableHash: String?
+  ### The create_child_job transaction hash, lowercase hex.
+  createTransaction: String?
+  ### The transaction that settled the child (complete, release, reject or
+  ### claim_refund), lowercase hex.
+  settleTransaction: String?
+  ### True when the provider has the same owner as the parent's agent (D10).
+  relatedParty: bool
+  ### The parent agent's justification of the pick, against the ranking.
+  justification: String
+  createdAt: DateTime
+indexes:
+  hire_receipt_line_parent_idx:
+    fields: parentHireId
+  hire_receipt_line_child_job_idx:
+    fields: childJobId
+    unique: true

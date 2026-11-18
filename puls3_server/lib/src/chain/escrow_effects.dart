@@ -82,8 +82,10 @@ abstract interface class EscrowEffects {
     List<JobCreatedEvent> events,
   );
 
-  /// After a successful `fund` ([SubmissionPurpose.fund]). [events] are all
-  /// the valid `job_funded` events of the transaction, in order.
+  /// After a successful `fund` ([SubmissionPurpose.fund]), or the
+  /// `fund_with_reserve` of a hire with a subcontract reserve (ADR-0011 D1),
+  /// which emits the same `job_funded` for the budget. [events] are all the
+  /// valid `job_funded` events of the transaction, in order.
   Future<EffectResult> onFunded(
     StoredSubmission submission,
     List<JobFundedEvent> events,

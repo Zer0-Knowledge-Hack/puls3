@@ -103,6 +103,8 @@ enum HireProblem {
   priceNotPositive,
   manifestVersionBelowOne,
   failureReasonEmpty,
+  parentIsSelf,
+  childReserveNotSupported,
 }
 
 final class InvalidHire extends DomainError {
@@ -116,6 +118,9 @@ final class InvalidHire extends DomainError {
     HireProblem.manifestVersionBelowOne =>
       'manifest version must be at least 1',
     HireProblem.failureReasonEmpty => 'a failed run needs a reason',
+    HireProblem.parentIsSelf => 'a hire cannot be its own parent',
+    HireProblem.childReserveNotSupported =>
+      'a child hire cannot have a subcontract reserve of its own',
   };
 }
 
