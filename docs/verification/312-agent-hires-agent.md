@@ -1,26 +1,69 @@
-# #312 verification, part 1: the payment rail between custodied agent wallets
+# #312 verification: one agent hires and pays another on testnet
 
-This record covers the **payment rail** of #312 on Stellar Testnet. It contains two runs of
-`puls3_server/tool/a2a_hire_testnet.dart`, made on 2026-11-18 from `main` at `64a6793`.
+This record checks the acceptance criteria of #312 on Stellar Testnet with three runs made on
+2026-11-18.
 
-> **Scope: this is not yet evidence of agents working.** In these runs, A and B are custodied
-> wallets registered on the Identity Registry. Neither runs a model:
->
-> - **A:** the tool decides to hire, not A's model.
-> - **B:** its output is a deterministic function in the tool, not a model run by the hire runtime.
->
-> What the runs prove is the rest of the path: server-side custody, the escrow calls, the chain
-> tracker, B's `submit` signed through the runtime path (#208) and the per-run budget, all with
-> no human signature. Payments go through the puls3 escrow, not x402 (#275).
->
-> A run with real Studio agents, where B's output comes from a model, is still pending. #312 stays
-> open until that run is recorded.
-
-| Criterion (#312) | What this record shows | Still missing |
+| Run | Tool | What A and B are |
 | --- | --- | --- |
-| One agent hires and pays another on testnet with no human signing in the loop. | [Run 1](#run-1-a-hires-and-pays-b): A's custodied key signs `create_job`, `fund` and `complete`, and B's custodied key signs `submit`. No human signs. | A and B as deployed Studio agents, with B's work done by its model. |
-| The payment and the result are linked to the calling hire and visible on stellar.expert. | Run 1: the four escrow transactions belong to hire 6 / escrow job 36. Each one links to stellar.expert below. | The same, with a model-produced result. |
-| Spending is bounded (per-run budget) so an agent cannot drain its wallet. | [Run 2](#run-2-the-per-run-budget-refuses-an-over-budget-hire): when the price is above the budget, the hire is refused before anything is signed. A's USDC balance stays the same. | — |
+| [3](#run-3-real-studio-agents-b-answers-with-its-model) | `puls3_server/tool/a2a_studio_hire_testnet.dart` | **Deployed Studio agents.** B is a Workers AI agent whose output comes from its model through the hire runtime. |
+| [1](#run-1-a-hires-and-pays-b), [2](#run-2-the-per-run-budget-refuses-an-over-budget-hire) | `puls3_server/tool/a2a_hire_testnet.dart` (from `main` `64a6793`) | Bare custodied wallets. B's work is deterministic. These runs cover only the payment rail and the budget refusal. |
+
+Payments go through the puls3 escrow, not x402 (#275).
+
+| Criterion (#312) | Evidence |
+| --- | --- |
+| One agent hires and pays another on testnet with no human signing in the loop. | **Run 3:** A and B are deployed Studio agents (registry 37 and 38). A's custodied key signs `create_job`, `fund` and `complete`. B's runtime runs its model, then B's custodied key signs `submit`. No human signs any of them. |
+| The payment and the result are linked to the calling hire and visible on stellar.expert. | **Run 3:** hire 7 / escrow job 37. All four escrow transactions return `SUCCESS` on the testnet RPC and link to stellar.expert. B's model output is stored on hire 7, and B's USDC balance went from 0 to 0.1. |
+| Spending is bounded (per-run budget) so an agent cannot drain its wallet. | **Run 2:** with the price above the budget, the hire is refused before anything is signed, and A's USDC balance stays the same. |
+
+**Limit of this evidence: a human starts the hire.** A's owner calls `hireAgentAs`, the endpoint
+behind CLI `studio hire-as`, the web Studio and the hire sheet. After that call, every signature
+belongs to an agent. Having A's model decide to subcontract B on its own is #334, and nothing in
+this record shows it.
+
+## Run 3: real Studio agents, B answers with its model
+
+- **Deploy:** the tool deploys both agents through the Studio endpoints the web app uses:
+  `saveDraft` → `prepareDeploy` → `register_full` → `prepareWalletAuthorization` →
+  `set_agent_wallet` → `active`. A throwaway builder owns both agents, and the builder's
+  Workers AI credential is stored encrypted, as the Studio stores it.
+- **Hire:** the tool calls `StudioEndpoint.hireAgentAs`. The server's own runtime and chain tracker run the hire.
+
+| | |
+| --- | --- |
+| Builder (owner of A and B) | [`GDKAJMNZ6WOMQ3EWLJI2UOWA3FWNHZM2BR7KJQUGQ2TQV5LZ7FUWJ7EO`](https://stellar.expert/explorer/testnet/account/GDKAJMNZ6WOMQ3EWLJI2UOWA3FWNHZM2BR7KJQUGQ2TQV5LZ7FUWJ7EO) |
+| Hiring agent A | registry agent 37, [`GC6PCP64EYOCXZ5KG7RWOU44KHJJ4QPLRW7X4JGZGR5GGDXR434B332U`](https://stellar.expert/explorer/testnet/account/GC6PCP64EYOCXZ5KG7RWOU44KHJJ4QPLRW7X4JGZGR5GGDXR434B332U) |
+| Hired agent B | registry agent 38, [`GCXYYLLMDSHLRL72XIHF6SITZZBDZNR2TRV45JBK6LBZ5FHC356AO6OO`](https://stellar.expert/explorer/testnet/account/GCXYYLLMDSHLRL72XIHF6SITZZBDZNR2TRV45JBK6LBZ5FHC356AO6OO) |
+| B's manifest | v1, provider `workers-ai`, model `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| Hire / escrow job | hire 7 / job 37, final status `completed` |
+| Price / budget | 1,000,000 / 2,000,000 (0.1 / 0.2 USDC) |
+| Input | `Summarize in two sentences why escrowed payments matter for AI agents hiring each other.` |
+| B's model output | `Escrowed payments matter for AI agents hiring each other because they provide a secure and trusted mechanism for exchanging value, ensuring that payment is made only when the agreed-upon service or task is completed to the satisfaction of the hiring agent. By holding payment in escrow until the terms of the agreement are fulfilled, AI agents can mitigate the risk of non-payment or non-delivery, facilitating more reliable and efficient transactions between autonomous entities.` |
+| USDC after the hire (Horizon) | A: 0.0100000 (0.11 before the hire). B: 0.1000000. |
+
+Every transaction returned `SUCCESS` from `getTransaction` on the testnet RPC:
+
+| Step | Signed by | Ledger | Transaction |
+| --- | --- | --- | --- |
+| `register_full` (A) | builder | 5800286 | [`7cd19189…130c20c8`](https://stellar.expert/explorer/testnet/tx/7cd19189ac3e0af27db414b703fc186a5024712d1948ccd6d0aaa929130c20c8) |
+| `set_agent_wallet` (A) | A (builder auth entry) | 5800289 | [`5afc66e1…ae63a245`](https://stellar.expert/explorer/testnet/tx/5afc66e107e3b2dfb6e6c1127fa15896d7dfea18e3f7a3f4376b7d6eae63a245) |
+| `register_full` (B) | builder | 5800290 | [`1cc013aa…49081181`](https://stellar.expert/explorer/testnet/tx/1cc013aa341654f1dc71ade41b497394b3cccf98590fd459a6d22dfb49081181) |
+| `set_agent_wallet` (B) | B (builder auth entry) | 5800293 | [`162d7258…cd87d7f85`](https://stellar.expert/explorer/testnet/tx/162d72582d9b5577c5193dc2d58179e911653b0d40f00ad04c3fafecd87d7f85) |
+| `create_job` | A | 5800295 | [`84b79237…88a2e1dd`](https://stellar.expert/explorer/testnet/tx/84b792374c04ba7c794788a70fe970320b0c0781019d8f2e0f57459c88a2e1dd) |
+| `fund` | A | 5800296 | [`b3f72ce6…341b8c27`](https://stellar.expert/explorer/testnet/tx/b3f72ce65b61ade05bbc7c2e465b806fcba37ede56771ddc44ecfced341b8c27) |
+| `submit` (after B's model run) | B | 5800298 | [`2b9e2169…3c580a7a`](https://stellar.expert/explorer/testnet/tx/2b9e2169f4ba78a367e901f289134ef5fc2e0b9401a16aaa460768b39c580a7a) |
+| `complete` | A | 5800299 | [`f4ab1ce0…f18d592a19`](https://stellar.expert/explorer/testnet/tx/f4ab1ce05333faec91bc253a23c8b64f643cb4d800479adf31f418f18d592a19) |
+
+To reproduce, run from `puls3_server/`. It needs a Cloudflare Workers AI token as the
+`workersAiApiToken` password in the `test` section of `config/passwords.yaml`, and the account id
+exported:
+
+```sh
+docker compose up -d postgres_test redis_test
+PULS3_WORKERS_AI_ACCOUNT_ID=<cloudflare account id> dart run tool/a2a_studio_hire_testnet.dart --mode test
+```
+
+The tool never prints the token, the account id or any secret seed.
 
 ## How the runs were made
 
@@ -88,6 +131,6 @@ The budget is checked twice. The first check uses the catalog price, before the 
 
 ## Not covered here
 
-- **Real agents.** A and B have no manifest and no model, and B's work is deterministic. A run with deployed Studio agents is pending (see the scope note at the top).
 - **An agent deciding to hire.** In the product, the owner of the hiring agent starts the hire (CLI `studio hire-as`, the web Studio or the hire sheet). No runtime tool lets a model decide to subcontract. That is #334.
+- **A's model.** A is a deployed Studio agent, but its model takes no part in run 3. A only acts as the paying client and evaluator, and its custodied key signs `complete` without checking B's output.
 - **A daily or cumulative cap.** The budget bounds each run. Nothing on the server caps the budget an owner passes, or how many runs happen per day. #312 asks only for a per-run budget.
