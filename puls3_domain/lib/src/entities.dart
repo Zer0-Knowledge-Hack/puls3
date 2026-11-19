@@ -116,22 +116,44 @@ final class Hire {
     this.failureReason,
     this.rejectedFrom,
     this.feedbackReference,
+    required this.subcontractReserve,
+    required this.allowRelatedParty,
+    this.parentHireId,
   });
 
   /// A hire whose escrow job was created. It always starts in
   /// [HireStatus.open].
+  ///
+  /// [subcontractReserve] is the cap the consumer funds for child jobs
+  /// (ADR-0011 D1); zero, the default, is a hire that never subcontracts.
+  /// [allowRelatedParty] is the consumer's related-party choice (D10),
+  /// allowed by default. [parentHireId] is set on a child hire (D7).
   factory Hire({
     required HireId id,
     required AgentId agentId,
     required StellarAddress consumer,
     required UsdcAmount price,
     required int manifestVersion,
+    UsdcAmount? subcontractReserve,
+    bool? allowRelatedParty,
+    HireId? parentHireId,
   }) {
     if (!price.isPositive) {
       throw const InvalidHire(HireProblem.priceNotPositive);
     }
     if (manifestVersion < 1) {
       throw const InvalidHire(HireProblem.manifestVersionBelowOne);
+    }
+    final reserve = subcontractReserve ?? UsdcAmount.zero;
+    if (parentHireId != null) {
+      if (parentHireId == id) {
+        throw const InvalidHire(HireProblem.parentIsSelf);
+      }
+      // The server enables depth 1 first: a child job is drawn with a
+      // sub-reserve of 0 (ADR-0011 D2, D5).
+      if (reserve.isPositive) {
+        throw const InvalidHire(HireProblem.childReserveNotSupported);
+      }
     }
     return Hire._(
       id: id,
@@ -140,6 +162,9 @@ final class Hire {
       price: price,
       manifestVersion: manifestVersion,
       status: HireStatus.open,
+      subcontractReserve: reserve,
+      allowRelatedParty: allowRelatedParty ?? true,
+      parentHireId: parentHireId,
     );
   }
 
@@ -172,6 +197,25 @@ final class Hire {
 
   /// The confirmed ERC-8004 feedback transaction. Set by [recordFeedback].
   final TransactionHash? feedbackReference;
+
+  /// The subcontract reserve the consumer funds beside [price]
+  /// (`fund_with_reserve`, ADR-0011 D1). Zero for a hire that never
+  /// subcontracts. The escrow, not the hire, tracks what is left of it.
+  final UsdcAmount subcontractReserve;
+
+  /// Whether the agent may subcontract an agent of the same owner (ADR-0011
+  /// D10). Enforced by the server; the contract does not read ownership.
+  final bool allowRelatedParty;
+
+  /// The hire whose reserve funded this one, for a child hire (ADR-0011 D7).
+  /// It is data: the status still mirrors this hire's own escrow job.
+  final HireId? parentHireId;
+
+  /// Whether the agent of this hire may draw child jobs from a reserve.
+  bool get canSubcontract => subcontractReserve.isPositive;
+
+  /// Whether this hire was drawn from another hire's reserve.
+  bool get isChild => parentHireId != null;
 
   /// `open` → `funded`, only with a payment that settles this hire and was
   /// made by its consumer, so the one who hires, pays and rates is the same.
@@ -283,6 +327,9 @@ final class Hire {
     failureReason: failureReason ?? this.failureReason,
     rejectedFrom: rejectedFrom ?? this.rejectedFrom,
     feedbackReference: feedbackReference ?? this.feedbackReference,
+    subcontractReserve: subcontractReserve,
+    allowRelatedParty: allowRelatedParty,
+    parentHireId: parentHireId,
   );
 }
 
