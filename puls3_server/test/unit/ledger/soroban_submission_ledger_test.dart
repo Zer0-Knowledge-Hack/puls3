@@ -87,6 +87,56 @@ void main() {
       expect(lookup.jobFunded.single.jobId, 3);
       expect(lookup.jobFunded.single.amount, BigInt.from(5000000));
       expect(lookup.jobCreated, isEmpty);
+      expect(lookup.childJobCreated, isEmpty);
+    });
+
+    test('a successful create_child_job carries its ChildJobCreated '
+        'event', () async {
+      final escrow = StellarConfig.testnet.escrow.value;
+      Map<String, Object?> entry(String key, Object? val) => {
+        'key': {'symbol': key},
+        'val': val,
+      };
+      final h = _ledger(
+        _edited('get_transaction_fund_job_3.json', (result) {
+          final events = result['events']! as Map<String, Object?>;
+          ((events['contractEventsJson']! as List).first as List).add({
+            'ext': 'v0',
+            'contract_id': escrow,
+            'type': 'contract',
+            'body': {
+              'v0': {
+                'topics': [
+                  {'symbol': 'child_job_created'},
+                  {'u64': '3'},
+                ],
+                'data': {
+                  'map': [
+                    entry('child_job_id', {'u64': '4'}),
+                    entry('provider', {
+                      'address':
+                          'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H',
+                    }),
+                    entry('agent_id', {'u32': 9}),
+                    entry('budget', {'i128': '500000'}),
+                    entry('reserve', {'i128': '0'}),
+                    entry('depth', {'u32': 1}),
+                    entry('parent_reserve_left', {'i128': '1500000'}),
+                  ],
+                },
+              },
+            },
+          });
+        }),
+      );
+
+      final lookup = await h.ledger.lookup(_fundHash);
+
+      final child = lookup.childJobCreated.single;
+      expect(child.parentJobId, 3);
+      expect(child.childJobId, 4);
+      expect(child.budget, BigInt.from(500000));
+      expect(lookup.jobFunded.single.jobId, 3);
     });
 
     test(

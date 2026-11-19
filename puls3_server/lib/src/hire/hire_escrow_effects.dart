@@ -5,6 +5,7 @@ import '../chain/escrow_effects.dart';
 import '../chain/submission_values.dart';
 import '../ledger/escrow_events.dart';
 import '../ledger/escrow_job.dart';
+import 'child_job_effects.dart';
 import 'escrow_preparation_store.dart';
 import 'hire_lifecycle_store.dart';
 
@@ -55,6 +56,11 @@ typedef HireLifecycleScope =
 /// exists and is `completed` and answers ok; confirming the submission is
 /// what makes it the hire's `feedbackReference`.
 ///
+/// A tracked `create_child_job` goes to [ChildJobEffects] when one is given
+/// (ADR-0011 D7). Without it both child effects throw, so such a submission
+/// stays `submitted` and is retried until a composition root supplies one
+/// (T6.4). The consumer-wallet `create_job` and `fund` paths do not use it.
+///
 /// The tracker only calls this for transactions the server relayed, and
 /// [StoredSubmission.hireId] ties the transaction to its hire. Never call it
 /// with a transaction hash a client supplied: anyone can replay a public
@@ -67,12 +73,14 @@ final class HireEscrowEffects implements EscrowEffects {
     required EscrowJobReader jobs,
     required StellarAddress usdc,
     required StellarAddress escrow,
+    ChildJobEffects? children,
   }) : _repositories = repositories,
        _lifecycle = lifecycle,
        _ledger = ledger,
        _jobs = jobs,
        _usdc = usdc,
-       _escrow = escrow;
+       _escrow = escrow,
+       _children = children;
 
   final HireRepositoryScope _repositories;
   final HireLifecycleScope _lifecycle;
@@ -84,6 +92,8 @@ final class HireEscrowEffects implements EscrowEffects {
   /// the contract a job id belongs to. It is bound to the hire with the job
   /// (#273).
   final StellarAddress _escrow;
+
+  final ChildJobEffects? _children;
 
   @override
   Future<EffectResult> onJobCreated(
@@ -157,6 +167,32 @@ final class HireEscrowEffects implements EscrowEffects {
           _fund(repository, HireId(hireId), submission, matches.single),
     );
   }
+
+  @override
+  Future<EffectResult> onChildJobCreated(
+    StoredSubmission submission,
+    List<ChildJobCreatedEvent> children, {
+    required List<JobCreatedEvent> created,
+    required List<JobFundedEvent> funded,
+  }) async => await _childEffects(submission).onChildJobCreated(
+    submission,
+    children,
+    created: created,
+    funded: funded,
+  );
+
+  @override
+  Future<void> onChildJobFailed(
+    StoredSubmission submission,
+    String code,
+  ) async => await _childEffects(submission).onChildJobFailed(submission, code);
+
+  ChildJobEffects _childEffects(StoredSubmission submission) =>
+      _children ??
+      (throw StateError(
+        'submission ${submission.id} is a create_child_job, but no child job '
+        'effects are configured',
+      ));
 
   @override
   Future<EffectResult> onFeedbackGiven(StoredSubmission submission) async {

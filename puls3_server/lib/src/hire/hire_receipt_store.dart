@@ -11,6 +11,13 @@ abstract final class ReceiptLineState {
   /// The `create_child_job` definitely did not land: the child was never
   /// opened and nothing was drawn from the reserve.
   static const notOpened = 'not_opened';
+
+  /// The `create_child_job` may have landed but could not be proven to be
+  /// this child: its events did not match the stored child, the job was
+  /// bound elsewhere, its events never showed up, or the node lost the
+  /// transaction past its retention. The child hire stays unfunded and never
+  /// runs; reconciling it against the chain is a T6.4 item.
+  static const unverified = 'unverified';
 }
 
 /// A receipt line to persist (ADR-0011 D6): one child job of a parent hire.
@@ -102,4 +109,22 @@ abstract interface class HireReceiptStore {
   /// is still [ReceiptLineState.pending]. One conditional write; returns
   /// whether it changed the line.
   Future<bool> markNotOpened(int childHireId);
+
+  /// Sets the line of [childHireId] to [ReceiptLineState.unverified] while
+  /// it is still [ReceiptLineState.pending]. One conditional write; returns
+  /// whether it changed the line.
+  Future<bool> markUnverified(int childHireId);
+
+  /// Records the confirmed child job on the line of [childHireId] while it is
+  /// still [ReceiptLineState.pending]: its [childJobId], its
+  /// [createTransaction] and the child's status name as [state]. One
+  /// conditional write; returns whether it changed the line. Joins
+  /// [transaction] when given.
+  Future<bool> markOpened(
+    int childHireId, {
+    required int childJobId,
+    required String createTransaction,
+    required String state,
+    Transaction? transaction,
+  });
 }
