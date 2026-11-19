@@ -1040,6 +1040,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do provedor';
 
   @override
@@ -1056,9 +1059,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get playgroundProviderUnsupported =>
       'Este provedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'Executando… Para ao chegar no tempo limite.';
@@ -2636,6 +2636,9 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do provedor';
 
   @override
@@ -2652,9 +2655,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get playgroundProviderUnsupported =>
       'Este provedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'Executando… Para ao chegar no tempo limite.';
@@ -4236,6 +4236,9 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do fornecedor';
 
   @override
@@ -4252,9 +4255,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get playgroundProviderUnsupported =>
       'Este fornecedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'A executar… Para ao chegar ao tempo limite.';

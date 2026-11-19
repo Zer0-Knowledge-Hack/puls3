@@ -8,8 +8,9 @@ final class StudioTestQuotaExceeded implements Exception {
   String toString() => 'StudioTestQuotaExceeded';
 }
 
-/// The draft cannot be run: no builder credential for its provider. The
-/// message never includes a prompt or a secret.
+/// The draft cannot be run: no builder credential for its paid provider. Free
+/// `workers-ai` models use the team account and never raise this. The message
+/// never includes a prompt or a secret.
 final class StudioCredentialMissing implements Exception {
   const StudioCredentialMissing();
 

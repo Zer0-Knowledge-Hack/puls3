@@ -7,6 +7,7 @@ import 'package:puls3_server/src/runtime/hire_run_store.dart';
 import 'package:puls3_server/src/runtime/hire_runner.dart';
 import 'package:puls3_server/src/runtime/run_manifest.dart';
 import 'package:puls3_server/src/runtime/runtime_task.dart';
+import 'package:puls3_server/src/runtime/team_run_quota.dart';
 import 'package:test/test.dart';
 
 import '../../support/in_memory_hire_run_store.dart';
@@ -24,6 +25,27 @@ const _manifest = RunManifest(
   inputMaxChars: 100,
   outputMaxChars: 100,
 );
+
+const _freeManifest = RunManifest(
+  provider: 'workers-ai',
+  modelId: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  systemPrompt: 'You triage one customer message.',
+  inputMaxChars: 100,
+  outputMaxChars: 100,
+);
+
+final class _Quota implements TeamRunQuota {
+  _Quota({this.allowed = true});
+
+  final bool allowed;
+  final agents = <int>[];
+
+  @override
+  bool reserve({required int agentId, required DateTime now}) {
+    agents.add(agentId);
+    return allowed;
+  }
+}
 
 final class _Manifests implements RunManifestSource {
   _Manifests(this.byAgent);
@@ -59,14 +81,17 @@ void main() {
   late List<String> logs;
   late DateTime clock;
 
-  HireRunner runner({Duration staleAfter = const Duration(minutes: 3)}) =>
-      HireRunner(
-        manifests: manifests,
-        runner: AgentRunner(runtime: model, timeout: _timeout),
-        staleAfter: staleAfter,
-        now: () => clock,
-        log: (level, message) => logs.add('${level.name}: $message'),
-      );
+  HireRunner runner({
+    Duration staleAfter = const Duration(minutes: 3),
+    TeamRunQuota? teamQuota,
+  }) => HireRunner(
+    manifests: manifests,
+    runner: AgentRunner(runtime: model, timeout: _timeout),
+    staleAfter: staleAfter,
+    now: () => clock,
+    log: (level, message) => logs.add('${level.name}: $message'),
+    teamQuota: teamQuota,
+  );
 
   /// A funded hire for agent 13 with [input], queued like the repository
   /// queues it when the payment is recorded.
@@ -131,6 +156,50 @@ void main() {
     expect(task.systemPrompt, 'You triage one customer message.');
     expect(task.input, 'My invoice is wrong');
     expect(task.maxOutputChars, 100);
+  });
+
+  test('a free-model hire above the team cap fails before the model', () async {
+    manifests.byAgent[13] = _freeManifest;
+    final id = fundedHire();
+    final quota = _Quota(allowed: false);
+
+    final summary = await runner(
+      teamQuota: quota,
+    ).pass(runs: runs, hires: hires);
+
+    expect(summary.failed, 1);
+    expect((await runs.find(id))!.failureReason, teamRunQuotaExceeded);
+    expect(model.tasks, isEmpty);
+    expect(quota.agents, [13]);
+  });
+
+  test('the team cap counts free-model hires only', () async {
+    final id = fundedHire();
+    final quota = _Quota(allowed: false);
+
+    final summary = await runner(
+      teamQuota: quota,
+    ).pass(runs: runs, hires: hires);
+
+    expect(summary.succeeded, 1);
+    expect((await runs.find(id))!.state, HireRunState.succeeded);
+    expect(model.tasks, hasLength(1));
+    expect(quota.agents, isEmpty);
+  });
+
+  test('a free-model hire under the cap calls the model', () async {
+    manifests.byAgent[13] = _freeManifest;
+    final id = fundedHire();
+    final quota = _Quota();
+
+    final summary = await runner(
+      teamQuota: quota,
+    ).pass(runs: runs, hires: hires);
+
+    final run = await runs.find(id);
+    expect(summary.succeeded, 1, reason: run?.failureReason);
+    expect(quota.agents, [13]);
+    expect(model.tasks.single.provider, 'workers-ai');
   });
 
   test('changing the manifest changes the run, with no code change', () async {

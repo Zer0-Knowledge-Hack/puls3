@@ -6,6 +6,7 @@ import 'agent_runner.dart';
 import 'hire_run_store.dart';
 import 'run_manifest.dart';
 import 'runtime_task.dart';
+import 'team_run_quota.dart';
 
 /// Failure code for a run whose manifest version is not known.
 const manifestUnavailable = 'manifest_unavailable';
@@ -21,6 +22,11 @@ const runNotRunnable = 'not_runnable';
 /// Failure code for a run that could not end before the job's `expired_at`:
 /// its result could never be submitted, so the model is not called.
 const runJobExpired = 'job_expired';
+
+/// Failure code for a free-model run above the agent's daily cap on the
+/// platform account (#318). The hire stays funded, so the consumer can
+/// reject it for a refund.
+const teamRunQuotaExceeded = 'team_run_quota_exceeded';
 
 /// Failure code for an unexpected error during the run, for example a TLS
 /// failure that is not a `RuntimeFailure`. The detail goes to the log only.
@@ -91,6 +97,7 @@ final class HireRunner {
     DateTime Function() now = DateTime.now,
     ChainLog log = ignoreChainLog,
     int batchSize = 10,
+    TeamRunQuota? teamQuota,
     Future<String> Function(RunManifest manifest, String input)? execute,
   }) : _manifests = manifests,
        _runner = runner,
@@ -98,6 +105,7 @@ final class HireRunner {
        _now = now,
        _log = log,
        _batchSize = batchSize,
+       _teamQuota = teamQuota ?? MemoryTeamRunQuota(),
        _execute = execute;
 
   final RunManifestSource _manifests;
@@ -106,6 +114,7 @@ final class HireRunner {
   final DateTime Function() _now;
   final ChainLog _log;
   final int _batchSize;
+  final TeamRunQuota _teamQuota;
   final Future<String> Function(RunManifest manifest, String input)? _execute;
 
   /// Fails interrupted runs, then runs up to one batch of queued ones, one at
@@ -206,6 +215,10 @@ final class HireRunner {
     );
     if (!_now().add(_runner.timeout).isBefore(expiresAt)) {
       return _fail(running, runs, runJobExpired);
+    }
+    if (manifest.provider == ModelPolicy.freeProvider &&
+        !_teamQuota.reserve(agentId: queued.agentId, now: _now())) {
+      return _fail(running, runs, teamRunQuotaExceeded);
     }
 
     final String output;
