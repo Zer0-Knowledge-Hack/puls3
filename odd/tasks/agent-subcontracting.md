@@ -175,6 +175,16 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     `subcontracting: null`, so no tools are offered until T6. T6 must implement `SubcontractPort`,
     `ChildResultSource`, wire `SubcontractSetup`, raise `staleAfter` and `TrackerLoop.passTimeout`
     for multi-segment runs, and reconcile half-opened children after `internal_error`.
+    Review of `171ae66` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-cc09f7096e96ab6f`) raised two warnings, fixed in `67ed0ee`: `markResumed`
+    now stores the loop state with the child's tool result in the same conditional write, so a
+    lease failure before the first segment cannot lose a paid child's result; and
+    `listAwaitingChild` returns damaged rows as `DamagedAwaitingRun`, which the runner fails as
+    `loop_state_unreadable` or `not_runnable`, so they cannot starve the batch. Fix reviewed
+    (lineage `review-96d9662ed6bd2465`, approved and acknowledged); its warning that
+    `_failDamaged` skips hire settlement does not hold, because `_fail` does not settle either
+    (`hire_runner.dart:552-570`); releasing an already-opened child stays a T6 item. Server
+    unit+hire 1191 passed, runtime 227, integration 194.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
   resumes with B's result, receipt stored. Route: delegated writer.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
