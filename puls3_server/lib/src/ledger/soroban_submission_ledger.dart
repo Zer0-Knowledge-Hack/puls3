@@ -34,6 +34,7 @@ final class SorobanSubmissionLedger implements SubmissionLedger {
       jobCreated: allJobCreated(tx, escrow: _escrow),
       jobFunded: allJobFunded(tx, escrow: _escrow),
       childJobCreated: allChildJobCreated(tx, escrow: _escrow),
+      jobCompleted: allJobCompleted(tx, escrow: _escrow),
     );
   }
 

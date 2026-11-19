@@ -91,6 +91,45 @@ final class ServerpodHireReceiptStore implements HireReceiptStore {
     return updated.isNotEmpty;
   }
 
+  @override
+  Future<bool> recordDeliverable(
+    int childHireId,
+    String deliverableHash, {
+    Transaction? transaction,
+  }) async {
+    final updated = await HireReceiptLineRecord.db.updateWhere(
+      _session,
+      columnValues: (t) => [t.deliverableHash(deliverableHash)],
+      where: (t) =>
+          t.childHireId.equals(childHireId) & t.deliverableHash.equals(null),
+      transaction: transaction,
+    );
+    return updated.isNotEmpty;
+  }
+
+  @override
+  Future<bool> markSettled(
+    int childHireId, {
+    required String state,
+    required int? fee,
+    required int? payout,
+    required String settleTransaction,
+  }) async {
+    final updated = await HireReceiptLineRecord.db.updateWhere(
+      _session,
+      columnValues: (t) => [
+        t.state(state),
+        t.fee(fee),
+        t.payout(payout),
+        t.settleTransaction(settleTransaction),
+      ],
+      where: (t) =>
+          t.childHireId.equals(childHireId) &
+          t.state.inSet(ReceiptLineState.unsettled),
+    );
+    return updated.isNotEmpty;
+  }
+
   Future<bool> _settlePending(int childHireId, String state) async {
     final updated = await HireReceiptLineRecord.db.updateWhere(
       _session,
@@ -115,5 +154,9 @@ final class ServerpodHireReceiptStore implements HireReceiptStore {
     relatedParty: row.relatedParty,
     justification: row.justification,
     createdAt: row.createdAt.toUtc(),
+    fee: row.fee,
+    payout: row.payout,
+    deliverableHash: row.deliverableHash,
+    settleTransaction: row.settleTransaction,
   );
 }

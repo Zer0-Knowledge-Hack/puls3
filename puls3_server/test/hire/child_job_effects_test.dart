@@ -29,11 +29,18 @@ final _escrow = StellarConfig.testnet.escrow;
 final _usdc = StellarConfig.testnet.usdcSac;
 final _at = DateTime.utc(2026, 11, 19, 12);
 
-StoredSubmission _submission(int? childHireId) => StoredSubmission(
+const _settleTx =
+    '9f2c3e8455cafdc08d62a644b8f9dd9174994644b2bdd3e57eaa6893aa5c2401';
+
+StoredSubmission _submission(
+  int? childHireId, {
+  SubmissionPurpose purpose = SubmissionPurpose.createChildJob,
+  String transactionHash = _createTx,
+}) => StoredSubmission(
   id: 21,
   preparationId: null,
-  purpose: SubmissionPurpose.createChildJob,
-  transactionHash: _createTx,
+  purpose: purpose,
+  transactionHash: transactionHash,
   state: SubmissionState.submitted,
   errorCode: null,
   explorerUrl: null,
@@ -351,6 +358,80 @@ void main() {
         ),
         throwsStateError,
       );
+    });
+  });
+  group('onChildSettled', () {
+    JobCompletedEvent completed({int jobId = _childJobId}) => JobCompletedEvent(
+      jobId: jobId,
+      evaluator: StellarAddress.parse(_agentA),
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: false,
+    );
+
+    Future<void> settle(
+      SubmissionPurpose purpose, [
+      List<JobCompletedEvent>? events,
+    ]) => effects.onChildSettled(
+      _submission(
+        childHireId,
+        purpose: purpose,
+        transactionHash: _settleTx,
+      ),
+      events ?? [completed()],
+    );
+
+    test('a confirmed complete records fee, payout and the settle '
+        'transaction', () async {
+      await apply();
+
+      await settle(SubmissionPurpose.childComplete);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.completed.name);
+      expect(settled.fee, 10000);
+      expect(settled.payout, 490000);
+      expect(settled.settleTransaction, _settleTx);
+    });
+
+    test('a confirmed reject pays nothing', () async {
+      await apply();
+
+      await settle(SubmissionPurpose.childReject, const []);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.rejected.name);
+      expect(settled.fee, 0);
+      expect(settled.payout, 0);
+      expect(settled.settleTransaction, _settleTx);
+    });
+
+    test('a complete without the child job event leaves fee and payout '
+        'unset', () async {
+      await apply();
+
+      await settle(SubmissionPurpose.childComplete, [completed(jobId: 99)]);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.completed.name);
+      expect(settled.fee, isNull);
+      expect(settled.payout, isNull);
+    });
+
+    test('is applied once', () async {
+      await apply();
+      await settle(SubmissionPurpose.childComplete);
+
+      await settle(SubmissionPurpose.childReject, const []);
+
+      expect((await line()).state, HireStatus.completed.name);
+    });
+
+    test('does not settle a line that never opened', () async {
+      await settle(SubmissionPurpose.childComplete);
+
+      expect((await line()).state, ReceiptLineState.pending);
+      expect((await line()).settleTransaction, isNull);
     });
   });
 }

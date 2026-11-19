@@ -86,6 +86,44 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
     createTransaction: createTransaction,
   );
 
+  @override
+  Future<bool> recordDeliverable(
+    int childHireId,
+    String deliverableHash, {
+    Transaction? transaction,
+  }) async {
+    final index = _lines.indexWhere(
+      (l) => l.childHireId == childHireId && l.deliverableHash == null,
+    );
+    if (index < 0) return false;
+    _lines[index] = _copy(_lines[index], deliverableHash: deliverableHash);
+    return true;
+  }
+
+  @override
+  Future<bool> markSettled(
+    int childHireId, {
+    required String state,
+    required int? fee,
+    required int? payout,
+    required String settleTransaction,
+  }) async {
+    final index = _lines.indexWhere(
+      (l) =>
+          l.childHireId == childHireId &&
+          ReceiptLineState.unsettled.contains(l.state),
+    );
+    if (index < 0) return false;
+    _lines[index] = _copy(
+      _lines[index],
+      state: state,
+      fee: fee,
+      payout: payout,
+      settleTransaction: settleTransaction,
+    );
+    return true;
+  }
+
   bool _settlePending(
     int childHireId, {
     required String state,
@@ -97,21 +135,40 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
           l.childHireId == childHireId && l.state == ReceiptLineState.pending,
     );
     if (index < 0) return false;
-    final line = _lines[index];
-    _lines[index] = ReceiptLine(
-      id: line.id,
-      parentHireId: line.parentHireId,
-      childHireId: line.childHireId,
-      childJobId: childJobId ?? line.childJobId,
-      providerAgentId: line.providerAgentId,
-      providerWallet: line.providerWallet,
-      budget: line.budget,
+    _lines[index] = _copy(
+      _lines[index],
       state: state,
-      createTransaction: createTransaction ?? line.createTransaction,
-      relatedParty: line.relatedParty,
-      justification: line.justification,
-      createdAt: line.createdAt,
+      childJobId: childJobId,
+      createTransaction: createTransaction,
     );
     return true;
   }
+
+  static ReceiptLine _copy(
+    ReceiptLine line, {
+    String? state,
+    int? childJobId,
+    String? createTransaction,
+    int? fee,
+    int? payout,
+    String? deliverableHash,
+    String? settleTransaction,
+  }) => ReceiptLine(
+    id: line.id,
+    parentHireId: line.parentHireId,
+    childHireId: line.childHireId,
+    childJobId: childJobId ?? line.childJobId,
+    providerAgentId: line.providerAgentId,
+    providerWallet: line.providerWallet,
+    budget: line.budget,
+    state: state ?? line.state,
+    createTransaction: createTransaction ?? line.createTransaction,
+    relatedParty: line.relatedParty,
+    justification: line.justification,
+    createdAt: line.createdAt,
+    fee: fee ?? line.fee,
+    payout: payout ?? line.payout,
+    deliverableHash: deliverableHash ?? line.deliverableHash,
+    settleTransaction: settleTransaction ?? line.settleTransaction,
+  );
 }
