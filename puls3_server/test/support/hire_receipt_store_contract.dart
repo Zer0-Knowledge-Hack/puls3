@@ -123,6 +123,73 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
     expect((await f.store.findByChildHire(f.childHireId))?.childJobId, 44);
   });
 
+  test('markSettled records the settlement of an opened line once', () async {
+    await f.store.insert(_line(f));
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'completed',
+        fee: 1,
+        payout: 2,
+        settleTransaction: 'ef' * 32,
+      ),
+      isFalse,
+      reason: 'a pending line is not settled',
+    );
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'completed',
+        fee: 10000,
+        payout: 490000,
+        settleTransaction: 'ef' * 32,
+      ),
+      isTrue,
+    );
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'rejected',
+        fee: 0,
+        payout: 0,
+        settleTransaction: '12' * 32,
+      ),
+      isFalse,
+    );
+
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.state, 'completed');
+    expect(line?.fee, 10000);
+    expect(line?.payout, 490000);
+    expect(line?.settleTransaction, 'ef' * 32);
+    expect(line?.childJobId, 44);
+  });
+
+  test('recordDeliverable sets the deliverable hash once', () async {
+    await f.store.insert(_line(f));
+
+    final first = await f.store.inTransaction(
+      (transaction) => f.store.recordDeliverable(
+        f.childHireId,
+        '34' * 32,
+        transaction: transaction,
+      ),
+    );
+
+    expect(first, isTrue);
+    expect(await f.store.recordDeliverable(f.childHireId, '56' * 32), isFalse);
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.deliverableHash, '34' * 32);
+    expect(line?.state, ReceiptLineState.pending);
+  });
+
   test('inTransaction rolls the insert back when the body throws', () async {
     await expectLater(
       f.store.inTransaction((transaction) async {

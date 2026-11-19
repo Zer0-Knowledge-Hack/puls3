@@ -1,4 +1,4 @@
-import 'package:puls3_domain/puls3_domain.dart' show StellarAddress;
+import 'package:puls3_domain/puls3_domain.dart' show HireStatus, StellarAddress;
 
 import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
@@ -149,6 +149,40 @@ final class ChildJobEffects {
         '${neverLanded ? ReceiptLineState.notOpened : ReceiptLineState.unverified}',
       );
     }
+  }
+
+  /// See [EscrowEffects.onChildSettled]. A `childComplete` moves the line to
+  /// `completed` with the fee and payout of the child job's `JobCompleted`
+  /// (unset when the transaction shows none for that job); a `childReject`
+  /// moves it to `rejected` with both 0, since the budget went back to the
+  /// parent's reserve (ADR-0011 D3). Only an opened, unsettled line moves,
+  /// so applying the same verdict again writes nothing.
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {
+    final childHireId = submission.hireId;
+    if (childHireId == null) return;
+    final complete = submission.purpose == SubmissionPurpose.childComplete;
+    await _scope((hires, receipts, openings) async {
+      final jobId = (await hires.findHire(childHireId))?.jobId;
+      final events = completed.where((e) => e.jobId == jobId).toList();
+      final event = events.length == 1 ? events.single : null;
+      final settled = await receipts.markSettled(
+        childHireId,
+        state: complete ? HireStatus.completed.name : HireStatus.rejected.name,
+        fee: complete ? event?.fee.toInt() : 0,
+        payout: complete ? event?.payout.toInt() : 0,
+        settleTransaction: submission.transactionHash,
+      );
+      if (settled && complete && event == null) {
+        _log(
+          ChainLogLevel.warning,
+          'The complete of child hire $childHireId shows no JobCompleted for '
+          'job $jobId; its fee and payout stay unset',
+        );
+      }
+    });
   }
 }
 

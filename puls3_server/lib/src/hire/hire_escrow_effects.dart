@@ -56,8 +56,8 @@ typedef HireLifecycleScope =
 /// exists and is `completed` and answers ok; confirming the submission is
 /// what makes it the hire's `feedbackReference`.
 ///
-/// A tracked `create_child_job` goes to [ChildJobEffects] when one is given
-/// (ADR-0011 D7). Without it both child effects throw, so such a submission
+/// A tracked `create_child_job` or child verdict goes to [ChildJobEffects]
+/// when one is given (ADR-0011 D7). Without it the child effects throw, so such a submission
 /// stays `submitted` and is retried until a composition root supplies one
 /// (T6.4). The consumer-wallet `create_job` and `fund` paths do not use it.
 ///
@@ -187,11 +187,18 @@ final class HireEscrowEffects implements EscrowEffects {
     String code,
   ) async => await _childEffects(submission).onChildJobFailed(submission, code);
 
+  @override
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async =>
+      await _childEffects(submission).onChildSettled(submission, completed);
+
   ChildJobEffects _childEffects(StoredSubmission submission) =>
       _children ??
       (throw StateError(
-        'submission ${submission.id} is a create_child_job, but no child job '
-        'effects are configured',
+        'submission ${submission.id} is a ${submission.purpose.wireName} of '
+        'a child job, but no child job effects are configured',
       ));
 
   @override
