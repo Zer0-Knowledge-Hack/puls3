@@ -61,8 +61,9 @@ typedef ChildAgentLookup = Future<ChildAgent?> Function(int registryId);
 /// once it confirms (T6.2).
 ///
 /// Idempotent per tool call: the child hire's request id is
-/// `child:<parentHireId>:<toolCallId>` under A's wallet, so a retry returns
-/// the stored child and signs and sends nothing again.
+/// `child:<parentHireId>:<toolCallId>`, and a retry finds it among the
+/// parent's receipt lines before any parent check or chain read, so it
+/// returns the stored child and reads, signs and sends nothing again.
 final class EscrowSubcontractPort implements SubcontractPort {
   EscrowSubcontractPort({
     required HireLifecycleStore hires,
@@ -128,6 +129,14 @@ final class EscrowSubcontractPort implements SubcontractPort {
         'a child request needs its tool call id',
       );
     }
+    // A retry of a call that already stored its child answers from the
+    // database alone, before any parent check or chain read: a parent that
+    // since left `funded`, or a chain that cannot be read, must not make the
+    // model subcontract again under a new call.
+    final requestId = requestIdOf(request.parentHireId, callId);
+    final stored = await _storedChild(request.parentHireId, requestId);
+    if (stored != null) return _reuse(stored);
+
     final nowSeconds = _now().toUtc().millisecondsSinceEpoch ~/ 1000;
     final parent = await _hires.findHire(request.parentHireId);
     final jobId = parent?.jobId;
@@ -140,13 +149,6 @@ final class EscrowSubcontractPort implements SubcontractPort {
         nowSeconds >= job.expiredAt) {
       throw const SubcontractRefused('parent_not_funded');
     }
-
-    final requestId = requestIdOf(parent.id, callId);
-    final existing = await _hires.findHireByRequest(
-      job.provider.value,
-      requestId,
-    );
-    if (existing != null) return _reuse(existing);
 
     final approvalWindow = await _chain(_approvalWindow);
     final childExpiry = min(
@@ -257,7 +259,7 @@ final class EscrowSubcontractPort implements SubcontractPort {
       });
     } on HireRequestConflict {
       // A concurrent retry of the same call stored the child first.
-      final won = await _hires.findHireByRequest(job.provider.value, requestId);
+      final won = await _storedChild(parent.id, requestId);
       if (won == null) rethrow;
       return _reuse(won);
     } on ChainSubmissionConflict {
@@ -270,15 +272,32 @@ final class EscrowSubcontractPort implements SubcontractPort {
     return child.id;
   }
 
+  /// The child an earlier attempt of the same call stored under
+  /// [parentHireId], with its receipt line, or `null`. It reads only the
+  /// database: the line and its child hire are stored in one transaction,
+  /// and the child's request id names the parent and the tool call.
+  Future<(int, ReceiptLine)?> _storedChild(
+    int parentHireId,
+    String requestId,
+  ) async {
+    for (final line in await _receipts.listByParent(parentHireId)) {
+      final childHireId = line.childHireId;
+      if (childHireId == null) continue;
+      final child = await _hires.findHire(childHireId);
+      if (child?.requestId == requestId) return (childHireId, line);
+    }
+    return null;
+  }
+
   /// The child an earlier attempt of the same call stored. A child whose
   /// `create_child_job` definitely failed is not reopened: the model gets a
   /// refusal and may subcontract again with a new call.
-  Future<int> _reuse(HireRow child) async {
-    final line = await _receipts.findByChildHire(child.id);
-    if (line == null || line.state == ReceiptLineState.notOpened) {
+  static int _reuse((int, ReceiptLine) stored) {
+    final (childHireId, line) = stored;
+    if (line.state == ReceiptLineState.notOpened) {
       throw const SubcontractRefused('child_not_opened');
     }
-    return child.id;
+    return childHireId;
   }
 
   /// Sends the stored envelope, as `AgentSubmitSender` does. A node that

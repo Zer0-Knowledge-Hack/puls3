@@ -87,6 +87,29 @@ void main() {
     now: () => rig.clock,
   );
 
+  /// Agent A's parent job on the chain.
+  EscrowJob chainJob({
+    int expiresIn = _jobDuration,
+    EscrowJobState state = EscrowJobState.funded,
+    int reserve = _reserve,
+  }) => EscrowJob(
+    client: rig.wallet,
+    provider: _agentA,
+    evaluator: rig.wallet,
+    agentId: AgentId(7),
+    token: StellarConfig.testnet.usdcSac,
+    budget: BigInt.from(price),
+    feeBps: platformFeeBps,
+    expiredAt: nowSeconds + expiresIn,
+    description: '',
+    state: state,
+    submittedAt: 0,
+    approvalDeadline: 0,
+    deliverable: null,
+    reserve: BigInt.from(reserve),
+    reserveFunded: BigInt.from(_reserve),
+  );
+
   /// A funded parent hire of agent A whose chain job expires at
   /// [expiresIn] seconds from now and holds [reserve].
   Future<HireRow> parent({
@@ -96,22 +119,10 @@ void main() {
     HireStatus status = HireStatus.funded,
   }) async {
     final hire = await rig.hire(status: status, subcontractReserve: _reserve);
-    rig.ledger.jobs[hire.jobId!] = EscrowJob(
-      client: rig.wallet,
-      provider: _agentA,
-      evaluator: rig.wallet,
-      agentId: AgentId(7),
-      token: StellarConfig.testnet.usdcSac,
-      budget: BigInt.from(price),
-      feeBps: platformFeeBps,
-      expiredAt: nowSeconds + expiresIn,
-      description: '',
+    rig.ledger.jobs[hire.jobId!] = chainJob(
+      expiresIn: expiresIn,
       state: state,
-      submittedAt: 0,
-      approvalDeadline: 0,
-      deliverable: null,
-      reserve: BigInt.from(reserve),
-      reserveFunded: BigInt.from(_reserve),
+      reserve: reserve,
     );
     return hire;
   }
@@ -217,6 +228,60 @@ void main() {
       expect(sent, hasLength(1));
       expect(receipts.all, hasLength(1));
       expect(await rig.submissions.listByHire(first), hasLength(1));
+    });
+
+    test('a retry returns the stored child before any chain read, even when '
+        'the chain cannot be read', () async {
+      final hire = await parent();
+      final first = await port().requestChild(_request(hire.id));
+      rig.ledger.jobError = const LedgerUnavailable('down');
+      approvalFailure = const LedgerUnavailable('down');
+
+      final again = await port().requestChild(_request(hire.id));
+
+      expect(again, first);
+      expect(signers, hasLength(1));
+      expect(sent, hasLength(1));
+      expect(approvalReads, 1, reason: 'only the first call read the window');
+    });
+
+    test('a retry returns the stored child after the parent left '
+        'funded', () async {
+      final hire = await parent();
+      final first = await port().requestChild(_request(hire.id));
+      rig.hires.statusOverride[hire.id] = HireStatus.submitted;
+      rig.ledger.jobs[hire.jobId!] = chainJob(state: EscrowJobState.submitted);
+
+      expect(await port().requestChild(_request(hire.id)), first);
+      expect(signers, hasLength(1));
+      expect(sent, hasLength(1));
+    });
+
+    test('a retry returns the stored child after the parent expired', () async {
+      final hire = await parent();
+      final first = await port().requestChild(_request(hire.id));
+      rig.clock = rig.clock.add(const Duration(seconds: _jobDuration + 1));
+
+      expect(await port().requestChild(_request(hire.id)), first);
+      expect(signers, hasLength(1));
+      expect(sent, hasLength(1));
+    });
+
+    test('a retry of a child that was not opened is refused before any chain '
+        'read', () async {
+      final hire = await parent();
+      answer = SendTransactionStatus.error;
+      await expectRefused(
+        port().requestChild(_request(hire.id)),
+        'chain_refused',
+      );
+      rig.ledger.jobError = const LedgerUnavailable('down');
+
+      await expectRefused(
+        port().requestChild(_request(hire.id)),
+        'child_not_opened',
+      );
+      expect(sent, hasLength(1));
     });
 
     test('another call id opens another child', () async {
