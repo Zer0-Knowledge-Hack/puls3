@@ -104,8 +104,11 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   by `chain_submission_tracker.dart` until T6. `allowRelatedParty` defaults to true (D10) and is
   stored only. The reserve ceiling comes from `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`. The
   `fund_with_reserve` encoding lives in slice B because it reads `HireRow.subcontractReserve`.
-- [ ] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
+- [x] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
   related-party flag, excluding self and cycles, ranked objectively. Route: delegated writer.
+  Evidence: domain `dart test` 338 passed, server unit+hire 1087 passed, integration 186 passed,
+  `dart analyze --fatal-infos` clean on both packages. `buildAgentSearchService` is wired in
+  `agent_catalog_wiring.dart` with no endpoint yet; T5's `search_agents` tool is its caller.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
   Route: delegated writer.
@@ -135,5 +138,7 @@ StellarExpert.
 ## Progress
 
 - 2026-11-18: research done (code map, agentic-payments landscape) and decisions recorded. Next: T1.
-- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slices A and B, not yet PRs) done. Next: review
-  each slice, open PR A stacked on #358 and PR B stacked on A, then T4.
+- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slice A PR #359, slice B PR #360) done; both T3
+  slices reviewed and acknowledged.
+- 2026-11-18: T4 done on `feat/334-agent-search`, stacked on `feat/334-server-subcontract`.
+  Next: native review of the T4 commit, open its PR stacked on #360, then T5.
