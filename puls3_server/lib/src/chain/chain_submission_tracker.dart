@@ -32,11 +32,14 @@ const _untrackedPurposes = {SubmissionPurpose.setAgentWallet};
 
 /// Server-signed calls whose third failure is `EscrowCallFailed`. The
 /// A-signed `createChildJob` is not one: each child hire has exactly one
-/// envelope, and a new tool call opens a new child instead of retrying.
+/// envelope, and a new tool call opens a new child instead of retrying. The
+/// A-signed child verdicts are: they retry up to the same bound.
 const _relayPurposes = {
   SubmissionPurpose.submit,
   SubmissionPurpose.release,
   SubmissionPurpose.claimRefund,
+  SubmissionPurpose.childComplete,
+  SubmissionPurpose.childReject,
 };
 
 /// What one [ChainSubmissionTracker.pass] did, for logging.
@@ -100,7 +103,9 @@ final class TrackerPassSummary {
 ///   is in memory and a restart starts it again), then fails
 ///   `JobEvidenceUnavailable`. The [EscrowEffects] result, given every valid
 ///   event of the transaction, decides `confirmed` or the failure code;
-///   `giveFeedback` needs no event. `submit`, `complete`, `reject`,
+///   `giveFeedback` needs no event. A child verdict (`childComplete`,
+///   `childReject`) records its settlement on the receipt line through
+///   [EscrowEffects.onChildSettled], then confirms. `submit`, `complete`, `reject`,
 ///   `release`, `claimRefund` and `registerFull` are confirmed when the
 ///   transaction succeeds. Hire status is derived from those confirmed
 ///   records (#208); the tracker does not write a status column.
@@ -372,6 +377,11 @@ final class ChainSubmissionTracker {
         );
       case SubmissionPurpose.giveFeedback:
         result = await _effects.onFeedbackGiven(submission);
+      case SubmissionPurpose.childComplete || SubmissionPurpose.childReject:
+        // The verdict landed: the child is settled on chain, so the record is
+        // confirmed once its receipt line says so.
+        await _effects.onChildSettled(submission, lookup.jobCompleted);
+        result = const EffectResult.ok();
       case SubmissionPurpose.submit ||
           SubmissionPurpose.release ||
           SubmissionPurpose.claimRefund ||

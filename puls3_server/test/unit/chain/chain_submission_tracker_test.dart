@@ -53,12 +53,14 @@ TransactionLookup _success({
   List<JobCreatedEvent> jobCreated = const [],
   List<JobFundedEvent> jobFunded = const [],
   List<ChildJobCreatedEvent> childJobCreated = const [],
+  List<JobCompletedEvent> jobCompleted = const [],
 }) => TransactionLookup(
   status: TransactionStatus.success,
   latestLedgerCloseTime: _start,
   jobCreated: jobCreated,
   jobFunded: jobFunded,
   childJobCreated: childJobCreated,
+  jobCompleted: jobCompleted,
 );
 
 /// Delegates to an in-memory store but throws from the transitions while
@@ -1248,6 +1250,65 @@ void main() {
 
       expect(summary.errors, 1);
       await expectState(s, SubmissionState.submitted);
+    });
+  });
+
+  group('child verdicts (ADR-0011 D3)', () {
+    final completed = JobCompletedEvent(
+      jobId: 4,
+      evaluator: _address,
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: false,
+    );
+
+    test('a successful childComplete settles the line and confirms', () async {
+      final s = await submit(SubmissionPurpose.childComplete);
+      ledger.lookups[s.transactionHash] = _success(jobCompleted: [completed]);
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.confirmed, 1);
+      expect(effects.childSettled, [s.id]);
+      expect(effects.childSettledEvents.single.single.fee, BigInt.from(10000));
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('a successful childReject settles the line and confirms', () async {
+      final s = await submit(SubmissionPurpose.childReject);
+      ledger.lookups[s.transactionHash] = _success();
+
+      await tracker.pass(store);
+
+      expect(effects.childSettled, [s.id]);
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('an effect that throws leaves the verdict submitted', () async {
+      final s = await submit(SubmissionPurpose.childComplete);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.error = StateError('receipt table locked');
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+    });
+
+    test('a failed verdict is stored failed without the effect', () async {
+      final s = await submit(SubmissionPurpose.childReject);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.childSettled, isEmpty);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
     });
   });
 
