@@ -44,6 +44,25 @@ With no indexed rows and a chain that cannot be read, the on-chain fallback
 throws the serializable `AgentCatalogUnavailable` exception; an outage is never
 an empty list, and an unknown id is never reported as an outage.
 
+### Marketplace search for subcontracting (ADR-0011 D9)
+
+`AgentSearchService` (built by `buildAgentSearchService`) ranks the agents a
+hired agent may subcontract. It has no endpoint; the runtime's `search_agents`
+tool calls it. Candidates are hireable, priced within the remaining reserve,
+and are neither the hiring agent nor any agent up its hire chain (by registry
+id or provider wallet). The pure rules live in `puls3_domain`
+(`rankAgentCandidates`, `justifyRelatedPartyPick`):
+
+- Score: `0.50 * skillMatch + 0.25 * (rating - 1) / 4 + 0.15 * hires / (hires + 10) + 0.10 * (1 - price / reserve)`,
+  ties to the lowest registry id. `skillMatch` is the matched fraction of the
+  requested skills and of the query words (0.6 / 0.4 when both are given).
+- Related party (D10): an agent sharing a custody, Studio deploy or registry
+  owner with the hiring agent. Unknown owners (no row, or a failed registry
+  read) count as related, so an opt-out anywhere in the hire chain drops them.
+- A related pick is justified when it is rank 1, costs no more than the
+  best-ranked independent candidate whose skill match is at least the pick's
+  minus 0.1, or no such independent exists.
+
 ## Agent catalog indexer
 
 A background loop keeps the `agent_record` index in sync with the identity
