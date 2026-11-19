@@ -131,8 +131,16 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     Source `0c0c346` on base `e5b151e` (assessed high, consent medium, granted, reliability lens,
     approved and acknowledged, lineage `review-11982293292aec6a`); two advisory suggestions in
     `run_manifest_test.dart:144-163` and `studio_form_check.dart:312-315`.
-  - [ ] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
+  - [x] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
     (final text or tool calls), `converse()` beside `complete()` for Anthropic and Workers AI.
+    Evidence: RED (5 new test files failed to load) then GREEN; runtime 161 passed, server
+    unit+hire 1124 passed, analyze clean. `ConversationRuntime implements ModelRuntime` keeps
+    other implementers compiling. Workers AI: Cloudflare documents `tool_calls` without a call id
+    and no way to return tool results
+    (developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/), so
+    `WorkersAiRuntime.converse` throws `tools_unsupported` with tools; subcontracting is
+    Anthropic-only. Anthropic assistant `content` is kept as opaque `providerContent` and replayed
+    verbatim; T5.3 must persist it in the transcript.
   - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
     `SubcontractPort`.
   - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
