@@ -29,6 +29,7 @@ void main() {
             );
             return hireId;
           },
+      damage: store.damageAwaiting,
     );
   });
 

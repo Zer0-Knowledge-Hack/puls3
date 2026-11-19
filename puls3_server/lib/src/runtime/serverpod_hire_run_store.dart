@@ -110,7 +110,7 @@ final class ServerpodHireRunStore implements HireRunStore {
   }
 
   @override
-  Future<List<AwaitingRun>> listAwaitingChild({int limit = 10}) async {
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10}) async {
     final runs = await HireRunRecord.db.find(
       session,
       where: (t) => t.state.equals(HireRunState.awaitingChild.name),
@@ -125,30 +125,36 @@ final class ServerpodHireRunStore implements HireRunStore {
       ))
         hire.id!: hire,
     };
+    // A row the runner cannot resume is listed as damaged, never dropped:
+    // a dropped row would hold its place under the limit on every pass.
     return [
       for (final run in runs)
-        if ((hires[run.hireId], run) case (
-          final hire?,
-          HireRunRecord(
-            loopState: final loopState?,
-            pendingToolCallId: final pendingToolCallId?,
-            childHireId: final childHireId?,
-            childRequest: final childRequest?,
-          ),
-        ))
-          AwaitingRun(
-            hireId: run.hireId,
-            agentId: hire.agentId,
-            manifestVersion: hire.manifestVersion,
-            input: hire.input ?? '',
-            expiredAt: hire.expiredAt,
-            attempts: run.attempts,
-            reserveStroops: hire.subcontractReserve,
-            loopState: loopState,
-            pendingToolCallId: pendingToolCallId,
-            childHireId: childHireId,
-            childRequest: childRequest,
-          ),
+        switch ((hires[run.hireId], run)) {
+          (null, _) => DamagedAwaitingRun(run.hireId, hireMissing: true),
+          (
+            final hire?,
+            HireRunRecord(
+              loopState: final loopState?,
+              pendingToolCallId: final pendingToolCallId?,
+              childHireId: final childHireId?,
+              childRequest: final childRequest?,
+            ),
+          ) =>
+            AwaitingRun(
+              hireId: run.hireId,
+              agentId: hire.agentId,
+              manifestVersion: hire.manifestVersion,
+              input: hire.input ?? '',
+              expiredAt: hire.expiredAt,
+              attempts: run.attempts,
+              reserveStroops: hire.subcontractReserve,
+              loopState: loopState,
+              pendingToolCallId: pendingToolCallId,
+              childHireId: childHireId,
+              childRequest: childRequest,
+            ),
+          _ => DamagedAwaitingRun(run.hireId),
+        },
     ];
   }
 
@@ -235,12 +241,17 @@ final class ServerpodHireRunStore implements HireRunStore {
   }
 
   @override
-  Future<bool> markResumed(int hireId, DateTime at) async {
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
+  }) async {
     final updated = await HireRunRecord.db.updateWhere(
       session,
       columnValues: (t) => [
         t.state(HireRunState.running.name),
         t.startedAt(at.toUtc()),
+        t.loopState(loopState),
         t.pendingToolCallId(null),
         t.childHireId(null),
         t.childRequest(null),

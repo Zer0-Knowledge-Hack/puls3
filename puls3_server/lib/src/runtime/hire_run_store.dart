@@ -110,10 +110,28 @@ final class QueuedRun {
   final String? loopState;
 }
 
+/// One row of [HireRunStore.listAwaitingChild]: a resumable [AwaitingRun],
+/// or a [DamagedAwaitingRun] the runner fails instead.
+sealed class AwaitingChildEntry {
+  const AwaitingChildEntry(this.hireId);
+
+  final int hireId;
+}
+
+/// An `awaitingChild` row that cannot be resumed: its loop data is missing
+/// ([hireMissing] false) or its hire row is ([hireMissing] true). It is
+/// listed, not skipped, so the runner fails it and a batch of such rows
+/// never starves the paused runs after it.
+final class DamagedAwaitingRun extends AwaitingChildEntry {
+  const DamagedAwaitingRun(super.hireId, {this.hireMissing = false});
+
+  final bool hireMissing;
+}
+
 /// A run waiting for its child, with what the runner needs to resume it.
-final class AwaitingRun {
+final class AwaitingRun extends AwaitingChildEntry {
   const AwaitingRun({
-    required this.hireId,
+    required int hireId,
     required this.agentId,
     required this.manifestVersion,
     required this.input,
@@ -124,9 +142,8 @@ final class AwaitingRun {
     required this.pendingToolCallId,
     required this.childHireId,
     required this.childRequest,
-  });
+  }) : super(hireId);
 
-  final int hireId;
   final int agentId;
   final int manifestVersion;
   final String input;
@@ -159,7 +176,9 @@ abstract interface class HireRunStore {
   Future<bool> markRunning(int hireId, DateTime at);
 
   /// The runs in [HireRunState.awaitingChild], up to [limit], oldest first.
-  Future<List<AwaitingRun>> listAwaitingChild({int limit = 10});
+  /// A row that cannot be resumed is listed as a [DamagedAwaitingRun] in its
+  /// place, never dropped.
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10});
 
   /// `running` → `queued` again after a retryable failure: one more attempt,
   /// not taken before [notBefore], with [reason] as the last error. A
@@ -186,9 +205,15 @@ abstract interface class HireRunStore {
   });
 
   /// `awaitingChild` → `running` at [at] (the stale sweep counts from it),
-  /// clearing the pending call, child hire and request; the loop state is
-  /// kept for a retry. False when it is not awaiting.
-  Future<bool> markResumed(int hireId, DateTime at);
+  /// replacing the loop state with [loopState] and clearing the pending
+  /// call, child hire and request in the same write. [loopState] already
+  /// holds the child's tool result, so the child's output survives any
+  /// retry before the next segment ends. False when it is not awaiting.
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
+  });
 
   /// `running` → `succeeded` with [result]. False when it is not running.
   Future<bool> markSucceeded(int hireId, String result, DateTime at);
