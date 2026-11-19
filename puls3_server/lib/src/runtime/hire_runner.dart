@@ -180,8 +180,11 @@ final class HireRunner {
     // Paused runs first: their child is already paid for, and the parent's
     // deadline keeps running.
     if (_subcontracting case final setup?) {
-      for (final paused in await runs.listAwaitingChild(limit: _batchSize)) {
-        count(await _resumeOne(paused, setup, runs, hires));
+      for (final entry in await runs.listAwaitingChild(limit: _batchSize)) {
+        count(switch (entry) {
+          AwaitingRun() => await _resumeOne(entry, setup, runs, hires),
+          DamagedAwaitingRun() => await _failDamaged(entry, runs),
+        });
         if (rateLimited) break;
       }
     }
@@ -373,7 +376,17 @@ final class HireRunner {
       return _Outcome.deferred;
     }
     if (manifest == null) return _fail(hire, runs, manifestUnavailable);
-    if (!await runs.markResumed(paused.hireId, _now())) {
+    // The child's result joins the stored transcript in the same write that
+    // resumes the run, before any lease or model call: a retry from here on
+    // continues a transcript whose last tool call has its result, so the
+    // paid child's output is never lost or asked for again.
+    final child = result;
+    final resumed = ToolLoop.resumedState(awaiting, child);
+    if (!await runs.markResumed(
+      paused.hireId,
+      _now(),
+      loopState: encodeToolLoopState(resumed),
+    )) {
       return _Outcome.skipped;
     }
     final run = ToolLoopRun(
@@ -389,8 +402,25 @@ final class HireRunner {
       hire,
       paused.attempts,
       runs,
-      (loop) => loop.resume(run, awaiting, result!),
+      (loop) => loop.resume(run, awaiting, child),
     );
+  }
+
+  /// Fails a paused row that cannot be resumed, so it leaves the awaiting
+  /// batch instead of holding its place there on every pass.
+  Future<_Outcome> _failDamaged(
+    DamagedAwaitingRun damaged,
+    HireRunStore runs,
+  ) async {
+    final code = damaged.hireMissing ? runNotRunnable : runLoopStateUnreadable;
+    _log(
+      ChainLogLevel.error,
+      'Paused hire ${damaged.hireId} cannot resume, its row is damaged: '
+      '$code',
+    );
+    return await runs.markFailed(damaged.hireId, code, _now())
+        ? _Outcome.failed
+        : _Outcome.skipped;
   }
 
   /// Runs [segment] of the tool loop for a run already `running`, on the

@@ -48,23 +48,55 @@ final class InMemoryHireRunStore implements HireRunStore {
   );
 
   @override
-  Future<List<AwaitingRun>> listAwaitingChild({int limit = 10}) async => [
-    for (final run in _runs.values)
-      if (run.state == HireRunState.awaitingChild)
-        AwaitingRun(
-          hireId: run.hireId,
-          agentId: _hires[run.hireId]!.agentId,
-          manifestVersion: _hires[run.hireId]!.manifestVersion,
-          input: _hires[run.hireId]!.input,
-          expiredAt: _hires[run.hireId]!.expiredAt,
-          attempts: _attempts[run.hireId] ?? 0,
-          reserveStroops: _hires[run.hireId]!.reserveStroops,
-          loopState: run.loopState!,
-          pendingToolCallId: run.pendingToolCallId!,
-          childHireId: run.childHireId!,
-          childRequest: run.childRequest!,
-        ),
-  ].take(limit).toList();
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10}) async =>
+      [
+        for (final run in _runs.values)
+          if (run.state == HireRunState.awaitingChild)
+            switch ((_hires[run.hireId], run)) {
+              (null, _) => DamagedAwaitingRun(run.hireId, hireMissing: true),
+              (
+                final hire?,
+                HireRun(
+                  loopState: final loopState?,
+                  pendingToolCallId: final pendingToolCallId?,
+                  childHireId: final childHireId?,
+                  childRequest: final childRequest?,
+                ),
+              ) =>
+                AwaitingRun(
+                  hireId: run.hireId,
+                  agentId: hire.agentId,
+                  manifestVersion: hire.manifestVersion,
+                  input: hire.input,
+                  expiredAt: hire.expiredAt,
+                  attempts: _attempts[run.hireId] ?? 0,
+                  reserveStroops: hire.reserveStroops,
+                  loopState: loopState,
+                  pendingToolCallId: pendingToolCallId,
+                  childHireId: childHireId,
+                  childRequest: childRequest,
+                ),
+              _ => DamagedAwaitingRun(run.hireId),
+            },
+      ].take(limit).toList();
+
+  /// Replaces the stored run of [run]'s hire, for tests that need a row no
+  /// transition writes (a damaged or foreign loop state).
+  void overwrite(HireRun run) => _runs[run.hireId] = run;
+
+  /// Clears the child request of [hireId]'s paused run, as a damaged row.
+  Future<void> damageAwaiting(int hireId) async {
+    final run = _runs[hireId]!;
+    _runs[hireId] = HireRun(
+      hireId: hireId,
+      state: run.state,
+      queuedAt: run.queuedAt,
+      startedAt: run.startedAt,
+      loopState: run.loopState,
+      pendingToolCallId: run.pendingToolCallId,
+      childHireId: run.childHireId,
+    );
+  }
 
   /// Retries recorded for [hireId].
   int attemptsOf(int hireId) => _attempts[hireId] ?? 0;
@@ -119,7 +151,11 @@ final class InMemoryHireRunStore implements HireRunStore {
   }
 
   @override
-  Future<bool> markResumed(int hireId, DateTime at) async {
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
+  }) async {
     final run = _runs[hireId];
     if (run == null || run.state != HireRunState.awaitingChild) return false;
     _runs[hireId] = HireRun(
@@ -127,7 +163,7 @@ final class InMemoryHireRunStore implements HireRunStore {
       state: HireRunState.running,
       queuedAt: run.queuedAt,
       startedAt: at,
-      loopState: run.loopState,
+      loopState: loopState,
     );
     return true;
   }

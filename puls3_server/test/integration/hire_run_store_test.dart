@@ -1,6 +1,6 @@
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/generated/protocol.dart'
-    show HirePaymentRecord;
+    show HirePaymentRecord, HireRunRecord;
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
 import 'package:puls3_server/src/hire/serverpod_hire_repository.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
@@ -68,6 +68,11 @@ void main() {
               manifestVersion: manifestVersion,
               input: input,
             ),
+        damage: (hireId) => HireRunRecord.db.updateWhere(
+          session,
+          columnValues: (t) => [t.childRequest(null)],
+          where: (t) => t.hireId.equals(hireId),
+        ),
       );
     });
 

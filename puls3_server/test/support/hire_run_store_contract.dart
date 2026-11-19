@@ -3,9 +3,17 @@ import 'package:test/test.dart';
 
 /// A store under test plus a way to queue runs in it.
 final class HireRunStoreFixture {
-  HireRunStoreFixture({required this.store, required this.queue});
+  HireRunStoreFixture({
+    required this.store,
+    required this.queue,
+    required this.damage,
+  });
 
   final HireRunStore store;
+
+  /// Clears the child request of a paused run, as a damaged row no
+  /// transition writes.
+  final Future<void> Function(int hireId) damage;
 
   /// Queues a run for a new funded hire and returns its hire id.
   final Future<int> Function({
@@ -34,6 +42,12 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
     childHireId: 77,
     childRequest: '{"child":1}',
     at: _t0,
+  );
+
+  Future<bool> resume(int hireId, DateTime at) => store().markResumed(
+    hireId,
+    at,
+    loopState: '{"loop":1,"child":"result"}',
   );
 
   setUp(() async => fixture = await create());
@@ -179,7 +193,7 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
     expect(await store().markRunning(999999, _t0), isFalse);
     expect(await store().markFailed(999999, 'timeout', _t0), isFalse);
     expect(await pause(999999), isFalse);
-    expect(await store().markResumed(999999, _t0), isFalse);
+    expect(await resume(999999, _t0), isFalse);
   });
 
   group('awaitingChild (ADR-0011 D8)', () {
@@ -207,7 +221,7 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
 
       final awaiting = await store().listAwaitingChild();
       expect(awaiting, hasLength(1));
-      final run = awaiting.single;
+      final run = awaiting.single as AwaitingRun;
       expect(run.hireId, hireId);
       expect(run.agentId, 13);
       expect(run.manifestVersion, 1);
@@ -247,7 +261,7 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
     test('markResumed moves awaitingChild to running once', () async {
       final hireId = await queueOne();
       expect(
-        await store().markResumed(hireId, _t0),
+        await resume(hireId, _t0),
         isFalse,
         reason: 'a queued run is not awaiting',
       );
@@ -255,8 +269,8 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
       await pause(hireId);
       final resumedAt = _t0.add(const Duration(minutes: 30));
 
-      expect(await store().markResumed(hireId, resumedAt), isTrue);
-      expect(await store().markResumed(hireId, resumedAt), isFalse);
+      expect(await resume(hireId, resumedAt), isTrue);
+      expect(await resume(hireId, resumedAt), isFalse);
       final run = (await store().find(hireId))!;
       expect(run.state, HireRunState.running);
       expect(
@@ -264,12 +278,42 @@ void hireRunStoreContract(Future<HireRunStoreFixture> Function() create) {
         isTrue,
         reason: 'the stale sweep counts from the resume',
       );
-      expect(run.loopState, '{"loop":1}', reason: 'kept for a retry');
+      expect(
+        run.loopState,
+        '{"loop":1,"child":"result"}',
+        reason: 'the child result is stored in the same write',
+      );
       expect(run.pendingToolCallId, isNull);
       expect(run.childHireId, isNull);
       expect(run.childRequest, isNull);
       expect(await store().listAwaitingChild(), isEmpty);
       expect(await store().markSucceeded(hireId, 'done', _t0), isTrue);
+    });
+
+    test('a damaged awaiting row is listed as damaged in its place, oldest '
+        'first, so it can be failed and never starves later runs', () async {
+      final damaged = await queueOne();
+      final healthy = await queueOne();
+      for (final id in [damaged, healthy]) {
+        await store().markRunning(id, _t0);
+        await pause(id);
+      }
+      await fixture.damage(damaged);
+
+      final first = await store().listAwaitingChild(limit: 1);
+      expect(first.single, isA<DamagedAwaitingRun>());
+      expect(first.single.hireId, damaged);
+      expect((first.single as DamagedAwaitingRun).hireMissing, isFalse);
+      final both = await store().listAwaitingChild();
+      expect([for (final entry in both) entry.hireId], [damaged, healthy]);
+      expect(both.last, isA<AwaitingRun>());
+
+      expect(
+        await store().markFailed(damaged, 'loop_state_unreadable', _t0),
+        isTrue,
+      );
+      final after = await store().listAwaitingChild(limit: 1);
+      expect(after.single.hireId, healthy);
     });
 
     test('an awaiting run can fail', () async {

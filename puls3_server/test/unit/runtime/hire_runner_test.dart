@@ -553,7 +553,7 @@ final class _RacingStore implements HireRunStore {
   );
 
   @override
-  Future<List<AwaitingRun>> listAwaitingChild({int limit = 10}) =>
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10}) =>
       inner.listAwaitingChild(limit: limit);
 
   @override
@@ -574,8 +574,11 @@ final class _RacingStore implements HireRunStore {
   );
 
   @override
-  Future<bool> markResumed(int hireId, DateTime at) =>
-      inner.markResumed(hireId, at);
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
+  }) => inner.markResumed(hireId, at, loopState: loopState);
 
   @override
   Future<bool> markSucceeded(int hireId, String result, DateTime at) =>

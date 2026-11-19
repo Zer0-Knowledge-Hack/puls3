@@ -92,11 +92,13 @@ final class _Port implements SubcontractPort {
 
 final class _Children implements ChildResultSource {
   ChildToolResult? result;
+  Object? error;
   final asked = <int>[];
 
   @override
   Future<ChildToolResult?> resultOf(int childHireId) async {
     asked.add(childHireId);
+    if (error case final error?) throw error;
     return result;
   }
 }
@@ -168,21 +170,25 @@ void main() {
   late _Children children;
   late DateTime clock;
 
-  HireRunner runner({bool subcontracting = true, RunnerLease? lease}) =>
-      HireRunner(
-        manifests: manifests,
-        runner: AgentRunner(runtime: model, timeout: _timeout),
-        staleAfter: _timeout + const Duration(minutes: 1),
-        now: () => clock,
-        subcontracting: subcontracting
-            ? SubcontractSetup(
-                search: _search,
-                port: port,
-                children: children,
-                lease: lease,
-              )
-            : null,
-      );
+  HireRunner runner({
+    bool subcontracting = true,
+    RunnerLease? lease,
+    int batchSize = 10,
+  }) => HireRunner(
+    manifests: manifests,
+    runner: AgentRunner(runtime: model, timeout: _timeout),
+    staleAfter: _timeout + const Duration(minutes: 1),
+    now: () => clock,
+    batchSize: batchSize,
+    subcontracting: subcontracting
+        ? SubcontractSetup(
+            search: _search,
+            port: port,
+            children: children,
+            lease: lease,
+          )
+        : null,
+  );
 
   int fundedHire({int expiredAt = 1800000000}) {
     final id = hires.hires.length + 1;
@@ -491,5 +497,181 @@ void main() {
     expect(summary.retried, 1, reason: 'a missing credential is retryable');
     expect(runs.lastErrors[id], 'unsupported_provider');
     expect(model.tasks, isEmpty);
+  });
+
+  group('a resume never loses the child or blocks the batch (T5.3 review)', () {
+    test('a lease failure on resume stores the child result first: the retry '
+        'sends it, the run completes and no second child is opened', () async {
+      var leases = 0;
+      Future<LoopOutcome> flaky(
+        RunManifest manifest,
+        Future<LoopOutcome> Function(AgentRunner runner) body,
+      ) {
+        leases++;
+        if (leases == 2) throw const RuntimeUnsupportedProvider('anthropic');
+        return body(AgentRunner(runtime: model, timeout: _timeout));
+      }
+
+      Future<RunPassSummary> leasedPass() =>
+          runner(lease: flaky).pass(runs: runs, hires: hires);
+      model = _Scripted([
+        _searchTurn,
+        _subcontractTurn,
+        const FinalText('Report with B.'),
+      ]);
+      final id = fundedHire();
+      expect((await leasedPass()).awaiting, 1);
+      children.result = const ChildDelivered('B found three sources.');
+
+      final second = await leasedPass();
+
+      expect(second.retried, 1);
+      expect(model.tasks, hasLength(2), reason: 'no model call on resume');
+      final stored = decodeToolLoopState((await runs.find(id))!.loopState!);
+      final kept = stored.transcript.last as ToolResultMessage;
+      expect(kept.callId, 'call_c');
+      expect(kept.content, contains('B found three sources.'));
+
+      clock = clock.add(retryBackoff[0]);
+      final third = await leasedPass();
+
+      expect(third.succeeded, 1);
+      final sent = model.tasks.last.messages.last as ToolResultMessage;
+      expect(sent.callId, 'call_c');
+      expect(sent.content, contains('B found three sources.'));
+      expect((await runs.find(id))!.result, 'Report with B.');
+      expect(port.requests, hasLength(1), reason: 'no child is paid twice');
+      expect(children.asked, hasLength(1));
+    });
+
+    test('an unreadable stored loop state on start fails the run as '
+        'loop_state_unreadable without a model call', () async {
+      final id = fundedHire();
+      final queued = (await runs.find(id))!;
+      runs.overwrite(
+        HireRun(
+          hireId: id,
+          state: HireRunState.queued,
+          queuedAt: queued.queuedAt,
+          loopState: '{"v":99}',
+        ),
+      );
+
+      final summary = await pass();
+
+      expect(summary.failed, 1);
+      final run = (await runs.find(id))!;
+      expect(run.state, HireRunState.failed);
+      expect(run.failureReason, runLoopStateUnreadable);
+      expect(model.tasks, isEmpty);
+      expect(model.completes, isEmpty);
+    });
+
+    test('an unreadable stored loop state on resume fails the run as '
+        'loop_state_unreadable without asking for the child', () async {
+      final id = await pausedHire(const []);
+      final paused = (await runs.find(id))!;
+      runs.overwrite(
+        HireRun(
+          hireId: id,
+          state: HireRunState.awaitingChild,
+          queuedAt: paused.queuedAt,
+          startedAt: paused.startedAt,
+          loopState: 'not json',
+          pendingToolCallId: paused.pendingToolCallId,
+          childHireId: paused.childHireId,
+          childRequest: paused.childRequest,
+        ),
+      );
+      children.result = const ChildDelivered('B output.');
+
+      final summary = await pass();
+
+      expect(summary.failed, 1);
+      final run = (await runs.find(id))!;
+      expect(run.state, HireRunState.failed);
+      expect(run.failureReason, runLoopStateUnreadable);
+      expect(children.asked, isEmpty);
+    });
+
+    test(
+      'a paused row missing its child request is failed as '
+      'loop_state_unreadable, so it never starves later paused runs',
+      () async {
+        final damaged = await pausedHire(const []);
+        final healthy = await pausedHire([const FinalText('Report with B.')]);
+        final row = (await runs.find(damaged))!;
+        runs.overwrite(
+          HireRun(
+            hireId: damaged,
+            state: HireRunState.awaitingChild,
+            queuedAt: row.queuedAt,
+            startedAt: row.startedAt,
+            loopState: row.loopState,
+            pendingToolCallId: row.pendingToolCallId,
+            childHireId: row.childHireId,
+          ),
+        );
+        children.result = const ChildDelivered('B output.');
+
+        final first = await runner(batchSize: 1).pass(runs: runs, hires: hires);
+
+        expect(first.failed, 1);
+        final failed = (await runs.find(damaged))!;
+        expect(failed.state, HireRunState.failed);
+        expect(failed.failureReason, runLoopStateUnreadable);
+
+        final second = await runner(
+          batchSize: 1,
+        ).pass(runs: runs, hires: hires);
+
+        expect(second.succeeded, 1);
+        expect((await runs.find(healthy))!.result, 'Report with B.');
+      },
+    );
+
+    test('a paused run whose hire is no longer funded fails as not_runnable '
+        'without asking for the child', () async {
+      final id = await pausedHire(const []);
+      hires.hires[id] = hires.hires[id]!.expire();
+      children.result = const ChildDelivered('B output.');
+      final calls = model.tasks.length;
+
+      final summary = await pass();
+
+      expect(summary.failed, 1);
+      final run = (await runs.find(id))!;
+      expect(run.state, HireRunState.failed);
+      expect(run.failureReason, runNotRunnable);
+      expect(children.asked, isEmpty);
+      expect(model.tasks, hasLength(calls));
+    });
+
+    test('an unreadable child state defers the resume: the run keeps '
+        'waiting', () async {
+      final id = await pausedHire(const []);
+      children.error = StateError('child store down');
+      final calls = model.tasks.length;
+
+      final summary = await pass();
+
+      expect(summary.deferred, 1);
+      expect((await runs.find(id))!.state, HireRunState.awaitingChild);
+      expect(model.tasks, hasLength(calls));
+    });
+
+    test('an unexpected error while driving the loop fails the run as '
+        'internal_error', () async {
+      final id = fundedHire();
+
+      final summary = await runner(
+        lease: (manifest, body) => throw StateError('port exploded'),
+      ).pass(runs: runs, hires: hires);
+
+      expect(summary.failed, 1);
+      final run = (await runs.find(id))!;
+      expect(run.state, HireRunState.failed);
+      expect(run.failureReason, runInternalError);
+    });
   });
 }

@@ -212,6 +212,24 @@ final class ToolLoop {
     LoopAwaitingChild paused,
     ChildToolResult result,
   ) {
+    final state = resumedState(paused, result);
+    final ledger = SubcontractLedger(
+      childrenUsed: state.childrenUsed,
+      remainingReserveStroops: state.remainingReserveStroops,
+      searches: state.searches,
+    );
+    return _drive(run, [...state.transcript], state.turnsUsed, ledger);
+  }
+
+  /// [paused]'s state with the child's [result] appended as the pending
+  /// call's tool result, without calling the model. The runner persists it
+  /// as it resumes, so a retry before the next segment ends still continues
+  /// from a transcript whose last tool call has its result
+  /// ([continueFrom]), and the paid child's output is never lost.
+  static ToolLoopState resumedState(
+    LoopAwaitingChild paused,
+    ChildToolResult result,
+  ) {
     final state = paused.state;
     final callId = paused.pendingToolCallId;
     final transcript = [
@@ -228,12 +246,13 @@ final class ToolLoop {
         ),
       },
     ];
-    final ledger = SubcontractLedger(
+    return ToolLoopState(
+      transcript: transcript,
+      turnsUsed: state.turnsUsed,
       childrenUsed: state.childrenUsed,
       remainingReserveStroops: state.remainingReserveStroops,
       searches: state.searches,
     );
-    return _drive(run, transcript, state.turnsUsed, ledger);
   }
 
   /// Continues [state] as stored after a retryable [LoopFailed] (T5.3): the
