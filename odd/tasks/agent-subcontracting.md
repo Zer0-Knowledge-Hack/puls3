@@ -109,6 +109,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   Evidence: domain `dart test` 338 passed, server unit+hire 1087 passed, integration 186 passed,
   `dart analyze --fatal-infos` clean on both packages. `buildAgentSearchService` is wired in
   `agent_catalog_wiring.dart` with no endpoint yet; T5's `search_agents` tool is its caller.
+  Source `719e732` on base `3317962` (assessed high, consent medium, granted, reliability lens,
+  approved and acknowledged, lineage `review-4bcab53db6eb5cf2`). Advisory, non-blocking follow-ups:
+  ancestor wallets read from the catalog (`agent_search_service.dart:71-77`, warning), untested
+  chain cap, non-ASCII query matching, and untested wiring.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
   Route: delegated writer.
@@ -141,4 +145,4 @@ StellarExpert.
 - 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slice A PR #359, slice B PR #360) done; both T3
   slices reviewed and acknowledged.
 - 2026-11-18: T4 done on `feat/334-agent-search`, stacked on `feat/334-server-subcontract`.
-  Next: native review of the T4 commit, open its PR stacked on #360, then T5.
+  T4 reviewed and acknowledged. Next: open the T4 PR stacked on #360 (user's call), then T5.
