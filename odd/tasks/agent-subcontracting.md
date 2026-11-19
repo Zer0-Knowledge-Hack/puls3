@@ -141,6 +141,9 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     `WorkersAiRuntime.converse` throws `tools_unsupported` with tools; subcontracting is
     Anthropic-only. Anthropic assistant `content` is kept as opaque `providerContent` and replayed
     verbatim; T5.3 must persist it in the transcript.
+    Source `30663b6` on base `70bc765` (consent medium, granted, reliability lens, approved and
+    acknowledged, lineage `review-0479630263c40896`); one advisory suggestion in
+    `agent_runner.dart:72-84`.
   - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
     `SubcontractPort`.
   - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
