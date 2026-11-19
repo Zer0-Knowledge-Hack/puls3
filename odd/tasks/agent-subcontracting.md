@@ -238,10 +238,31 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     unique (`hire.spy.yaml:35-36`, `hire_payment.spy.yaml:16-20`); only its Postgres test is
     missing. T6.4 must pass `children: ChildJobEffects` in `chain_tracker_wiring.dart` and
     reconcile `unverified` lines; T6.3 maps `not_opened` to `ChildFailed('child_not_opened')`.
-  - [ ] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
+  - [x] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
     settlement fields, and no parent `submit` while children are open.
+    Evidence: RED (new test files failed to load) then GREEN; server unit+hire 1300 passed,
+    integration 210, analyze clean. Source `30f6e61`. `judgeChildOutput` returns
+    `child_run_failed`, `child_output_empty`, `child_output_too_long` (over 16000 runes),
+    `child_not_submitted` or `child_complete`; the reason hash is sha256 of the code.
+    `EscrowChildResultSource` signs one verdict at a time with A's key under the new server-signed
+    purposes `childComplete` / `childReject` (persisted by name); the tracker's `onChildSettled`
+    fills the line's state, fee, payout and settle transaction. `AgentSubmitSender` takes an
+    optional `childrenOpen` check (`OpenChildren.anyOpen`), and a `ChildrenOpen` refusal burns no
+    attempt. Review (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-6f18abf3c28cddc2`) raised two warnings, both moved to T6.4.
   - [ ] **T6.4** Production wiring of `SubcontractSetup`, `staleAfter` and `passTimeout` for
     multi-segment runs, and reconciliation of half-opened children and children of failed runs.
+    Carried items:
+    - Wire `SubcontractSetup`, `ChildAgentLookup`, `contractApprovalWindow`, `ChildJobEffects`
+      (in `chain_tracker_wiring.dart`), `EscrowChildResultSource` and `childrenOpen`.
+    - Serialize agent-signed calls per signing wallet instead of globally: `AgentSubmitSender`
+      already gated `submit` globally, and T6.3 widened that gate to the child purposes, so one
+      stuck child call stalls every agent's submit (`agent_submit_sender.dart:132`).
+    - Record relay settlements (`release`, `claim_refund`) on the child's receipt line; today
+      only A-signed verdicts fill it (`child_job_effects.dart:160-186`).
+    - Reconcile `unverified` and half-opened lines, release children of failed parent runs, map
+      an orphan `HireRequestConflict` to `SubcontractRefused`, and handle a throwing
+      `childrenOpen`.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
