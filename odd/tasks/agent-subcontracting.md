@@ -113,7 +113,7 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   approved and acknowledged, lineage `review-4bcab53db6eb5cf2`). Advisory, non-blocking follow-ups:
   ancestor wallets read from the catalog (`agent_search_service.dart:71-77`, warning), untested
   chain cap, non-ASCII query matching, and untested wiring.
-- [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
+- [x] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
   Route: delegated writer, one work unit and one stacked PR each (user approved 2026-11-18).
   Defaults: 8 turns max per hire; `max_children` with a platform cap of 2, both config with
