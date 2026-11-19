@@ -22,7 +22,7 @@ Without a session the catalog commands still work, and hire and Studio commands 
 
 ## Run it
 
-`puls3_cli` is a member of the repository's Dart workspace and is not on pub.dev. Install the workspace once, with Flutter 3.44.4 as in the [SDK quickstart](../sdk/quickstart.md#1-install-the-workspace):
+`puls3_cli` is a member of the repository's Dart workspace and is not on pub.dev. Install the workspace once, with Flutter 3.44.4 as in the [repository README](../../README.md#build-and-run):
 
 ```bash
 cd puls3

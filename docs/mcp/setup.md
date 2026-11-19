@@ -7,7 +7,7 @@
 
 ## 1. Install the workspace
 
-You need Flutter 3.44.4 and a clone of this repository, as in the [SDK quickstart](../sdk/quickstart.md#1-install-the-workspace):
+You need Flutter 3.44.4 and a clone of this repository, as in the [repository README](../../README.md#build-and-run):
 
 ```bash
 git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
