@@ -50,6 +50,7 @@ final class StudioRunManifestSource implements RunManifestSource {
       systemPrompt: manifest.systemPrompt,
       inputMaxChars: manifest.inputMaxChars,
       outputMaxChars: manifest.outputMaxChars,
+      subcontract: manifest.subcontract,
     );
   }
 }
