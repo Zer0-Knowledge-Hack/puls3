@@ -186,7 +186,36 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     (`hire_runner.dart:552-570`); releasing an already-opened child stays a T6 item. Server
     unit+hire 1191 passed, runtime 227, integration 194.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
-  resumes with B's result, receipt stored. Route: delegated writer.
+  resumes with B's result, receipt stored. Route: delegated writer, one work unit and one
+  stacked PR each (user approved 2026-11-19; the chain is now 15 slices).
+  Defaults: the verdict is a server rule (D3): reject when B's run failed, its output is empty or
+  over the output limit, otherwise complete; the reason hash is sha256 of the reason code. An
+  undecided child is released by the existing deadline relay. Child `expired_at =
+  min(now + job duration, parent.expired_at − approval_window − 600)`; `subcontract` refuses with
+  `parent_too_short` before opening a child that could not submit in time. The child reserve is 0
+  (depth 1, D5). The example job duration becomes 259200 s: with the testnet 24 h
+  `approval_window`, a parent needs two windows plus the 600 s margin, so 172800 leaves no room for
+  a child (`set_approval_window` can shorten the window later; that is a deploy choice for T8).
+  - [x] **T6.1** Real `SubcontractPort`: child hire + receipt line, A-signed `create_child_job`,
+    contract refusals as tool errors, idempotent per tool call.
+    Evidence: RED (port test failed to load) then GREEN; server unit+hire 1217 passed,
+    integration 199 (receipt store on Postgres), analyze clean. Source `16c1297`.
+    `EscrowSubcontractPort` checks the chain job, drafts and signs with A before any write, then
+    one transaction stores the child hire (`requestId = child:<parentHireId>:<toolCallId>`), the
+    receipt line and the submitted `createChildJob` record; the envelope is sent after it. The
+    approval window is read live from the contract (`contractApprovalWindow`).
+    `childRunHeadroom = 30 min`; `parent_too_short` when `childExpiry <= now + window + headroom`.
+    A node refusal marks the line `not_opened`; an unreachable node leaves it `pending`.
+    Open items: T6.2 confirms the job and moves the line from `pending`; T6.4 builds
+    `ChildAgentLookup`, wires `contractApprovalWindow`, and must serialize A's account sequence
+    with other submits (`txBadSeq` today ends as `chain_refused`). `tool_loop_codec` does not
+    store `ChildRequest.toolCallId`, which only matters if a restored request is re-sent.
+  - [ ] **T6.2** Track `createChildJob`: bind the child job, record the payment (payer A, payee B)
+    so B's run is enqueued, update the receipt line.
+  - [ ] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
+    settlement fields, and no parent `submit` while children are open.
+  - [ ] **T6.4** Production wiring of `SubcontractSetup`, `staleAfter` and `passTimeout` for
+    multi-segment runs, and reconciliation of half-opened children and children of failed runs.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
