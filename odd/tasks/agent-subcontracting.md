@@ -162,8 +162,19 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     id runs no call and gets exactly one `duplicate_call_id` result. Fix reviewed (consent medium,
     granted, reliability lens, approved and acknowledged, lineage `review-dafe0e08a5ee9316`);
     server unit+hire 1158 passed, runtime 195 passed.
-  - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
+  - [x] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
     turns persisted (migration), and `HireRunner` resumes paused runs.
+    Evidence: RED (three new test files failed to load) then GREEN; server unit+hire 1183
+    passed, runtime 219, integration 193, analyze clean on server and client, a second
+    `serverpod generate` changed nothing. Source `171ae66`, generated + migration
+    `20261119030418895-hire-run-phases` in `d4e9ef8` (four nullable `hire_run` columns).
+    `awaitingChild` maps to runtime status `running`, so the hire stays `funded` (D7). The
+    `tool_loop_codec` is version 1; an unreadable state fails as `loop_state_unreadable`. A
+    retryable mid-loop failure continues from the stored state via `ToolLoop.continueFrom`.
+    Studio runs reach the loop through `runnerLease` / `withBuilderRunner`. Production wires
+    `subcontracting: null`, so no tools are offered until T6. T6 must implement `SubcontractPort`,
+    `ChildResultSource`, wire `SubcontractSetup`, raise `staleAfter` and `TrackerLoop.passTimeout`
+    for multi-segment runs, and reconcile half-opened children after `internal_error`.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
   resumes with B's result, receipt stored. Route: delegated writer.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
