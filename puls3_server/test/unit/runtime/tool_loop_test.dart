@@ -111,9 +111,10 @@ final class _FakePort implements SubcontractPort {
 }
 
 final class _FakeSearch {
-  _FakeSearch(this.results);
+  _FakeSearch(this.results, {this.fails = false});
 
   final List<AgentCandidate> results;
+  final bool fails;
   final calls = <Map<String, Object?>>[];
 
   Future<List<AgentCandidate>> call({
@@ -128,6 +129,7 @@ final class _FakeSearch {
       'query': query,
       'skills': skills,
     });
+    if (fails) throw Exception('search down');
     return results;
   }
 }
@@ -156,11 +158,26 @@ ToolCall _subcontract(
   },
 );
 
-/// The tool results the model saw in the last task, by call id.
-Map<String, ToolResultMessage> _results(ConversationTask task) => {
-  for (final message in task.messages)
-    if (message is ToolResultMessage) message.callId: message,
-};
+/// The tool results the model saw in [task], by call id, latest turn last.
+///
+/// Fails when one assistant turn's results hold a call id twice: a provider
+/// rejects two results for one tool call.
+Map<String, ToolResultMessage> _results(ConversationTask task) {
+  final results = <String, ToolResultMessage>{};
+  var turnIds = <String>{};
+  for (final message in task.messages) {
+    if (message is AssistantMessage) turnIds = <String>{};
+    if (message is ToolResultMessage) {
+      expect(
+        turnIds.add(message.callId),
+        isTrue,
+        reason: 'two results for call ${message.callId} in one turn',
+      );
+      results[message.callId] = message;
+    }
+  }
+  return results;
+}
 
 String _errorCode(ToolResultMessage result) {
   expect(result.isError, isTrue, reason: result.content);
@@ -172,13 +189,16 @@ void main() {
   late _FakeSearch search;
   late _FakePort port;
 
-  ToolLoop loop({int maxTurns = defaultMaxLoopTurns, DateTime? now}) =>
-      ToolLoop(
-        runner: AgentRunner(runtime: model, timeout: _timeout),
-        tools: SubcontractTools(search: search.call, port: port),
-        maxTurns: maxTurns,
-        clock: () => now ?? _now,
-      );
+  ToolLoop loop({
+    int maxTurns = defaultMaxLoopTurns,
+    DateTime? now,
+    DateTime Function()? clock,
+  }) => ToolLoop(
+    runner: AgentRunner(runtime: model, timeout: _timeout),
+    tools: SubcontractTools(search: search.call, port: port),
+    maxTurns: maxTurns,
+    clock: clock ?? () => now ?? _now,
+  );
 
   setUp(() {
     search = _FakeSearch([
@@ -414,6 +434,27 @@ void main() {
       expect(search.calls, hasLength(1));
     });
 
+    test('a call id repeated within one turn runs neither call', () async {
+      model = _Scripted([
+        _calls([_search('s0')]),
+        _calls([_subcontract('d1'), _search('d1'), _search('s2')]),
+        const FinalText('done'),
+      ]);
+      final outcome = await loop().start(_run());
+      expect(outcome, isA<LoopCompleted>());
+      final results = _results(model.tasks[2]);
+      expect(_errorCode(results['d1']!), 'duplicate_call_id');
+      expect(results['s2']!.isError, isFalse);
+      expect(port.requests, isEmpty);
+      expect(search.calls, hasLength(2));
+    });
+
+    test('a search failure', () async {
+      search = _FakeSearch(const [], fails: true);
+      final result = await resultOf([_search('s1')], 's1');
+      expect(_errorCode(result), 'search_unavailable');
+    });
+
     test('bad search arguments', () async {
       final result = await resultOf([_search('s1', query: 42)], 's1');
       expect(_errorCode(result), 'invalid_arguments');
@@ -525,6 +566,69 @@ void main() {
       expect(outcome.turnsUsed, 3);
       expect(model.tasks, hasLength(3));
     });
+
+    test('a subcontract on the last turn is refused before the port', () async {
+      model = _Scripted([
+        _calls([_search('s1')]),
+        _calls([_subcontract('c1')]),
+      ]);
+
+      final outcome = await loop(maxTurns: 2).start(_run());
+
+      expect(port.requests, isEmpty);
+      expect(outcome, isA<LoopFailed>());
+      outcome as LoopFailed;
+      expect(outcome.code, 'max_turns_exceeded');
+      expect(outcome.state.childrenUsed, 0);
+      expect(outcome.state.remainingReserveStroops, 1000);
+      final last = outcome.transcript.last as ToolResultMessage;
+      expect(last.callId, 'c1');
+      expect(_errorCode(last), 'no_turns_left');
+    });
+
+    test(
+      'a subcontract with a turn left still resumes and completes',
+      () async {
+        model = _Scripted([
+          _calls([_search('s1'), _subcontract('c1')]),
+          const FinalText('done'),
+        ]);
+        final run = _run();
+        final paused = await loop(maxTurns: 2).start(run) as LoopAwaitingChild;
+
+        final outcome = await loop(
+          maxTurns: 2,
+        ).resume(run, paused, const ChildDelivered('sources'));
+
+        expect((outcome as LoopCompleted).text, 'done');
+        expect(port.requests, hasLength(1));
+      },
+    );
+
+    test(
+      'a subcontract with no time for another segment is refused',
+      () async {
+        model = _Scripted([
+          _calls([_search('s1'), _subcontract('c1')]),
+        ]);
+        // Before the segment there is room (now + 120s <= expiry); after it
+        // 90s have passed and the next segment could not finish in time.
+        // Reads: start's check, the pre-segment check, then the rest.
+        final times = [_now, _now, _now.add(const Duration(seconds: 90))];
+        var reads = 0;
+        DateTime clock() => times[reads < times.length ? reads++ : 2];
+
+        final outcome = await loop(clock: clock).start(
+          _run(expiresAt: _now.add(const Duration(seconds: 200))),
+        );
+
+        expect(port.requests, isEmpty);
+        expect((outcome as LoopFailed).code, 'deadline_exceeded');
+        expect(outcome.state.childrenUsed, 0);
+        final last = outcome.transcript.last as ToolResultMessage;
+        expect(_errorCode(last), 'no_time_left');
+      },
+    );
 
     test('the default is 8 turns per hire', () {
       expect(defaultMaxLoopTurns, 8);

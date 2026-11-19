@@ -268,24 +268,40 @@ final class ToolLoop {
           transcript.add(AssistantMessage(text: text));
           return LoopCompleted(text, _state(transcript, turnsUsed, ledger));
         case ToolCallsTurn(:final calls):
-          final seen = {
+          final earlier = {
             for (final message in transcript)
               if (message is AssistantMessage)
                 for (final call in message.toolCalls) call.id,
           };
+          final countInTurn = <String, int>{};
+          for (final call in calls) {
+            countInTurn.update(call.id, (n) => n + 1, ifAbsent: () => 1);
+          }
           transcript.add(turn.toMessage());
+          // Each call id gets exactly one result in this turn. An id used in
+          // an earlier turn, or more than once in this one, runs none of its
+          // calls: one duplicate_call_id error answers them all.
+          final answered = <String>{};
           String? pendingCallId;
           ChildRequested? pending;
           for (final call in calls) {
-            if (!seen.add(call.id)) {
+            if (!answered.add(call.id)) continue;
+            if (earlier.contains(call.id) || countInTurn[call.id]! > 1) {
               transcript.add(
                 toolError(
                   call.id,
                   'duplicate_call_id',
-                  'Call id ${call.id} was already used.',
+                  'Call id ${call.id} was used by more than one call.',
                 ),
               );
               continue;
+            }
+            if (call.name == subcontractToolName) {
+              final blocked = _noFollowUp(run, turnsUsed);
+              if (blocked != null) {
+                transcript.add(blocked(call.id));
+                continue;
+              }
             }
             final outcome = await _tools.handle(
               call,
@@ -316,6 +332,36 @@ final class ToolLoop {
 
   bool _pastDeadline(ToolLoopRun run) =>
       _clock().add(_runner.timeout).isAfter(run.expiresAt);
+
+  /// Why a `subcontract` after [turnsUsed] segments could never be consumed,
+  /// as a tool error builder, or `null` when it could.
+  ///
+  /// A child's output is read only by a resumed segment, which [_drive]
+  /// refuses when `turnsUsed >= maxTurns` or [_pastDeadline]. Both are
+  /// checked now, before the port opens (and pays for) the child: the turn
+  /// count cannot change before the resume, and the clock only moves
+  /// forward, so a failing check now fails on resume too. Passing it does
+  /// not promise the child finishes in time.
+  ToolResultMessage Function(String callId)? _noFollowUp(
+    ToolLoopRun run,
+    int turnsUsed,
+  ) {
+    if (turnsUsed >= maxTurns) {
+      return (id) => toolError(
+        id,
+        'no_turns_left',
+        'No turn is left to read a subcontract result; answer now.',
+      );
+    }
+    if (_pastDeadline(run)) {
+      return (id) => toolError(
+        id,
+        'no_time_left',
+        'Too little time is left to read a subcontract result; answer now.',
+      );
+    }
+    return null;
+  }
 
   static ToolLoopState _state(
     List<ConversationMessage> transcript,
