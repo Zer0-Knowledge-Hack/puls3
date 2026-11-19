@@ -210,6 +210,18 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     `ChildAgentLookup`, wires `contractApprovalWindow`, and must serialize A's account sequence
     with other submits (`txBadSeq` today ends as `chain_refused`). `tool_loop_codec` does not
     store `ChildRequest.toolCallId`, which only matters if a restored request is re-sent.
+    Review of `16c1297` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-d42625275e3c0841`) raised three warnings. Two are fixed in `f3f7df6`: the
+    stored-child lookup now runs first and reads only the database (`listByParent` plus the
+    child's `requestId`), so a retry after a chain failure or a parent state change returns the
+    stored child instead of risking a duplicate; and an integration test against the Serverpod
+    stores proves the child hire, receipt line and submission roll back together (it fails when
+    `insertHire` leaves the transaction). The reserve race does not hold: a hire has one run
+    (`hire_run` unique on `hireId`, conditional writes), the loop refuses a second `subcontract`
+    in a turn, and the contract checks the reserve. Fix reviewed (lineage
+    `review-bfbfb6031598701e`, approved and acknowledged); its warning that a child hire without
+    a receipt line rethrows a raw `HireRequestConflict` is a T6.4 item (map it to
+    `SubcontractRefused`). Server unit+hire 1221 passed, integration 201.
   - [ ] **T6.2** Track `createChildJob`: bind the child job, record the payment (payer A, payee B)
     so B's run is enqueued, update the receipt line.
   - [ ] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
