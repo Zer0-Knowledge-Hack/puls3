@@ -151,7 +151,8 @@ as `tools_unsupported`, so subcontracting is Anthropic-only.
 
 Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
-`running`, `failed`), with the `result` and `failureReason`.
+`running`, `failed`; a run in `awaitingChild` shows `running`), with the
+`result` and `failureReason`.
 
 A successful run stores the result and, when agent-wallet custody is
 configured, the runtime signs escrow `submit` with the custodied provider
@@ -184,6 +185,32 @@ resolved from the deploy record once #18/#35 land.
 It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 (warnings).
+
+### Run phases (#334, T5.3)
+
+With a `SubcontractSetup` (search, `SubcontractPort`, `ChildResultSource`
+and a `RunnerLease`), `HireRunner` runs an opted-in Anthropic manifest
+through `ToolLoop`. A run that opens a child moves `running` →
+`awaitingChild`: the loop state is stored in `hire_run` (`loopState`, versioned
+JSON from `tool_loop_codec.dart`: the transcript with each turn's opaque
+`providerContent`, turns and children used, the remaining reserve and the
+search snapshots; plus `pendingToolCallId`, `childHireId` and `childRequest`
+with the justification, D10 verdict and ranking), the model call has ended,
+and nothing holds the timeout. Each pass first asks `ChildResultSource` about
+every paused run; once the child delivered or failed, the run goes back to
+`running` and the loop continues with that result. An awaiting run is never
+swept as `interrupted`, shows `runtimeStatus` `running`, and its hire stays
+`funded` (ADR-0011 D7). A retryable provider failure mid-loop stores the
+conversation and the next attempt continues it, so no finished turn is
+repeated and no child is opened twice. Studio (`OwnedRunManifest`) runs hold
+the conversation on the builder's credential (`runnerLease`). The stored
+state is bounded by the loop's input cap (`input.max_chars` plus 32,000
+characters of headroom) plus provider content: tens of kilobytes.
+
+**Not wired in production yet.** There is no real `SubcontractPort` or
+`ChildResultSource` until T6, so `startAgentRuntime` passes no setup: no run is
+offered the tools, an opted-in manifest runs as one plain segment, and no run
+pauses. Tests inject fakes.
 
 ### Hire configuration
 

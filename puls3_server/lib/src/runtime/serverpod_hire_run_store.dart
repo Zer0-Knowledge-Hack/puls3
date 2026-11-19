@@ -103,6 +103,51 @@ final class ServerpodHireRunStore implements HireRunStore {
             input: hire.input ?? '',
             expiredAt: hire.expiredAt,
             attempts: run.attempts,
+            reserveStroops: hire.subcontractReserve,
+            loopState: run.loopState,
+          ),
+    ];
+  }
+
+  @override
+  Future<List<AwaitingRun>> listAwaitingChild({int limit = 10}) async {
+    final runs = await HireRunRecord.db.find(
+      session,
+      where: (t) => t.state.equals(HireRunState.awaitingChild.name),
+      orderBy: (t) => t.id,
+      limit: limit,
+    );
+    if (runs.isEmpty) return const [];
+    final hires = {
+      for (final hire in await HireRecord.db.find(
+        session,
+        where: (t) => t.id.inSet(runs.map((r) => r.hireId).toSet()),
+      ))
+        hire.id!: hire,
+    };
+    return [
+      for (final run in runs)
+        if ((hires[run.hireId], run) case (
+          final hire?,
+          HireRunRecord(
+            loopState: final loopState?,
+            pendingToolCallId: final pendingToolCallId?,
+            childHireId: final childHireId?,
+            childRequest: final childRequest?,
+          ),
+        ))
+          AwaitingRun(
+            hireId: run.hireId,
+            agentId: hire.agentId,
+            manifestVersion: hire.manifestVersion,
+            input: hire.input ?? '',
+            expiredAt: hire.expiredAt,
+            attempts: run.attempts,
+            reserveStroops: hire.subcontractReserve,
+            loopState: loopState,
+            pendingToolCallId: pendingToolCallId,
+            childHireId: childHireId,
+            childRequest: childRequest,
           ),
     ];
   }
@@ -138,6 +183,7 @@ final class ServerpodHireRunStore implements HireRunStore {
     String reason, {
     required DateTime notBefore,
     required DateTime at,
+    String? loopState,
   }) async {
     final run = await HireRunRecord.db.findFirstRow(
       session,
@@ -154,11 +200,54 @@ final class ServerpodHireRunStore implements HireRunStore {
         t.notBefore(notBefore.toUtc()),
         t.lastError(reason),
         t.startedAt(null),
+        if (loopState != null) t.loopState(loopState),
       ],
       where: (t) =>
           t.hireId.equals(hireId) &
           t.state.equals(HireRunState.running.name) &
           t.attempts.equals(run.attempts),
+    );
+    return updated.isNotEmpty;
+  }
+
+  @override
+  Future<bool> markAwaitingChild(
+    int hireId, {
+    required String loopState,
+    required String pendingToolCallId,
+    required int childHireId,
+    required String childRequest,
+    required DateTime at,
+  }) async {
+    final updated = await HireRunRecord.db.updateWhere(
+      session,
+      columnValues: (t) => [
+        t.state(HireRunState.awaitingChild.name),
+        t.loopState(loopState),
+        t.pendingToolCallId(pendingToolCallId),
+        t.childHireId(childHireId),
+        t.childRequest(childRequest),
+      ],
+      where: (t) =>
+          t.hireId.equals(hireId) & t.state.equals(HireRunState.running.name),
+    );
+    return updated.isNotEmpty;
+  }
+
+  @override
+  Future<bool> markResumed(int hireId, DateTime at) async {
+    final updated = await HireRunRecord.db.updateWhere(
+      session,
+      columnValues: (t) => [
+        t.state(HireRunState.running.name),
+        t.startedAt(at.toUtc()),
+        t.pendingToolCallId(null),
+        t.childHireId(null),
+        t.childRequest(null),
+      ],
+      where: (t) =>
+          t.hireId.equals(hireId) &
+          t.state.equals(HireRunState.awaitingChild.name),
     );
     return updated.isNotEmpty;
   }
@@ -192,6 +281,7 @@ final class ServerpodHireRunStore implements HireRunStore {
           t.state.inSet({
             HireRunState.queued.name,
             HireRunState.running.name,
+            HireRunState.awaitingChild.name,
           }),
     );
     return updated.isNotEmpty;
@@ -205,6 +295,10 @@ final class ServerpodHireRunStore implements HireRunStore {
     finishedAt: record.finishedAt,
     result: record.result,
     failureReason: record.failureReason,
+    loopState: record.loopState,
+    pendingToolCallId: record.pendingToolCallId,
+    childHireId: record.childHireId,
+    childRequest: record.childRequest,
   );
 }
 

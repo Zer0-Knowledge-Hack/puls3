@@ -4,6 +4,8 @@ import 'adapters/workers_ai_runtime.dart';
 import 'agent_runner.dart';
 import 'run_manifest.dart';
 import 'runtime_task.dart';
+import 'subcontract_setup.dart';
+import 'tool_loop.dart';
 
 /// Finds the credential a builder saved for one provider.
 typedef BuilderCredentialLookup =
@@ -33,17 +35,48 @@ Future<String> Function(RunManifest manifest, String input) runExecutor({
 }) {
   return (manifest, input) async {
     if (manifest is! OwnedRunManifest) return team.run(manifest.task(input));
-    final credential = await credentials(
-      owner: manifest.owner,
-      provider: manifest.provider,
-    );
-    final account = credential?.accountId;
-    if (credential == null ||
-        credential.secret.isEmpty ||
-        (manifest.provider == WorkersAiRuntime.provider &&
-            (account == null || account.isEmpty))) {
-      throw RuntimeUnsupportedProvider(manifest.provider);
-    }
+    final credential = await _ownerCredential(manifest, credentials);
     return builder(manifest.task(input), credential);
   };
+}
+
+/// Runs a body on a builder's own provider account (see [withBuilderRunner]).
+typedef BuilderLease =
+    Future<LoopOutcome> Function(
+      BuilderProviderCredential credential,
+      Future<LoopOutcome> Function(AgentRunner runner) body,
+    );
+
+/// The [RunnerLease] of the tool loop, with [runExecutor]'s routing: an
+/// [OwnedRunManifest] holds its conversation on its owner's credential
+/// through [builder], and fails as [RuntimeUnsupportedProvider] without
+/// one; any other manifest runs on [team].
+RunnerLease runnerLease({
+  required AgentRunner team,
+  required BuilderCredentialLookup credentials,
+  BuilderLease builder = withBuilderRunner,
+}) {
+  return (manifest, body) async {
+    if (manifest is! OwnedRunManifest) return body(team);
+    final credential = await _ownerCredential(manifest, credentials);
+    return builder(credential, body);
+  };
+}
+
+Future<BuilderProviderCredential> _ownerCredential(
+  OwnedRunManifest manifest,
+  BuilderCredentialLookup credentials,
+) async {
+  final credential = await credentials(
+    owner: manifest.owner,
+    provider: manifest.provider,
+  );
+  final account = credential?.accountId;
+  if (credential == null ||
+      credential.secret.isEmpty ||
+      (manifest.provider == WorkersAiRuntime.provider &&
+          (account == null || account.isEmpty))) {
+    throw RuntimeUnsupportedProvider(manifest.provider);
+  }
+  return credential;
 }

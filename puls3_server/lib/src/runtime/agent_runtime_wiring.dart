@@ -206,6 +206,12 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
         }
       },
     ),
+    // No SubcontractPort or ChildResultSource exists until T6 (#334), so no
+    // run is offered the subcontract tools: an opted-in manifest runs as one
+    // plain segment and no run pauses. T6 passes a SubcontractSetup here,
+    // with `runnerLease` for Studio runs, and must raise staleAfter and the
+    // pass timeout to cover up to `defaultMaxLoopTurns` segments per run.
+    subcontracting: null,
     // A run still `running` a minute past the timeout was interrupted.
     staleAfter: config.timeout + const Duration(minutes: 1),
     log: log,

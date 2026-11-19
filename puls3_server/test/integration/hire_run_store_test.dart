@@ -169,7 +169,17 @@ void main() {
       final queued = await _fundedHire(session, seq: ++seq);
       final running = await _fundedHire(session, seq: ++seq);
       final failed = await _fundedHire(session, seq: ++seq);
+      final awaiting = await _fundedHire(session, seq: ++seq);
       final now = DateTime.utc(2026, 10, 8, 12);
+      await runs.markRunning(awaiting, now);
+      await runs.markAwaitingChild(
+        awaiting,
+        loopState: '{}',
+        pendingToolCallId: 'toolu_1',
+        childHireId: 99,
+        childRequest: '{}',
+        at: now,
+      );
       await runs.markRunning(running, now);
       await runs.markRunning(failed, now);
       await runs.markFailed(failed, 'timeout', now);
@@ -177,12 +187,15 @@ void main() {
       final q = (await repo.findById(HireId(queued)))!;
       final r = (await repo.findById(HireId(running)))!;
       final f = (await repo.findById(HireId(failed)))!;
+      final a = (await repo.findById(HireId(awaiting)))!;
 
       expect(q.status, HireStatus.funded);
       expect(q.runtimeStatus, RuntimeStatus.queued);
       expect(r.runtimeStatus, RuntimeStatus.running);
       expect(f.runtimeStatus, RuntimeStatus.failed);
       expect(f.failureReason, 'timeout');
+      expect(a.status, HireStatus.funded, reason: 'D7: no hire state for it');
+      expect(a.runtimeStatus, RuntimeStatus.running);
     });
   });
 }

@@ -107,11 +107,16 @@ final class LoopAwaitingChild extends LoopOutcome {
 /// The loop stopped without an answer. [code] is storable as the hire's
 /// `failureReason`: a [RuntimeFailure] code, `max_turns_exceeded` or
 /// `deadline_exceeded`. [state] is the conversation up to the last
-/// completed segment.
+/// completed segment, so a retry can continue from it
+/// ([ToolLoop.continueFrom]).
 final class LoopFailed extends LoopOutcome {
-  const LoopFailed(this.code, super.state);
+  const LoopFailed(this.code, super.state, {this.failure});
 
   final String code;
+
+  /// The model call's failure, when the loop stopped on one; the runner
+  /// decides from it whether the run is retried.
+  final RuntimeFailure? failure;
 }
 
 /// What the child returned, for [ToolLoop.resume].
@@ -177,8 +182,8 @@ final class ToolLoop {
       remainingReserveStroops: run.reserveStroops,
       searches: const [],
     );
-    LoopFailed fail(String code) =>
-        LoopFailed(code, _state(transcript, 0, ledger));
+    LoopFailed fail(String code, [RuntimeFailure? failure]) =>
+        LoopFailed(code, _state(transcript, 0, ledger), failure: failure);
 
     if (_pastDeadline(run)) return fail('deadline_exceeded');
     if (!offersTools(run.manifest)) {
@@ -186,7 +191,7 @@ final class ToolLoop {
       try {
         text = await _runner.run(run.manifest.task(run.input));
       } on RuntimeFailure catch (failure) {
-        return fail(failure.code);
+        return fail(failure.code, failure);
       }
       transcript.add(AssistantMessage(text: text));
       return LoopCompleted(text, _state(transcript, 1, ledger));
@@ -231,6 +236,20 @@ final class ToolLoop {
     return _drive(run, transcript, state.turnsUsed, ledger);
   }
 
+  /// Continues [state] as stored after a retryable [LoopFailed] (T5.3): the
+  /// same conversation is sent again, with the turns, children, reserve and
+  /// searches it already used, so no segment or child is repeated. A run
+  /// that is not offered tools has no conversation to continue and starts.
+  Future<LoopOutcome> continueFrom(ToolLoopRun run, ToolLoopState state) {
+    if (!offersTools(run.manifest)) return start(run);
+    final ledger = SubcontractLedger(
+      childrenUsed: state.childrenUsed,
+      remainingReserveStroops: state.remainingReserveStroops,
+      searches: state.searches,
+    );
+    return _drive(run, [...state.transcript], state.turnsUsed, ledger);
+  }
+
   Future<LoopOutcome> _drive(
     ToolLoopRun run,
     List<ConversationMessage> transcript,
@@ -240,8 +259,11 @@ final class ToolLoop {
     final manifest = run.manifest;
     final systemPrompt = '${manifest.systemPrompt}\n\n$dataEnvelopeNote';
     while (true) {
-      LoopFailed fail(String code) =>
-          LoopFailed(code, _state(transcript, turnsUsed, ledger));
+      LoopFailed fail(String code, [RuntimeFailure? failure]) => LoopFailed(
+        code,
+        _state(transcript, turnsUsed, ledger),
+        failure: failure,
+      );
       if (turnsUsed >= maxTurns) return fail('max_turns_exceeded');
       if (_pastDeadline(run)) return fail('deadline_exceeded');
 
@@ -259,7 +281,7 @@ final class ToolLoop {
           ),
         );
       } on RuntimeFailure catch (failure) {
-        return fail(failure.code);
+        return fail(failure.code, failure);
       }
       turnsUsed += 1;
 
