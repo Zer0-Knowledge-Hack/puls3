@@ -65,7 +65,8 @@ final class ExpiredFundUnknown extends ExpiredFund {
 
 /// Applies the domain effect of a successful relayed transaction (api.md
 /// relay step 5): record the job id after `create_job`, `Hire.fund` after
-/// `fund`, confirm the rating after `give_feedback`.
+/// `fund`, open and fund a child hire after `create_child_job`, confirm the
+/// rating after `give_feedback`.
 ///
 /// The tracker marks the submission `confirmed` or `failed` only after an
 /// effect returns, so a crash in between applies the effect again on the
@@ -90,6 +91,24 @@ abstract interface class EscrowEffects {
     StoredSubmission submission,
     List<JobFundedEvent> events,
   );
+
+  /// After a successful A-signed `create_child_job`
+  /// ([SubmissionPurpose.createChildJob], ADR-0011 D2). [children] are all
+  /// the valid `child_job_created` events of the transaction, in order;
+  /// [created] and [funded] its `job_created` and `job_funded` events, which
+  /// the child job emits too. The implementation proves the child against
+  /// its stored hire and receipt line, then opens and funds it.
+  Future<EffectResult> onChildJobCreated(
+    StoredSubmission submission,
+    List<ChildJobCreatedEvent> children, {
+    required List<JobCreatedEvent> created,
+    required List<JobFundedEvent> funded,
+  });
+
+  /// Before a `create_child_job` submission is stored `failed` with [code],
+  /// so the child's receipt line records whether the child never opened. An
+  /// exception leaves the submission `submitted` and is retried.
+  Future<void> onChildJobFailed(StoredSubmission submission, String code);
 
   /// After a successful `give_feedback` ([SubmissionPurpose.giveFeedback]).
   ///
@@ -140,6 +159,28 @@ final class NoopEscrowEffects implements EscrowEffects {
     );
     return const EffectResult.ok();
   }
+
+  @override
+  Future<EffectResult> onChildJobCreated(
+    StoredSubmission submission,
+    List<ChildJobCreatedEvent> children, {
+    required List<JobCreatedEvent> created,
+    required List<JobFundedEvent> funded,
+  }) async {
+    _log(
+      ChainLogLevel.info,
+      'No escrow effect for child job '
+      '${_jobIds(children.map((e) => e.childJobId))} created by submission '
+      '${submission.id}',
+    );
+    return const EffectResult.ok();
+  }
+
+  @override
+  Future<void> onChildJobFailed(
+    StoredSubmission submission,
+    String code,
+  ) async {}
 
   @override
   Future<EffectResult> onFeedbackGiven(StoredSubmission submission) async {

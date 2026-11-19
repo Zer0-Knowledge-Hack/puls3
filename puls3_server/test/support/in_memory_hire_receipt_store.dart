@@ -65,7 +65,33 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
   ];
 
   @override
-  Future<bool> markNotOpened(int childHireId) async {
+  Future<bool> markNotOpened(int childHireId) async =>
+      _settlePending(childHireId, state: ReceiptLineState.notOpened);
+
+  @override
+  Future<bool> markUnverified(int childHireId) async =>
+      _settlePending(childHireId, state: ReceiptLineState.unverified);
+
+  @override
+  Future<bool> markOpened(
+    int childHireId, {
+    required int childJobId,
+    required String createTransaction,
+    required String state,
+    Transaction? transaction,
+  }) async => _settlePending(
+    childHireId,
+    state: state,
+    childJobId: childJobId,
+    createTransaction: createTransaction,
+  );
+
+  bool _settlePending(
+    int childHireId, {
+    required String state,
+    int? childJobId,
+    String? createTransaction,
+  }) {
     final index = _lines.indexWhere(
       (l) =>
           l.childHireId == childHireId && l.state == ReceiptLineState.pending,
@@ -76,12 +102,12 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
       id: line.id,
       parentHireId: line.parentHireId,
       childHireId: line.childHireId,
-      childJobId: line.childJobId,
+      childJobId: childJobId ?? line.childJobId,
       providerAgentId: line.providerAgentId,
       providerWallet: line.providerWallet,
       budget: line.budget,
-      state: ReceiptLineState.notOpened,
-      createTransaction: line.createTransaction,
+      state: state,
+      createTransaction: createTransaction ?? line.createTransaction,
       relatedParty: line.relatedParty,
       justification: line.justification,
       createdAt: line.createdAt,

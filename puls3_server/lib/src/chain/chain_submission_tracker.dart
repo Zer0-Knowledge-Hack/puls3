@@ -30,7 +30,9 @@ const defaultTrackerBatchLimit = 100;
 /// is then derived from those confirmed records (#208).
 const _untrackedPurposes = {SubmissionPurpose.setAgentWallet};
 
-/// Server-signed calls whose third failure is `EscrowCallFailed`.
+/// Server-signed calls whose third failure is `EscrowCallFailed`. The
+/// A-signed `createChildJob` is not one: each child hire has exactly one
+/// envelope, and a new tool call opens a new child instead of retrying.
 const _relayPurposes = {
   SubmissionPurpose.submit,
   SubmissionPurpose.release,
@@ -92,7 +94,8 @@ final class TrackerPassSummary {
 ///   fails `SubmissionRejected`; an `ERROR` status is logged and the record
 ///   waits for its time bounds.
 /// - `FAILED`: fails `TransactionFailed`.
-/// - `SUCCESS`: `createJob` and `fund` need their escrow event: with none the
+/// - `SUCCESS`: `createJob`, `fund` and `createChildJob` need their escrow
+///   event (`ChildJobCreated` for the last): with none the
 ///   record stays `submitted` for [evidencePasses] passes in total (the count
 ///   is in memory and a restart starts it again), then fails
 ///   `JobEvidenceUnavailable`. The [EscrowEffects] result, given every valid
@@ -101,6 +104,10 @@ final class TrackerPassSummary {
 ///   `release`, `claimRefund` and `registerFull` are confirmed when the
 ///   transaction succeeds. Hire status is derived from those confirmed
 ///   records (#208); the tracker does not write a status column.
+///
+/// Every failure of a `createChildJob` first goes through
+/// [EscrowEffects.onChildJobFailed], so the child's receipt line says
+/// whether the child never opened.
 ///
 /// The chain time is the lookup's latest ledger close time, because the
 /// envelope time bounds are checked against it. Only when the node does not
@@ -352,6 +359,17 @@ final class ChainSubmissionTracker {
         final events = lookup.jobFunded;
         if (events.isEmpty) return _missingEvidence(store, submission, summary);
         result = await _effects.onFunded(submission, events);
+      case SubmissionPurpose.createChildJob:
+        final children = lookup.childJobCreated;
+        if (children.isEmpty) {
+          return _missingEvidence(store, submission, summary);
+        }
+        result = await _effects.onChildJobCreated(
+          submission,
+          children,
+          created: lookup.jobCreated,
+          funded: lookup.jobFunded,
+        );
       case SubmissionPurpose.giveFeedback:
         result = await _effects.onFeedbackGiven(submission);
       case SubmissionPurpose.submit ||
@@ -389,7 +407,8 @@ final class ChainSubmissionTracker {
     }
   }
 
-  /// A successful `createJob` or `fund` whose transaction shows no escrow
+  /// A successful `createJob`, `fund` or `createChildJob` whose transaction
+  /// shows no escrow
   /// event: the record waits for the next [evidencePasses] - 1 passes in case
   /// the node's event index is late, then fails `JobEvidenceUnavailable`.
   Future<bool> _missingEvidence(
@@ -423,6 +442,9 @@ final class ChainSubmissionTracker {
   /// two failed envelopes of the same hire and call is stored as
   /// `EscrowCallFailed` instead of [code]: it is the failure that uses the
   /// last attempt (api.md).
+  ///
+  /// A `createChildJob` tells [EscrowEffects.onChildJobFailed] first; if
+  /// that throws, the record stays `submitted` and is retried.
   Future<bool> _fail(
     ChainSubmissionStore store,
     StoredSubmission submission,
@@ -430,6 +452,9 @@ final class ChainSubmissionTracker {
     TrackerPassSummary summary,
   ) async {
     final stored = await _failureCode(store, submission, code);
+    if (submission.purpose == SubmissionPurpose.createChildJob) {
+      await _effects.onChildJobFailed(submission, stored);
+    }
     if (await store.markFailed(submission.id, stored)) summary.failed++;
     return true;
   }

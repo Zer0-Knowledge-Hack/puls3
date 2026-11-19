@@ -24,6 +24,18 @@ final class FakeEscrowEffects implements EscrowEffects {
   /// The event list of every [onFunded] call, in call order.
   final fundedEvents = <List<JobFundedEvent>>[];
 
+  /// The submission ids [onChildJobCreated] was called with.
+  final childCreated = <int>[];
+
+  /// The `child_job_created` events of every [onChildJobCreated] call.
+  final childCreatedEvents = <List<ChildJobCreatedEvent>>[];
+
+  /// Every [onChildJobFailed] call as `(submission id, code)`, in order.
+  final childFailed = <(int, String)>[];
+
+  /// Thrown by [onChildJobFailed] when set.
+  Object? childFailedError;
+
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
@@ -42,6 +54,28 @@ final class FakeEscrowEffects implements EscrowEffects {
     funded.add(submission.id);
     fundedEvents.add(events);
     return _answer();
+  }
+
+  @override
+  Future<EffectResult> onChildJobCreated(
+    StoredSubmission submission,
+    List<ChildJobCreatedEvent> children, {
+    required List<JobCreatedEvent> created,
+    required List<JobFundedEvent> funded,
+  }) async {
+    childCreated.add(submission.id);
+    childCreatedEvents.add(children);
+    return _answer();
+  }
+
+  @override
+  Future<void> onChildJobFailed(
+    StoredSubmission submission,
+    String code,
+  ) async {
+    final failure = childFailedError;
+    if (failure != null) throw failure;
+    childFailed.add((submission.id, code));
   }
 
   @override
