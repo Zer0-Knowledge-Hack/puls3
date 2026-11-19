@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
-import '../runtime_task.dart';
+import '../conversation.dart';
 
 /// [ModelRuntime] for `model.provider: workers-ai`, the free provider of the
 /// #34 model policy: one non-streaming call to the Cloudflare Workers AI REST
@@ -13,7 +13,7 @@ import '../runtime_task.dart';
 /// The timeout is applied by `AgentRunner`; when it fires, the request is
 /// aborted through its `abortTrigger`. The API token is sent only in the
 /// `Authorization` header and never appears in a failure.
-final class WorkersAiRuntime implements ModelRuntime {
+final class WorkersAiRuntime implements ConversationRuntime {
   WorkersAiRuntime({
     required http.Client httpClient,
     required String accountId,
@@ -72,21 +72,70 @@ final class WorkersAiRuntime implements ModelRuntime {
     if (task.provider != provider) {
       throw RuntimeUnsupportedProvider(task.provider);
     }
+    return _run(
+      task.modelId,
+      [
+        {'role': 'system', 'content': task.systemPrompt},
+        {'role': 'user', 'content': task.input},
+      ],
+      maxTokensFor(task),
+      abortTrigger,
+    );
+  }
+
+  /// A plain conversation, always a [FinalText]. Tools are not supported:
+  /// the Workers AI docs list function calling for the model, but its
+  /// `tool_calls` carry only `name` and `arguments` (no id to answer) and
+  /// no way to send a tool result back is documented. So offering tools, or
+  /// replaying tool calls or results, fails as `tools_unsupported` with no
+  /// call, and subcontracting is Anthropic-only (ADR-0011 D8).
+  @override
+  Future<ModelTurn> converse(
+    ConversationTask task, {
+    Future<void>? abortTrigger,
+  }) async {
+    if (task.provider != provider) {
+      throw RuntimeUnsupportedProvider(task.provider);
+    }
+    final messages = [
+      {'role': 'system', 'content': task.systemPrompt},
+    ];
+    if (task.tools.isNotEmpty) throw const RuntimeToolsUnsupported();
+    for (final message in task.messages) {
+      switch (message) {
+        case UserMessage(:final text):
+          messages.add({'role': 'user', 'content': text});
+        case AssistantMessage(:final text, :final toolCalls):
+          if (toolCalls.isNotEmpty) throw const RuntimeToolsUnsupported();
+          messages.add({'role': 'assistant', 'content': text});
+        case ToolResultMessage():
+          throw const RuntimeToolsUnsupported();
+      }
+    }
+    final text = await _run(
+      task.modelId,
+      messages,
+      min(maxTokensCeiling, task.maxOutputChars),
+      abortTrigger,
+    );
+    return FinalText(text);
+  }
+
+  Future<String> _run(
+    String modelId,
+    List<Map<String, String>> messages,
+    int maxTokens,
+    Future<void>? abortTrigger,
+  ) async {
     final url =
-        runUrl(_accountId, task.modelId) ?? (throw const RuntimeInvalidModel());
+        runUrl(_accountId, modelId) ?? (throw const RuntimeInvalidModel());
     final request =
         http.AbortableRequest('POST', url, abortTrigger: abortTrigger)
           ..headers.addAll({
             'content-type': 'application/json',
             'authorization': 'Bearer $_apiToken',
           })
-          ..body = jsonEncode({
-            'messages': [
-              {'role': 'system', 'content': task.systemPrompt},
-              {'role': 'user', 'content': task.input},
-            ],
-            'max_tokens': maxTokensFor(task),
-          });
+          ..body = jsonEncode({'messages': messages, 'max_tokens': maxTokens});
     final http.Response response;
     try {
       response = await http.Response.fromStream(await _http.send(request));

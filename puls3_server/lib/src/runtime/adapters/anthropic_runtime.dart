@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
-import '../runtime_task.dart';
+import '../conversation.dart';
 
 /// [ModelRuntime] for `model.provider: anthropic`: one non-streaming call to
 /// the Claude Messages API over HTTP (there is no official Dart SDK).
@@ -12,7 +12,7 @@ import '../runtime_task.dart';
 /// The timeout is applied by `AgentRunner`, for every provider; when it fires,
 /// the request is aborted through its `abortTrigger`. The API key is sent only
 /// in the `x-api-key` header and never appears in a failure.
-final class AnthropicRuntime implements ModelRuntime {
+final class AnthropicRuntime implements ConversationRuntime {
   AnthropicRuntime({required http.Client httpClient, required String apiKey})
     : _http = httpClient,
       _apiKey = apiKey;
@@ -40,8 +40,10 @@ final class AnthropicRuntime implements ModelRuntime {
   /// output within the limit fits. Some scripts and emoji take more than one
   /// token per character, so such an output near the limit can still end as
   /// `output_truncated`. `AgentRunner` enforces the limit on the text.
-  static int maxTokensFor(RuntimeTask task) =>
-      min(maxTokensCeiling, task.maxOutputChars + thinkingHeadroom);
+  static int maxTokensFor(RuntimeTask task) => _maxTokens(task.maxOutputChars);
+
+  static int _maxTokens(int maxOutputChars) =>
+      min(maxTokensCeiling, maxOutputChars + thinkingHeadroom);
 
   /// Models that accept server-side fallbacks on a refusal.
   static const _fallbackModels = {
@@ -60,7 +62,111 @@ final class AnthropicRuntime implements ModelRuntime {
     if (task.provider != provider) {
       throw RuntimeUnsupportedProvider(task.provider);
     }
-    final fallbacks = _fallbackModels.contains(task.modelId);
+    final body = await _post(task.modelId, {
+      'model': task.modelId,
+      'max_tokens': maxTokensFor(task),
+      'system': task.systemPrompt,
+      'messages': [
+        {'role': 'user', 'content': task.input},
+      ],
+    }, abortTrigger);
+    final (stopReason, content) = _decode(body);
+    if (stopReason == 'tool_use') throw _unexpectedStop;
+    return _joinText(content);
+  }
+
+  /// One turn of a conversation with tools: [ConversationTask.tools] as
+  /// `tools`, assistant turns replayed as content blocks (their
+  /// `providerContent` verbatim when present, so thinking blocks come back
+  /// unchanged), and consecutive tool results grouped in one user message of
+  /// `tool_result` blocks. `stop_reason: tool_use` is a [ToolCallsTurn]; a
+  /// `tool_use` block without an id, a name or an object input fails as
+  /// `provider_error:malformed_tool_call`.
+  @override
+  Future<ModelTurn> converse(
+    ConversationTask task, {
+    Future<void>? abortTrigger,
+  }) async {
+    if (task.provider != provider) {
+      throw RuntimeUnsupportedProvider(task.provider);
+    }
+    final body = await _post(task.modelId, {
+      'model': task.modelId,
+      'max_tokens': _maxTokens(task.maxOutputChars),
+      'system': task.systemPrompt,
+      if (task.tools.isNotEmpty)
+        'tools': [
+          for (final tool in task.tools)
+            {
+              'name': tool.name,
+              'description': tool.description,
+              'input_schema': tool.parameters,
+            },
+        ],
+      'messages': _messages(task.messages),
+    }, abortTrigger);
+    final (stopReason, content) = _decode(body);
+    if (stopReason != 'tool_use') return FinalText(_joinText(content));
+    return ToolCallsTurn(
+      calls: _toolCalls(content),
+      text: _joinText(content),
+      providerContent: content,
+    );
+  }
+
+  /// The Messages API `messages` for [messages].
+  static List<Map<String, Object?>> _messages(
+    List<ConversationMessage> messages,
+  ) {
+    final out = <Map<String, Object?>>[];
+    List<Map<String, Object?>>? results;
+    for (final message in messages) {
+      if (message is! ToolResultMessage) results = null;
+      switch (message) {
+        case UserMessage(:final text):
+          out.add({'role': 'user', 'content': text});
+        case AssistantMessage():
+          out.add({
+            'role': 'assistant',
+            'content': message.providerContent ?? _blocks(message),
+          });
+        case ToolResultMessage():
+          final block = {
+            'type': 'tool_result',
+            'tool_use_id': message.callId,
+            'content': message.content,
+            'is_error': message.isError,
+          };
+          if (results == null) {
+            results = [block];
+            out.add({'role': 'user', 'content': results});
+          } else {
+            results.add(block);
+          }
+      }
+    }
+    return out;
+  }
+
+  static List<Map<String, Object?>> _blocks(AssistantMessage message) => [
+    if (message.text.isNotEmpty) {'type': 'text', 'text': message.text},
+    for (final call in message.toolCalls)
+      {
+        'type': 'tool_use',
+        'id': call.id,
+        'name': call.name,
+        'input': call.arguments,
+      },
+  ];
+
+  /// POSTs [payload], plus fallbacks for the models that accept them, and
+  /// returns the body of a 200 response.
+  Future<String> _post(
+    String modelId,
+    Map<String, Object?> payload,
+    Future<void>? abortTrigger,
+  ) async {
+    final fallbacks = _fallbackModels.contains(modelId);
     final request =
         http.AbortableRequest('POST', _messagesUrl, abortTrigger: abortTrigger)
           ..headers.addAll({
@@ -70,12 +176,7 @@ final class AnthropicRuntime implements ModelRuntime {
             if (fallbacks) 'anthropic-beta': _fallbackBeta,
           })
           ..body = jsonEncode({
-            'model': task.modelId,
-            'max_tokens': maxTokensFor(task),
-            'system': task.systemPrompt,
-            'messages': [
-              {'role': 'user', 'content': task.input},
-            ],
+            ...payload,
             if (fallbacks) 'fallbacks': 'default',
           });
     final http.Response response;
@@ -94,7 +195,7 @@ final class AnthropicRuntime implements ModelRuntime {
         errorType: _errorType(response.body),
       );
     }
-    return _text(response.body);
+    return response.body;
   }
 
   /// The `error.type` of an API error body, or `null` if there is none.
@@ -109,24 +210,39 @@ final class AnthropicRuntime implements ModelRuntime {
     }
   }
 
-  static String _text(String body) {
-    const malformed = RuntimeProviderFailed(
-      status: 200,
-      errorType: 'malformed_response',
-    );
+  static const _malformed = RuntimeProviderFailed(
+    status: 200,
+    errorType: 'malformed_response',
+  );
+  static const _malformedToolCall = RuntimeProviderFailed(
+    status: 200,
+    errorType: 'malformed_tool_call',
+  );
+  static const _unexpectedStop = RuntimeProviderFailed(
+    status: 200,
+    errorType: 'unexpected_stop_reason',
+  );
+
+  /// The `stop_reason` (`end_turn`, `stop_sequence` or `tool_use`) and the
+  /// `content` of a 200 body. Refusals, truncation and other stop reasons
+  /// fail.
+  static (String, List<Object?>) _decode(String body) {
     final Object? decoded;
     try {
       decoded = jsonDecode(body);
     } on FormatException {
-      throw malformed;
+      throw _malformed;
     }
-    if (decoded is! Map<String, Object?>) throw malformed;
+    if (decoded is! Map<String, Object?>) throw _malformed;
     final content = decoded['content'];
-    if (content is! List) throw malformed;
+    if (content is! List) throw _malformed;
 
     switch (decoded['stop_reason']) {
-      case 'end_turn' || 'stop_sequence':
-        break;
+      case final String reason
+          when reason == 'end_turn' ||
+              reason == 'stop_sequence' ||
+              reason == 'tool_use':
+        return (reason, content);
       case 'refusal':
         final details = decoded['stop_details'];
         final category = details is Map ? details['category'] : null;
@@ -134,12 +250,11 @@ final class AnthropicRuntime implements ModelRuntime {
       case 'max_tokens':
         throw const RuntimeOutputTruncated();
       default:
-        throw const RuntimeProviderFailed(
-          status: 200,
-          errorType: 'unexpected_stop_reason',
-        );
+        throw _unexpectedStop;
     }
+  }
 
+  static String _joinText(List<Object?> content) {
     final text = StringBuffer();
     for (final block in content) {
       if (block is Map && block['type'] == 'text' && block['text'] is String) {
@@ -147,6 +262,23 @@ final class AnthropicRuntime implements ModelRuntime {
       }
     }
     return text.toString();
+  }
+
+  static List<ToolCall> _toolCalls(List<Object?> content) {
+    final calls = <ToolCall>[];
+    for (final block in content) {
+      if (block is! Map || block['type'] != 'tool_use') continue;
+      final id = block['id'];
+      final name = block['name'];
+      final input = block['input'];
+      if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
+        throw _malformedToolCall;
+      }
+      if (input is! Map<String, Object?>) throw _malformedToolCall;
+      calls.add(ToolCall(id: id, name: name, arguments: input));
+    }
+    if (calls.isEmpty) throw _malformedToolCall;
+    return calls;
   }
 
   @override
