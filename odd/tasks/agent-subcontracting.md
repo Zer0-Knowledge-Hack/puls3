@@ -115,7 +115,25 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   chain cap, non-ASCII query matching, and untested wiring.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
-  Route: delegated writer.
+  Route: delegated writer, one work unit and one stacked PR each (user approved 2026-11-18).
+  Defaults: 8 turns max per hire; `max_children` with a platform cap of 2, both config with
+  defaults; a mid-loop provider failure resumes from the stored transcript; Studio runs use the
+  loop too; the transcript is stored in Postgres within the existing limits; if Workers AI tool
+  calling on llama-3.3-70b is unreliable, subcontracting is Anthropic-only. T5 ends at a persisted
+  `awaitingChild` and a resume proven with a fake `SubcontractPort`; T6 wires the real child.
+  - [x] **T5.0** Manifest opt-in `subcontract { max_children, suggested_reserve }` on domain
+    `AgentManifest` and server `RunManifest`; manifests without it keep their hash.
+    Evidence: RED (compile failures) then GREEN; domain 349 passed, server unit+hire 1092 passed,
+    analyze clean on domain and server, `flutter analyze` clean on `studio_form_check.dart`.
+    New `ManifestProblem.subcontractMalformed` and `subcontractInvalid`. Canonical JSON of the
+    workers-ai example is pinned byte for byte. Cap is the constant `subcontractMaxChildrenCap = 2`
+    (no env var); `effectiveMaxChildren` is 0 without the opt-in. Studio form is T7.
+  - [ ] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
+    (final text or tool calls), `converse()` beside `complete()` for Anthropic and Workers AI.
+  - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
+    `SubcontractPort`.
+  - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
+    turns persisted (migration), and `HireRunner` resumes paused runs.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
   resumes with B's result, receipt stored. Route: delegated writer.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
