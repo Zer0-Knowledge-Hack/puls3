@@ -1,12 +1,12 @@
 # puls3_sdk
 
-Dart SDK for the puls3 API. It reads the catalog and, in later parts, prepares
-hire and Studio calls. **It never signs or submits a transaction.** The design
-is [ADR-0007](../docs/adr/0007-developer-sdk.md).
+Dart SDK for the puls3 API: the catalog, the start of a hire, and the hire and
+Studio calls that prepare unsigned transactions. **It never signs or submits a
+transaction.** The design is [ADR-0007](../docs/adr/0007-developer-sdk.md).
 
-This version covers the catalog, which needs no session. Hire and Studio
-calls wait for the session decision in ADR-0007, tracked in
-[#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259).
+The catalog needs no session. Everything that acts for a wallet (hire and Studio
+calls) needs a CLI session; see the [quickstart](../docs/sdk/quickstart.md) and
+[CLI sessions](../docs/sdk/sessions.md).
 
 ## Use it from this repo
 
@@ -37,6 +37,24 @@ try {
   sdk.close();
 }
 ```
+
+## Start a hire
+
+With a session, `createHire` returns the persisted hire and, when available, its
+unsigned `create_job`. `prepareCreateJob` asks for a fresh envelope, and
+`prepareFund` returns the unsigned `fund`. Repeat the same `requestId` to retry
+safely.
+
+```dart
+final start = await sdk.createHire(agentId, wallet, input, requestId);
+final createJob =
+    start.preparedCreateJob ?? await sdk.prepareCreateJob(start.hire.id);
+final fund = await sdk.prepareFund(start.hire.id);
+```
+
+`createJob` and `fund` are `PreparedTransaction`s: the wallet signs them; the
+SDK does not. `getHire`, `prepareComplete` and `prepareReject` cover the rest of
+the lifecycle.
 
 ## Run the example
 
