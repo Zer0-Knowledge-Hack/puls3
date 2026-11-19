@@ -40,6 +40,28 @@ final class _FakeHire implements HireApi {
   final calls = <String>[];
 
   @override
+  Future<CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) async {
+    calls.add('create $agentId $consumer $input $requestId');
+    if (error != null) throw error!;
+    return CreateHireResult(
+      hire: Hire(
+        id: 21,
+        agentId: agentId,
+        consumer: consumer,
+        price: 5000000,
+        manifestVersion: 1,
+        status: 'open',
+      ),
+      preparedCreateJob: _prepared('createJob'),
+    );
+  }
+
+  @override
   Future<HireDetail> get(int hireId, String consumer) async {
     calls.add('get $hireId $consumer');
     if (error != null) throw error!;
@@ -55,6 +77,20 @@ final class _FakeHire implements HireApi {
       agent: _agent,
       input: 'summarise this',
     );
+  }
+
+  @override
+  Future<PreparedTransaction> prepareCreateJob(int hireId) async {
+    calls.add('createJob $hireId');
+    if (error != null) throw error!;
+    return _prepared('createJob');
+  }
+
+  @override
+  Future<PreparedTransaction> prepareFund(int hireId) async {
+    calls.add('fund $hireId');
+    if (error != null) throw error!;
+    return _prepared('fund');
   }
 
   @override
@@ -109,6 +145,37 @@ void main() {
       expect(sdk.hasSession, isTrue);
     });
 
+    test(
+      'createHire starts a hire and returns its unsigned create_job',
+      () async {
+        final started = await sdk.createHire(
+          7,
+          ' $_wallet ',
+          'hello',
+          ' req-1 ',
+        );
+        expect(started.hire.id, 21);
+        expect(started.hire.agentId, 7);
+        expect(started.hire.consumer, _wallet);
+        expect(started.preparedCreateJob?.purpose, 'createJob');
+        expect(started.preparedCreateJob?.unsignedTransactionXdr, 'AAAA');
+        expect(hire.calls, ['create 7 $_wallet hello req-1']);
+      },
+    );
+
+    test(
+      'prepareCreateJob and prepareFund return unsigned envelopes',
+      () async {
+        final createJob = await sdk.prepareCreateJob(12);
+        final fund = await sdk.prepareFund(12);
+        expect(createJob.purpose, 'createJob');
+        expect(createJob.unsignedTransactionXdr, 'AAAA');
+        expect(fund.purpose, 'fund');
+        expect(fund.unsignedTransactionXdr, 'AAAA');
+        expect(hire.calls, ['createJob 12', 'fund 12']);
+      },
+    );
+
     test('getHire asks for the hire of the given wallet', () async {
       final detail = await sdk.getHire(12, ' $_wallet ');
       expect(detail.hire.id, 12);
@@ -153,6 +220,15 @@ void main() {
     });
 
     test('bad arguments are refused without calling the server', () {
+      expect(
+        () => sdk.createHire(-1, _wallet, 'hi', 'req'),
+        throwsArgumentError,
+      );
+      expect(() => sdk.createHire(1, ' ', 'hi', 'req'), throwsArgumentError);
+      expect(() => sdk.createHire(1, _wallet, ' ', 'req'), throwsArgumentError);
+      expect(() => sdk.createHire(1, _wallet, 'hi', ' '), throwsArgumentError);
+      expect(() => sdk.prepareCreateJob(0), throwsArgumentError);
+      expect(() => sdk.prepareFund(0), throwsArgumentError);
       expect(() => sdk.getHire(0, _wallet), throwsArgumentError);
       expect(() => sdk.getHire(1, '  '), throwsArgumentError);
       expect(() => sdk.prepareComplete(-1), throwsArgumentError);
@@ -184,6 +260,15 @@ void main() {
         ),
       );
       expect(() => sdk.getHire(1, _wallet), sessionRequired('getHire'));
+      expect(
+        () => sdk.createHire(1, _wallet, 'hi', 'req'),
+        sessionRequired('createHire'),
+      );
+      expect(
+        () => sdk.prepareCreateJob(1),
+        sessionRequired('prepareCreateJob'),
+      );
+      expect(() => sdk.prepareFund(1), sessionRequired('prepareFund'));
       expect(() => sdk.prepareComplete(1), sessionRequired('prepareComplete'));
       expect(
         () => sdk.prepareReject(1, 'no'),
