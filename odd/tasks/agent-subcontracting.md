@@ -128,6 +128,9 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     New `ManifestProblem.subcontractMalformed` and `subcontractInvalid`. Canonical JSON of the
     workers-ai example is pinned byte for byte. Cap is the constant `subcontractMaxChildrenCap = 2`
     (no env var); `effectiveMaxChildren` is 0 without the opt-in. Studio form is T7.
+    Source `0c0c346` on base `e5b151e` (assessed high, consent medium, granted, reliability lens,
+    approved and acknowledged, lineage `review-11982293292aec6a`); two advisory suggestions in
+    `run_manifest_test.dart:144-163` and `studio_form_check.dart:312-315`.
   - [ ] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
     (final text or tool calls), `converse()` beside `complete()` for Anthropic and Workers AI.
   - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
