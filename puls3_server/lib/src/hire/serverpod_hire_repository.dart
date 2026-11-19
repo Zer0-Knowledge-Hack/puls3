@@ -307,7 +307,10 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
   static Hire _replayRun(Hire funded, HireRunRecord run) =>
       switch (HireRunState.parse(run.state)) {
         HireRunState.queued => funded,
-        HireRunState.running || HireRunState.succeeded => funded.startRun(),
+        // A run waiting for its child is still working (ADR-0011 D7).
+        HireRunState.running ||
+        HireRunState.awaitingChild ||
+        HireRunState.succeeded => funded.startRun(),
         HireRunState.failed =>
           (run.startedAt == null ? funded : funded.startRun()).failRun(
             reason: run.failureReason ?? runFailedWithoutReason,

@@ -7,15 +7,24 @@ const runFailedWithoutReason = 'unknown';
 enum HireRunState {
   queued,
   running,
+
+  /// The loop opened a child hire and stopped (ADR-0011 D8): the loop state
+  /// is stored, no model call is open and nothing holds the runtime timeout.
+  /// A later pass resumes it once the child finished.
+  awaitingChild,
   succeeded,
   failed;
 
   /// The domain [RuntimeStatus] the app shows. A succeeded run stays
   /// `running` until the escrow `submit` lands and the hire is `submitted`
-  /// (api.md, "Hire escrow states").
+  /// (api.md, "Hire escrow states"). A run waiting for its child is still
+  /// working on the hire, so it shows `running` too: waiting for a
+  /// subcontract is run data, not a hire or runtime state (ADR-0011 D7).
   RuntimeStatus get runtimeStatus => switch (this) {
     HireRunState.queued => RuntimeStatus.queued,
-    HireRunState.running || HireRunState.succeeded => RuntimeStatus.running,
+    HireRunState.running ||
+    HireRunState.awaitingChild ||
+    HireRunState.succeeded => RuntimeStatus.running,
     HireRunState.failed => RuntimeStatus.failed,
   };
 
@@ -33,6 +42,10 @@ final class HireRun {
     this.finishedAt,
     this.result,
     this.failureReason,
+    this.loopState,
+    this.pendingToolCallId,
+    this.childHireId,
+    this.childRequest,
   });
 
   final int hireId;
@@ -46,6 +59,19 @@ final class HireRun {
 
   /// A safe `RuntimeFailure` code, once the run failed.
   final String? failureReason;
+
+  /// The tool loop's state (`tool_loop_codec.dart`), once the loop paused
+  /// or was retried mid-conversation.
+  final String? loopState;
+
+  /// The `subcontract` call the paused loop waits on; set only while
+  /// [state] is [HireRunState.awaitingChild], like [childHireId] and
+  /// [childRequest].
+  final String? pendingToolCallId;
+  final int? childHireId;
+
+  /// The encoded `ChildRequest`: justification, D10 verdict and ranking.
+  final String? childRequest;
 }
 
 /// A queued run with the hire data the runner needs.
@@ -57,6 +83,8 @@ final class QueuedRun {
     required this.input,
     required this.expiredAt,
     this.attempts = 0,
+    this.reserveStroops = 0,
+    this.loopState,
   });
 
   final int hireId;
@@ -74,6 +102,60 @@ final class QueuedRun {
 
   /// Retries already made after a retryable provider failure.
   final int attempts;
+
+  /// The subcontract reserve the hire funded, in stroops (0 without one).
+  final int reserveStroops;
+
+  /// The loop state a retried tool loop continues from, or `null` to start.
+  final String? loopState;
+}
+
+/// One row of [HireRunStore.listAwaitingChild]: a resumable [AwaitingRun],
+/// or a [DamagedAwaitingRun] the runner fails instead.
+sealed class AwaitingChildEntry {
+  const AwaitingChildEntry(this.hireId);
+
+  final int hireId;
+}
+
+/// An `awaitingChild` row that cannot be resumed: its loop data is missing
+/// ([hireMissing] false) or its hire row is ([hireMissing] true). It is
+/// listed, not skipped, so the runner fails it and a batch of such rows
+/// never starves the paused runs after it.
+final class DamagedAwaitingRun extends AwaitingChildEntry {
+  const DamagedAwaitingRun(super.hireId, {this.hireMissing = false});
+
+  final bool hireMissing;
+}
+
+/// A run waiting for its child, with what the runner needs to resume it.
+final class AwaitingRun extends AwaitingChildEntry {
+  const AwaitingRun({
+    required int hireId,
+    required this.agentId,
+    required this.manifestVersion,
+    required this.input,
+    required this.expiredAt,
+    required this.attempts,
+    required this.reserveStroops,
+    required this.loopState,
+    required this.pendingToolCallId,
+    required this.childHireId,
+    required this.childRequest,
+  }) : super(hireId);
+
+  final int agentId;
+  final int manifestVersion;
+  final String input;
+
+  /// See [QueuedRun.expiredAt].
+  final int expiredAt;
+  final int attempts;
+  final int reserveStroops;
+  final String loopState;
+  final String pendingToolCallId;
+  final int childHireId;
+  final String childRequest;
 }
 
 /// Persists agent runs. Every transition is one conditional write, so a
@@ -93,20 +175,50 @@ abstract interface class HireRunStore {
   /// took it, or it does not exist).
   Future<bool> markRunning(int hireId, DateTime at);
 
+  /// The runs in [HireRunState.awaitingChild], up to [limit], oldest first.
+  /// A row that cannot be resumed is listed as a [DamagedAwaitingRun] in its
+  /// place, never dropped.
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10});
+
   /// `running` → `queued` again after a retryable failure: one more attempt,
-  /// not taken before [notBefore], with [reason] as the last error. False
-  /// when it is not running.
+  /// not taken before [notBefore], with [reason] as the last error. A
+  /// [loopState] replaces the stored one, so the next attempt continues the
+  /// conversation; without it the stored one is kept. False when it is not
+  /// running.
   Future<bool> markRetry(
     int hireId,
     String reason, {
     required DateTime notBefore,
     required DateTime at,
+    String? loopState,
+  });
+
+  /// `running` → `awaitingChild`, storing the loop state, the pending call,
+  /// the child hire and its encoded request. False when it is not running.
+  Future<bool> markAwaitingChild(
+    int hireId, {
+    required String loopState,
+    required String pendingToolCallId,
+    required int childHireId,
+    required String childRequest,
+    required DateTime at,
+  });
+
+  /// `awaitingChild` → `running` at [at] (the stale sweep counts from it),
+  /// replacing the loop state with [loopState] and clearing the pending
+  /// call, child hire and request in the same write. [loopState] already
+  /// holds the child's tool result, so the child's output survives any
+  /// retry before the next segment ends. False when it is not awaiting.
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
   });
 
   /// `running` → `succeeded` with [result]. False when it is not running.
   Future<bool> markSucceeded(int hireId, String result, DateTime at);
 
-  /// `queued` or `running` → `failed` with the safe [reason] code. False when
-  /// it is in neither state.
+  /// `queued`, `running` or `awaitingChild` → `failed` with the safe
+  /// [reason] code. False when it is in none of them.
   Future<bool> markFailed(int hireId, String reason, DateTime at);
 }

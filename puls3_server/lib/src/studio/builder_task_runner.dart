@@ -12,6 +12,14 @@ import 'builder_credential.dart';
 Future<String> runBuilderTask(
   RuntimeTask task,
   BuilderProviderCredential credential,
+) => withBuilderRunner(credential, (runner) => runner.run(task));
+
+/// Runs [body] on an [AgentRunner] over [credential]'s provider, closing its
+/// HTTP client after. Both adapters are `ConversationRuntime`s, so the tool
+/// loop (ADR-0011 D8) can hold a conversation on it too.
+Future<T> withBuilderRunner<T>(
+  BuilderProviderCredential credential,
+  Future<T> Function(AgentRunner runner) body,
 ) async {
   final client = http.Client();
   try {
@@ -27,10 +35,9 @@ Future<String> runBuilderTask(
       ),
       _ => throw RuntimeUnsupportedProvider(credential.provider),
     };
-    return await AgentRunner(
-      runtime: runtime,
-      timeout: RuntimeConfig.defaultTimeout,
-    ).run(task);
+    return await body(
+      AgentRunner(runtime: runtime, timeout: RuntimeConfig.defaultTimeout),
+    );
   } finally {
     client.close();
   }

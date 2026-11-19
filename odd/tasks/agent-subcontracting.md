@@ -113,7 +113,7 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   approved and acknowledged, lineage `review-4bcab53db6eb5cf2`). Advisory, non-blocking follow-ups:
   ancestor wallets read from the catalog (`agent_search_service.dart:71-77`, warning), untested
   chain cap, non-ASCII query matching, and untested wiring.
-- [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
+- [x] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
   Route: delegated writer, one work unit and one stacked PR each (user approved 2026-11-18).
   Defaults: 8 turns max per hire; `max_children` with a platform cap of 2, both config with
@@ -162,8 +162,29 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     id runs no call and gets exactly one `duplicate_call_id` result. Fix reviewed (consent medium,
     granted, reliability lens, approved and acknowledged, lineage `review-dafe0e08a5ee9316`);
     server unit+hire 1158 passed, runtime 195 passed.
-  - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
+  - [x] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
     turns persisted (migration), and `HireRunner` resumes paused runs.
+    Evidence: RED (three new test files failed to load) then GREEN; server unit+hire 1183
+    passed, runtime 219, integration 193, analyze clean on server and client, a second
+    `serverpod generate` changed nothing. Source `171ae66`, generated + migration
+    `20261119030418895-hire-run-phases` in `d4e9ef8` (four nullable `hire_run` columns).
+    `awaitingChild` maps to runtime status `running`, so the hire stays `funded` (D7). The
+    `tool_loop_codec` is version 1; an unreadable state fails as `loop_state_unreadable`. A
+    retryable mid-loop failure continues from the stored state via `ToolLoop.continueFrom`.
+    Studio runs reach the loop through `runnerLease` / `withBuilderRunner`. Production wires
+    `subcontracting: null`, so no tools are offered until T6. T6 must implement `SubcontractPort`,
+    `ChildResultSource`, wire `SubcontractSetup`, raise `staleAfter` and `TrackerLoop.passTimeout`
+    for multi-segment runs, and reconcile half-opened children after `internal_error`.
+    Review of `171ae66` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-cc09f7096e96ab6f`) raised two warnings, fixed in `67ed0ee`: `markResumed`
+    now stores the loop state with the child's tool result in the same conditional write, so a
+    lease failure before the first segment cannot lose a paid child's result; and
+    `listAwaitingChild` returns damaged rows as `DamagedAwaitingRun`, which the runner fails as
+    `loop_state_unreadable` or `not_runnable`, so they cannot starve the batch. Fix reviewed
+    (lineage `review-96d9662ed6bd2465`, approved and acknowledged); its warning that
+    `_failDamaged` skips hire settlement does not hold, because `_fail` does not settle either
+    (`hire_runner.dart:552-570`); releasing an already-opened child stays a T6 item. Server
+    unit+hire 1191 passed, runtime 227, integration 194.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
   resumes with B's result, receipt stored. Route: delegated writer.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract

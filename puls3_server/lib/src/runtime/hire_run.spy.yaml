@@ -7,7 +7,7 @@ table: hire_run
 serverOnly: true
 fields:
   hireId: int
-  ### queued, running, succeeded or failed.
+  ### queued, running, awaitingChild, succeeded or failed.
   state: String
   queuedAt: DateTime
   startedAt: DateTime?
@@ -24,6 +24,20 @@ fields:
   ### The safe code of the last retryable failure; failureReason stays empty
   ### until the run really fails.
   lastError: String?
+  ### The tool loop's state as versioned JSON (tool_loop_codec.dart): the
+  ### transcript with each turn's provider content, the turns and children
+  ### used, the remaining reserve and the search snapshots (ADR-0011 D8).
+  ### Set when the loop pauses or is retried mid-conversation; bounded by the
+  ### loop's input cap.
+  loopState: String?
+  ### The subcontract call id the paused loop waits on. Set only while the
+  ### run is awaitingChild, like childHireId and childRequest.
+  pendingToolCallId: String?
+  ### The child hire the paused loop waits on.
+  childHireId: int?
+  ### The child request as versioned JSON: task, justification, the D10
+  ### verdict and the ranking snapshot.
+  childRequest: String?
 indexes:
   hire_run_hire_idx:
     fields: hireId
