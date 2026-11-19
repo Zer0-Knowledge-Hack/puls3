@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'runtime_task.dart';
+import 'conversation.dart';
 
 export 'runtime_task.dart' show ModelRuntime;
 
@@ -32,22 +32,62 @@ final class AgentRunner {
     if (inputLength > task.maxInputChars) {
       throw RuntimeInputTooLong(inputLength, task.maxInputChars);
     }
-    final abort = Completer<void>();
-    final call = _runtime.complete(task, abortTrigger: abort.future);
-    final String output;
-    try {
-      output = await call.timeout(_timeout);
-    } on TimeoutException {
-      // The aborted call then fails on its own; `timeout` already listens to
-      // it, so that late error is not unhandled.
-      abort.complete();
-      throw RuntimeTimedOut(_timeout);
+    final output = await _withinTimeout(
+      (abort) => _runtime.complete(task, abortTrigger: abort),
+    );
+    _checkText(output, task.maxOutputChars);
+    return output;
+  }
+
+  /// One model turn of a conversation (ADR-0011 D8), under the same rules as
+  /// [run]: the per-segment timeout aborts the call; the conversation's
+  /// [ConversationTask.conversationLength] must fit `maxInputChars` before
+  /// the call; a final text must be non-blank and fit `maxOutputChars`, and
+  /// so must the tool calls of a [ToolCallsTurn] (names plus encoded
+  /// arguments). A runtime that is not a [ConversationRuntime] fails as
+  /// `tools_unsupported`. [run] is unchanged.
+  Future<ModelTurn> converseOnce(ConversationTask task) async {
+    final runtime = _runtime;
+    if (runtime is! ConversationRuntime) {
+      throw const RuntimeToolsUnsupported();
     }
+    final inputLength = task.conversationLength;
+    if (inputLength > task.maxInputChars) {
+      throw RuntimeInputTooLong(inputLength, task.maxInputChars);
+    }
+    final turn = await _withinTimeout(
+      (abort) => runtime.converse(task, abortTrigger: abort),
+    );
+    switch (turn) {
+      case FinalText(:final text):
+        _checkText(text, task.maxOutputChars);
+      case ToolCallsTurn(:final length):
+        if (length > task.maxOutputChars) {
+          throw RuntimeOutputTooLong(length, task.maxOutputChars);
+        }
+    }
+    return turn;
+  }
+
+  Future<T> _withinTimeout<T>(Future<T> Function(Future<void> abort) start) {
+    final abort = Completer<void>();
+    final call = start(abort.future);
+    return call.timeout(
+      _timeout,
+      onTimeout: () {
+        // The aborted call then fails on its own; `timeout` already listens
+        // to it, so that late error is not unhandled.
+        abort.complete();
+        throw RuntimeTimedOut(_timeout);
+      },
+    );
+  }
+
+  static void _checkText(String output, int maxOutputChars) {
     if (output.trim().isEmpty) throw const RuntimeEmptyOutput();
     final outputLength = output.runes.length;
-    if (outputLength > task.maxOutputChars) {
-      throw RuntimeOutputTooLong(outputLength, task.maxOutputChars);
+    if (outputLength > maxOutputChars) {
+      throw RuntimeOutputTooLong(outputLength, maxOutputChars);
     }
-    return output;
   }
 }

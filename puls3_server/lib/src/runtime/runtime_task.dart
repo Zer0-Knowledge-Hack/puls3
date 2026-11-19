@@ -150,6 +150,16 @@ final class RuntimeInvalidModel extends RuntimeFailure {
   String get code => 'invalid_model';
 }
 
+/// The provider's runtime cannot hold a conversation with tools (for example
+/// Workers AI, whose tool calls carry no id to answer). Retrying fails the
+/// same way.
+final class RuntimeToolsUnsupported extends RuntimeFailure {
+  const RuntimeToolsUnsupported();
+
+  @override
+  String get code => 'tools_unsupported';
+}
+
 /// No adapter serves the manifest's `model.provider`.
 final class RuntimeUnsupportedProvider extends RuntimeFailure {
   const RuntimeUnsupportedProvider(this.provider);
