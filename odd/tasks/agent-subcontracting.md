@@ -155,6 +155,13 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     escaped as JSON unicode escapes. Price comes from the search snapshot, never the model.
     T5.3 must persist the full `ToolLoopState`, the pending call id, the child hire id and the
     `ChildRequest`, and needs a tool-capable runner for Studio (`OwnedRunManifest`) runs.
+    Source `4170668` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-525194518622257e`) raised two warnings, fixed in `d80a465`: `subcontract` is
+    refused with `no_turns_left` or `no_time_left` before the port is called when no follow-up
+    segment is possible, so no child is paid without being consumed; and an in-turn duplicate call
+    id runs no call and gets exactly one `duplicate_call_id` result. Fix reviewed (consent medium,
+    granted, reliability lens, approved and acknowledged, lineage `review-dafe0e08a5ee9316`);
+    server unit+hire 1158 passed, runtime 195 passed.
   - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
     turns persisted (migration), and `HireRunner` resumes paused runs.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
