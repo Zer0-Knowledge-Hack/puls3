@@ -95,7 +95,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   `dart test test/unit test/hire` 1077 passed, `dart test test/integration` 185 passed, client
   analyze clean; a second `serverpod generate` changed no content. Native review of the unsplit
   source: medium risk, granted, one reliability lens, approved and acknowledged (lineage
-  `review-f955cb3b83a47254`); the split slices are new review targets. Notes:
+  `review-f955cb3b83a47254`). Each split slice was reviewed again as its own target: A `2386ef4`
+  (medium, granted, reliability lens, approved and acknowledged, lineage
+  `review-bc7e85bf85502f8d`) and B source `ec44b71` on base `2386ef4` (medium, granted, reliability
+  lens, approved and acknowledged, lineage `review-cb09b5b886640baf`). Notes:
   `fund_with_reserve` stays under purpose `fund` (the tracker only funds on `fund`), and the wire
   function name now comes from `SubmissionPurpose.contractFunction`. `createChildJob` is untracked
   by `chain_submission_tracker.dart` until T6. `allowRelatedParty` defaults to true (D10) and is
