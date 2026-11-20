@@ -16,10 +16,17 @@ final class ChildRequest {
     required this.isRelatedParty,
     required this.relatedPartyJustification,
     required List<AgentCandidate> ranking,
+    this.toolCallId,
   }) : ranking = List.unmodifiable(ranking);
 
   /// The hire whose agent subcontracts.
   final int parentHireId;
+
+  /// The id of the `subcontract` tool call, the port's idempotency key with
+  /// [parentHireId]. Null only for a request read back from a stored loop
+  /// state (`tool_loop_codec` v1 does not keep it): such a request is never
+  /// sent to the port again.
+  final String? toolCallId;
 
   /// The child agent's registry id, from the search snapshot.
   final int agentRegistryId;
