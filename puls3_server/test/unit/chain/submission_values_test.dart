@@ -15,7 +15,34 @@ void main() {
         'submit',
         'release',
         'claimRefund',
+        'createChildJob',
       ]);
+    });
+
+    test('each purpose names its snake_case contract function', () {
+      expect(
+        {
+          for (final p in SubmissionPurpose.values)
+            p.wireName: p.contractFunction,
+        },
+        {
+          'createJob': 'create_job',
+          'fund': 'fund',
+          'complete': 'complete',
+          'reject': 'reject',
+          'registerFull': 'register_full',
+          'setAgentWallet': 'set_agent_wallet',
+          'giveFeedback': 'give_feedback',
+          'submit': 'submit',
+          'release': 'release',
+          'claimRefund': 'claim_refund',
+          'createChildJob': 'create_child_job',
+        },
+      );
+    });
+
+    test('a funding with a reserve calls fund_with_reserve (ADR-0011 D1)', () {
+      expect(fundWithReserveFunction, 'fund_with_reserve');
     });
 
     test('every purpose round-trips through its wire name', () {
@@ -26,7 +53,14 @@ void main() {
     });
 
     test('an unknown or differently cased name is rejected', () {
-      for (final wire in ['', 'CreateJob', 'create_job', 'claim_refund']) {
+      for (final wire in [
+        '',
+        'CreateJob',
+        'create_job',
+        'claim_refund',
+        'create_child_job',
+        'fund_with_reserve',
+      ]) {
         expect(SubmissionPurpose.tryParse(wire), isNull, reason: wire);
         expect(
           () => SubmissionPurpose.parse(wire),
@@ -36,16 +70,20 @@ void main() {
       }
     });
 
-    test('only submit, release and claimRefund are server-signed', () {
-      expect(
-        SubmissionPurpose.values.where((p) => p.isServerSigned),
-        [
-          SubmissionPurpose.submit,
-          SubmissionPurpose.release,
-          SubmissionPurpose.claimRefund,
-        ],
-      );
-    });
+    test(
+      'submit, release, claimRefund and createChildJob are server-signed',
+      () {
+        expect(
+          SubmissionPurpose.values.where((p) => p.isServerSigned),
+          [
+            SubmissionPurpose.submit,
+            SubmissionPurpose.release,
+            SubmissionPurpose.claimRefund,
+            SubmissionPurpose.createChildJob,
+          ],
+        );
+      },
+    );
   });
 
   group('SubmissionState', () {

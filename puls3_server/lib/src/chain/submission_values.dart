@@ -2,8 +2,16 @@
 /// them. The table stores these strings; Dart code uses the enums.
 library;
 
+/// The escrow function a `fund` submission calls when the hire carries a
+/// subcontract reserve (ADR-0011 D1). It stays a [SubmissionPurpose.fund]:
+/// funding is one escrow step whatever the reserve, so the tracker, the
+/// funding check and the hire status treat both calls alike.
+const fundWithReserveFunction = 'fund_with_reserve';
+
 /// What a submitted transaction does. [wireName] is the camelCase value of
-/// `ChainSubmission.purpose`.
+/// `ChainSubmission.purpose`; [contractFunction] is the snake_case Soroban
+/// function the transaction calls. New values go last: stored rows and
+/// tests read them by name, never by index, but the order is pinned.
 enum SubmissionPurpose {
   createJob,
   fund,
@@ -14,14 +22,38 @@ enum SubmissionPurpose {
   giveFeedback,
   submit,
   release,
-  claimRefund;
+  claimRefund,
+
+  /// A child job drawn from the parent's reserve, signed by the parent's
+  /// provider through custody (ADR-0011 D2).
+  createChildJob;
 
   String get wireName => name;
+
+  /// The contract function this purpose calls. Explicit, never derived from
+  /// [wireName]: the stored camelCase value and the Soroban name are two
+  /// contracts. A `fund` with a reserve calls [fundWithReserveFunction].
+  String get contractFunction => switch (this) {
+    createJob => 'create_job',
+    fund => 'fund',
+    complete => 'complete',
+    reject => 'reject',
+    registerFull => 'register_full',
+    setAgentWallet => 'set_agent_wallet',
+    giveFeedback => 'give_feedback',
+    submit => 'submit',
+    release => 'release',
+    claimRefund => 'claim_refund',
+    createChildJob => 'create_child_job',
+  };
 
   /// Signed by the server, never prepared for a wallet, so it has no
   /// preparation id.
   bool get isServerSigned =>
-      this == submit || this == release || this == claimRefund;
+      this == submit ||
+      this == release ||
+      this == claimRefund ||
+      this == createChildJob;
 
   /// The purpose whose [wireName] is exactly [wire], or `null`.
   static SubmissionPurpose? tryParse(String wire) => _byWire(values, wire);
