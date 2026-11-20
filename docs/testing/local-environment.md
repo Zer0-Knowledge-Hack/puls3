@@ -155,16 +155,22 @@ Prepare each worktree on its own (#327):
    docker compose -p puls3_wt_<name> -f puls3_server/docker-compose.yaml down -v
    ```
 
-4. **Run the services of one worktree at a time.** The ports (8000, 9090, 9091,
-   8090) are fixed, so two worktrees cannot run them together. Stop one
+4. **Run the services of one worktree at a time.** The ports (8000, 8090, 8091,
+   9090, 9091) are fixed, so two worktrees cannot run them together. Stop one
    worktree's project (`down`) before starting another's.
-5. **Get the WASM.** Either build it (run `scripts/setup-local-soroban.sh`
-   without `--skip-build`) or copy the git-ignored `contracts/target/` artifacts
-   from another checkout; they hold no secret.
-6. **Rebuild after contract changes.** `scripts/setup-local-soroban.sh
-   --skip-build` against stale WASM deploys contracts that no longer match
-   `main`, and the E2E then fails with `JobMismatch (job_id)`. Use `--skip-build`
-   only when the WASM was built from the code you are testing.
+5. **Get the WASM.** Either build it in this worktree (`(cd contracts &&
+   stellar contract build)`) or copy the git-ignored `contracts/target/`
+   artifacts from another checkout; they hold no secret. A copied WASM is
+   deployed as it is: the setup script never rebuilds a WASM that already
+   exists, so make sure it was built from the code you are testing.
+6. **Rebuild after contract changes.** `scripts/setup-local-soroban.sh` skips
+   the build whenever the WASM file already exists, with or without
+   `--skip-build` (`--skip-build` only turns a missing WASM into an error). After
+   changing the contracts, or after copying `contracts/target/`, run
+   `(cd contracts && stellar contract build)` or delete
+   `contracts/target/wasm32v1-none/release/*.wasm` before the script. Otherwise
+   it deploys contracts that no longer match `main`, and the E2E then fails with
+   `JobMismatch (job_id)`.
 
 On Windows, `melos` needs Developer Mode symlinks and its scripts use POSIX
 `case`: run it from Git Bash or WSL, or use `dart pub get` plus `dart test` per
