@@ -151,9 +151,10 @@ melos run test:integration
 melos run test:e2e
 ```
 
-CI runs the server E2E suites in `.github/workflows/e2e.yml` (#298). It is
-non-gating until it is stable on `main`; the Flutter browser suite (#256) stays
-manual for now.
+CI runs the server E2E suites in `.github/workflows/e2e.yml` (#298) and the
+Flutter browser suite (#256) in `.github/workflows/e2e-browser.yml` (#372). Both
+are non-gating until they are stable on `main`. To run the browser suite by hand,
+use `scripts/e2e-flutter-local.sh` (`--help` lists what it needs).
 
 The per-package detail:
 

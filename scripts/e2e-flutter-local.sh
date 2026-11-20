@@ -25,6 +25,8 @@
 #   PULS3_E2E_DB_CLIENT      compose (default: psql inside postgres_test) or psql
 #                            (a local psql at PULS3_E2E_DB_HOST:PULS3_E2E_DB_PORT)
 #   PULS3_REPO_ROOT          repository root (default: the parent of scripts/)
+#   PULS3_E2E_LOG_DIR        when set, the server and chromedriver logs are copied
+#                            there before the temp directory is deleted (CI uploads it)
 #
 # In Docker (Linux toolchain, needed on Windows): scripts/e2e-flutter-docker.sh
 set -euo pipefail
@@ -43,7 +45,7 @@ DRIVER_PORT=4444
 
 case "${1:-}" in
   -h | --help)
-    sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,31p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   "") ;;
@@ -98,6 +100,10 @@ cleanup() {
   [ -z "$SERVER_PID" ] || kill "$SERVER_PID" 2>/dev/null || true
   [ -z "$DRIVER_PID" ] || kill "$DRIVER_PID" 2>/dev/null || true
   db "DROP DATABASE IF EXISTS $E2E_DB WITH (FORCE)" 2>/dev/null || true
+  if [ -n "${PULS3_E2E_LOG_DIR:-}" ]; then
+    mkdir -p "$PULS3_E2E_LOG_DIR"
+    cp "$WORK"/*.log "$PULS3_E2E_LOG_DIR"/ 2>/dev/null || true
+  fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT

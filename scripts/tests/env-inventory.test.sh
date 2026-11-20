@@ -29,7 +29,9 @@ ok() { PASS=$((PASS + 1)); echo "ok   - $1"; }
 bad() { FAIL=$((FAIL + 1)); echo "FAIL - $1 ($2)"; }
 
 # Shell variables that look like env reads but are the scripts' own locals.
-SCRIPT_LOCALS=" POSITIONAL "
+# PULS3_E2E_LOG_DIR (#372) is a CI-only knob of the browser E2E launcher: the
+# workflow sets it so the logs survive for upload; nobody configures it locally.
+SCRIPT_LOCALS=" POSITIONAL PULS3_E2E_LOG_DIR "
 
 # vars_read_in_code: one name per line, sorted, from Dart sources and scripts.
 vars_read_in_code() {
