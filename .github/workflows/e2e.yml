@@ -2,37 +2,24 @@ name: E2E sandbox
 
 # Follow-up #298 of #255, #256 and #290. The server E2E suites run the hire
 # journey against the local Soroban sandbox (#253), so a change that breaks it
-# fails here instead of merging green. The job is non-gating on purpose: it is
-# not part of the `gate` job in ci.yml until it has proven stable on `main`.
-# Then add `e2e` to `needs` and to the result loop of `gate`.
+# fails here instead of merging green.
+#
+# Required since #371: ci.yml calls this workflow as its `e2e` job, behind the
+# `changes` path filter, and the `gate` job waits for it. It cannot keep its own
+# push and pull_request triggers: a path-filtered workflow that does not run
+# never reports, so a required check on it would hang on every docs-only PR.
+# Stability evidence behind the promotion: 16 completed runs, 0 failures
+# (2026-11-17 to 2026-11-20), 3.5 to 4.5 minutes each.
 #
 # The Flutter browser suite (#256) is a separate job later: it adds Chrome and
 # chromedriver, and a flaky browser must not hide a server failure.
 
 on:
-  push:
-    branches: [main]
-    paths: &paths
-      - 'puls3_server/**'
-      - 'puls3_domain/**'
-      - 'puls3_client/**'
-      - 'contracts/**'
-      - 'scripts/setup-local-soroban.sh'
-      - 'scripts/setup-local-secrets.sh'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - '.github/workflows/e2e.yml'
-  pull_request:
-    branches: [main]
-    paths: *paths
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   e2e:
