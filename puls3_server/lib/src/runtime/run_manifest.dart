@@ -1,9 +1,13 @@
 import 'dart:convert';
 
-import 'package:puls3_domain/puls3_domain.dart' show AgentId;
+import 'package:puls3_domain/puls3_domain.dart' show AgentId, SubcontractOptIn;
 
 import '../agent/registry_reader.dart';
 import 'runtime_task.dart';
+
+/// The platform cap on subcontracts per hire (ADR-0011 D8): a manifest may
+/// ask for more, but a hire never opens more than this many children.
+const subcontractMaxChildrenCap = 2;
 
 /// The parts of a deployed agent manifest (ADR-0004) the runtime needs. The
 /// domain `AgentManifest` (#34) replaces it once deployed manifests are
@@ -15,6 +19,7 @@ final class RunManifest {
     required this.systemPrompt,
     required this.inputMaxChars,
     required this.outputMaxChars,
+    this.subcontract,
   });
 
   final String provider;
@@ -22,6 +27,21 @@ final class RunManifest {
   final String systemPrompt;
   final int inputMaxChars;
   final int outputMaxChars;
+
+  /// The manifest's opt-in to subcontract, or `null` when the agent never
+  /// does. Demo manifests never opt in.
+  final SubcontractOptIn? subcontract;
+
+  /// How many children one hire of this manifest may open: the manifest's
+  /// `max_children` capped by [subcontractMaxChildrenCap], or 0 without the
+  /// opt-in.
+  int get effectiveMaxChildren {
+    final optIn = subcontract;
+    if (optIn == null) return 0;
+    return optIn.maxChildren < subcontractMaxChildrenCap
+        ? optIn.maxChildren
+        : subcontractMaxChildrenCap;
+  }
 
   /// The task that runs this manifest on [input].
   RuntimeTask task(String input) => RuntimeTask(
@@ -44,6 +64,7 @@ final class OwnedRunManifest extends RunManifest {
     required super.systemPrompt,
     required super.inputMaxChars,
     required super.outputMaxChars,
+    super.subcontract,
   });
 
   final String owner;
