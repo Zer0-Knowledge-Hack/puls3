@@ -104,11 +104,39 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   by `chain_submission_tracker.dart` until T6. `allowRelatedParty` defaults to true (D10) and is
   stored only. The reserve ceiling comes from `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`. The
   `fund_with_reserve` encoding lives in slice B because it reads `HireRow.subcontractReserve`.
-- [ ] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
+- [x] **T4** Server-side marketplace search for agents: skill, rating, paid hires, price, `hireable`,
   related-party flag, excluding self and cycles, ranked objectively. Route: delegated writer.
+  Evidence: domain `dart test` 338 passed, server unit+hire 1087 passed, integration 186 passed,
+  `dart analyze --fatal-infos` clean on both packages. `buildAgentSearchService` is wired in
+  `agent_catalog_wiring.dart` with no endpoint yet; T5's `search_agents` tool is its caller.
+  Source `719e732` on base `3317962` (assessed high, consent medium, granted, reliability lens,
+  approved and acknowledged, lineage `review-4bcab53db6eb5cf2`). Advisory, non-blocking follow-ups:
+  ancestor wallets read from the catalog (`agent_search_service.dart:71-77`, warning), untested
+  chain cap, non-ASCII query matching, and untested wiring.
 - [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
-  Route: delegated writer.
+  Route: delegated writer, one work unit and one stacked PR each (user approved 2026-11-18).
+  Defaults: 8 turns max per hire; `max_children` with a platform cap of 2, both config with
+  defaults; a mid-loop provider failure resumes from the stored transcript; Studio runs use the
+  loop too; the transcript is stored in Postgres within the existing limits; if Workers AI tool
+  calling on llama-3.3-70b is unreliable, subcontracting is Anthropic-only. T5 ends at a persisted
+  `awaitingChild` and a resume proven with a fake `SubcontractPort`; T6 wires the real child.
+  - [x] **T5.0** Manifest opt-in `subcontract { max_children, suggested_reserve }` on domain
+    `AgentManifest` and server `RunManifest`; manifests without it keep their hash.
+    Evidence: RED (compile failures) then GREEN; domain 349 passed, server unit+hire 1092 passed,
+    analyze clean on domain and server, `flutter analyze` clean on `studio_form_check.dart`.
+    New `ManifestProblem.subcontractMalformed` and `subcontractInvalid`. Canonical JSON of the
+    workers-ai example is pinned byte for byte. Cap is the constant `subcontractMaxChildrenCap = 2`
+    (no env var); `effectiveMaxChildren` is 0 without the opt-in. Studio form is T7.
+    Source `0c0c346` on base `e5b151e` (assessed high, consent medium, granted, reliability lens,
+    approved and acknowledged, lineage `review-11982293292aec6a`); two advisory suggestions in
+    `run_manifest_test.dart:144-163` and `studio_form_check.dart:312-315`.
+  - [ ] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
+    (final text or tool calls), `converse()` beside `complete()` for Anthropic and Workers AI.
+  - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
+    `SubcontractPort`.
+  - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
+    turns persisted (migration), and `HireRunner` resumes paused runs.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
   resumes with B's result, receipt stored. Route: delegated writer.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
@@ -135,5 +163,7 @@ StellarExpert.
 ## Progress
 
 - 2026-11-18: research done (code map, agentic-payments landscape) and decisions recorded. Next: T1.
-- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slices A and B, not yet PRs) done. Next: review
-  each slice, open PR A stacked on #358 and PR B stacked on A, then T4.
+- 2026-11-18: T1 (PR #357), T2 (PR #358) and T3 (slice A PR #359, slice B PR #360) done; both T3
+  slices reviewed and acknowledged.
+- 2026-11-18: T4 done on `feat/334-agent-search`, stacked on `feat/334-server-subcontract`.
+  T4 reviewed and acknowledged. Next: open the T4 PR stacked on #360 (user's call), then T5.

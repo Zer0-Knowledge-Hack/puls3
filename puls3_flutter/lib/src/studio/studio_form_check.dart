@@ -309,7 +309,10 @@ String skillIdFor(String name) => canonicalSkillId(name);
     ManifestProblem.toolsNotSupported ||
     ManifestProblem.versionInDraft ||
     ManifestProblem.schemaUnsupported ||
-    ManifestProblem.versionInvalid => (
+    ManifestProblem.versionInvalid ||
+    // The Studio form has no subcontract field yet (#334 T7).
+    ManifestProblem.subcontractMalformed ||
+    ManifestProblem.subcontractInvalid => (
       StudioField.name,
       copy.studioErrCannotSave,
     ),
