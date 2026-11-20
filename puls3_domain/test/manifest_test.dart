@@ -1451,6 +1451,178 @@ void main() {
     });
   });
 
+  group('Subcontract opt-in (ADR-0011 D8)', () {
+    Map<String, Object?> withSubcontract(Object? subcontract) => {
+      ...draftDoc(),
+      'subcontract': subcontract,
+    };
+    Map<String, Object?> manifestDoc(Map<String, Object?> draft) => {
+      'schema': AgentManifest.schemaId,
+      'version': 1,
+      ...draft,
+    };
+    const optIn = {'max_children': 2, 'suggested_reserve': 1000000};
+
+    test('the value object keeps a positive child count and a reserve', () {
+      final s = SubcontractOptIn(maxChildren: 3, suggestedReserve: 0);
+      expect(s.maxChildren, 3);
+      expect(s.suggestedReserve, 0);
+      expect(s, SubcontractOptIn(maxChildren: 3, suggestedReserve: 0));
+      expect(
+        s.hashCode,
+        SubcontractOptIn(maxChildren: 3, suggestedReserve: 0).hashCode,
+      );
+      expect(s, isNot(SubcontractOptIn(maxChildren: 2, suggestedReserve: 0)));
+    });
+
+    test('the value object rejects fewer than one child or a negative '
+        'reserve', () {
+      for (final (children, reserve) in [(0, 0), (-1, 0), (1, -1)]) {
+        expect(
+          () => SubcontractOptIn(
+            maxChildren: children,
+            suggestedReserve: reserve,
+          ),
+          problems([ManifestProblem.subcontractInvalid]),
+          reason: '($children, $reserve)',
+        );
+      }
+    });
+
+    test('a draft without it has no subcontract and no wire key', () {
+      final d = AgentManifestDraft.fromJson(draftDoc());
+      expect(d.subcontract, isNull);
+      expect(d.toJson().containsKey('subcontract'), isFalse);
+      expect(d.toJson(), draftDoc());
+    });
+
+    test('a draft parses it and writes it back', () {
+      final d = AgentManifestDraft.fromJson(withSubcontract(optIn));
+      expect(
+        d.subcontract,
+        SubcontractOptIn(maxChildren: 2, suggestedReserve: 1000000),
+      );
+      expect(d.toJson(), withSubcontract(optIn));
+    });
+
+    test('the manifest keeps it through validate, toDraft and equality', () {
+      final m = AgentManifestDraft.fromJson(
+        withSubcontract(optIn),
+      ).validate(policy, ManifestVersion.first);
+      expect(m.subcontract?.maxChildren, 2);
+      expect(m.toDraft().subcontract, m.subcontract);
+      final plain = AgentManifestDraft.fromJson(
+        draftDoc(),
+      ).validate(policy, ManifestVersion.first);
+      expect(m, isNot(plain));
+      expect(
+        AgentManifest.fromJson(manifestDoc(withSubcontract(optIn)), policy),
+        m,
+      );
+    });
+
+    test('it is in the canonical form and changes it', () {
+      final plain = AgentManifest.fromJson(manifestDoc(draftDoc()), policy);
+      final opted = AgentManifest.fromJson(
+        manifestDoc(withSubcontract(optIn)),
+        policy,
+      );
+      expect(
+        opted.toCanonicalJson(),
+        contains(
+          '"subcontract":{"max_children":2,"suggested_reserve":1000000}',
+        ),
+      );
+      expect(opted.toCanonicalJson(), isNot(plain.toCanonicalJson()));
+      expect(plain.toCanonicalJson(), isNot(contains('subcontract')));
+    });
+
+    test('a manifest without it keeps its canonical bytes', () {
+      // Pinned before the field existed: the workers-ai reference example.
+      const pinned =
+          '{"description":"Summarizes long text into a short brief with the '
+          'key points.","input":{"max_chars":6000,"type":"text"},"model":'
+          '{"id":"@cf/meta/llama-3.3-70b-instruct-fp8-fast","provider":'
+          '"workers-ai"},"name":"Brief Bot","output":{"max_chars":2000,'
+          '"type":"markdown"},"price":{"amount":1000000,"asset":"USDC"},'
+          '"schema":"puls3.agent-manifest/v1","skills":[{"description":'
+          '"Turns a long text into five bullet points.","id":"summarize",'
+          '"name":"Summarize","tags":["summary","writing"]}],"system_prompt":'
+          '"You are Brief Bot. The user gives you a long text. Reply with at '
+          'most five bullet points that capture its key points, in the '
+          'language of the text. Do not add facts that the text does not '
+          'state.","version":1}';
+      final packageRoot = File.fromUri(
+        Isolate.resolvePackageUriSync(
+          Uri.parse('package:puls3_domain/puls3_domain.dart'),
+        )!,
+      ).parent.parent.path;
+      final doc = jsonDecode(
+        File(
+          '$packageRoot/../docs/architecture/examples/'
+          'agent-manifest.workers-ai.example.json',
+        ).readAsStringSync(),
+      );
+      final canonical = AgentManifest.fromJson(doc, policy).toCanonicalJson();
+      expect(canonical, pinned);
+      expect(utf8.encode(canonical), utf8.encode(pinned));
+    });
+
+    test('a malformed value is one subcontract problem', () {
+      for (final bad in <Object?>[
+        'yes',
+        2,
+        <Object?>[],
+        {'max_children': 2},
+        {'suggested_reserve': 0},
+        {'max_children': '2', 'suggested_reserve': 0},
+        {'max_children': 2, 'suggested_reserve': 1.5},
+      ]) {
+        expect(
+          () => AgentManifestDraft.fromJson(withSubcontract(bad)),
+          problems([ManifestProblem.subcontractMalformed]),
+          reason: '$bad',
+        );
+      }
+    });
+
+    test('an unknown key inside it is an unknown key', () {
+      expect(
+        () => AgentManifestDraft.fromJson(
+          withSubcontract({...optIn, 'max_depth': 3}),
+        ),
+        problems([ManifestProblem.unknownKey]),
+      );
+    });
+
+    test('out-of-range values are invalid in a draft and a manifest', () {
+      for (final bad in [
+        {'max_children': 0, 'suggested_reserve': 0},
+        {'max_children': 1, 'suggested_reserve': -1},
+      ]) {
+        expect(
+          () => AgentManifestDraft.fromJson(withSubcontract(bad)),
+          problems([ManifestProblem.subcontractInvalid]),
+          reason: '$bad',
+        );
+        expect(
+          () => AgentManifest.fromJson(
+            manifestDoc(withSubcontract(bad)),
+            policy,
+          ),
+          problems([ManifestProblem.subcontractInvalid]),
+          reason: '$bad',
+        );
+      }
+    });
+
+    test('an explicit null is the same as no opt-in', () {
+      final d = AgentManifestDraft.fromJson(withSubcontract(null));
+      expect(d.subcontract, isNull);
+      expect(d.toJson().containsKey('subcontract'), isFalse);
+    });
+  });
+
   group('Reference examples', () {
     // Resolved from the package location, so the tests do not depend on the
     // directory `dart test` runs from.
