@@ -582,7 +582,9 @@ void main() {
           transactionHash: serial.toRadixString(16).padLeft(64, '0'),
           signedEnvelopeXdr: 'envelope-$serial',
           validUntil: _validUntil,
-          preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+          preparationId: purpose.isServerSigned || purpose.isPermissionless
+              ? null
+              : 'prep-$serial',
           hireId: hireId,
         );
         await store.markFailed(
@@ -596,7 +598,9 @@ void main() {
         transactionHash: serial.toRadixString(16).padLeft(64, '0'),
         signedEnvelopeXdr: 'envelope-$serial',
         validUntil: _validUntil,
-        preparationId: purpose.isServerSigned ? null : 'prep-$serial',
+        preparationId: purpose.isServerSigned || purpose.isPermissionless
+            ? null
+            : 'prep-$serial',
         hireId: hireId,
       );
     }
@@ -672,6 +676,37 @@ void main() {
 
         await expectState(
           refund,
+          SubmissionState.failed,
+          SubmissionOutcomeCode.transactionFailed,
+        );
+      },
+    );
+
+    test(
+      'consumer-signed failed claims do not count towards the third',
+      () async {
+        for (var i = 0; i < 2; i++) {
+          serial++;
+          final failed = await store.insertSubmitted(
+            purpose: SubmissionPurpose.claimRefund,
+            transactionHash: (1000 + i).toRadixString(16).padLeft(64, '0'),
+            signedEnvelopeXdr: 'consumer-$i',
+            validUntil: _validUntil,
+            preparationId: 'consumer-$i',
+            hireId: hireId,
+          );
+          await store.markFailed(
+            failed.id,
+            SubmissionOutcomeCode.transactionFailed,
+          );
+        }
+        final s = await attempt(SubmissionPurpose.claimRefund, prior: 0);
+        failWith(s, SubmissionOutcomeCode.transactionFailed);
+
+        await tracker.pass(store);
+
+        await expectState(
+          s,
           SubmissionState.failed,
           SubmissionOutcomeCode.transactionFailed,
         );

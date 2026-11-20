@@ -918,6 +918,37 @@ class _HireEndpoint {
     });
   }
 
+  _ida.Future<_ip1gnsd7.PreparedTransaction> prepareClaimRefund(
+    _ist.TestSessionBuilder sessionBuilder,
+    int hireId,
+  ) async {
+    return _ist.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'hire',
+            method: 'prepareClaimRefund',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'hire',
+          methodName: 'prepareClaimRefund',
+          parameters: _ist.testObjectToJson({'hireId': hireId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _ida.Future<_ip1gnsd7.PreparedTransaction>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
   _ida.Future<_i0z7bvay.HireDetail> getHire(
     _ist.TestSessionBuilder sessionBuilder,
     int hireId,

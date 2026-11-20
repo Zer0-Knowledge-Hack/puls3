@@ -228,6 +228,85 @@ void main() {
     expect(store.all.last.purpose, SubmissionPurpose.claimRefund);
   });
 
+  test(
+    'a consumer-signed claim in flight does not hold back another hire',
+    () async {
+      await store.insertSubmitted(
+        purpose: SubmissionPurpose.claimRefund,
+        transactionHash: 'c' * 64,
+        signedEnvelopeXdr: 'consumer-claim',
+        validUntil: _now,
+        preparationId: 'consumer-prep',
+        hireId: 99,
+      );
+
+      await sender().send(hireId: 4, jobId: 3, call: EscrowServerCall.release);
+
+      expect(codec.built, hasLength(1));
+      expect(sent, hasLength(1));
+      expect(store.all.last.preparationId, isNull);
+    },
+  );
+
+  test(
+    'a consumer claim in flight for the same hire still holds it back',
+    () async {
+      await store.insertSubmitted(
+        purpose: SubmissionPurpose.claimRefund,
+        transactionHash: 'd' * 64,
+        signedEnvelopeXdr: 'consumer-claim',
+        validUntil: _now,
+        preparationId: 'consumer-prep',
+        hireId: 4,
+      );
+
+      await sender().send(
+        hireId: 4,
+        jobId: 3,
+        call: EscrowServerCall.claimRefund,
+      );
+
+      expect(store.all, hasLength(1));
+      expect(codec.built, isEmpty);
+      expect(sent, isEmpty);
+    },
+  );
+
+  test('consumer-signed failed claims do not use the relay attempts', () async {
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      final row = await store.insertSubmitted(
+        purpose: SubmissionPurpose.claimRefund,
+        transactionHash: (1000 + i).toRadixString(16).padLeft(64, '0'),
+        signedEnvelopeXdr: 'consumer-$i',
+        validUntil: _now,
+        preparationId: 'consumer-$i',
+        hireId: 4,
+      );
+      await store.markFailed(row.id, SubmissionOutcomeCode.submissionRejected);
+    }
+    answer = const SendTransactionResult(
+      status: SendTransactionStatus.error,
+      hash: 'ab',
+      errorResultXdr: 'AAAA',
+    );
+
+    for (var i = 0; i < maxEscrowCallAttempts; i++) {
+      accounts.sequence = 8 + i;
+      await sender().send(
+        hireId: 4,
+        jobId: 3,
+        call: EscrowServerCall.claimRefund,
+      );
+    }
+
+    final relay = store.all.where((row) => row.preparationId == null);
+    expect(relay.map((row) => row.errorCode), [
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.submissionRejected,
+      SubmissionOutcomeCode.escrowCallFailed,
+    ]);
+  });
+
   test('a refused relay call does not hold back the next hire', () async {
     answer = const SendTransactionResult(
       status: SendTransactionStatus.error,

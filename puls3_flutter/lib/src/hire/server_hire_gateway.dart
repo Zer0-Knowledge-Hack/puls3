@@ -24,6 +24,10 @@ typedef PrepareEscrowCall = Future<PreparedTransaction> Function(int hireId);
 typedef PrepareRejectCall =
     Future<PreparedTransaction> Function(int hireId, String reason);
 
+/// `client.hire.prepareClaimRefund`.
+typedef PrepareClaimRefundCall =
+    Future<PreparedTransaction> Function(int hireId);
+
 /// `client.hire.submitEscrowCall`.
 typedef SubmitEscrowCall =
     Future<HireDetail> Function(
@@ -64,6 +68,7 @@ class ServerHireGateway implements HireGateway {
     required this._prepareFund,
     required this._prepareComplete,
     required this._prepareReject,
+    required this._prepareClaimRefund,
     required this._submitEscrowCall,
     required this._getHire,
     required this._prepareFeedback,
@@ -81,6 +86,7 @@ class ServerHireGateway implements HireGateway {
   final PrepareEscrowCall _prepareFund;
   final PrepareEscrowCall _prepareComplete;
   final PrepareRejectCall _prepareReject;
+  final PrepareClaimRefundCall _prepareClaimRefund;
   final SubmitEscrowCall _submitEscrowCall;
   final GetHireCall _getHire;
   final PrepareFeedbackCall _prepareFeedback;
@@ -184,6 +190,10 @@ class ServerHireGateway implements HireGateway {
   @override
   Future<EscrowPreparation> prepareReject(int hireId, String reason) async =>
       _preparation(await _call(() => _prepareReject(hireId, reason)));
+
+  @override
+  Future<EscrowPreparation> prepareClaimRefund(int hireId) async =>
+      _preparation(await _call(() => _prepareClaimRefund(hireId)));
 
   @override
   Future<EscrowPreparation> prepareFeedback(
@@ -321,6 +331,9 @@ class ServerHireGateway implements HireGateway {
           detail.paymentExplorerUrl ??
           (fund?.transaction == paymentTransaction ? fund?.explorerUrl : null),
       approvalDeadline: detail.approvalDeadline,
+      expiresAt: detail.expiresAt,
+      runFinished: detail.runFinished,
+      submitErrorCode: detail.submitErrorCode,
       decisionTransaction: decision?.transaction,
       decisionExplorerUrl: decision?.explorerUrl,
       feedbackTransaction: hire.feedbackReference,

@@ -422,7 +422,8 @@ final class ChainSubmissionTracker {
   /// A server-signed `submit`, `release` or `claim_refund` that fails after
   /// two failed envelopes of the same hire and call is stored as
   /// `EscrowCallFailed` instead of [code]: it is the failure that uses the
-  /// last attempt (api.md).
+  /// last attempt (api.md). A consumer-prepared claim has a preparation, so
+  /// it keeps its own code.
   Future<bool> _fail(
     ChainSubmissionStore store,
     StoredSubmission submission,
@@ -440,13 +441,16 @@ final class ChainSubmissionTracker {
     String code,
   ) async {
     final hireId = submission.hireId;
-    if (hireId == null || !_relayPurposes.contains(submission.purpose)) {
+    if (hireId == null ||
+        submission.preparationId != null ||
+        !_relayPurposes.contains(submission.purpose)) {
       return code;
     }
     final prior = (await store.listByHire(hireId))
         .where(
           (row) =>
               row.id != submission.id &&
+              row.preparationId == null &&
               row.purpose == submission.purpose &&
               row.state == SubmissionState.failed,
         )

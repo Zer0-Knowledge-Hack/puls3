@@ -1,4 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
+import 'package:puls3_server/src/agent/custodied_wallets.dart';
+import 'package:puls3_server/src/chain/escrow_deadline.dart'
+    show maxEscrowCallAttempts;
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/feedback/reputation_calls.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
@@ -30,14 +33,16 @@ void main() {
   late InMemoryHireRunStore runs;
   late Future<AgentSummary?> Function(int) agents;
 
-  HireQueryService query({EscrowJobReader? jobs}) => HireQueryService(
-    hires: rig.hires,
-    runs: runs,
-    submissions: rig.submissions,
-    preparations: rig.preparations,
-    agents: (id) => agents(id),
-    jobs: jobs,
-  );
+  HireQueryService query({EscrowJobReader? jobs, CustodyLookup? custody}) =>
+      HireQueryService(
+        hires: rig.hires,
+        runs: runs,
+        submissions: rig.submissions,
+        preparations: rig.preparations,
+        agents: (id) => agents(id),
+        jobs: jobs,
+        custody: custody,
+      );
 
   void queue(int hireId) => runs.enqueue(
     QueuedRun(
@@ -88,6 +93,130 @@ void main() {
     expect(detail.hire.status, 'funded');
     expect(detail.hire.runtimeStatus, 'running');
     expect(detail.result, isNull);
+    expect(detail.runFinished, isTrue);
+  });
+
+  group('submitErrorCode (#277)', () {
+    var serial = 0;
+
+    Future<void> submitFailure(int hireId, String code) =>
+        rig.submissions.insertFailed(
+          purpose: SubmissionPurpose.submit,
+          errorCode: code,
+          hireId: hireId,
+        );
+
+    Future<void> submitInFlight(int hireId) => rig.submissions.insertSubmitted(
+      purpose: SubmissionPurpose.submit,
+      transactionHash: (++serial).toRadixString(16).padLeft(64, '0'),
+      signedEnvelopeXdr: 'AAAA',
+      validUntil: rig.clock.add(const Duration(minutes: 5)),
+      hireId: hireId,
+    );
+
+    test('is null while the submit can still land', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.hires.payees[hire.id] = agentWallet;
+
+      final detail = await query(
+        custody: (addresses) async => addresses,
+      ).getHire(rig.wallet, hire.id);
+
+      expect(detail.submitErrorCode, isNull);
+    });
+
+    test('is AgentCannotDeliver when the payee is not custodied', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.hires.payees[hire.id] = stranger;
+
+      final detail = await query(
+        custody: (_) async => const {},
+      ).getHire(rig.wallet, hire.id);
+
+      expect(detail.submitErrorCode, agentCannotDeliverCode);
+    });
+
+    test('reports a terminal submission rejection', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.hires.payees[hire.id] = agentWallet;
+      await submitFailure(
+        hire.id,
+        SubmissionOutcomeCode.submitSimulationRejected,
+      );
+
+      final detail = await query(
+        custody: (addresses) async => addresses,
+      ).getHire(rig.wallet, hire.id);
+
+      expect(
+        detail.submitErrorCode,
+        SubmissionOutcomeCode.submitSimulationRejected,
+      );
+    });
+
+    test('a retryable simulation failure is not terminal', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.hires.payees[hire.id] = agentWallet;
+      await submitFailure(hire.id, SubmissionOutcomeCode.simulationFailed);
+
+      final detail = await query(
+        custody: (addresses) async => addresses,
+      ).getHire(rig.wallet, hire.id);
+
+      expect(detail.submitErrorCode, isNull);
+    });
+
+    test('exhausted attempts report EscrowCallFailed', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.hires.payees[hire.id] = agentWallet;
+      for (var i = 0; i < maxEscrowCallAttempts; i++) {
+        await submitFailure(hire.id, SubmissionOutcomeCode.simulationFailed);
+      }
+
+      final detail = await query(
+        custody: (addresses) async => addresses,
+      ).getHire(rig.wallet, hire.id);
+
+      expect(detail.submitErrorCode, SubmissionOutcomeCode.escrowCallFailed);
+    });
+
+    test(
+      'an unknown outcome is reported, and a submit in flight clears it',
+      () async {
+        final hire = await rig.hire(status: HireStatus.funded);
+        rig.hires.payees[hire.id] = agentWallet;
+        await submitFailure(hire.id, SubmissionOutcomeCode.outcomeUnknown);
+
+        final unknown = await query(
+          custody: (addresses) async => addresses,
+        ).getHire(rig.wallet, hire.id);
+        expect(unknown.submitErrorCode, SubmissionOutcomeCode.outcomeUnknown);
+
+        await submitInFlight(hire.id);
+        final inFlight = await query(
+          custody: (addresses) async => addresses,
+        ).getHire(rig.wallet, hire.id);
+        expect(inFlight.submitErrorCode, isNull);
+      },
+    );
+    test(
+      'an unknown outcome on another escrow call wins over the custody rule',
+      () async {
+        final hire = await rig.hire(status: HireStatus.funded);
+        rig.hires.payees[hire.id] = stranger;
+        await rig.record(
+          hire.id,
+          SubmissionPurpose.reject,
+          failedWith: SubmissionOutcomeCode.outcomeUnknown,
+        );
+
+        final detail = await query(
+          custody: (_) async => const {},
+        ).getHire(rig.wallet, hire.id);
+
+        expect(detail.submitErrorCode, SubmissionOutcomeCode.outcomeUnknown);
+      },
+    );
   });
 
   group('the result is shown only once the agent submitted it (#204)', () {

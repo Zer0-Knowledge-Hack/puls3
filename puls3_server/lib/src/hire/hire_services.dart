@@ -153,6 +153,7 @@ final class HireWiring {
         preparations: preparations,
         agents: agentOf,
         jobs: ledger,
+        custody: custodyOn(session),
       ),
     );
   }
