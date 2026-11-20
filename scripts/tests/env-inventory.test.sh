@@ -29,7 +29,9 @@ ok() { PASS=$((PASS + 1)); echo "ok   - $1"; }
 bad() { FAIL=$((FAIL + 1)); echo "FAIL - $1 ($2)"; }
 
 # Shell variables that look like env reads but are the scripts' own locals.
-SCRIPT_LOCALS=" POSITIONAL "
+# check-migrations.sh (#373) takes the standard libpq variables and two tool
+# options; they point it at a scratch Postgres and are not app configuration.
+SCRIPT_LOCALS=" POSITIONAL PGHOST PGPORT PGUSER PGPASSWORD PG_CONTAINER SERVERPOD_BIN "
 
 # vars_read_in_code: one name per line, sorted, from Dart sources and scripts.
 vars_read_in_code() {

@@ -19,6 +19,7 @@ jobs:
       contracts: ${{ steps.paths.outputs.contracts }}
       docker: ${{ steps.paths.outputs.docker }}
       sdk: ${{ steps.paths.outputs.sdk }}
+      migrations: ${{ steps.paths.outputs.migrations }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -30,7 +31,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          domain=false server=false app=false contracts=false docker=false sdk=false
+          domain=false server=false app=false contracts=false docker=false sdk=false migrations=false
           while IFS= read -r path; do
             case "$path" in
               pubspec.yaml|pubspec.lock)
@@ -54,6 +55,10 @@ jobs:
               .github/workflows/ci.yml)
                 domain=true; server=true; app=true; contracts=true; docker=true; sdk=true ;;
             esac
+            case "$path" in
+              puls3_server/migrations/*|puls3_server/*.spy.yaml|scripts/check-migrations.sh|.github/workflows/ci.yml)
+                migrations=true ;;
+            esac
           done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "domain=$domain" >> "$GITHUB_OUTPUT"
           echo "server=$server" >> "$GITHUB_OUTPUT"
@@ -61,6 +66,7 @@ jobs:
           echo "contracts=$contracts" >> "$GITHUB_OUTPUT"
           echo "docker=$docker" >> "$GITHUB_OUTPUT"
           echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
+          echo "migrations=$migrations" >> "$GITHUB_OUTPUT"
 
   domain:
     needs: changes
@@ -142,6 +148,18 @@ jobs:
       - working-directory: puls3_server
         run: dart analyze --fatal-infos && dart test && serverpod generate
       - run: git diff --exit-code -- puls3_server puls3_client
+      - name: Check migrations (fresh vs upgraded schema, no pending migration)
+        if: needs.changes.outputs.migrations == 'true'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PGHOST: localhost
+          PGPORT: '9090'
+          PGUSER: postgres
+          PGPASSWORD: ci_database_password
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          scripts/check-migrations.sh "$BASE_SHA"
 
   app:
     needs: changes
