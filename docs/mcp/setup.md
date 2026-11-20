@@ -81,7 +81,11 @@ Ask the client something like *"List the puls3 agents and their prices"*. It cal
 | `hire_prepare_reject` | `hireId`, `reason` | Will prepare the unsigned escrow `reject` of a hire for your wallet to sign. It does not send it. |
 | `studio_test_run` | `draftId`, `input` | Will run one of your Studio drafts on an input. Both arguments are required. |
 
-**Today only the two catalog tools work.** The other four need a wallet session that the SDK does not have yet ([ADR-0007](../adr/0007-developer-sdk.md#open-decisions), [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259)). Until then they answer `error: SessionUnavailable` and call nothing. This page will say how to pass the session when #259 lands.
+**Today only the two catalog tools work.** The other four need a wallet session that the SDK does not have yet ([ADR-0007](../adr/0007-developer-sdk.md#open-decisions), [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259)). Until then they answer `error: SessionUnavailable` and call nothing.
+
+## Revoke a CLI session
+
+The app creates CLI sessions from the wallet sheet (**Copy session for CLI**). The same sheet lists the wallet's live sessions under that action: each shows when it was created, last used and when it ends, with a **Revoke** button. Revoking one never signs out the app. A revoked session can still answer for up to 10 minutes, because access tokens are checked without a database read until they expire.
 
 ## When something fails
 
