@@ -315,6 +315,7 @@ final class SubcontractTools {
       isRelatedParty: pick.isRelatedParty,
       relatedPartyJustification: verdict,
       ranking: ranking,
+      toolCallId: call.id,
     );
     final int childHireId;
     try {
