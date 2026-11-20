@@ -6,8 +6,9 @@ name: E2E sandbox
 # not part of the `gate` job in ci.yml until it has proven stable on `main`.
 # Then add `e2e` to `needs` and to the result loop of `gate`.
 #
-# The Flutter browser suite (#256) is a separate job later: it adds Chrome and
-# chromedriver, and a flaky browser must not hide a server failure.
+# The Flutter browser suite (#256) runs in its own workflow, e2e-browser.yml
+# (#372): it adds Chrome and chromedriver, and a flaky browser must not hide a
+# server failure.
 
 on:
   push:
