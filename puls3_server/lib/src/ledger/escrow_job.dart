@@ -101,7 +101,7 @@ abstract interface class EscrowExpiryReader {
 /// An escrow `Job` as the contract stores it. It lives in the server package:
 /// the domain does not model escrow jobs.
 final class EscrowJob {
-  const EscrowJob({
+  EscrowJob({
     required this.client,
     required this.provider,
     required this.evaluator,
@@ -115,7 +115,13 @@ final class EscrowJob {
     required this.submittedAt,
     required this.approvalDeadline,
     required this.deliverable,
-  });
+    BigInt? reserve,
+    BigInt? reserveFunded,
+    this.openChildren = 0,
+    this.parentJobId,
+    this.depth = 0,
+  }) : reserve = reserve ?? BigInt.zero,
+       reserveFunded = reserveFunded ?? BigInt.zero;
 
   final StellarAddress client;
   final StellarAddress provider;
@@ -142,12 +148,32 @@ final class EscrowJob {
 
   /// The 32-byte deliverable hash in lowercase hex, or `null` before submit.
   final String? deliverable;
+
+  /// Unspent subcontract reserve (ADR-0011 D1). 0 on a v0.1 escrow.
+  final BigInt reserve;
+
+  /// What was put into the reserve at funding; never changes afterwards.
+  final BigInt reserveFunded;
+
+  /// Child jobs of this job that have not settled yet.
+  final int openChildren;
+
+  /// The job whose reserve funded this one; `null` for a consumer's job.
+  final int? parentJobId;
+
+  /// 0 for a consumer's job, `parent.depth + 1` for a child.
+  final int depth;
 }
 
 /// Decodes the `map` ScVal that the escrow `get_job` returns.
 ///
-/// Throws [LedgerUnavailable] when a field is missing, has another type, or
-/// the state index is not one the contract defines.
+/// The puls3 fields of escrow v0.2.0 (`reserve`, `reserve_funded`,
+/// `open_children`, `parent_job_id`, `depth`) are read when present; a v0.1
+/// job has none of them and reads as a root job with no reserve, so the
+/// decoder works against both deployments (ADR-0011, Migration).
+///
+/// Throws [LedgerUnavailable] when a v0.1 field is missing, any field has
+/// another type, or the state index is not one the contract defines.
 EscrowJob decodeEscrowJob(Object? value) {
   final fields = readMap(value);
 
@@ -157,6 +183,9 @@ EscrowJob decodeEscrowJob(Object? value) {
     }
     return fields[name];
   }
+
+  T? optional<T>(String name, T Function(Object?) read) =>
+      fields.containsKey(name) ? read(fields[name]) : null;
 
   final stateIndex = readU32(field('state'));
   if (stateIndex >= EscrowJobState.values.length) {
@@ -182,6 +211,13 @@ EscrowJob decodeEscrowJob(Object? value) {
     submittedAt: readU64(field('submitted_at')),
     approvalDeadline: readU64(field('approval_deadline')),
     deliverable: readOptional(field('deliverable'), _hexOfBytes),
+    reserve: optional('reserve', readI128),
+    reserveFunded: optional('reserve_funded', readI128),
+    openChildren: optional('open_children', readU32) ?? 0,
+    parentJobId: fields.containsKey('parent_job_id')
+        ? readOptional(fields['parent_job_id'], readU64)
+        : null,
+    depth: optional('depth', readU32) ?? 0,
   );
 }
 
