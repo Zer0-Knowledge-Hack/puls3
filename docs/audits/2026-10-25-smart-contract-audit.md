@@ -82,3 +82,6 @@ D-1, I-1, E-5 (in review), the rest of P-1, and the redeploy that puts the
 "fixed in source" rows on chain. They are tracked in
 [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206). E-4 needs the
 original report.
+
+What each open item needs, who decides it, and the key-separation procedure for
+D-1 are in [mainnet readiness](../security/mainnet-readiness.md).
