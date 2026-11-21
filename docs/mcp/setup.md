@@ -95,6 +95,7 @@ Things to know:
 - **The session ends 72 hours after the app created it.** The tools then answer `error: SessionExpired`: copy a new session and repeat the steps.
 - **It is separate from the app's session.** Ending one does not end the other. The server can revoke a CLI session (`cliSession.revoke`), but the app has no button for that yet; until it does, a session you no longer want simply ends at 72 hours.
 - **The `puls3` CLI uses the same file.** If you already seeded the CLI, the server finds the session with no token in its config: set only `PULS3_WALLET`.
+- **More on CLI sessions,** including how an automated test gets one without the app: [CLI sessions outside the app](../sdk/sessions.md).
 
 ## Tools
 

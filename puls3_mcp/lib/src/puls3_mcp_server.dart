@@ -361,7 +361,9 @@ String redactedTokens(String text) => text
 CallToolResult _json(Object value) =>
     CallToolResult(content: [TextContent(text: jsonEncode(value))]);
 
+/// A one-line tool error. Every message goes through [redactedTokens], so a
+/// token quoted by the server or the network layer never reaches the client.
 CallToolResult _error(String code, String message) => CallToolResult(
   isError: true,
-  content: [TextContent(text: 'error: $code: $message')],
+  content: [TextContent(text: redactedTokens('error: $code: $message'))],
 );

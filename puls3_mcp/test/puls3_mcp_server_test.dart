@@ -531,6 +531,23 @@ void main() {
       }
     });
 
+    test('a server message quoting a token is redacted', () async {
+      // Defense in depth: typed server errors pass their message through.
+      const token = 'sajrt:aWQ=:Zml4ZWQ=:cm90YXRpbmc=';
+      await signIn(
+        error: Puls3ApiException(
+          code: 'HireNotFound',
+          message: 'no hire for $token',
+        ),
+      );
+      final result = await session.call('hire_prepare_complete', {'hireId': 3});
+      expect(result.isError, isTrue);
+      expect(
+        _text(result),
+        'error: HireNotFound: no hire for sajrt:[redacted]',
+      );
+    });
+
     test('studio_test_run without a draft id or an input is refused', () async {
       await signIn();
       for (final args in [
