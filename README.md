@@ -60,6 +60,8 @@ flowchart LR
 
 puls3 is in **early development**. What exists today:
 
+**Reviewing the SOW?** Every week's evidence, with links you can click and check on stellar.expert, is in **[docs/sow-evidence.md](docs/sow-evidence.md)**.
+
 - ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3.org](https://puls3.org/)**
 - ✅ The puls3 brand identity ([brand guide](docs/brand/README.md))
 - ✅ The Agent Identity Registry contract on Soroban, deployed on testnet with 8 current demo agents ([evidence](#on-chain-evidence-testnet))
