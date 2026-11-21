@@ -3,6 +3,7 @@ import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
 import 'agent_index_repository.dart';
 import 'agent_summary_reader.dart';
+import 'catalog_id_owner.dart';
 import 'registry_event_reader.dart';
 import 'registry_reader.dart';
 
@@ -29,6 +30,10 @@ final class IndexPassSummary {
   /// registrations), which are not indexed.
   int skipped = 0;
 
+  /// Agents that reuse a catalog id another owner registered first, which are
+  /// not indexed (audit I-1).
+  int foreign = 0;
+
   /// Whether the pass re-hydrated every indexed agent because the event stream
   /// had a gap (retention or truncation).
   bool recoveredAll = false;
@@ -37,7 +42,7 @@ final class IndexPassSummary {
   String toString() =>
       'from ${fromLedger ?? 'bootstrap'} to $toLedger, '
       'events $events, touched $touched, hydrated $hydrated, '
-      'skipped $skipped${recoveredAll ? ', recoveredAll' : ''}';
+      'skipped $skipped, foreign $foreign${recoveredAll ? ', recoveredAll' : ''}';
 }
 
 /// Syncs the catalog index from the identity registry.
@@ -123,12 +128,31 @@ final class CatalogIndexer {
     summary.touched = ids.length;
 
     final agents = <AgentSummary>[];
+    // The first registration of each catalog id seen in this pass.
+    final first = <String, int>{};
     for (final id in ids) {
       final agent = await readAgentSummary(_registry, id);
       if (agent == null) {
         summary.skipped++;
         continue;
       }
+      // Every indexed row of a catalog id has the same owner, so any of them
+      // stands for the first registration.
+      final claimed =
+          first[agent.id] ??
+          (await _repository.findByAgentId(agent.id))?.registryId;
+      if (claimed != null &&
+          claimed != id &&
+          !await mayTakeOverCatalogId(_registry, earlier: claimed, later: id)) {
+        summary.foreign++;
+        _log(
+          ChainLogLevel.warning,
+          'Registry id $id reuses catalog id ${agent.id}, registered first '
+          'by another owner (registry id $claimed): not indexed (audit I-1).',
+        );
+        continue;
+      }
+      first.putIfAbsent(agent.id, () => id);
       agents.add(agent);
     }
     if (agents.isNotEmpty) await _repository.upsertAll(agents);

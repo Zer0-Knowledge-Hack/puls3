@@ -90,6 +90,41 @@ final class _FakeRegistry implements RegistryReader {
     final wallet = wallets[id.value];
     return wallet == null ? null : StellarAddress.parse(wallet);
   }
+
+  /// Owners by registry id; any other agent below [total] is owned by
+  /// [_wallet], so a repeated catalog id is a redeploy by the same owner.
+  final Map<int, String> owners = {};
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    if (agent.value >= total) return null;
+    return StellarAddress.parse(owners[agent.value] ?? _wallet);
+  }
+}
+
+/// [registry], but with no owner for [missing], and counting owner reads.
+final class _NoOwner implements RegistryReader {
+  _NoOwner(this.registry, this.missing);
+
+  final _FakeRegistry registry;
+  final int missing;
+  int ownerReads = 0;
+
+  @override
+  Future<int> totalAgents() => registry.totalAgents();
+
+  @override
+  Future<Uint8List?> agentMetadata(AgentId id, String key) =>
+      registry.agentMetadata(id, key);
+
+  @override
+  Future<StellarAddress?> agentWallet(AgentId id) => registry.agentWallet(id);
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    ownerReads++;
+    return agent.value == missing ? null : registry.ownerOf(agent);
+  }
 }
 
 final class _Clock {
@@ -191,6 +226,67 @@ void main() {
       expect(agents.map((a) => a.id), ['agt-002', 'agt-001']);
       expect(agents.map((a) => a.registryId), [1, 2]);
       expect(agents.last.name, 'Second registration');
+    });
+
+    group('a repeated catalog id (audit I-1, #206)', () {
+      const squatter =
+          'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+      test('another owner cannot take over the id', () async {
+        final registry = _FakeRegistry(
+          {
+            0: _metadata(1, overrides: {'name': 'The real agent'}),
+            1: _metadata(1, overrides: {'name': 'A copy'}),
+          },
+          wallets: {0: _wallet, 1: squatter},
+        )..owners[1] = squatter;
+
+        final agents = await serviceOver(registry).list();
+
+        expect(agents.single.registryId, 0);
+        expect(agents.single.name, 'The real agent');
+        expect(agents.single.wallet, _wallet);
+        expect(await serviceOver(registry).get('agt-001'), isNotNull);
+      });
+
+      test('a copy before a redeploy does not stop the redeploy', () async {
+        final registry = _FakeRegistry({
+          0: _metadata(1, overrides: {'name': 'Version 1'}),
+          1: _metadata(1, overrides: {'name': 'A copy'}),
+          2: _metadata(1, overrides: {'name': 'Version 2'}),
+        })..owners[1] = squatter;
+
+        final agents = await serviceOver(registry).list();
+
+        expect(agents.single.registryId, 2);
+        expect(agents.single.name, 'Version 2');
+      });
+
+      test('an unknown owner does not take over (fails closed)', () async {
+        final registry = _FakeRegistry({
+          0: _metadata(1, overrides: {'name': 'The real agent'}),
+          1: _metadata(1, overrides: {'name': 'Unknown owner'}),
+        });
+        final service = AgentCatalogService(
+          _NoOwner(registry, 1),
+          now: clock.call,
+        );
+
+        final agents = await service.list();
+
+        expect(agents.single.registryId, 0);
+      });
+
+      test('owners are read only for a repeated id', () async {
+        final registry = _FakeRegistry({
+          for (var id = 0; id < 5; id++) id: _metadata(id + 1),
+        });
+        final counting = _NoOwner(registry, -1);
+
+        await AgentCatalogService(counting, now: clock.call).list();
+
+        expect(counting.ownerReads, 0);
+      });
     });
 
     test('orders by registry id even when reads finish out of order', () async {

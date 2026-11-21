@@ -47,6 +47,23 @@ The server MUST define a serializable `AgentSummary` with the fields `id` (metad
 - WHEN `get` is called with `agt-999`
 - THEN it returns `null`
 
+### Requirement: A catalog id belongs to its first owner
+
+When several valid registrations carry the same metadata id, the catalog and its index MUST keep the newest one whose `owner_of` equals the owner of the first registration of that id. A registration by any other owner MUST be ignored, and so MUST one whose owner, or whose first registration's owner, cannot be read (fail closed). Owners MUST be read only for an id that repeats. This stops anyone from taking over an agent's catalog entry, its hires and its payments by registering a copy of its metadata (audit 2026-10-25, I-1, #206).
+
+#### Scenario: A copy by another owner is ignored
+
+- GIVEN registry id 0 has metadata id `agt-001`, owned by A
+- AND registry id 1 has metadata id `agt-001`, owned by B
+- WHEN the catalog is built or indexed
+- THEN `agt-001` is registry id 0
+
+#### Scenario: A redeploy by the same owner supersedes
+
+- GIVEN registry ids 0 and 2 have metadata id `agt-001`, both owned by A, and registry id 1 has it too, owned by B
+- WHEN the catalog is built
+- THEN `agt-001` is registry id 2
+
 ### Requirement: Enumeration and orphan skipping
 
 The catalog service MUST enumerate registry ids `0` through `total-1`, where `total` comes from `totalAgents`. An agent whose metadata is missing or invalid MUST be skipped without failing the list. Invalid means any required key (`id`, `name`, `description`, `skills`, `priceUsdcStroops`) is absent or fails the parsing rules below. Skipping MUST NOT be reported as unavailability.

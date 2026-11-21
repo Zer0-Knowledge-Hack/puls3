@@ -4,6 +4,7 @@ import '../chain/chain_log.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
 import 'agent_summary_reader.dart';
+import 'catalog_id_owner.dart';
 import 'catalog_reader.dart';
 import 'registry_reader.dart';
 
@@ -17,7 +18,9 @@ const _readConcurrency = 4;
 ///
 /// The registry has no list function, so the catalog enumerates the ids
 /// `0` to `total_agents - 1`. An agent whose metadata is missing or invalid
-/// (for example a superseded registration) is skipped. A chain that cannot be
+/// (for example a superseded registration) is skipped, and so is one that
+/// reuses a catalog id another owner registered first (audit I-1, see
+/// [mayTakeOverCatalogId]). A chain that cannot be
 /// read is different: the refresh is abandoned, the last list built is served
 /// when there is one, and [AgentCatalogUnavailable] is thrown otherwise. An
 /// outage is never reported as an empty catalog.
@@ -108,19 +111,31 @@ final class AgentCatalogService implements CatalogReader {
       aborted = true;
       rethrow;
     }
-    return List.unmodifiable(_newestPerId(found));
+    return List.unmodifiable(await _newestPerId(found));
   }
 
   /// One agent, or `null` when its metadata is missing or invalid.
   Future<AgentSummary?> _read(int registryId) =>
       readAgentSummary(_registry, registryId);
 
-  /// Orphans may repeat a metadata id: keep the newest registration.
-  List<AgentSummary> _newestPerId(List<AgentSummary> agents) {
+  /// Orphans may repeat a metadata id: keep the newest registration by the
+  /// owner who registered the id first. The owners are read only for an id
+  /// that repeats.
+  Future<List<AgentSummary>> _newestPerId(List<AgentSummary> agents) async {
+    final sorted = [...agents]
+      ..sort((a, b) => a.registryId.compareTo(b.registryId));
+    final first = <String, int>{};
     final newest = <String, AgentSummary>{};
-    for (final agent in agents) {
-      final current = newest[agent.id];
-      if (current == null || agent.registryId > current.registryId) {
+    for (final agent in sorted) {
+      final claimed = first[agent.id];
+      if (claimed == null) {
+        first[agent.id] = agent.registryId;
+        newest[agent.id] = agent;
+      } else if (await mayTakeOverCatalogId(
+        _registry,
+        earlier: claimed,
+        later: agent.registryId,
+      )) {
         newest[agent.id] = agent;
       }
     }
