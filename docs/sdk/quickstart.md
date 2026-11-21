@@ -4,7 +4,7 @@ This page takes a Dart developer from a clean checkout to listing the puls3 agen
 
 - **Network:** Stellar testnet. The catalog is read only; nothing on this page moves funds.
 - **Time:** about 5 minutes.
-- **What works today:** the catalog (`listAgents`, `getAgent`). Preparing a hire (`createHire`, `prepareFund`, `prepareComplete` and the rest) needs a wallet session and is [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259). This page gains that section when #259 lands.
+- **What works today:** the catalog (`listAgents`, `getAgent`) needs nothing. Hire and Studio calls also exist, but they act for a wallet and need a session; see [CLI sessions](sessions.md). This page only uses the catalog.
 
 ## What you need
 
@@ -106,12 +106,12 @@ Errors are the server's own: `AgentCatalogUnavailable` for a catalog outage, `Pu
 
 ## What this SDK will not do
 
-- **It does not sign or submit transactions.** When the hire calls land (#259), each `prepare*` call returns an unsigned envelope. A wallet signs it, never the SDK.
+- **It does not sign or submit transactions.** Each `prepare*` call returns an unsigned envelope. A wallet signs it, never the SDK.
 - **It does not hold a seed or a secret key.** Do not paste an `S…` secret into the example or into your code to "make it work". Wallet secrets stay where [`docs/infra/secrets.md`](../infra/secrets.md) puts them.
 - **It is not on pub.dev yet.** Depend on it by path from this repository.
 
 ## Next
 
 - The design and the operations still to come: [ADR-0007](../adr/0007-developer-sdk.md).
-- The session-bound operations (hire, feedback, Studio): [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259).
+- The session-bound operations (hire, Studio): [CLI sessions](sessions.md).
 - The `puls3` command line, built on this SDK: [#224](https://github.com/Zer0-Knowledge-Hack/puls3/issues/224).
