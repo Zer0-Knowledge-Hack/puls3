@@ -505,6 +505,22 @@ middleware, before added middleware runs, so preflight responses still carry
 `Access-Control-Allow-Origin: *`. The request that follows is still rejected
 when its origin is not allowed.
 
+## Before rotating the escrow: store the escrow on old hires (#307)
+
+Hires created before the `hire.escrow` column have it empty, which means "the escrow configured now". Once `PULS3_STELLAR_ESCROW` points to a new escrow, those hires would point to the wrong one. Before the first rotation in an environment that has hires, run from `puls3_server/`, with that environment's database and Stellar settings:
+
+```bash
+dart run tool/backfill_hire_escrow.dart --escrow <escrow the hires were funded on>          # dry run
+dart run tool/backfill_hire_escrow.dart --escrow <escrow the hires were funded on> --apply  # writes
+```
+
+`--mode` selects the Serverpod config (`development` by default). The tool works like this:
+- It reads each hire's job on that escrow and writes the address only when the job is there for the same client and agent.
+- It never overwrites a hire that already has an escrow.
+- It signs nothing, and can be rerun.
+
+Hires it cannot match are listed (`noSuchJob`, `otherJob`, `archived`) and stay empty. See [ADR-0009](../docs/adr/0009-ratings-after-the-escrow-job-archives.md#escrow-rotation-273-item-3).
+
 ## Deploy to Serverpod Cloud
 
 The server runs on Serverpod Cloud, which also provides its PostgreSQL
