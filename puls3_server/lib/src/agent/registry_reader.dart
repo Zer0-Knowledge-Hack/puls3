@@ -16,4 +16,7 @@ abstract interface class RegistryReader {
 
   /// The wallet registered for [id], or `null` when there is none.
   Future<StellarAddress?> agentWallet(AgentId id);
+
+  /// Who owns [agent] (`owner_of`), or `null` when there is no such agent.
+  Future<StellarAddress?> ownerOf(AgentId agent);
 }

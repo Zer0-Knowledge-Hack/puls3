@@ -52,6 +52,16 @@ final class _FakeRegistry implements RegistryReader {
     final wallet = wallets[id.value];
     return wallet == null ? null : StellarAddress.parse(wallet);
   }
+
+  /// Owners by registry id; any other agent below [total] is owned by
+  /// [_wallet], so a repeated catalog id is a redeploy by the same owner.
+  final Map<int, String> owners = {};
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    if (agent.value >= total) return null;
+    return StellarAddress.parse(owners[agent.value] ?? _wallet);
+  }
 }
 
 final class _FakeEvents implements RegistryEventReader {
@@ -170,6 +180,70 @@ void main() {
     log: log,
   );
 
+  group('a repeated catalog id (audit I-1, #206)', () {
+    const squatter = 'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+    test('the first pass does not index a copy by another owner', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'A copy',
+      })..owners[1] = squatter;
+      final index = _InMemoryIndex();
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 500),
+        index,
+      ).pass();
+
+      expect(index.rows.keys.toList(), [0]);
+      expect(summary.foreign, 1);
+      expect(summary.hydrated, 1);
+      expect((await index.findByRegistryId(0))!.name, 'Agent 1');
+    });
+
+    test('a later copy is not indexed and the agent stays hireable', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'A copy',
+      })..owners[1] = squatter;
+      final index = _InMemoryIndex()
+        ..rows[0] = _stale(0, 'Agent 1').copyWith(id: 'agt-001')
+        ..checkpoint = 500;
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 600, events: [_registered(1)]),
+        index,
+      ).pass();
+
+      expect(index.rows.keys.toList(), [0]);
+      expect(summary.foreign, 1);
+      expect(await index.findByRegistryId(0), isNotNull);
+      expect((await index.findByAgentId('agt-001'))!.registryId, 0);
+    });
+
+    test('a redeploy by the same owner still supersedes', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'Version 2',
+      });
+      final index = _InMemoryIndex()
+        ..rows[0] = _stale(0, 'Agent 1').copyWith(id: 'agt-001')
+        ..checkpoint = 500;
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 600, events: [_registered(1)]),
+        index,
+      ).pass();
+
+      expect(summary.foreign, 0);
+      expect((await index.findByAgentId('agt-001'))!.name, 'Version 2');
+      expect(await index.findByRegistryId(0), isNull);
+    });
+  });
+
   test('the first pass bootstraps every agent from state', () async {
     final registry = _FakeRegistry({
       0: _metadata(1),
@@ -248,7 +322,7 @@ void main() {
 
     expect(summary.hydrated, 1);
     expect(summary.skipped, 1);
-    expect(index.rows.keys, [0]);
+    expect(index.rows.keys.toList(), [0]);
   });
 
   test('a chain outage aborts the pass and leaves the index untouched',
