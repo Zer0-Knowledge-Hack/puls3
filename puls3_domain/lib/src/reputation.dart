@@ -10,24 +10,33 @@ const double reputationPriorMean = 4.0;
 /// few ratings harder toward [reputationPriorMean].
 const double reputationPriorWeight = 5.0;
 
-/// The reputation of an agent from its [feedback]: the Bayesian average of the
-/// scores (each 1–5), pulled toward [reputationPriorMean] by
+/// The reputation of an agent from its [feedback]: the Bayesian average of
+/// its clients' scores (each 1–5), pulled toward [reputationPriorMean] by
 /// [reputationPriorWeight] so an agent with few ratings is not over- or
 /// under-ranked. Rounded to two decimals.
+///
+/// **One client is one rating** (ADR-0012, #324): a client who rated the
+/// agent several times counts once, with the mean of their scores. A paid
+/// hire from an owner's second wallet costs the owner almost nothing, since
+/// the agent's earnings come back to them, so repeated hires from one wallet
+/// must not add up. Each further rating then needs another client.
 ///
 /// With no feedback it is [reputationPriorMean], so a new agent is never ranked
 /// above one with a history. The formula and its worked examples live in
 /// docs/domain/reputation.md (#11).
 double reputationOf(Iterable<Feedback> feedback) {
-  var sum = 0;
-  var count = 0;
+  final byClient = <StellarAddress, ({int sum, int count})>{};
   for (final item in feedback) {
-    sum += item.score;
-    count += 1;
+    final seen = byClient[item.client] ?? (sum: 0, count: 0);
+    byClient[item.client] = (sum: seen.sum + item.score, count: seen.count + 1);
+  }
+  var sum = 0.0;
+  for (final client in byClient.values) {
+    sum += client.sum / client.count;
   }
   final average =
       (reputationPriorWeight * reputationPriorMean + sum) /
-      (reputationPriorWeight + count);
+      (reputationPriorWeight + byClient.length);
   return (average * 100).round() / 100;
 }
 
