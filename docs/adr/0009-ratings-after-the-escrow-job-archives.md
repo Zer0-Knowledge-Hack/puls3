@@ -40,6 +40,12 @@ A rating names its job as `puls3:job:v1:<escrow>:<job id>`, so a job is its escr
 
 1. **The reader trusts a list.** `PULS3_STELLAR_ESCROW` is the escrow new hires use. `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated) lists the ones it replaced. A reference to any escrow outside the two is still `otherEscrow`, and each job is read from the escrow its reference names. `FeedbackProvenance` holds `escrows` and keys its jobs by reference; the verification script reads the same list as the server.
 2. **The hire stores its escrow.** `hire.escrow` is set when the `create_job` is confirmed, to the escrow the tracker reads the event from, and `give_feedback` names that escrow in the reference and the commitment. The column is nullable and added without a backfill.
-3. **A hire without an escrow means the configured one.** That covers hires created before the column and hires without a job. The alternative, filling in the escrow address for existing hires, is tracked in #307 and has to be decided before the first rotation in an environment that has hires.
+3. **A hire without an escrow means the configured one.** That covers hires created before the column and hires without a job.
+4. **Before the first rotation, old hires get their escrow from the chain (#307).** In each environment that has hires, an operator runs `puls3_server/tool/backfill_hire_escrow.dart --escrow <the escrow they were funded on>`, first as a dry run and then with `--apply`. For every hire with a job and no escrow, it reads `get_job` on that escrow and writes the address only when the job is there for the same client and agent. Anything else stays empty and is reported:
+   - no such job;
+   - a job for another client or agent;
+   - an archived job.
+
+   **Why not a migration.** A migration runs on every database, local and test ones included, whose hires may come from another escrow, and a wrong backfill is hard to undo. This tool writes only what the chain confirms, never overwrites a hire's own escrow, and can be rerun. It is the reason an escrow rotation's checklist starts with this run.
 
 Not covered: hires that are still in flight when the escrow is rotated (prepared, funded or settled through the new escrow). The relay and the deadline runner use the configured escrow for every call, so this change keeps their ratings checkable, not their settlement.
