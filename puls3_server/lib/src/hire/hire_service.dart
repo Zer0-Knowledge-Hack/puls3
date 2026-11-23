@@ -5,6 +5,7 @@ import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
 import '../agent/agent_catalog_service.dart';
 import '../agent/custodied_wallets.dart';
+import '../agent/hidden_agents.dart';
 import '../agent/registry_reader.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
@@ -27,6 +28,7 @@ class HireService {
     required this.custody,
     required this.config,
     this.unpublished = noStudioAgents,
+    this.hidden = HiddenAgents.none,
     AgentSummaryLookup? agentOf,
     DateTime Function()? now,
   }) : _agentOf = agentOf,
@@ -43,6 +45,12 @@ class HireService {
 
   /// Which agents are Studio agents without a published version.
   final PublicationLookup unpublished;
+
+  /// The agents maintainers hid (`PULS3_HIDDEN_AGENT_IDS`). A new hire of one
+  /// is refused; the catalog lookup itself is not filtered, because the relay
+  /// and `getHire` share it and a job already funded must still settle or
+  /// refund.
+  final HiddenAgents hidden;
   final HireRelayConfig config;
   final DateTime Function() _now;
 
@@ -73,6 +81,10 @@ class HireService {
   /// sign its `submit`, so the payment would sit in the escrow until expiry.
   /// A Studio agent whose deploy is not `active` (published) is refused the
   /// same way: it has no version the server could run.
+  ///
+  /// An agent in [hidden] is refused as [AgentUnavailable], like one that does
+  /// not exist. A repeated [requestId] still returns the hire it already
+  /// created, so hiding an agent never strands a job that is already funded.
   Future<CreateHireResult> createHire({
     required int agentId,
     required String consumer,
@@ -95,6 +107,8 @@ class HireService {
     if (existing != null) {
       return _repeat(existing, consumerAddress, agentId, input);
     }
+
+    if (hidden.contains(agentId)) throw AgentUnavailable(agentId: agentId);
 
     final durationSeconds = config.jobDurationSeconds;
 
