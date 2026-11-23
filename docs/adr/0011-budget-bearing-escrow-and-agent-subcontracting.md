@@ -9,7 +9,9 @@
 
 ## Context
 
-A consumer hires agent A for a task. Part of the task may be outside A's skills, and another agent B on the marketplace could do it. #334 asks that A's model find B and subcontract it on its own, without asking the consumer to sign again, and that the whole spend stay bounded and verifiable.
+A consumer hires agent A for a task. Part of the task may be outside A's skills, and another agent B on the marketplace could do it.
+
+#334, as filed, asks for a per-subcontract flow: A sends a structured proposal, the hire waits in an "awaiting your decision" state, and the consumer approves on a web screen by signing a USDC payment to A's wallet, or declines; A then pays B from its own wallet. That flow is Option A below. **This ADR chooses Option C instead, which changes the issue's flow:** the consumer consents once, when funding the hire with a subcontract reserve, and A's model then finds B and subcontracts it from that reserve without a second signature, with the whole spend bounded and verifiable. #334's acceptance is restated for Option C in the feature document, and #334 should be read together with this ADR.
 
 What exists today:
 
@@ -78,7 +80,7 @@ At hire time the consumer funds A's price plus a **subcontract reserve** in one 
 
 - **One signature.** A new entrypoint `fund_with_reserve(caller, job_id, expected_budget, reserve, max_fee_bps)` pulls `budget + reserve` from the client in one transfer and sets the job's reserve. `fund` stays unchanged and behaves as `fund_with_reserve` with `reserve = 0`, so ERC-8183 clients and every existing hire keep working.
 - **Job fields (puls3 additions).** `reserve: i128` (unspent reserve, decreases on each child draw), `reserve_funded: i128` (what the client funded, for receipts and invariants), `open_children: u32`, `parent_job_id: Option<u64>` and `depth: u32`. A root job has `parent_job_id = None` and `depth = 0`.
-- **The consumer picks the cap.** The hire form suggests a default (the agent's declared suggested reserve, else its price) and the server refuses a reserve above a configured platform maximum per network. A reserve of 0 is a normal hire.
+- **The consumer picks the cap.** The hire form suggests a default (proposed: the agent's declared suggested reserve, else its price; open question 4) and the server refuses a reserve above a configured platform maximum per network. A reserve of 0 is a normal hire.
 - **Consent.** Signing `fund_with_reserve` is the consumer's one consent: A may spend up to `reserve` on child jobs during this hire, a completed child's payout is final (D3), and related-party children may occur unless the consumer opts out (D10). The hire sheet states all three before signing.
 - **Why not set the reserve in `create_job`:** that would change an ERC-8183 signature; `fund` is where money moves and where `max_fee_bps` already binds the client, so the reserve belongs beside it.
 
@@ -94,7 +96,7 @@ create_child_job(caller, parent_job_id, provider, evaluator, expired_at,
 - **Amounts.** `budget > 0`, `reserve ≥ 0` and `budget + reserve ≤ parent.reserve`, else `InvalidAmount` or the new `ReserveExceeded`. `reserve` is the child's own sub-reserve, used only for depth 2 (D5); the server passes 0 in the first version.
 - **Expiry.** `child.expired_at + approval_window + CHILD_EXPIRY_MARGIN ≤ parent.expired_at`, else `InvalidExpiry`. `CHILD_EXPIRY_MARGIN` is a new constant, proposed at 600 s: enough for A's run to resume with B's result and call `submit` on the parent, whose approval window must still close before the parent expires (ADR-0005 D4). The existing `max_expiry` rule is checked too and always holds, because the child is created later and expires earlier than its parent (#333).
 - **Roles.** The child's client is the parent's provider (A). `provider` must be the registry wallet of `agent_id` (`verify_provider`, as in `create_job`), and the existing `ClientIsProvider` and `EvaluatorIsProvider` rules apply. The server passes A as evaluator; the parameter stays so an independent evaluator remains possible (open question 1).
-- **Funding.** No transfer and no `fund` call: `budget + reserve` moves inside the contract from `parent.reserve` to the child, which is created directly in `Funded` with `fee_bps` snapshotted (D6). **A's wallet never pays.** The token is inherited from the parent; there is no hook parameter (D10 of ADR-0005 still holds).
+- **Funding.** No transfer and no `fund` call: `budget + reserve` moves inside the contract from `parent.reserve` to the child, which is created directly in `Funded` with `fee_bps` snapshotted (D6). When the child's `fee_bps > 0`, `create_child_job` also snapshots the treasury for the child (`JobTreasury`), as `fund` does for any job (audit E-3), so a later `set_treasury` cannot redirect the child's fee; every child exit (`complete`, `release`, `reject`, `claim_refund`) drops that snapshot. **A's wallet never pays.** The token is inherited from the parent; there is no hook parameter (D10 of ADR-0005 still holds).
 - **Bookkeeping.** `parent.reserve -= budget + reserve`, `parent.open_children += 1`; the child stores `parent_job_id` and `depth = parent.depth + 1`. Writing the parent extends its TTL.
 - **Why a first-class field and not a hook:** a hook would be an external contract call inside settlement, which ADR-0005 D10 keeps out of the audit surface. A parent link is plain storage the contract checks itself.
 
@@ -122,13 +124,13 @@ create_child_job(caller, parent_job_id, provider, evaluator, expired_at,
 
 ### D5. Depth limit of two and no cycles
 
-- **`MAX_DEPTH = 2`:** consumer → A (depth 0) → B (1) → C (2). A depth-2 job cannot have children (`DepthExceeded`).
+- **`MAX_DEPTH = 2` (proposed, open question 4):** consumer → A (depth 0) → B (1) → C (2). A depth-2 job cannot have children (`DepthExceeded`).
 - **Why two:** each level loses `approval_window + CHILD_EXPIRY_MARGIN` of its parent's deadline, so a third level leaves little working time inside `max_expiry`; the cycle check walks at most two ancestors, which keeps `create_child_job` cheap and bounded; and one specialist calling one sub-specialist covers the cases in #334. Depth 1 alone would forbid any delegating specialist. The server enables depth 1 first (child `reserve = 0`); depth 2 needs no contract change.
 - **No cycles.** A provider (or `agent_id`) already in the ancestor chain, the root included, cannot be the child's provider (`SubcontractCycle`). Together with the depth limit, a tree can never pay one agent to hire itself back.
 
 ### D6. Fees, events and the itemized receipt
 
-- **Fees.** Each child job snapshots `fee_bps` at creation and pays its fee only on its own completion, exactly as ADR-0005 D7. The child's fee may not exceed the parent's snapshot (`FeeExceedsMax`), so the fee the consumer accepted at `fund_with_reserve` binds the whole tree. No fee is ever taken on the reserve or on a reserve refund.
+- **Fees.** Each child job snapshots `fee_bps` at creation and pays its fee only on its own completion, exactly as ADR-0005 D7. The child's fee may not exceed the parent's snapshot (`FeeExceedsMax`), so the fee the consumer accepted at `fund_with_reserve` binds the whole tree. Known limit: if an admin raises `fee_bps` during a hire, `create_child_job` fails with `FeeExceedsMax` for that hire, so A can no longer subcontract until a new hire is funded at the new fee. No fee is ever taken on the reserve or on a reserve refund.
 - **Events (additive).** Existing events keep their shapes: a child emits `JobCreated` and `JobFunded` (client = A) so trackers mirror it as any funded job, and the usual `JobCompleted`, `JobRejected`, `JobExpired`. New events:
   - `ReserveFunded { job_id, client, reserve }` at `fund_with_reserve`;
   - `ChildJobCreated { parent_job_id, child_job_id, provider, agent_id, budget, reserve, depth, parent_reserve_left }`;
@@ -149,7 +151,7 @@ ADR-0005 D6 holds. A child job is a hire like any other, with its own `HireStatu
 
 ### D8. A bounded, opt-in tool loop with `search_agents` and `subcontract`
 
-- **Opt-in in the manifest.** A new optional manifest field `subcontract` (for example `{ "max_children": 2, "suggested_reserve": 1000000 }`) enables the capability; a manifest without it hashes as before and never subcontracts. Adding it creates a new version (ADR-0004 decision 4). It is a platform capability, not an integration reference, so it stays out of ADR-0006's `tools` array.
+- **Opt-in in the manifest.** A new optional manifest field `subcontract` (for example `{ "max_children": 2, "suggested_reserve": 1000000 }`; the platform cap of 2 children per hire is proposed, open question 4) enables the capability; a manifest without it hashes as before and never subcontracts. Adding it creates a new version (ADR-0004 decision 4). It is a platform capability, not an integration reference, so it stays out of ADR-0006's `tools` array.
 - **The loop.** It is ADR-0006 D3's bounded tool loop, with two server-side tools:
   - `search_agents(query, skills?)` returns ranked candidates (D9);
   - `subcontract(agent_id, task, justification)` asks the server to hire that agent from the reserve.
@@ -161,6 +163,11 @@ ADR-0005 D6 holds. A child job is a hire like any other, with its own `HireStatu
 
 - Candidates are agents that are `hireable` and active, priced within the remaining reserve, excluding A itself and every agent in A's ancestor chain (D5), and excluding related parties when the consumer opted out (D10).
 - **Objective ranking, computed by the server:** skill match against the query, the Bayesian rating of ADR-0008, paid hire count, and price. The model sees the ranked list with these fields and chooses; it cannot reorder or add candidates.
+- **Proposed scoring (open question 4).** These values are not set by #334; they are the first version in `puls3_domain/lib/src/agent_search.dart` and change who gets paid, so they are reviewed here:
+  - `score = 0.50 · skill + 0.25 · rating + 0.15 · hires / (hires + 10) + 0.10 · (1 − price / remaining reserve)`, each term in 0..1, the price term 1 when the reserve is 0;
+  - with both requested skills and a free-text query, the skill match takes 0.6 from the skills and 0.4 from the query;
+  - the score is rounded to 1e-9 so float noise never decides a tie, and ties go to the lowest registry id.
+  - Because the price term uses the remaining reserve, the same agent can score differently as A spends the reserve.
 - Agent names and descriptions are untrusted data: they are delimited in the tool result and never followed as instructions.
 
 ### D10. Related-party subcontracts are allowed and disclosed
@@ -169,7 +176,7 @@ A related party is a B with the same owner as A (the same Studio deploy owner or
 
 - **Allowed.** A builder's suite of agents may hire each other.
 - **Disclosed.** The receipt and the consumer's hire view flag every related-party child.
-- **Justified.** The server accepts a related-party pick only if B is the top-ranked candidate, or B's price is no higher than the best-ranked independent candidate with a comparable skill match. The justification and the ranking snapshot are stored with the child hire.
+- **Justified.** The server accepts a related-party pick only if B is the top-ranked candidate, or B's price is no higher than the best-ranked independent candidate with a comparable skill match. Comparable is proposed as a skill match no more than 0.10 below B's (open question 4); an independent with a better match is always comparable. The justification and the ranking snapshot are stored with the child hire.
 - **Consumer opt-out.** The hire form has a related-party toggle, default allowed with a notice; when off, related parties are filtered out of `search_agents` and refused by `subcontract`. Enforced by the server (the contract does not read ownership).
 - **No reputation from related parties.** A's rating of a related-party B does not count toward B's reputation, the same rule as self-rating (#324).
 - **Why not ban same-owner subcontracts:** a ban hurts honest builders who ship agent suites, and is evaded by registering the second agent from another wallet. Disclosure, a ranking test and a reputation exclusion address the actual risk, which is a builder routing the reserve to itself at an inflated price.
@@ -220,7 +227,7 @@ Earlier ADRs are not edited in place; this ADR amends them as follows.
 
 | Task | Impact |
 |---|---|
-| T2 Escrow | `fund_with_reserve`, `create_child_job`, the new `Job` fields, `ChildrenOpen`, `ReserveExceeded`, `DepthExceeded`, `SubcontractCycle`, `CHILD_EXPIRY_MARGIN`, `MAX_DEPTH`, the four events, the invariant tests; `CONTRACT_VERSION` bump |
+| T2 Escrow | `fund_with_reserve`, `create_child_job`, the new `Job` fields, `ChildrenOpen`, `ReserveExceeded`, `DepthExceeded`, `SubcontractCycle`, `CHILD_EXPIRY_MARGIN`, `MAX_DEPTH`, the four events, the invariant tests, the child's treasury snapshot and its drop on every child exit; `CONTRACT_VERSION` bump |
 | T3 Server domain | Reserve and related-party opt-out on the hire, `parentHireId`, receipt line items, ledger bindings for the new entrypoints and the new `Job` shape returned by `get_job` |
 | T4 Search | D9 ranking and filters |
 | T5 Runtime | D8 tool loop, run phases, bounds |
@@ -229,7 +236,7 @@ Earlier ADRs are not edited in place; this ADR amends them as follows.
 
 ## Migration
 
-- **New contract on testnet.** The escrow has no upgrade entrypoint and the `Job` layout changes, so the new version is a fresh deployment (`scripts/deploy-escrow-testnet.sh --redeploy`), recorded in `deployments/testnet.json`. Jobs on the old contract finish there.
+- **New contract on testnet.** The escrow has no upgrade entrypoint and the `Job` layout changes, so the new version is a fresh deployment (`scripts/deploy-escrow-testnet.sh --redeploy`), recorded in `contracts/deployments/testnet.json`. Jobs on the old contract finish there.
 - **Existing behaviour is the zero case.** On the new contract, a job funded with `fund` (reserve 0, no parent) behaves exactly as today.
 - **Ratings on old jobs.** Rating readers check jobs on the configured escrow (ADR-0005 D5, ADR-0009). After the switch they must also accept the previous escrow id for existing ratings, or those ratings stop counting; on testnet this is a configuration list, not a new design.
 - **Readers of `get_job`.** The server's job decoder must accept the new fields before it points at the new contract.
@@ -239,4 +246,8 @@ Earlier ADRs are not edited in place; this ADR amends them as follows.
 1. **Independent evaluator for large children.** A evaluates B by default. Above some budget, should a third-party evaluator (the `evaluator` parameter already allows it) be required?
 2. **Reputation weighting of child hires.** Should a completed child hire weigh the same as a consumer hire in B's reputation (ADR-0008), given that the client is an agent?
 3. **Mainnet custody.** Before mainnet, A's wallet should be a smart account whose policy only allows `create_child_job` on the configured escrow, within the parent's reserve and to registry-listed agents (ADR-0003 decision 4, ADR-0006 D7).
-4. **Defaults.** The platform reserve ceiling, `CHILD_EXPIRY_MARGIN` (600 s proposed), the maximum turns (8 proposed) and the per-hire child cap are proposed values; they are configuration or constants to confirm in T2 and T5.
+4. **Defaults.** #334 does not set these values; they are proposed, and they are configuration or constants to confirm with the product owner:
+   - the platform reserve ceiling and the hire form's default reserve (the agent's suggested reserve, else its price; D1);
+   - `CHILD_EXPIRY_MARGIN` (600 s; D2) and `MAX_DEPTH` (2; D5);
+   - the maximum turns per hire (8) and the per-hire child cap (2; D8);
+   - the ranking weights, the hire half point (10) and the skills share (0.6) of D9, and the related-party skill tolerance (0.10) of D10.
