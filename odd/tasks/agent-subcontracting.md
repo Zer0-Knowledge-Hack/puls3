@@ -475,3 +475,17 @@ StellarExpert.
 - 2026-11-23: T6.4.4 E done (`7376160`). B decided by the user (option 1: judge orphans by the normal rule) and done. Next: A.
 - 2026-11-23: T6.4.4 B done (`92ecd7b`). A decided by the user ("Dale, me gusta") and done; T6.4.4 complete. Next: independent verifier for A (Risk item 4), then T6.4.5.
 - 2026-11-23: verifier on T6.4.4: no blockers; its 4 notes on A fixed in one batch with regression tests. Next: native review of the slice (user consent), then T6.4.5.
+- 2026-11-23: native review of `c30c7d7..a1aad7c` (lenses risk, resilience and reliability; lineage
+  `review-f220e18d6da284a4`; escalated as Risk item 4) was granted, approved and acknowledged. The
+  reviewed boundary is now `a1aad7c`. The six advisory findings do not block and are follow-ups:
+  - R3-alike-siblings-wait: alike unopened siblings wait until the parent's deadline
+    (`unverified_child_reconciler.dart:133`);
+  - R3-orphan-sweep-isolation-untested: the per-line try/catch in `judgeOrphans` has no test;
+  - R3-plain-relay-depends-on-effect (`chain_submission_tracker.dart:386`);
+  - R3-reopen-before-open: `reopenUnverified` runs before `open`. A crash in between leaves the
+    line `pending`, and a later pass recovers it;
+  - R4-orphan-log-drops-cause: the orphan log prints only the error type;
+  - R4-reconciler-unbounded-rescan: each pass rescans from the parent's job id.
+
+  Next: T6.4.5 production wiring. It should also wire `UnverifiedChildReconciler.reconcile` into
+  the runtime pass.
