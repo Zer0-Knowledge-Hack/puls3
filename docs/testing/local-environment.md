@@ -133,6 +133,31 @@ docker compose -f puls3_server/docker-compose.yaml up -d
 scripts/setup-local-soroban.sh
 ```
 
+## Check the migrations
+
+CI runs `scripts/check-migrations.sh` (#373) whenever a migration or a `.spy.yaml`
+model changes. It fails when the models need a migration that is not committed, or
+when a database built from all the migrations ends with a different schema than
+one built from the base branch's migrations and then this branch's.
+
+Run the same check locally against the integration-test database. It needs
+`serverpod`, `psql` and `pg_dump` on the PATH (or `PG_CONTAINER=<container>` to
+run the Postgres tools inside the container), and a clean `puls3_server/migrations`:
+
+```bash
+docker compose -f puls3_server/docker-compose.yaml up -d postgres_test
+# PGPASSWORD is POSTGRES_TEST_PASSWORD from puls3_server/.env, and the `test:`
+# section of puls3_server/config/passwords.yaml must hold the same `database` value.
+PGPORT=9090 PGPASSWORD=<POSTGRES_TEST_PASSWORD> scripts/check-migrations.sh
+```
+
+The base defaults to the merge base with `origin/main`; pass another commit as the
+first argument. To use another database server, set `PGHOST`, `PGPORT`, `PGUSER`
+and `PGPASSWORD`; the script reaches it through the server's
+`SERVERPOD_DATABASE_HOST` and `SERVERPOD_DATABASE_PORT`, and names the scratch
+databases through `SERVERPOD_DATABASE_NAME`. It creates `mig_fresh` and
+`mig_upgraded` and drops both when it ends.
+
 ## Troubleshooting
 
 | Symptom | Fix |
