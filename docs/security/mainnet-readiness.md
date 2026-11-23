@@ -75,13 +75,20 @@ issue.
 
 ## I-1: proof of control at registration (before mainnet: decide)
 
-**In review (#381):** a catalog id belongs to the owner who registered it first.
-A copy of an existing agent's metadata by another owner no longer takes over
+**In review (#381):** who may hold a catalog id.
+
+- **A Studio id** (`studio-<draftId>`) belongs to the wallet that owns the
+  draft, known off chain. A squatter cannot take it, whether it registers
+  before or after the builder.
+- **Any other id**, such as the seed `agt-*`, belongs to the owner who
+  registered it first.
+
+Either way, a copy of an agent's metadata by another owner no longer takes over
 its catalog entry, its hires or its payments.
 
-**Left:** registration is still first come, first served. Someone can register
-an id or an `agent_uri` before its real owner does. That needs proof of
-control, which is a design choice, not a fix:
+**Left:** for ids outside the Studio, and for `agent_uri`, registration is
+still first come, first served. Someone can register one before its real owner
+does. That needs proof of control, which is a design choice, not a fix:
 
 | Option | How it proves control | Cost |
 |---|---|---|
