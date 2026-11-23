@@ -4,8 +4,24 @@ import 'package:puls3_client/puls3_client.dart';
 /// session. [Puls3Sdk.connect] backs them with the generated Serverpod
 /// client; tests pass a fake.
 abstract interface class HireApi {
+  /// Creates the hire of [requestId] for [consumer] and prepares its
+  /// `create_job` (`HireEndpoint.createHire`).
+  Future<CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  );
+
   /// The hire [hireId] of [consumer] (`HireEndpoint.getHire`).
   Future<HireDetail> get(int hireId, String consumer);
+
+  /// A fresh unsigned `create_job` for [hireId]
+  /// (`HireEndpoint.prepareCreateJob`).
+  Future<PreparedTransaction> prepareCreateJob(int hireId);
+
+  /// The unsigned `fund` of hire [hireId] (`HireEndpoint.prepareFund`).
+  Future<PreparedTransaction> prepareFund(int hireId);
 
   /// The unsigned `complete` of hire [hireId]
   /// (`HireEndpoint.prepareComplete`).
@@ -41,8 +57,24 @@ final class ClientHireApi implements HireApi {
   final Client _client;
 
   @override
+  Future<CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) => _client.hire.createHire(agentId, consumer, input, requestId);
+
+  @override
   Future<HireDetail> get(int hireId, String consumer) =>
       _client.hire.getHire(hireId, consumer);
+
+  @override
+  Future<PreparedTransaction> prepareCreateJob(int hireId) =>
+      _client.hire.prepareCreateJob(hireId);
+
+  @override
+  Future<PreparedTransaction> prepareFund(int hireId) =>
+      _client.hire.prepareFund(hireId);
 
   @override
   Future<PreparedTransaction> prepareComplete(int hireId) =>

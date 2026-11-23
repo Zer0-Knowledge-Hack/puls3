@@ -19,6 +19,8 @@ jobs:
       contracts: ${{ steps.paths.outputs.contracts }}
       docker: ${{ steps.paths.outputs.docker }}
       sdk: ${{ steps.paths.outputs.sdk }}
+      e2e: ${{ steps.paths.outputs.e2e }}
+      migrations: ${{ steps.paths.outputs.migrations }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -30,29 +32,42 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          domain=false server=false app=false contracts=false docker=false sdk=false
+          domain=false server=false app=false contracts=false docker=false sdk=false e2e=false migrations=false
           while IFS= read -r path; do
             case "$path" in
               pubspec.yaml|pubspec.lock)
-                domain=true; server=true; app=true; docker=true; sdk=true ;;
+                domain=true; server=true; app=true; docker=true; sdk=true; e2e=true ;;
               puls3_domain/*)
-                domain=true; server=true; docker=true ;;
+                domain=true; server=true; docker=true; e2e=true ;;
               docs/architecture/examples/*)
                 domain=true ;;
               puls3_server/*)
-                server=true; docker=true ;;
+                server=true; docker=true; e2e=true ;;
               .dockerignore)
                 docker=true ;;
+              # The server image resolves puls3_client and puls3_sdk as dev
+              # dependencies, and the server job runs the SDK contract tests
+              # (#375), so both jobs follow these packages.
               puls3_client/*)
-                server=true; app=true; sdk=true ;;
-              puls3_sdk/*|puls3_cli/*|puls3_mcp/*)
+                server=true; app=true; sdk=true; docker=true; e2e=true ;;
+              puls3_sdk/*)
+                server=true; sdk=true; docker=true ;;
+              puls3_mcp/*)
+                server=true; sdk=true ;;
+              puls3_cli/*)
                 sdk=true ;;
               puls3_flutter/*)
                 app=true ;;
               contracts/*)
-                contracts=true ;;
+                contracts=true; e2e=true ;;
+              scripts/setup-local-soroban.sh|scripts/setup-local-secrets.sh|.github/workflows/e2e.yml)
+                e2e=true ;;
               .github/workflows/ci.yml)
-                domain=true; server=true; app=true; contracts=true; docker=true; sdk=true ;;
+                domain=true; server=true; app=true; contracts=true; docker=true; sdk=true; e2e=true ;;
+            esac
+            case "$path" in
+              puls3_server/migrations/*|puls3_server/*.spy.yaml|scripts/check-migrations.sh|.github/workflows/ci.yml)
+                migrations=true ;;
             esac
           done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "domain=$domain" >> "$GITHUB_OUTPUT"
@@ -61,6 +76,8 @@ jobs:
           echo "contracts=$contracts" >> "$GITHUB_OUTPUT"
           echo "docker=$docker" >> "$GITHUB_OUTPUT"
           echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+          echo "migrations=$migrations" >> "$GITHUB_OUTPUT"
 
   domain:
     needs: changes
@@ -142,6 +159,18 @@ jobs:
       - working-directory: puls3_server
         run: dart analyze --fatal-infos && dart test && serverpod generate
       - run: git diff --exit-code -- puls3_server puls3_client
+      - name: Check migrations (fresh vs upgraded schema, no pending migration)
+        if: needs.changes.outputs.migrations == 'true'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PGHOST: localhost
+          PGPORT: '9090'
+          PGUSER: postgres
+          PGPASSWORD: ci_database_password
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          scripts/check-migrations.sh "$BASE_SHA"
 
   app:
     needs: changes
@@ -244,10 +273,18 @@ jobs:
       - run: cargo test
       - run: stellar contract build
 
+  # The server E2E suites against the Soroban sandbox (#298), required since #371.
+  # It runs only when its inputs change, like every other component, so a docs-only
+  # or Flutter-only PR neither runs nor waits for it.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    uses: ./.github/workflows/e2e.yml
+
   gate:
     name: gate
     if: always()
-    needs: [changes, domain, sdk, server, app, docker, scripts, contracts]
+    needs: [changes, domain, sdk, server, app, docker, scripts, contracts, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Require every applicable component
@@ -260,8 +297,9 @@ jobs:
           DOCKER: ${{ needs.docker.result }}
           SCRIPTS: ${{ needs.scripts.result }}
           CONTRACTS: ${{ needs.contracts.result }}
+          E2E: ${{ needs.e2e.result }}
         run: |
-          for result in "$CHANGES" "$DOMAIN" "$SDK" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS"; do
+          for result in "$CHANGES" "$DOMAIN" "$SDK" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS" "$E2E"; do
             if [[ "$result" != success && "$result" != skipped ]]; then
               echo "A required CI job finished with: $result" >&2
               exit 1
