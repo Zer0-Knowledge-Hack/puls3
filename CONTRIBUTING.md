@@ -177,6 +177,24 @@ cargo clippy --all-targets -- -D warnings && cargo test
 stellar contract build
 ```
 
+### 2.6 Which tests does my change need
+
+A change adds only the layers that apply to it. Write the layers in the issue's
+**Tests** field and mirror them in the PR's **Tests** section; use `N/A` with
+the reason for a layer that does not apply.
+
+| What changed | Add | Run with |
+| --- | --- | --- |
+| Server logic (endpoints, services, runtime) | Unit | `melos run test:unit` |
+| Persistence or a migration | Integration | `melos run test:integration` (needs `postgres_test` and `redis_test`) |
+| Behavior that crosses the server and the chain (hire, escrow, relay) | E2E | `melos run test:e2e` (needs the local sandbox) |
+| Smart contract | Contract tests | `cd contracts && cargo test` |
+| Client, SDK or MCP | Unit, plus integration when the call shape matters | `melos run test:unit`, then `melos run test:integration` |
+| UI flow | Widget test, plus the browser suite when the hire flow changes | `melos run test:unit`; the browser suite is `puls3_flutter/integration_test/hire_flow_e2e_test.dart`, run by hand for now |
+| Docs only | None (`N/A`) | none |
+
+The commands are described in [2.5](#25-checks-to-run-before-opening-a-pr).
+
 ---
 
 ## 3. How we work
