@@ -250,6 +250,12 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     optional `childrenOpen` check (`OpenChildren.anyOpen`), and a `ChildrenOpen` refusal burns no
     attempt. Review (consent medium, granted, reliability lens, approved and acknowledged,
     lineage `review-6f18abf3c28cddc2`) raised two warnings, both moved to T6.4.
+    PR #368 review (2026-11-23): `child_output_too_long` is removed. It could never fire, because
+    no manifest may set `output.max_chars` above 16000 (`manifest.dart:418-425`), the Studio
+    source revalidates on every run, and `AgentRunner` fails both `run` and `converse` over the
+    limit (`agent_runner.dart:38,63`). `judgeChildOutput` no longer takes a limit; a
+    16000-rune output is completed. RED: `child_verdict_test` failed to load; GREEN: server
+    unit+hire 1300 passed, analyze clean.
   - [ ] **T6.4** Production wiring of `SubcontractSetup`, `staleAfter` and `passTimeout` for
     multi-segment runs, and reconciliation of half-opened children and children of failed runs.
     Carried items:
@@ -263,6 +269,12 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     - Reconcile `unverified` and half-opened lines, release children of failed parent runs, map
       an orphan `HireRequestConflict` to `SubcontractRefused`, and handle a throwing
       `childrenOpen`.
+    - Bound what child results add to A's conversation (found 2026-11-23). The whole transcript
+      counts against `inputMaxChars + defaultConversationHeadroomChars` (32000,
+      `tool_loop.dart:15,298`). Two children at the 16000-rune ceiling, plus search results and
+      JSON escaping, exceed it, so A's next segment fails `input_too_long` after B was paid.
+    - Bound the retries of a persistent `LedgerException` while preparing a verdict
+      (`escrow_child_result_source.dart`, #368 review, non-blocking).
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
@@ -291,3 +303,10 @@ StellarExpert.
   slices reviewed and acknowledged.
 - 2026-11-18: T4 done on `feat/334-agent-search`, stacked on `feat/334-server-subcontract`.
   T4 reviewed and acknowledged. Next: open the T4 PR stacked on #360 (user's call), then T5.
+- 2026-11-23: answering the reviews before T6.4. ADR-0011 fixes for #357 and #361 in `d2a15a0` on
+  `feat/334-agent-subcontracting` (Context says Option C changes #334's flow, the unspecified
+  defaults and the D9/D10 scoring values are marked proposed, the child's treasury snapshot is
+  documented). The `audit` failure on #357 is repo-wide: `main` fails too (new `heapless`
+  advisories RUSTSEC-2026-0574 to 0582). #368: `child_output_too_long` removed (see T6.3).
+  Next: push both, reply to the reviews, rebase #360/#363/#365/#367 (squash merges left them
+  conflicting), then T6.4.
