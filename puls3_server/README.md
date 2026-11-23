@@ -234,6 +234,10 @@ The parent's loop gets B's stored output (`ChildDelivered`) after a confirmed
 `complete` or a deadline-relay `release`, and `ChildFailed` with the reason
 code after a confirmed `reject`, `child_expired` after `claim_refund`, and
 `child_not_opened` for a child whose `create_child_job` never landed. A
+delivered output that would push the parent's conversation past its limit
+(`input.max_chars` plus the loop's headroom) is cut to the longest prefix that
+fits and labelled with `truncated` and `output_runes`, so the paid result never
+fails the parent's next segment with `input_too_long`. A
 `pending` or `unverified` receipt line keeps the parent waiting. One verdict
 is in flight per child; a failed one is built again up to three attempts,
 after which the deadline relay settles the child. On confirmation the tracker
