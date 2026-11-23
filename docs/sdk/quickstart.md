@@ -4,7 +4,7 @@ This page takes a Dart developer from a clean checkout to listing the puls3 agen
 
 - **Network:** Stellar testnet. The catalog is read only; nothing on this page moves funds.
 - **Time:** about 5 minutes.
-- **What works today:** the catalog (`listAgents`, `getAgent`) needs nothing. Hire and Studio calls also exist, but they act for a wallet and need a session; see [CLI sessions](sessions.md). This page only uses the catalog.
+- **What works today:** the catalog (`listAgents`, `getAgent`) needs nothing. The hire calls are `createHire`, `prepareCreateJob`, `prepareFund`, `getHire`, `prepareComplete` and `prepareReject`; the Studio calls are `testRun` and `hireAgentAs`. They act for a wallet and need a session; see [CLI sessions](sessions.md). This page only uses the catalog.
 
 ## What you need
 

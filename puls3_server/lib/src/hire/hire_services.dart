@@ -7,6 +7,7 @@ import '../agent/agent_catalog_service.dart';
 import '../agent/agent_catalog_wiring.dart' show catalogConsoleLog;
 import '../agent/custodied_wallets.dart';
 import '../agent/serverpod_agent_index_repository.dart';
+import '../agent/studio_draft_owners.dart';
 import '../chain/serverpod_chain_submission_store.dart';
 import '../chain/submission_ledger.dart';
 import '../feedback/feedback_service.dart';
@@ -84,7 +85,14 @@ final class HireWiring {
     return HireWiring._(
       stellar: stellar,
       ledger: ledger,
-      catalog: AgentCatalogService(ledger, log: catalogConsoleLog),
+      catalog: AgentCatalogService(
+        ledger,
+        log: catalogConsoleLog,
+        // A Studio id belongs to its draft's owner (#381).
+        owners: studioDraftOwnersOf(
+          () async => Serverpod.instance.createSession(),
+        ),
+      ),
       codec: StellarEnvelopeCodec.forPassphrase(stellar.networkPassphrase),
       accounts: RpcChainAccounts(rpc),
       sender: SorobanSubmissionLedger(rpc, escrow: stellar.escrow),
