@@ -160,7 +160,8 @@ the same transaction. Each pass:
    `AgentRunner` (input and output limits, timeout that aborts the call);
    a free-model (`workers-ai`) run first reserves one slot for the agent on
    the UTC day, and above 10 slots it fails with `team_run_quota_exceeded`
-   before calling the model;
+   before calling the model. This covers every free-model agent, including
+   the seeded demo agents; a run that fails after reserving keeps its slot;
 4. stores the result, or a safe failure code such as `timeout`,
    `provider_error:<type>`, `manifest_unavailable` or
    `team_run_quota_exceeded`.
