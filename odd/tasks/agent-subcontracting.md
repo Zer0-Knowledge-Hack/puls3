@@ -275,6 +275,22 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       JSON escaping, exceed it, so A's next segment fails `input_too_long` after B was paid.
     - Bound the retries of a persistent `LedgerException` while preparing a verdict
       (`escrow_child_result_source.dart`, #368 review, non-blocking).
+
+    Units (planned 2026-11-23, one commit each on `feat/334-subcontract-wiring`). The wiring
+    comes last, because it turns the feature on in production:
+    - [x] **T6.4.1** Bound child results in A's conversation. Route: inline (about 100 lines).
+      `ToolLoop.resumedState` now takes `maxConversationChars` and cuts a delivered output to
+      the longest whole-rune prefix that keeps the transcript within it, labelled with
+      `truncated` and `output_runes`. RED: the new `child_result_budget_test` failed to compile.
+      GREEN: server unit+hire 1304 passed, analyze clean. Risk: none.
+    - [ ] **T6.4.2** Serialize agent-signed calls per signing wallet. Risk: item 4 (concurrency),
+      which needs an independent verifier.
+    - [ ] **T6.4.3** Record relay `release` / `claim_refund` on the child's receipt line.
+    - [ ] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
+      parent runs, orphan `HireRequestConflict`, a throwing `childrenOpen`, and bounded
+      `LedgerException` retries.
+    - [ ] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
+      Risk: item 5 (environment).
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
