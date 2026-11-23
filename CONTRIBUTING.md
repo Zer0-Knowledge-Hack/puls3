@@ -151,9 +151,13 @@ melos run test:integration
 melos run test:e2e
 ```
 
-CI runs the server E2E suites in `.github/workflows/e2e.yml` (#298). It is
-non-gating until it is stable on `main`; the Flutter browser suite (#256) stays
-manual for now.
+CI runs the server E2E suites as the `e2e` job of `ci.yml` (defined in
+`.github/workflows/e2e.yml`, #298). It is required (#371) and path-scoped: it runs
+only when the server, domain, client, contracts or the sandbox setup scripts
+change, and `gate` waits for it. The Flutter browser suite
+(`.github/workflows/e2e-browser.yml`, #372) is non-gating until it is stable on
+`main`. To run it by hand, use `scripts/e2e-flutter-local.sh` (`--help` lists what
+it needs).
 
 The per-package detail:
 
@@ -175,6 +179,24 @@ cd contracts && cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings && cargo test
 stellar contract build
 ```
+
+### 2.6 Which tests does my change need
+
+A change adds only the layers that apply to it. Write the layers in the issue's
+**Tests** field and mirror them in the PR's **Tests** section; use `N/A` with
+the reason for a layer that does not apply.
+
+| What changed | Add | Run with |
+| --- | --- | --- |
+| Server logic (endpoints, services, runtime) | Unit | `melos run test:unit` |
+| Persistence or a migration | Integration | `melos run test:integration` (needs `postgres_test` and `redis_test`) |
+| Behavior that crosses the server and the chain (hire, escrow, relay) | E2E | `melos run test:e2e` (needs the local sandbox) |
+| Smart contract | Contract tests | `cd contracts && cargo test` |
+| Client, SDK or MCP | Unit, plus integration when the call shape matters | `melos run test:unit`, then `melos run test:integration` |
+| UI flow | Widget test, plus the browser suite when the hire flow changes | `melos run test:unit`; the browser suite is `puls3_flutter/integration_test/hire_flow_e2e_test.dart`, run by hand for now |
+| Docs only | None (`N/A`) | none |
+
+The commands are described in [2.5](#25-checks-to-run-before-opening-a-pr).
 
 ---
 
