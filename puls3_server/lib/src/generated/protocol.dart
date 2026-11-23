@@ -54,6 +54,7 @@ import 'hire_detail.dart' as _ipbsq2gs;
 import 'ledger/terminal_job_fact.dart' as _itxj7opn;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
+import 'puls3_api_error_details.dart' as _i6knfj5b;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
 import 'studio/agent_hire_started.dart' as _i3ggywhi;
@@ -98,6 +99,7 @@ export 'hire_detail.dart';
 export 'ledger/terminal_job_fact.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
+export 'puls3_api_error_details.dart';
 export 'puls3_api_exception.dart';
 export 'runtime/hire_run.dart';
 export 'studio/agent_hire_started.dart';
@@ -1712,6 +1714,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _i83uy5s0.PreparedTransaction) {
       return _i83uy5s0.PreparedTransaction.fromJson(data) as T;
     }
+    if (t == _i6knfj5b.Puls3ApiErrorDetails) {
+      return _i6knfj5b.Puls3ApiErrorDetails.fromJson(data) as T;
+    }
     if (t == _i5rj3edu.Puls3ApiException) {
       return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
     }
@@ -1876,6 +1881,12 @@ class Protocol extends _is.DatabaseSerializationManager {
               : null)
           as T;
     }
+    if (t == _is.getType<_i6knfj5b.Puls3ApiErrorDetails?>()) {
+      return (data != null
+              ? _i6knfj5b.Puls3ApiErrorDetails.fromJson(data)
+              : null)
+          as T;
+    }
     if (t == _is.getType<_i5rj3edu.Puls3ApiException?>()) {
       return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
           as T;
@@ -1933,6 +1944,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == Map<String, String>) {
+      return (data as Map).map(
+            (k, v) => MapEntry(deserialize<String>(k), deserialize<String>(v)),
+          )
+          as T;
     }
     if (t == List<_ige837u7.ManifestSkill>) {
       return (data as List)
@@ -2023,6 +2040,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _itxj7opn.TerminalJobFact => 'TerminalJobFact',
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
+      _i6knfj5b.Puls3ApiErrorDetails => 'Puls3ApiErrorDetails',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _iw9spjs5.HireRunRecord => 'HireRunRecord',
       _i3ggywhi.AgentHireStarted => 'AgentHireStarted',
@@ -2112,6 +2130,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'Payment';
       case _i83uy5s0.PreparedTransaction():
         return 'PreparedTransaction';
+      case _i6knfj5b.Puls3ApiErrorDetails():
+        return 'Puls3ApiErrorDetails';
       case _i5rj3edu.Puls3ApiException():
         return 'Puls3ApiException';
       case _iw9spjs5.HireRunRecord():
@@ -2256,6 +2276,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'PreparedTransaction') {
       return deserialize<_i83uy5s0.PreparedTransaction>(data['data']);
+    }
+    if (dataClassName == 'Puls3ApiErrorDetails') {
+      return deserialize<_i6knfj5b.Puls3ApiErrorDetails>(data['data']);
     }
     if (dataClassName == 'Puls3ApiException') {
       return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);

@@ -1,0 +1,9 @@
+### Never sent on its own. Serverpod 4.0.4 generates a container's
+### deserializer only from the fields of a class, not of an exception, so
+### without this class the protocol cannot read `Map<String, String>`. Every
+### client then fails to decode a `Puls3ApiException` that carries `details`
+### and gets a bare `ServerpodClientBadRequest` without the error code.
+### Keep the field type identical to `Puls3ApiException.details`.
+class: Puls3ApiErrorDetails
+fields:
+  values: Map<String, String>
