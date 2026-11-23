@@ -12,6 +12,15 @@ Closes #
 
 - [ ]
 
+## Tests
+
+<!-- Mirror the issue's "Tests" field. For each layer, link the tests this PR adds, or write N/A with the reason. Then give the command that ran them. -->
+
+- Unit:
+- Integration:
+- E2E:
+- Command run:
+
 ## Verification evidence
 
 <!-- The issue's "How to verify" steps and their real output: commands run, screenshots, tx hashes. -->
