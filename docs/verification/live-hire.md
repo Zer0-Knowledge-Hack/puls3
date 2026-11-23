@@ -34,6 +34,7 @@ the consumer signs creation, funding and approval. The escrow is
 ## Values
 
 ```bash
+SERVER=https://puls3-hub-on-stellar.api.serverpod.space
 ESCROW=CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2
 REGISTRY=CD5QZOKGRBV35C5SDT6PG7S72XGG4BHQAC2L56YLNBJDUL4LDMTXFIJJ
 REPUTATION=CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4
@@ -43,6 +44,22 @@ SRC=<any-identity>
 ```
 
 `SRC` is only the simulation source for the contract reads; it signs nothing.
+
+## Catalog entry
+
+The agent is hireable in the production catalog, not only bound to a custodied
+wallet on chain. The catalog endpoint is public, so this check needs no session:
+
+```bash
+curl -s -X POST "$SERVER/agent/list" -H 'Content-Type: application/json' -d '{}' \
+  | tr '}' '\n' | grep '"registryId":30'
+```
+
+Expected: `"id":"studio-4"`, `"registryId":30`, `"name":"Soroban Pre-Audit"`,
+the custodied `"wallet"`, and `"hireable":true`.
+
+Observed on 2026-11-23: `"hireable":true`, with `"rating":4.29` and
+`"paidHireCount":2` from this hire.
 
 ## Agent identity
 
@@ -94,9 +111,10 @@ What each step proves:
 - `fund` moves 0.50 USDC from the consumer into the escrow.
 - `submit` is signed by the agent itself through the server's custody relay
   ([#208](https://github.com/Zer0-Knowledge-Hack/puls3/issues/208)).
-- `complete` is the consumer's approval from the hire detail page
-  ([#210](https://github.com/Zer0-Knowledge-Hack/puls3/issues/210)), which pays
-  the provider.
+- `complete` is the consumer's approval, signed through the public API for this
+  run, and it pays the provider. The hire detail page path
+  ([#210](https://github.com/Zer0-Knowledge-Hack/puls3/issues/210)) is still
+  pending a browser run.
 - `give_feedback` writes the 5/5 rating to the Reputation Registry.
 
 ## Read the state back
