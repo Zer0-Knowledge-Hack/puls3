@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
+import 'package:puls3_server/src/agent/catalog_id_owner.dart';
 import 'package:puls3_server/src/agent/registry_reader.dart';
 import 'package:puls3_server/src/chain/chain_log.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
@@ -89,6 +90,41 @@ final class _FakeRegistry implements RegistryReader {
   Future<StellarAddress?> agentWallet(AgentId id) async {
     final wallet = wallets[id.value];
     return wallet == null ? null : StellarAddress.parse(wallet);
+  }
+
+  /// Owners by registry id; any other agent below [total] is owned by
+  /// [_wallet], so a repeated catalog id is a redeploy by the same owner.
+  final Map<int, String> owners = {};
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    if (agent.value >= total) return null;
+    return StellarAddress.parse(owners[agent.value] ?? _wallet);
+  }
+}
+
+/// [registry], but with no owner for [missing], and counting owner reads.
+final class _NoOwner implements RegistryReader {
+  _NoOwner(this.registry, this.missing);
+
+  final _FakeRegistry registry;
+  final int missing;
+  int ownerReads = 0;
+
+  @override
+  Future<int> totalAgents() => registry.totalAgents();
+
+  @override
+  Future<Uint8List?> agentMetadata(AgentId id, String key) =>
+      registry.agentMetadata(id, key);
+
+  @override
+  Future<StellarAddress?> agentWallet(AgentId id) => registry.agentWallet(id);
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    ownerReads++;
+    return agent.value == missing ? null : registry.ownerOf(agent);
   }
 }
 
@@ -191,6 +227,183 @@ void main() {
       expect(agents.map((a) => a.id), ['agt-002', 'agt-001']);
       expect(agents.map((a) => a.registryId), [1, 2]);
       expect(agents.last.name, 'Second registration');
+    });
+
+    group('a Studio id belongs to its draft owner (#381)', () {
+      const builder =
+          'GDKAJMNZ6WOMQ3EWLJI2UOWA3FWNHZM2BR7KJQUGQ2TQV5LZ7FUWJ7EO';
+      const squatter =
+          'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+      /// Draft 31 belongs to [builder]; no other draft exists.
+      final drafts = StudioCatalogIdOwners(
+        (draftId) async => draftId == 31 ? builder : null,
+      );
+
+      Map<String, String> studio(String id, String name) =>
+          _metadata(1, overrides: {'id': id, 'name': name});
+
+      AgentCatalogService over(_FakeRegistry registry) =>
+          AgentCatalogService(registry, now: clock.call, owners: drafts);
+
+      test('registering a Studio id first does not take it', () async {
+        // The squatter guessed the next draft id and registered it before
+        // the builder deployed.
+        final registry =
+            _FakeRegistry({
+                0: studio('studio-31', 'Squatter'),
+                1: studio('studio-31', 'The real agent'),
+              })
+              ..owners[0] = squatter
+              ..owners[1] = builder;
+
+        final agents = await over(registry).list();
+
+        expect(agents.single.registryId, 1);
+        expect(agents.single.name, 'The real agent');
+      });
+
+      test('a squatter alone is not listed', () async {
+        final registry = _FakeRegistry({0: studio('studio-31', 'Squatter')})
+          ..owners[0] = squatter;
+
+        expect(await over(registry).list(), isEmpty);
+      });
+
+      test('the newest registration of the draft owner wins', () async {
+        final registry =
+            _FakeRegistry({
+                0: studio('studio-31', 'Version 1'),
+                1: studio('studio-31', 'Squatter'),
+                2: studio('studio-31', 'Version 2'),
+                3: studio('studio-31', 'Squatter again'),
+              })
+              ..owners[0] = builder
+              ..owners[1] = squatter
+              ..owners[2] = builder
+              ..owners[3] = squatter;
+
+        final agents = await over(registry).list();
+
+        expect(agents.single.registryId, 2);
+        expect(agents.single.name, 'Version 2');
+      });
+
+      test('a Studio id without a draft is held by nobody', () async {
+        final registry =
+            _FakeRegistry({
+                0: studio('studio-99', 'No draft'),
+                1: studio('studio-abc', 'Not a draft id'),
+                2: _metadata(2),
+              })
+              ..owners[0] = builder
+              ..owners[1] = builder;
+
+        final agents = await over(registry).list();
+
+        expect(agents.map((a) => a.id), ['agt-002']);
+      });
+
+      test('an unreadable draft store keeps the last catalog', () async {
+        final registry = _FakeRegistry({0: studio('studio-31', 'Real')})
+          ..owners[0] = builder;
+        var broken = false;
+        final service = AgentCatalogService(
+          registry,
+          now: clock.call,
+          owners: StudioCatalogIdOwners((draftId) async {
+            if (broken) throw StateError('database down');
+            return builder;
+          }),
+        );
+        expect((await service.list()).single.name, 'Real');
+
+        broken = true;
+        clock.advance(const Duration(minutes: 5));
+
+        expect((await service.list()).single.name, 'Real');
+      });
+    });
+
+    test(
+      'a seed id whose first registration turns invalid is open again (#381)',
+      () async {
+        // Pins the current behaviour: the first-registrant rule only sees
+        // valid registrations. Only the first owner can make its own
+        // metadata invalid, so this frees an id it gave up, never one it
+        // still holds.
+        const other =
+            'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+        final registry = _FakeRegistry({
+          0: _metadata(1, overrides: {'name': null}),
+          1: _metadata(1, overrides: {'name': 'Next owner'}),
+        })..owners[1] = other;
+
+        final agents = await serviceOver(registry).list();
+
+        expect(agents.single.registryId, 1);
+      },
+    );
+
+    group('a repeated catalog id (audit I-1, #206)', () {
+      const squatter =
+          'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+      test('another owner cannot take over the id', () async {
+        final registry = _FakeRegistry(
+          {
+            0: _metadata(1, overrides: {'name': 'The real agent'}),
+            1: _metadata(1, overrides: {'name': 'A copy'}),
+          },
+          wallets: {0: _wallet, 1: squatter},
+        )..owners[1] = squatter;
+
+        final agents = await serviceOver(registry).list();
+
+        expect(agents.single.registryId, 0);
+        expect(agents.single.name, 'The real agent');
+        expect(agents.single.wallet, _wallet);
+        expect(await serviceOver(registry).get('agt-001'), isNotNull);
+      });
+
+      test('a copy before a redeploy does not stop the redeploy', () async {
+        final registry = _FakeRegistry({
+          0: _metadata(1, overrides: {'name': 'Version 1'}),
+          1: _metadata(1, overrides: {'name': 'A copy'}),
+          2: _metadata(1, overrides: {'name': 'Version 2'}),
+        })..owners[1] = squatter;
+
+        final agents = await serviceOver(registry).list();
+
+        expect(agents.single.registryId, 2);
+        expect(agents.single.name, 'Version 2');
+      });
+
+      test('an unknown owner does not take over (fails closed)', () async {
+        final registry = _FakeRegistry({
+          0: _metadata(1, overrides: {'name': 'The real agent'}),
+          1: _metadata(1, overrides: {'name': 'Unknown owner'}),
+        });
+        final service = AgentCatalogService(
+          _NoOwner(registry, 1),
+          now: clock.call,
+        );
+
+        final agents = await service.list();
+
+        expect(agents.single.registryId, 0);
+      });
+
+      test('owners are read only for a repeated id', () async {
+        final registry = _FakeRegistry({
+          for (var id = 0; id < 5; id++) id: _metadata(id + 1),
+        });
+        final counting = _NoOwner(registry, -1);
+
+        await AgentCatalogService(counting, now: clock.call).list();
+
+        expect(counting.ownerReads, 0);
+      });
     });
 
     test('orders by registry id even when reads finish out of order', () async {
