@@ -43,7 +43,9 @@ try {
 With a session, `createHire` returns the persisted hire and, when available, its
 unsigned `create_job`. `prepareCreateJob` asks for a fresh envelope, and
 `prepareFund` returns the unsigned `fund`. Repeat the same `requestId` to retry
-safely.
+safely: the server returns the same hire. The key is opaque, so the SDK sends it
+exactly as given. Repeating it with a different agent or input is rejected by
+the server (`InvalidHire`), which reaches you as a `Puls3ApiException`.
 
 ```dart
 final start = await sdk.createHire(agentId, wallet, input, requestId);

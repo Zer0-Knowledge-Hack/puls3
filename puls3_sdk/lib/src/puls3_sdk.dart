@@ -74,8 +74,10 @@ final class Puls3Sdk {
   /// available, its unsigned `create_job`.
   ///
   /// [requestId] is the idempotency key: repeating it for the same [consumer]
-  /// returns the same hire, so a retry is safe. [consumer] must be the session
-  /// wallet's address. The SDK does not sign or submit anything.
+  /// returns the same hire, so a retry is safe. The key is opaque: the SDK
+  /// sends it exactly as given, as the server and every other client do, so
+  /// `" req-1 "` and `"req-1"` are two different keys. [consumer] must be the
+  /// session wallet's address. The SDK does not sign or submit anything.
   ///
   /// Throws [ArgumentError] for a negative [agentId] or a blank [consumer],
   /// [input] or [requestId], and [SessionRequired] without a session, without
@@ -102,7 +104,7 @@ final class Puls3Sdk {
       agentId,
       consumer.trim(),
       input,
-      requestId.trim(),
+      requestId,
     );
   }
 

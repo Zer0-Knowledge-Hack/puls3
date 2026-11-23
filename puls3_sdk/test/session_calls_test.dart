@@ -38,6 +38,12 @@ final class _FakeHire implements HireApi {
 
   final Object? error;
   final calls = <String>[];
+  final _envelopes = <String, PreparedTransaction>{};
+
+  /// The one envelope this fake hands out per purpose, so a test can tell the
+  /// SDK returned it untouched.
+  PreparedTransaction envelope(String purpose) =>
+      _envelopes.putIfAbsent(purpose, () => _prepared(purpose));
 
   @override
   Future<CreateHireResult> createHire(
@@ -57,7 +63,7 @@ final class _FakeHire implements HireApi {
         manifestVersion: 1,
         status: 'open',
       ),
-      preparedCreateJob: _prepared('createJob'),
+      preparedCreateJob: envelope('createJob'),
     );
   }
 
@@ -83,14 +89,14 @@ final class _FakeHire implements HireApi {
   Future<PreparedTransaction> prepareCreateJob(int hireId) async {
     calls.add('createJob $hireId');
     if (error != null) throw error!;
-    return _prepared('createJob');
+    return envelope('createJob');
   }
 
   @override
   Future<PreparedTransaction> prepareFund(int hireId) async {
     calls.add('fund $hireId');
     if (error != null) throw error!;
-    return _prepared('fund');
+    return envelope('fund');
   }
 
   @override
@@ -159,9 +165,36 @@ void main() {
         expect(started.hire.consumer, _wallet);
         expect(started.preparedCreateJob?.purpose, 'createJob');
         expect(started.preparedCreateJob?.unsignedTransactionXdr, 'AAAA');
-        expect(hire.calls, ['create 7 $_wallet hello req-1']);
+        expect(hire.calls, ['create 7 $_wallet hello  req-1 ']);
       },
     );
+
+    test('createHire sends the requestId exactly as given', () async {
+      await sdk.createHire(7, _wallet, 'hello', ' req-1 ');
+      await sdk.createHire(7, _wallet, 'hello', 'req-1');
+      expect(hire.calls, [
+        'create 7 $_wallet hello  req-1 ',
+        'create 7 $_wallet hello req-1',
+      ]);
+    });
+
+    test('the envelopes come back unsigned and untouched', () async {
+      final started = await sdk.createHire(7, _wallet, 'hello', 'req-1');
+      final createJob = await sdk.prepareCreateJob(12);
+      final fund = await sdk.prepareFund(12);
+      // The SDK hands back the very envelope the server returned: it neither
+      // signs it nor rebuilds it, so the wallet is the only signer (ADR-0007).
+      expect(
+        identical(started.preparedCreateJob, hire.envelope('createJob')),
+        isTrue,
+      );
+      expect(identical(createJob, hire.envelope('createJob')), isTrue);
+      expect(identical(fund, hire.envelope('fund')), isTrue);
+      for (final envelope in [started.preparedCreateJob!, createJob, fund]) {
+        expect(envelope.signer, _wallet);
+        expect(envelope.unsignedTransactionXdr, 'AAAA');
+      }
+    });
 
     test(
       'prepareCreateJob and prepareFund return unsigned envelopes',
