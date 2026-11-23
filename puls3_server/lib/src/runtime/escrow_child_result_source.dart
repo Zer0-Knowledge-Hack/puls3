@@ -248,6 +248,13 @@ final class EscrowChildResultSource implements ChildResultSource {
       await _recordSimulationFailure(childHireId, purpose, priorFailures);
       return;
     } on LedgerException catch (e) {
+      // A node that cannot be reached is transient, so it stores nothing
+      // and uses no attempt, as `AgentSubmitSender` does for a `submit`.
+      // Counting it would let a short RPC outage use up
+      // [maxEscrowCallAttempts] and leave the child without a verdict for
+      // good. While the node is down no other path frees the budget faster,
+      // and the deadline relay still settles the child (T6.4.4, user
+      // decision 2026-11-23). The cost is one warning per pass.
       _log(
         ChainLogLevel.warning,
         'Could not prepare the verdict of child hire $childHireId: $e',

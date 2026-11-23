@@ -467,6 +467,26 @@ void main() {
       expect(sent, isEmpty);
     });
 
+    test('an unreachable node stores nothing and uses no attempt, so the '
+        'verdict is sent once the node is back', () async {
+      run(HireRunState.failed);
+      accounts.simulationFailure = const LedgerUnavailable('node down');
+
+      for (var i = 0; i < maxEscrowCallAttempts + 1; i++) {
+        expect(await source().resultOf(childHireId), isNull);
+      }
+      expect(verdicts(), isEmpty, reason: 'no attempt was used');
+      expect(sent, isEmpty);
+
+      accounts.simulationFailure = null;
+      expect(await source().resultOf(childHireId), isNull);
+
+      final verdict = verdicts().single;
+      expect(verdict.purpose, SubmissionPurpose.childReject);
+      expect(verdict.state, SubmissionState.submitted);
+      expect(sent, hasLength(1));
+    });
+
     test('custody that cannot sign stores nothing', () async {
       run(HireRunState.failed);
       signFailure = const AgentWalletCustodyUnavailable('locked');

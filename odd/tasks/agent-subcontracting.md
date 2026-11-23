@@ -358,10 +358,19 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         RED: the new sender test failed with `Bad state: database down`.
         C and D checks: analyze clean, unit+hire+ledger 1400 passed, integration 211 passed.
         Risk: none.
-      - [ ] **E** Bounded `LedgerException` retries in verdict preparation
+      - [x] **E** `LedgerException` retries in verdict preparation
         (`escrow_child_result_source.dart:250`): a plain `LedgerException` stores nothing,
-        so it never reaches `maxEscrowCallAttempts`. Needs a decision: persist a failed row,
-        or bound it in memory or by time.
+        so it never reaches `maxEscrowCallAttempts`. User decision 2026-11-23 ("Vamos con la
+        1"): keep it unbounded on purpose, as `AgentSubmitSender` does.
+        - A node that cannot be reached is transient. Counting it would let a short RPC
+          outage use up the attempts and leave the child without a verdict for good.
+        - No other path frees the budget faster while the node is down, and the deadline
+          relay still settles the child.
+        - The cost is one warning per pass.
+
+        The reason is written in the code, and a characterization test pins it: no attempt
+        is used, and the verdict is sent once the node is back. There is no RED because the
+        behavior did not change. Focused 21 passed, analyze clean. Risk: none.
       - [ ] **B** Children of failed parent runs: `markFailed` drops the run from
         `listAwaitingChild`, so A never judges its open children, and the deadline relay
         settles them. Needs a policy decision.
@@ -416,3 +425,4 @@ StellarExpert.
   reviewed boundary is now `c30c7d7`. T6.4.3 done. Next: T6.4.4.
 - 2026-11-23: user on verifier note A: "Follow up". It stays out of T6.4.4 as a separate
   follow-up. Next: T6.4.4.
+- 2026-11-23: T6.4.4 C and D done (`7318113`). E decided by the user ("Vamos con la 1"): unbounded transient retries, documented and pinned. Next: B.
