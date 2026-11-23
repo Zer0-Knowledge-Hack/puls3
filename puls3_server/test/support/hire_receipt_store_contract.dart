@@ -97,6 +97,47 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
     expect(await unsettled(), isEmpty, reason: 'a settled line is final');
   });
 
+  test('listUnopened lists a pending or unverified line, never an opened '
+      'one', () async {
+    Future<List<String>> unopened() async => [
+      for (final line in await f.store.listUnopened())
+        if (line.parentHireId == f.parentHireId) line.state,
+    ];
+    await f.store.insert(_line(f));
+    expect(await unopened(), [ReceiptLineState.pending]);
+
+    await f.store.markUnverified(f.childHireId);
+    expect(await unopened(), [ReceiptLineState.unverified]);
+
+    await f.store.reopenUnverified(f.childHireId);
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+    expect(await unopened(), isEmpty);
+  });
+
+  test('reopenUnverified moves an unverified line back to pending once, so '
+      'it can be opened or closed', () async {
+    await f.store.insert(_line(f));
+    expect(
+      await f.store.reopenUnverified(f.childHireId),
+      isFalse,
+      reason: 'a pending line is not unverified',
+    );
+    await f.store.markUnverified(f.childHireId);
+
+    expect(await f.store.reopenUnverified(f.childHireId), isTrue);
+    expect(await f.store.reopenUnverified(f.childHireId), isFalse);
+    expect(
+      (await f.store.findByChildHire(f.childHireId))?.state,
+      ReceiptLineState.pending,
+    );
+    expect(await f.store.markNotOpened(f.childHireId), isTrue);
+  });
+
   test('markNotOpened moves a pending line once', () async {
     await f.store.insert(_line(f));
 

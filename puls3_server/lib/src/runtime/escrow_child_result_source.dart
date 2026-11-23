@@ -29,8 +29,8 @@ import 'tool_loop.dart';
 ///
 /// - line `not_opened` (or no line): `ChildFailed('child_not_opened')`;
 /// - line `pending` or `unverified`: `null`. An unverified child may have
-///   landed; reconciling it against the chain is T6.4, until then the
-///   parent keeps waiting;
+///   landed; the parent keeps waiting until `UnverifiedChildReconciler`
+///   opens it or closes it as `not_opened` (T6.4.4);
 /// - a confirmed `childComplete`, or a `release` by the deadline relay:
 ///   `ChildDelivered` with B's stored run result, which A's loop delimits as
 ///   untrusted data;

@@ -71,6 +71,26 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
   ];
 
   @override
+  Future<List<ReceiptLine>> listUnopened() async => [
+    for (final line in _lines)
+      if (line.state == ReceiptLineState.pending ||
+          line.state == ReceiptLineState.unverified)
+        line,
+  ];
+
+  @override
+  Future<bool> reopenUnverified(int childHireId) async {
+    final index = _lines.indexWhere(
+      (l) =>
+          l.childHireId == childHireId &&
+          l.state == ReceiptLineState.unverified,
+    );
+    if (index < 0) return false;
+    _lines[index] = _copy(_lines[index], state: ReceiptLineState.pending);
+    return true;
+  }
+
+  @override
   Future<bool> markNotOpened(int childHireId) async =>
       _settlePending(childHireId, state: ReceiptLineState.notOpened);
 

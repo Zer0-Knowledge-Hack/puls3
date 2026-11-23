@@ -343,7 +343,7 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       unit+hire+ledger 1398 passed, integration 211 passed, analyze clean. Risk: none. The
       tracker's relay path also serves plain hires: pinned by the no-children test and the
       tracker tests.
-    - [ ] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
+    - [x] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
       parent runs, orphan `HireRequestConflict`, a throwing `childrenOpen`, and bounded
       `LedgerException` retries. Mapped by a read-only explorer, then split into five
       independent fronts, each with a small inline route:
@@ -391,9 +391,26 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         GREEN: analyze clean, unit+hire+ledger 1408 passed, integration 212 passed. The
         server README is updated. Risk: none. It reuses `resultOf` and the per-wallet gate
         unchanged, and only children of failed parents are affected.
-      - [ ] **A** `unverified` and half-opened lines: stuck until the parent deadline, and the
-        relay never reaches them because no `jobId` is bound. Needs decisions on how to find the
-        child job on chain and which state results.
+      - [x] **A** `unverified` and half-opened lines: they stayed stuck until the parent's
+        deadline, and the relay never reached them because no `jobId` was bound. User decision
+        2026-11-23 ("Dale, me gusta"):
+        - scan the escrow from the parent's job id + 1 up to the first missing id, for a job
+          whose fields match the child's;
+        - one match: `ChildJobStore.open`, through the normal path;
+        - no match: `not_opened`, but only after every envelope's `validUntil` has passed and
+          no create was confirmed;
+        - several matches, or a job another hire holds: the line stays unverified.
+
+        The fix is a new `UnverifiedChildReconciler`, plus `HireReceiptStore.listUnopened` and
+        `reopenUnverified`, contract-tested on both stores. Every write is a pending-only
+        conditional one. It is not wired in production until T6.4.5.
+
+        The reconciler tests passed on first run, because the code was written first. Two
+        mutations each made them fail: dropping the `validUntil` guard, and dropping the
+        re-mark on `taken`. The contract tests were written before the store code, but RED was
+        not run on its own. GREEN: analyze clean, unit+hire+ledger 1420 passed, integration
+        214 passed. Risk: item 4 (concurrency): the reconciler and the tracker can act on the
+        same line, and the pending-only conditional writes resolve it.
     - [ ] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
       Risk: item 5 (environment).
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
@@ -444,3 +461,4 @@ StellarExpert.
   follow-up. Next: T6.4.4.
 - 2026-11-23: T6.4.4 C and D done (`7318113`). E decided by the user ("Vamos con la 1"): unbounded transient retries, documented and pinned. Next: B.
 - 2026-11-23: T6.4.4 E done (`7376160`). B decided by the user (option 1: judge orphans by the normal rule) and done. Next: A.
+- 2026-11-23: T6.4.4 B done (`92ecd7b`). A decided by the user ("Dale, me gusta") and done; T6.4.4 complete. Next: independent verifier for A (Risk item 4), then T6.4.5.
