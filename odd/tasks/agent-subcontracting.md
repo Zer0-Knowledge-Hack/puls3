@@ -411,6 +411,18 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         not run on its own. GREEN: analyze clean, unit+hire+ledger 1420 passed, integration
         214 passed. Risk: item 4 (concurrency): the reconciler and the tracker can act on the
         same line, and the pending-only conditional writes resolve it.
+        Independent verifier: no blockers, and every front was met. Its notes were fixed in one
+        correction batch, with its probes added as regression tests:
+        - a `JobMismatch` or `JobEvidenceUnavailable` create counts as landed, so it is never
+          closed as `not_opened`;
+        - a job an opened sibling holds is not a candidate;
+        - an alike sibling that is also unopened makes the match ambiguous, because the jobs
+          are interchangeable on chain and binding one could run the wrong task;
+        - `landingMargin` (5 min) after `validUntil` covers clock skew and node lag.
+
+        RED: 4 probes failed on the old code. The fifth, two reconcilers at once, already
+        passed and now pins the behavior. GREEN: unit+hire+ledger 1425 passed, integration 214
+        passed, analyze clean.
     - [ ] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
       Risk: item 5 (environment).
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
@@ -462,3 +474,4 @@ StellarExpert.
 - 2026-11-23: T6.4.4 C and D done (`7318113`). E decided by the user ("Vamos con la 1"): unbounded transient retries, documented and pinned. Next: B.
 - 2026-11-23: T6.4.4 E done (`7376160`). B decided by the user (option 1: judge orphans by the normal rule) and done. Next: A.
 - 2026-11-23: T6.4.4 B done (`92ecd7b`). A decided by the user ("Dale, me gusta") and done; T6.4.4 complete. Next: independent verifier for A (Risk item 4), then T6.4.5.
+- 2026-11-23: verifier on T6.4.4: no blockers; its 4 notes on A fixed in one batch with regression tests. Next: native review of the slice (user consent), then T6.4.5.

@@ -34,10 +34,13 @@ import 'hire_receipt_store.dart';
 ///   [ChildJobStore.open] binds, pays and queues the child, as a confirmed
 ///   `create_child_job` would. A child left with too little time fails its
 ///   run, and the relay refunds it;
-/// - more than one match: it is ambiguous, nothing is written and the line
-///   waits;
+/// - more than one match, or an alike sibling that is also unopened: it is
+///   ambiguous, because alike children's jobs are interchangeable on the
+///   chain. Nothing is written and the line waits. A job a sibling line
+///   already holds is never a candidate;
 /// - no match: the line is [ReceiptLineState.notOpened], but only once no
-///   `create_child_job` was confirmed and every envelope's `validUntil`
+///   `create_child_job` landed (confirmed, or failed with a code that shows
+///   it succeeded) and every envelope's `validUntil` plus [landingMargin]
 ///   has passed. Before that the transaction could still land.
 ///
 /// A line with a `create_child_job` still in flight belongs to the tracker
@@ -47,6 +50,19 @@ import 'hire_receipt_store.dart';
 /// other chain error defers the line to a later pass. The cost is one
 /// `get_job` per job created since the parent, and only for these rare
 /// lines. Not wired in production until T6.4.5.
+/// How long after an envelope's `validUntil` the reconciler still treats it
+/// as able to land. It covers a server clock ahead of the network and a
+/// lagging RPC node.
+const landingMargin = Duration(minutes: 5);
+
+/// Failure codes of a `create_child_job` whose transaction succeeded on
+/// the chain, even though its events could not prove this child. Such a
+/// child landed somewhere, so it is never closed as `not_opened`.
+const _landedCodes = {
+  SubmissionOutcomeCode.jobMismatch,
+  SubmissionOutcomeCode.jobEvidenceUnavailable,
+};
+
 final class UnverifiedChildReconciler {
   UnverifiedChildReconciler({
     required HireReceiptStore receipts,
@@ -104,7 +120,26 @@ final class UnverifiedChildReconciler {
     final parentJobId = (await _hires.findHire(parentHireId))?.jobId;
     if (parentJobId == null) return;
 
-    final matches = await _matches(child, line, parentJobId);
+    final siblings = [
+      for (final other in await _receipts.listByParent(parentHireId))
+        if (other.childHireId != childHireId) other,
+    ];
+    // A job a sibling already holds is that sibling's, not a candidate.
+    final held = {for (final other in siblings) ?other.childJobId};
+    final matches = [
+      for (final match in await _matches(child, line, parentJobId))
+        if (!held.contains(match.id)) match,
+    ];
+    if (matches.isNotEmpty && await _hasAlikeUnopened(siblings, child, line)) {
+      // On chain the jobs of alike children are interchangeable, so a match
+      // cannot tell whose it is. Binding it could run the wrong task.
+      _log(
+        ChainLogLevel.warning,
+        'Child hire $childHireId has an alike unopened sibling; job '
+        '${[for (final m in matches) m.id]} stays unreconciled',
+      );
+      return;
+    }
     if (matches.length > 1) {
       _log(
         ChainLogLevel.warning,
@@ -146,9 +181,15 @@ final class UnverifiedChildReconciler {
       );
       return;
     }
-    final landed = creates.any((row) => row.state == SubmissionState.confirmed);
+    final landed = creates.any(
+      (row) =>
+          row.state == SubmissionState.confirmed ||
+          _landedCodes.contains(row.errorCode),
+    );
     final now = _now().toUtc();
-    final mayLand = creates.any((row) => !now.isAfter(row.validUntil));
+    final mayLand = creates.any(
+      (row) => !now.isAfter(row.validUntil.add(landingMargin)),
+    );
     if (landed || mayLand) return;
     await _receipts.reopenUnverified(childHireId);
     if (await _receipts.markNotOpened(childHireId)) {
@@ -158,6 +199,34 @@ final class UnverifiedChildReconciler {
         'is ${ReceiptLineState.notOpened}',
       );
     }
+  }
+
+  /// Whether another unopened line of the parent has the same provider,
+  /// agent, price and expiry as this child.
+  Future<bool> _hasAlikeUnopened(
+    List<ReceiptLine> siblings,
+    HireRow child,
+    ReceiptLine line,
+  ) async {
+    for (final other in siblings) {
+      final otherHireId = other.childHireId;
+      if (otherHireId == null ||
+          other.childJobId != null ||
+          (other.state != ReceiptLineState.pending &&
+              other.state != ReceiptLineState.unverified) ||
+          other.providerWallet != line.providerWallet ||
+          other.budget != line.budget) {
+        continue;
+      }
+      final hire = await _hires.findHire(otherHireId);
+      if (hire != null &&
+          hire.agentId == child.agentId &&
+          hire.price == child.price &&
+          hire.expiredAt == child.expiredAt) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// The jobs above [parentJobId] that are this child, read up to the first

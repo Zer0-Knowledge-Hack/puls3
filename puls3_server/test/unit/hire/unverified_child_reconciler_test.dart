@@ -73,7 +73,38 @@ void main() {
   late _Jobs jobs;
   late DateTime now;
   late int childHireId;
+  late int parentHireId;
   late StoredSubmission create;
+
+  /// Another child of the same parent, with the same provider, agent, price
+  /// and expiry, and its receipt line.
+  Future<int> sibling() async {
+    final hire = await hires.insertHire(
+      NewHire(
+        consumer: _agentA,
+        agentId: 9,
+        price: _price,
+        manifestVersion: 3,
+        expiredAt: _childExpiry,
+        requestId: 'child:$parentHireId:call-2',
+        input: 'other research',
+        parentHireId: parentHireId,
+      ),
+    );
+    await receipts.insert(
+      NewReceiptLine(
+        parentHireId: parentHireId,
+        childHireId: hire.id,
+        providerAgentId: 9,
+        providerWallet: _agentB,
+        budget: _price,
+        relatedParty: false,
+        justification: 'cheapest research agent',
+        createTransaction: 'cd' * 32,
+      ),
+    );
+    return hire.id;
+  }
 
   UnverifiedChildReconciler reconciler() => UnverifiedChildReconciler(
     receipts: receipts,
@@ -122,6 +153,7 @@ void main() {
       ),
     );
     childHireId = child.id;
+    parentHireId = parent.id;
     await receipts.insert(
       NewReceiptLine(
         parentHireId: parent.id,
@@ -270,5 +302,76 @@ void main() {
 
     expect((await line()).state, ReceiptLineState.unverified);
     expect(openings.queued, isEmpty);
+  });
+  group('verifier probes (T6.4.4 A)', () {
+    test('a create that landed but failed its proof is never closed as '
+        'not_opened', () async {
+      final mismatched = await submissions.insertSubmitted(
+        purpose: SubmissionPurpose.createChildJob,
+        transactionHash: 'ee' * 32,
+        signedEnvelopeXdr: 'envelope-mismatch',
+        validUntil: _at,
+        hireId: childHireId,
+      );
+      await submissions.markFailed(
+        mismatched.id,
+        SubmissionOutcomeCode.jobMismatch,
+      );
+
+      await reconciler().reconcile();
+
+      expect((await line()).state, ReceiptLineState.unverified);
+    });
+
+    test('a job an opened sibling holds is not a candidate', () async {
+      final opened = await sibling();
+      await hires.bindJob(opened, 11, expiredAt: _childExpiry);
+      await receipts.markOpened(
+        opened,
+        childJobId: 11,
+        createTransaction: 'cd' * 32,
+        state: 'funded',
+      );
+      jobs.jobs[11] = _job();
+      jobs.jobs[12] = _job();
+
+      await reconciler().reconcile();
+
+      expect((await line()).childJobId, 12);
+    });
+
+    test('a sibling that is also unopened and alike makes the match '
+        'ambiguous: neither binds it', () async {
+      final other = await sibling();
+      await receipts.markUnverified(other);
+      jobs.jobs[11] = _job();
+
+      await reconciler().reconcile();
+
+      expect((await line()).state, ReceiptLineState.unverified);
+      expect(
+        (await receipts.findByChildHire(other))!.state,
+        ReceiptLineState.unverified,
+      );
+      expect(openings.queued, isEmpty);
+    });
+
+    test('an envelope just past validUntil is not closed yet: the margin '
+        'covers clock skew and node lag', () async {
+      now = _at.add(const Duration(minutes: 6));
+
+      await reconciler().reconcile();
+
+      expect((await line()).state, ReceiptLineState.unverified);
+    });
+
+    test('two reconcilers at once open the child once', () async {
+      jobs.jobs[11] = _job();
+
+      await Future.wait([reconciler().reconcile(), reconciler().reconcile()]);
+
+      expect((await line()).childJobId, 11);
+      expect(openings.queued, [childHireId]);
+    });
   });
 }
