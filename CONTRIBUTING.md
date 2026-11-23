@@ -192,7 +192,7 @@ the reason for a layer that does not apply.
 | Persistence or a migration | Integration | `melos run test:integration` (needs `postgres_test` and `redis_test`) |
 | Behavior that crosses the server and the chain (hire, escrow, relay) | E2E | `melos run test:e2e` (needs the local sandbox) |
 | Smart contract | Contract tests | `cd contracts && cargo test` |
-| Client, SDK or MCP | Unit, plus integration when the call shape matters | `melos run test:unit`, then `melos run test:integration` |
+| Client, SDK or MCP | Unit, plus integration when the call shape matters (the SDK contract tests live in `puls3_server/test/integration/sdk_contract_test.dart`, #375) | `melos run test:unit`, then `melos run test:integration` |
 | UI flow | Widget test, plus the browser suite when the hire flow changes | `melos run test:unit`; the browser suite is `puls3_flutter/integration_test/hire_flow_e2e_test.dart`, run by hand for now |
 | Docs only | None (`N/A`) | none |
 
