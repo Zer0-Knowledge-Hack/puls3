@@ -31,6 +31,11 @@ abstract interface class AgentIndexRepository {
   /// same agents leaves the index unchanged.
   Future<void> upsertAll(List<AgentSummary> agents);
 
+  /// Deletes the rows of [registryIds], if any: registrations the indexer no
+  /// longer accepts, for example one that holds a Studio id its draft's
+  /// owner did not register (#381).
+  Future<void> removeAll(Set<int> registryIds);
+
   /// The last ledger the indexer processed, or `null` before the first pass.
   Future<int?> lastProcessedLedger();
 
