@@ -93,6 +93,13 @@ class FakeLedger implements LedgerPort, RegistryReader, EscrowJobReader {
     return metadata[id.value]?[key];
   }
 
+  /// Owners by registry id. Every agent has its wallet as owner unless set.
+  final Map<int, StellarAddress> owners = {};
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async =>
+      owners[agent.value] ?? wallets[agent.value];
+
   @override
   Future<int> totalAgents() async {
     if (wallets.isEmpty && metadata.isEmpty) return 0;
