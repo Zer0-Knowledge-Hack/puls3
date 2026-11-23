@@ -75,7 +75,6 @@ final class EscrowChildResultSource implements ChildResultSource {
     required this.escrow,
     required this.inclusionFee,
     required this.validitySeconds,
-    this.maxOutputChars = defaultChildOutputMaxChars,
     DateTime Function()? now,
     ChainLog log = ignoreChainLog,
   }) : _receipts = receipts,
@@ -103,9 +102,6 @@ final class EscrowChildResultSource implements ChildResultSource {
   final StellarAddress escrow;
   final int inclusionFee;
   final int validitySeconds;
-
-  /// See [judgeChildOutput].
-  final int maxOutputChars;
 
   @override
   Future<ChildToolResult?> resultOf(int childHireId) async {
@@ -181,7 +177,7 @@ final class EscrowChildResultSource implements ChildResultSource {
         if (row.purpose == SubmissionPurpose.submit) row,
     ];
     if (submits.any((row) => row.state == SubmissionState.confirmed)) {
-      return judgeChildOutput(output, maxOutputChars: maxOutputChars);
+      return judgeChildOutput(output);
     }
     if (run?.state == HireRunState.failed) {
       return const ChildVerdict.reject(ChildVerdictCode.runFailed);

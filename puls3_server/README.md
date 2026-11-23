@@ -218,11 +218,17 @@ SHA-256 of the UTF-8 reason code:
 
 | Code | When | Call |
 |---|---|---|
-| `child_complete` | B's `submit` confirmed and its output is non-blank and within 16,000 runes | `complete` from `Submitted` |
+| `child_complete` | B's `submit` confirmed and its output is non-blank | `complete` from `Submitted` |
 | `child_output_empty` | B's submitted output is empty or blank | `reject` from `Submitted` |
-| `child_output_too_long` | B's submitted output is over the limit | `reject` from `Submitted` |
 | `child_run_failed` | B's run failed | `reject` from `Funded` |
 | `child_not_submitted` | B's run succeeded but its `submit` can never land | `reject` from `Funded` |
+
+Length is never a reason to reject. B's run already fails an output over its
+own manifest's `output.max_chars`, which no manifest may set above 16,000
+(domain invariant I30), so a stored output is work B delivered within its own
+terms. "Malformed" and "off the subtask" (D3) are not checked either, on
+purpose: they would need a model call that B's output could steer, so anything
+non-blank is paid.
 
 The parent's loop gets B's stored output (`ChildDelivered`) after a confirmed
 `complete` or a deadline-relay `release`, and `ChildFailed` with the reason

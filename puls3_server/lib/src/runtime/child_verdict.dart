@@ -5,11 +5,6 @@ import 'package:crypto/crypto.dart';
 
 import '../chain/submission_values.dart';
 
-/// The most characters (runes) of a child's output the parent agent accepts.
-/// A child run already keeps its own manifest's `outputMaxChars`; this bounds
-/// what one tool result adds to the parent's transcript. T6.4 may tune it.
-const defaultChildOutputMaxChars = 16000;
-
 /// The reason codes of a child verdict and of a failed child (ADR-0011 D3).
 /// The verdict's 32-byte `reason` is [childReasonHash] of its code, so
 /// anyone can check a `JobCompleted` or `JobRejected` against this list.
@@ -22,9 +17,6 @@ abstract final class ChildVerdictCode {
 
   /// B's output is empty or blank; rejected from `Submitted`.
   static const outputEmpty = 'child_output_empty';
-
-  /// B's output is over the parent's limit; rejected from `Submitted`.
-  static const outputTooLong = 'child_output_too_long';
 
   /// B's run succeeded but its `submit` can never land (a terminal
   /// simulation rejection or the attempts used up); rejected from `Funded`.
@@ -67,17 +59,21 @@ final class ChildVerdict {
 }
 
 /// The server rule of ADR-0011 D3 for a child's stored [output]: reject a
-/// missing output (the run failed), an empty or blank one, or one over
-/// [maxOutputChars] runes; complete anything else.
-ChildVerdict judgeChildOutput(String? output, {required int maxOutputChars}) {
+/// missing output (the run failed) or an empty or blank one; complete
+/// anything else.
+///
+/// Length is never a reason to reject: B's run already fails an output over
+/// its own manifest's `outputMaxChars`, which no manifest may set above
+/// 16000, so a stored output is work B delivered within its own terms.
+/// "Malformed" and "off the subtask" (D3) are not checked either, on purpose:
+/// they would need a model call that B's output could steer, so anything
+/// non-blank is paid.
+ChildVerdict judgeChildOutput(String? output) {
   if (output == null) {
     return const ChildVerdict.reject(ChildVerdictCode.runFailed);
   }
   if (output.trim().isEmpty) {
     return const ChildVerdict.reject(ChildVerdictCode.outputEmpty);
-  }
-  if (output.runes.length > maxOutputChars) {
-    return const ChildVerdict.reject(ChildVerdictCode.outputTooLong);
   }
   return const ChildVerdict.complete();
 }

@@ -7,8 +7,8 @@ import 'package:test/test.dart';
 
 void main() {
   group('judgeChildOutput', () {
-    test('completes a non-blank output within the limit', () {
-      final verdict = judgeChildOutput('Findings: three.', maxOutputChars: 16);
+    test('completes a non-blank output', () {
+      final verdict = judgeChildOutput('Findings: three.');
 
       expect(verdict.complete, isTrue);
       expect(verdict.code, ChildVerdictCode.complete);
@@ -16,7 +16,7 @@ void main() {
     });
 
     test('rejects a missing output as a failed run', () {
-      final verdict = judgeChildOutput(null, maxOutputChars: 100);
+      final verdict = judgeChildOutput(null);
 
       expect(verdict.complete, isFalse);
       expect(verdict.code, ChildVerdictCode.runFailed);
@@ -25,22 +25,21 @@ void main() {
 
     test('rejects an empty or blank output', () {
       for (final output in ['', '  \n\t ']) {
-        final verdict = judgeChildOutput(output, maxOutputChars: 100);
+        final verdict = judgeChildOutput(output);
         expect(verdict.code, ChildVerdictCode.outputEmpty, reason: output);
         expect(verdict.complete, isFalse);
       }
     });
 
-    test('rejects an output over the limit, counted in runes', () {
-      expect(
-        judgeChildOutput('abcde', maxOutputChars: 4).code,
-        ChildVerdictCode.outputTooLong,
-      );
-      // Four runes, eight UTF-16 code units: within a limit of 4.
-      expect(
-        judgeChildOutput('\u{1F600}' * 4, maxOutputChars: 4).code,
-        ChildVerdictCode.complete,
-      );
+    test('never rejects an output for its length', () {
+      // B's own run already fails an output over its manifest's
+      // `outputMaxChars`, which no manifest may set above 16000, so a stored
+      // output of any length was valid work and is paid.
+      for (final output in ['x' * 16000, 'x' * 40000, '\u{1F600}' * 16000]) {
+        final verdict = judgeChildOutput(output);
+        expect(verdict.code, ChildVerdictCode.complete);
+        expect(verdict.complete, isTrue);
+      }
     });
   });
 
@@ -48,7 +47,6 @@ void main() {
     expect(ChildVerdictCode.complete, 'child_complete');
     expect(ChildVerdictCode.runFailed, 'child_run_failed');
     expect(ChildVerdictCode.outputEmpty, 'child_output_empty');
-    expect(ChildVerdictCode.outputTooLong, 'child_output_too_long');
     expect(ChildVerdictCode.notSubmitted, 'child_not_submitted');
     expect(ChildVerdictCode.notOpened, 'child_not_opened');
     expect(ChildVerdictCode.expired, 'child_expired');
@@ -59,7 +57,6 @@ void main() {
       ChildVerdictCode.complete,
       ChildVerdictCode.runFailed,
       ChildVerdictCode.outputEmpty,
-      ChildVerdictCode.outputTooLong,
       ChildVerdictCode.notSubmitted,
     ]) {
       expect(
@@ -69,7 +66,7 @@ void main() {
       );
     }
     expect(
-      judgeChildOutput('ok', maxOutputChars: 10).reasonHash,
+      judgeChildOutput('ok').reasonHash,
       childReasonHash(ChildVerdictCode.complete),
     );
   });

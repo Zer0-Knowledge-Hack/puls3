@@ -68,30 +68,28 @@ void main() {
   late int childHireId;
   var serial = 0;
 
-  EscrowChildResultSource source({int maxOutputChars = 1000}) =>
-      EscrowChildResultSource(
-        receipts: receipts,
-        hires: hires,
-        runs: runs,
-        submissions: submissions,
-        accounts: accounts,
-        codec: codec,
-        sign: (prepared, signer) async {
-          final failure = signFailure;
-          if (failure != null) throw failure;
-          signers.add(signer);
-          return FakeEnvelopeCodec.sign(prepared.envelopeXdr);
-        },
-        send: (envelope, hash) async {
-          sent.add(envelope);
-          return SendTransactionResult(status: answer, hash: hash);
-        },
-        escrow: _escrow,
-        inclusionFee: 100,
-        validitySeconds: 300,
-        maxOutputChars: maxOutputChars,
-        now: () => _at,
-      );
+  EscrowChildResultSource source() => EscrowChildResultSource(
+    receipts: receipts,
+    hires: hires,
+    runs: runs,
+    submissions: submissions,
+    accounts: accounts,
+    codec: codec,
+    sign: (prepared, signer) async {
+      final failure = signFailure;
+      if (failure != null) throw failure;
+      signers.add(signer);
+      return FakeEnvelopeCodec.sign(prepared.envelopeXdr);
+    },
+    send: (envelope, hash) async {
+      sent.add(envelope);
+      return SendTransactionResult(status: answer, hash: hash);
+    },
+    escrow: _escrow,
+    inclusionFee: 100,
+    validitySeconds: 300,
+    now: () => _at,
+  );
 
   void run(HireRunState state, {String? result}) => runs.overwrite(
     HireRun(hireId: childHireId, state: state, queuedAt: _at, result: result),
@@ -342,17 +340,19 @@ void main() {
       expect(builtCall().invoke, expectedCall('reject', 'child_output_empty'));
     });
 
-    test('a submitted child over the output limit is rejected', () async {
-      run(HireRunState.succeeded, result: _output);
-      await record(SubmissionPurpose.submit);
+    test(
+      'a submitted child at the platform output ceiling is completed',
+      () async {
+        // 16000 runes is the most any manifest allows (`outputMaxChars`), so
+        // B's longest valid result is paid, never rejected for its length.
+        run(HireRunState.succeeded, result: 'x' * 16000);
+        await record(SubmissionPurpose.submit);
 
-      await source(maxOutputChars: 5).resultOf(childHireId);
+        await source().resultOf(childHireId);
 
-      expect(
-        builtCall().invoke,
-        expectedCall('reject', 'child_output_too_long'),
-      );
-    });
+        expect(builtCall().invoke, expectedCall('complete', 'child_complete'));
+      },
+    );
 
     test('a child whose submit can never land is rejected from Funded as '
         'child_not_submitted', () async {
