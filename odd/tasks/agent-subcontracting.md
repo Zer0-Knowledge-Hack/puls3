@@ -373,4 +373,6 @@ StellarExpert.
   from its `backup/334-pre-rebase-*` branch only by the ADR-0011 change, and #360 to #368 are
   mergeable with their approvals kept. Next: T6.4 on `feat/334-subcontract-wiring`.
 - 2026-11-23: resumed after a power cut (tree clean at `da49afb`). T6.4.2 done with decision B
-  (signer read from the stored envelope, no migration). Next: T6.4.3.
+  (signer read from the stored envelope, no migration). Native review of `c30c7d7` (lenses resilience
+  and reliability, lineage `review-453dd25ab4c54ba9`) granted, approved and acknowledged; the
+  reviewed boundary is now `c30c7d7`. Next: T6.4.3.
