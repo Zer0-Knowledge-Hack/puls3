@@ -275,7 +275,11 @@ final class EscrowSubcontractPort implements SubcontractPort {
     } on HireRequestConflict {
       // A concurrent retry of the same call stored the child first.
       final won = await _storedChild(parent.id, requestId);
-      if (won == null) rethrow;
+      // Another hire of this wallet holds the request id and is not a child
+      // of this parent. Everything rolled back, so nothing is held. It is a
+      // refusal, not an error: an escaping exception would fail the whole
+      // parent run (T6.4.4).
+      if (won == null) throw const SubcontractRefused('request_conflict');
       return _reuse(won);
     } on ChainSubmissionConflict {
       // The same envelope is already stored: another child drafted on the

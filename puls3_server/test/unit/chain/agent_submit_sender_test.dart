@@ -337,6 +337,17 @@ void main() {
       expect(store.all, isEmpty);
     });
 
+    test('a childrenOpen that throws holds the submit and does not escape '
+        'send', () async {
+      await sender(
+        childrenOpen: (_) async => throw StateError('database down'),
+      ).send(_due());
+
+      expect(codec.built, isEmpty);
+      expect(store.all, isEmpty);
+      expect(sent, isEmpty);
+    });
+
     test('is submitted once every child settled', () async {
       await sender(childrenOpen: (_) async => false).send(_due());
 
