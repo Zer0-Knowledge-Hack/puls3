@@ -63,6 +63,7 @@ void main() {
     submissions: rig.submissions,
     jobs: rig.ledger,
     relay: rig.service,
+    codec: rig.codec,
     config: HireRelayConfig(_environment()),
     childAgent: (registryId) async =>
         registryId == _childRegistryId ? childAgent : null,
@@ -287,6 +288,10 @@ void main() {
     test('another call id opens another child', () async {
       final hire = await parent();
       final first = await port().requestChild(_request(hire.id));
+      // The first create_child_job landed: A's sequence moved on.
+      await rig.submissions.markConfirmed(
+        (await rig.submissions.listSubmitted()).single.id,
+      );
       rig.accounts.sequence += 1;
 
       final second = await port().requestChild(
@@ -309,6 +314,56 @@ void main() {
       expect(sent, hasLength(1));
       expect(receipts.all, hasLength(1), reason: 'the line rolled back');
     });
+
+    test('refuses with chain_busy, before anything is signed, while another '
+        'call A signed is in flight', () async {
+      final hire = await parent();
+      await rig.submissions.insertSubmitted(
+        purpose: SubmissionPurpose.submit,
+        transactionHash: 'cd' * 32,
+        signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_agentA),
+        validUntil: rig.clock.add(const Duration(minutes: 5)),
+        hireId: hire.id + 50,
+      );
+
+      await expectRefused(port().requestChild(_request(hire.id)), 'chain_busy');
+      expectNothingOpened();
+      expect(rig.codec.built, isEmpty, reason: 'nothing is drafted');
+    });
+
+    test('an unreadable agent-signed envelope in flight refuses with '
+        'chain_busy', () async {
+      final hire = await parent();
+      await rig.submissions.insertSubmitted(
+        purpose: SubmissionPurpose.submit,
+        transactionHash: 'cd' * 32,
+        signedEnvelopeXdr: 'AAAA',
+        validUntil: rig.clock.add(const Duration(minutes: 5)),
+        hireId: hire.id + 50,
+      );
+
+      await expectRefused(port().requestChild(_request(hire.id)), 'chain_busy');
+      expectNothingOpened();
+    });
+
+    test(
+      "another wallet's call in flight does not hold a subcontract",
+      () async {
+        final hire = await parent();
+        await rig.submissions.insertSubmitted(
+          purpose: SubmissionPurpose.childComplete,
+          transactionHash: 'cd' * 32,
+          signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_agentB),
+          validUntil: rig.clock.add(const Duration(minutes: 5)),
+          hireId: hire.id + 50,
+        );
+
+        await port().requestChild(_request(hire.id));
+
+        expect(signers, [_agentA]);
+        expect(sent, hasLength(1));
+      },
+    );
 
     test('refuses a parent that is not funded', () async {
       final hire = await parent(status: HireStatus.open);

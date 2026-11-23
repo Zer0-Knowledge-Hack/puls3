@@ -14,6 +14,7 @@ import '../ledger/xdr_invoke_encoder.dart' show ScArg;
 import 'chain_log.dart';
 import 'chain_submission_store.dart';
 import 'escrow_deadline.dart';
+import 'agent_call_gate.dart';
 import 'submission_values.dart';
 
 /// SHA-256 of the UTF-8 run output, the 32-byte escrow `deliverable`.
@@ -58,9 +59,10 @@ final class DueSubmit {
 /// Builds, signs with the agent's custodied key, persists and sends one
 /// escrow `submit`.
 ///
-/// One agent-signed call ([agentSignedPurposes]) is in flight at a time,
-/// across hires: agent wallets can have more than one funded job, and two
-/// envelopes built against the same sequence would be `txBadSeq`. A hire
+/// One agent-signed call ([agentSignedPurposes]) is in flight per signing
+/// wallet, across hires ([agentCallInFlight]): agent wallets can have more
+/// than one funded job, and two envelopes built against the same sequence
+/// would be `txBadSeq`. Another agent's call does not hold it. A hire
 /// with any non-final submission is skipped too. After
 /// [maxEscrowCallAttempts] failed `submit`s the pass stops building another.
 ///
@@ -124,12 +126,19 @@ final class AgentSubmitSender {
   final int inclusionFee;
   final int validitySeconds;
 
-  /// Sends [due] unless an agent-signed call is already in flight, the hire
+  /// Sends [due] unless an agent-signed call of its provider is already in
+  /// flight, the hire
   /// has a non-final submission, a `submit` already confirmed, attempts are
   /// exhausted, or the hire has an open child job.
   Future<void> send(DueSubmit due) async {
     const purpose = SubmissionPurpose.submit;
-    if (await _submissions.hasSubmitted(agentSignedPurposes)) return;
+    if (await agentCallInFlight(
+      submissions: _submissions,
+      codec: _codec,
+      signer: due.provider,
+    )) {
+      return;
+    }
     final existing = await _submissions.listByHire(due.hireId);
     if (existing.any((row) => !row.state.isFinal)) return;
     if (existing.any(

@@ -28,6 +28,9 @@ const _agentA = 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY';
 const _agentB = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
 const _childJobId = 4;
 const _output = 'B found three sources.';
+final _otherAgent = StellarAddress.parse(
+  'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H',
+);
 final _escrow = StellarAddress.parse(
   'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
 );
@@ -101,12 +104,13 @@ void main() {
     SubmissionState state = SubmissionState.confirmed,
     String errorCode = SubmissionOutcomeCode.transactionFailed,
     int? hireId,
+    String? envelope,
   }) async {
     serial++;
     final row = await submissions.insertSubmitted(
       purpose: purpose,
       transactionHash: serial.toRadixString(16).padLeft(64, '0'),
-      signedEnvelopeXdr: 'envelope-$serial',
+      signedEnvelopeXdr: envelope ?? 'envelope-$serial',
       validUntil: _at,
       preparationId: purpose.isServerSigned ? null : 'prep-$serial',
       hireId: hireId ?? childHireId,
@@ -383,16 +387,47 @@ void main() {
       expect(verdicts(), hasLength(1));
     });
 
-    test('waits while another agent-signed call is in flight', () async {
+    test('waits while another call A signed is in flight', () async {
       run(HireRunState.failed);
       await record(
         SubmissionPurpose.submit,
         state: SubmissionState.submitted,
         hireId: childHireId + 50,
+        envelope: FakeEnvelopeCodec.signedBy(StellarAddress.parse(_agentA)),
       );
 
       expect(await source().resultOf(childHireId), isNull);
       expect(codec.built, isEmpty);
+    });
+
+    test(
+      'an unreadable agent-signed envelope in flight holds the verdict',
+      () async {
+        run(HireRunState.failed);
+        await record(
+          SubmissionPurpose.submit,
+          state: SubmissionState.submitted,
+          hireId: childHireId + 50,
+          envelope: 'AAAA',
+        );
+
+        expect(await source().resultOf(childHireId), isNull);
+        expect(codec.built, isEmpty);
+      },
+    );
+
+    test("another wallet's call in flight does not hold the verdict", () async {
+      run(HireRunState.failed);
+      await record(
+        SubmissionPurpose.submit,
+        state: SubmissionState.submitted,
+        hireId: childHireId + 50,
+        envelope: FakeEnvelopeCodec.signedBy(_otherAgent),
+      );
+
+      expect(await source().resultOf(childHireId), isNull);
+      expect(codec.built, hasLength(1));
+      expect(signers.map((s) => s.value), [_agentA]);
     });
 
     test('a node refusal fails the verdict; a later pass signs again until '
