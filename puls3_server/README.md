@@ -233,7 +233,10 @@ non-blank is paid.
 The parent's loop gets B's stored output (`ChildDelivered`) after a confirmed
 `complete` or a deadline-relay `release`, and `ChildFailed` with the reason
 code after a confirmed `reject`, `child_expired` after `claim_refund`, and
-`child_not_opened` for a child whose `create_child_job` never landed. A
+`child_not_opened` for a child whose `create_child_job` never landed. When
+the parent's run fails, its open children are still judged by the same rule on
+every runtime pass. The reserve backs B's work until B finishes, whoever hired
+the parent. A
 delivered output that would push the parent's conversation past its limit
 (`input.max_chars` plus the loop's headroom) is cut to the longest prefix that
 fits and labelled with `truncated` and `output_runes`, so the paid result never

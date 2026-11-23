@@ -69,6 +69,7 @@ void main() {
   late SendTransactionStatus answer;
   late Object? signFailure;
   late int childHireId;
+  late int parentHireId;
   var serial = 0;
 
   EscrowChildResultSource source() => EscrowChildResultSource(
@@ -193,6 +194,7 @@ void main() {
       ),
     );
     childHireId = child.id;
+    parentHireId = parent.id;
     await hires.bindJob(childHireId, _childJobId, expiredAt: 1791747914);
     await receipts.insert(
       NewReceiptLine(
@@ -294,6 +296,55 @@ void main() {
 
       expect(await source().resultOf(childHireId), isNull);
       expect(codec.built, isEmpty);
+    });
+  });
+
+  group('judgeOrphans: a child of a failed parent run (T6.4.4)', () {
+    void parentRun(HireRunState state) => runs.overwrite(
+      HireRun(hireId: parentHireId, state: state, queuedAt: _at),
+    );
+
+    test('a failed child is rejected, signed by A', () async {
+      parentRun(HireRunState.failed);
+      run(HireRunState.failed);
+
+      await source().judgeOrphans();
+
+      expect(builtCall().invoke, expectedCall('reject', 'child_run_failed'));
+      expect(signers.map((s) => s.value), [_agentA]);
+      expect(verdicts().single.purpose, SubmissionPurpose.childReject);
+      expect(sent, hasLength(1));
+    });
+
+    test('a delivered child is completed by the normal rule (Policy 1)', () async {
+      parentRun(HireRunState.failed);
+      run(HireRunState.succeeded, result: _output);
+      await record(SubmissionPurpose.submit);
+
+      await source().judgeOrphans();
+
+      expect(builtCall().invoke, expectedCall('complete', 'child_complete'));
+      expect(verdicts().single.purpose, SubmissionPurpose.childComplete);
+    });
+
+    test('a child still working keeps its reserve and signs nothing', () async {
+      parentRun(HireRunState.failed);
+
+      await source().judgeOrphans();
+
+      expect(verdicts(), isEmpty);
+      expect(sent, isEmpty);
+    });
+
+    test('the child of a parent that is not failed is left to its '
+        'resume', () async {
+      parentRun(HireRunState.awaitingChild);
+      run(HireRunState.failed);
+
+      await source().judgeOrphans();
+
+      expect(verdicts(), isEmpty);
+      expect(sent, isEmpty);
     });
   });
 

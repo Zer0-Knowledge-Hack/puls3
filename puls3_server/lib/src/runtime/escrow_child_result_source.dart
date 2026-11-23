@@ -166,6 +166,40 @@ final class EscrowChildResultSource implements ChildResultSource {
     return null;
   }
 
+  /// Sends the verdict of each opened, unsettled child whose parent run
+  /// failed (T6.4.4). A failed parent run leaves `awaitingChild`, so its
+  /// resume never calls [resultOf] again.
+  ///
+  /// User decision 2026-11-23: such a child is judged by the normal rule,
+  /// not rejected early and not left to the deadline relay alone:
+  /// - B was hired to do the work. The reserve backs that work until B
+  ///   finishes, whoever hired the parent, a human or another agent.
+  /// - A child that delivered keeps its pay (Policy 1), and a blank output is
+  ///   still rejected. The relay's `release` would pay it unjudged.
+  /// - Rejecting B mid-work would race its `submit` and cut work it was
+  ///   paid to do.
+  ///
+  /// A child still working is skipped until a later pass. One line that
+  /// cannot be read is logged and does not hold the others.
+  @override
+  Future<void> judgeOrphans() async {
+    for (final line in await _receipts.listUnsettled()) {
+      final childHireId = line.childHireId;
+      if (childHireId == null) continue;
+      try {
+        final parent = await _runs.find(line.parentHireId);
+        if (parent?.state != HireRunState.failed) continue;
+        await resultOf(childHireId);
+      } on Object catch (e) {
+        _log(
+          e is LedgerException ? ChainLogLevel.warning : ChainLogLevel.error,
+          'Verdict of child hire $childHireId of failed parent '
+          '${line.parentHireId} deferred: ${e.runtimeType}',
+        );
+      }
+    }
+  }
+
   /// The verdict the final facts call for, or `null` while B still works.
   /// Every input it reads is final once it answers, so a confirmed reject
   /// recomputes the same code.

@@ -101,6 +101,15 @@ final class _Children implements ChildResultSource {
     if (error case final error?) throw error;
     return result;
   }
+
+  var orphanSweeps = 0;
+  Object? orphanError;
+
+  @override
+  Future<void> judgeOrphans() async {
+    orphanSweeps++;
+    if (orphanError case final error?) throw error;
+  }
 }
 
 AgentCandidate _candidate() => const AgentCandidate(
@@ -658,6 +667,24 @@ void main() {
       expect(summary.deferred, 1);
       expect((await runs.find(id))!.state, HireRunState.awaitingChild);
       expect(model.tasks, hasLength(calls));
+    });
+
+    test('every pass judges the children of failed parents once '
+        '(T6.4.4)', () async {
+      await pass();
+
+      expect(children.orphanSweeps, 1);
+    });
+
+    test('a failing orphan sweep does not hold the queued runs', () async {
+      manifests.manifest = _manifest();
+      fundedHire();
+      children.orphanError = StateError('receipt store down');
+
+      final summary = await pass();
+
+      expect(children.orphanSweeps, 1);
+      expect(summary.succeeded, 1);
     });
 
     test('an unexpected error while driving the loop fails the run as '

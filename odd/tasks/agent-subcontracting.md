@@ -371,9 +371,26 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         The reason is written in the code, and a characterization test pins it: no attempt
         is used, and the verdict is sent once the node is back. There is no RED because the
         behavior did not change. Focused 21 passed, analyze clean. Risk: none.
-      - [ ] **B** Children of failed parent runs: `markFailed` drops the run from
-        `listAwaitingChild`, so A never judges its open children, and the deadline relay
-        settles them. Needs a policy decision.
+      - [x] **B** Children of failed parent runs: `markFailed` dropped the run from
+        `listAwaitingChild`, so A never judged its open children. The deadline relay then
+        settled them, and its `release` paid a blank output without judging it.
+        User decision 2026-11-23 (option 1): "Pues la 1, ya que es lo corecto, las reservas
+        deben de quedarse trabadas hasta que el agent termine su trabajo, independientemente
+        de quien lo haya contratado, si un humano u otro agente".
+
+        The fix adds `HireReceiptStore.listUnsettled` (contract-tested on both stores) and
+        `ChildResultSource.judgeOrphans`. `judgeOrphans` calls the same `resultOf` for each
+        opened, unsettled line whose parent run is `failed`, and `HireRunner.pass` runs it on
+        every pass. The sweep is isolated: one failing line, or a failing sweep, does not hold
+        the rest. There is no migration and no schema change.
+
+        RED:
+        - the contract and the `judgeOrphans` tests failed to compile;
+        - the runner tests failed with `Expected: <1> Actual: <0>`.
+
+        GREEN: analyze clean, unit+hire+ledger 1408 passed, integration 212 passed. The
+        server README is updated. Risk: none. It reuses `resultOf` and the per-wallet gate
+        unchanged, and only children of failed parents are affected.
       - [ ] **A** `unverified` and half-opened lines: stuck until the parent deadline, and the
         relay never reaches them because no `jobId` is bound. Needs decisions on how to find the
         child job on chain and which state results.
@@ -426,3 +443,4 @@ StellarExpert.
 - 2026-11-23: user on verifier note A: "Follow up". It stays out of T6.4.4 as a separate
   follow-up. Next: T6.4.4.
 - 2026-11-23: T6.4.4 C and D done (`7318113`). E decided by the user ("Vamos con la 1"): unbounded transient retries, documented and pinned. Next: B.
+- 2026-11-23: T6.4.4 E done (`7376160`). B decided by the user (option 1: judge orphans by the normal rule) and done. Next: A.

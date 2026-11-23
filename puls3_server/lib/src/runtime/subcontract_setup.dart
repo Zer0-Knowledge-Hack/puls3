@@ -12,6 +12,11 @@ abstract interface class ChildResultSource {
   /// delivered nor ended. A thrown error leaves the run waiting for a later
   /// pass.
   Future<ChildToolResult?> resultOf(int childHireId);
+
+  /// Judges every open child whose parent run failed, by the same rule as
+  /// [resultOf]. A failed parent never resumes, so nothing else would ask
+  /// for these verdicts. A thrown error leaves them for a later pass.
+  Future<void> judgeOrphans();
 }
 
 /// Runs [body] on the [AgentRunner] that [manifest] runs on: the team runner
