@@ -32,6 +32,17 @@ body:
     validations:
       required: true
   - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: For each layer, the tests this issue adds, or `N/A` with the reason (for example "docs only"). See the table in CONTRIBUTING.md, section 2.6.
+      placeholder: |
+        - Unit: ...
+        - Integration: ...
+        - E2E: ...
+    validations:
+      required: true
+  - type: textarea
     id: how-to-verify
     attributes:
       label: How to verify
