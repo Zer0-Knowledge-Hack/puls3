@@ -43,11 +43,14 @@ jobs:
                 server=true; docker=true ;;
               .dockerignore)
                 docker=true ;;
+              # The server image resolves puls3_client and puls3_sdk as dev
+              # dependencies, and the server job runs the SDK contract tests
+              # (#375), so both jobs follow these packages.
               puls3_client/*)
-                server=true; app=true; sdk=true ;;
-              # The server job runs the SDK contract tests (#375), so a
-              # change to the SDK or the MCP server runs them too.
-              puls3_sdk/*|puls3_mcp/*)
+                server=true; app=true; sdk=true; docker=true ;;
+              puls3_sdk/*)
+                server=true; sdk=true; docker=true ;;
+              puls3_mcp/*)
                 server=true; sdk=true ;;
               puls3_cli/*)
                 sdk=true ;;
