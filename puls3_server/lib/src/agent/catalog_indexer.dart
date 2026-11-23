@@ -30,9 +30,14 @@ final class IndexPassSummary {
   /// registrations), which are not indexed.
   int skipped = 0;
 
-  /// Agents that reuse a catalog id another owner registered first, which are
-  /// not indexed (audit I-1).
+  /// Agents that may not hold their catalog id, which are not indexed (audit
+  /// I-1): a copy of an id another owner registered first, or a Studio id its
+  /// draft's owner did not register (#381).
   int foreign = 0;
+
+  /// Rows already in the index that a pass refused and deleted, so a
+  /// registration indexed before the rule stops shadowing the right one.
+  int removed = 0;
 
   /// Whether the pass re-hydrated every indexed agent because the event stream
   /// had a gap (retention or truncation).
@@ -42,7 +47,7 @@ final class IndexPassSummary {
   String toString() =>
       'from ${fromLedger ?? 'bootstrap'} to $toLedger, '
       'events $events, touched $touched, hydrated $hydrated, '
-      'skipped $skipped, foreign $foreign${recoveredAll ? ', recoveredAll' : ''}';
+      'skipped $skipped, foreign $foreign, removed $removed${recoveredAll ? ', recoveredAll' : ''}';
 }
 
 /// Syncs the catalog index from the identity registry.
@@ -62,12 +67,15 @@ final class CatalogIndexer {
     required RegistryEventReader events,
     required AgentIndexRepository repository,
     required ChainLog log,
+    CatalogIdOwners owners = const FirstRegistrantOnly(),
   }) : _registry = registry,
+       _owners = owners,
        _events = events,
        _repository = repository,
        _log = log;
 
   final RegistryReader _registry;
+  final CatalogIdOwners _owners;
   final RegistryEventReader _events;
   final AgentIndexRepository _repository;
   final ChainLog _log;
@@ -130,25 +138,22 @@ final class CatalogIndexer {
     final agents = <AgentSummary>[];
     // The first registration of each catalog id seen in this pass.
     final first = <String, int>{};
+    // Indexed rows this pass refuses: they are deleted, not just skipped.
+    final refused = <int>{};
     for (final id in ids) {
       final agent = await readAgentSummary(_registry, id);
       if (agent == null) {
         summary.skipped++;
         continue;
       }
-      // Every indexed row of a catalog id has the same owner, so any of them
-      // stands for the first registration.
-      final claimed =
-          first[agent.id] ??
-          (await _repository.findByAgentId(agent.id))?.registryId;
-      if (claimed != null &&
-          claimed != id &&
-          !await mayTakeOverCatalogId(_registry, earlier: claimed, later: id)) {
+      final refusal = await _refusal(agent, first);
+      if (refusal != null) {
         summary.foreign++;
+        if (indexed.contains(id)) refused.add(id);
         _log(
           ChainLogLevel.warning,
-          'Registry id $id reuses catalog id ${agent.id}, registered first '
-          'by another owner (registry id $claimed): not indexed (audit I-1).',
+          'Registry id $id may not hold catalog id ${agent.id}: $refusal. '
+          'Not indexed (audit I-1).',
         );
         continue;
       }
@@ -157,8 +162,40 @@ final class CatalogIndexer {
     }
     if (agents.isNotEmpty) await _repository.upsertAll(agents);
     summary.hydrated = agents.length;
+    if (refused.isNotEmpty) {
+      await _repository.removeAll(refused);
+      summary.removed = refused.length;
+    }
 
     if (advanceCursor) await _repository.setLastProcessedLedger(latest);
     return summary;
+  }
+
+  /// Why [agent] may not hold its catalog id, or null when it may. [first]
+  /// holds the first registration of each id seen in this pass.
+  Future<String?> _refusal(AgentSummary agent, Map<String, int> first) async {
+    final id = agent.registryId;
+    switch (await _owners.claimOf(agent.id)) {
+      case NobodyClaim():
+        return 'no Studio draft has this id';
+      case OwnerClaim(:final owner):
+        return await isOwnedBy(_registry, id, owner)
+            ? null
+            : 'it is not owned by the draft owner ${owner.value}';
+      case FirstRegistrantClaim():
+        // Every indexed row of a catalog id has the same owner, so any of
+        // them stands for the first registration.
+        final claimed =
+            first[agent.id] ??
+            (await _repository.findByAgentId(agent.id))?.registryId;
+        if (claimed == null || claimed == id) return null;
+        return await mayTakeOverCatalogId(
+              _registry,
+              earlier: claimed,
+              later: id,
+            )
+            ? null
+            : 'registry id $claimed registered it first, with another owner';
+    }
   }
 }
