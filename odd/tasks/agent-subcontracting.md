@@ -310,3 +310,8 @@ StellarExpert.
   advisories RUSTSEC-2026-0574 to 0582). #368: `child_output_too_long` removed (see T6.3).
   Next: push both, reply to the reviews, rebase #360/#363/#365/#367 (squash merges left them
   conflicting), then T6.4.
+- 2026-11-23: both pushed; replies posted on #357, #361 and #368, and #334 links the ADR. The
+  stack from `feat/334-server-subcontract` to `feat/334-child-verdict` was rebased with
+  `--onto` past the squash-merged slices and force-pushed with lease. Each rebased tree differs
+  from its `backup/334-pre-rebase-*` branch only by the ADR-0011 change, and #360 to #368 are
+  mergeable with their approvals kept. Next: T6.4 on `feat/334-subcontract-wiring`.
