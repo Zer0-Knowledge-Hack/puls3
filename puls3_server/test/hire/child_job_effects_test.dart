@@ -339,6 +339,25 @@ void main() {
       expect(openings.queued, [childHireId]);
     });
 
+    test('delegates relay settlements to its ChildJobEffects', () async {
+      await apply();
+
+      await hireEffects(children: effects).onRelaySettled(
+        _submission(childHireId, purpose: SubmissionPurpose.claimRefund),
+        const [],
+      );
+
+      expect((await line()).state, HireStatus.expired.name);
+    });
+
+    test('without ChildJobEffects a relay settlement changes nothing and does '
+        'not throw, because plain hires are released too', () async {
+      await hireEffects().onRelaySettled(
+        _submission(childHireId, purpose: SubmissionPurpose.release),
+        const [],
+      );
+    });
+
     test('without ChildJobEffects throws, so the record is retried', () {
       final bare = hireEffects();
 
@@ -432,6 +451,100 @@ void main() {
 
       expect((await line()).state, ReceiptLineState.pending);
       expect((await line()).settleTransaction, isNull);
+    });
+  });
+  group('onRelaySettled', () {
+    JobCompletedEvent completed({int jobId = _childJobId}) => JobCompletedEvent(
+      jobId: jobId,
+      evaluator: StellarAddress.parse(_agentA),
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: true,
+    );
+
+    Future<void> relay(
+      SubmissionPurpose purpose, [
+      List<JobCompletedEvent>? events,
+      int? hireId,
+    ]) => effects.onRelaySettled(
+      _submission(
+        hireId ?? childHireId,
+        purpose: purpose,
+        transactionHash: _settleTx,
+      ),
+      events ?? [completed()],
+    );
+
+    test('a confirmed release records the child as completed with fee, '
+        'payout and the settle transaction', () async {
+      await apply();
+
+      await relay(SubmissionPurpose.release);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.completed.name);
+      expect(settled.fee, 10000);
+      expect(settled.payout, 490000);
+      expect(settled.settleTransaction, _settleTx);
+    });
+
+    test('a confirmed claim_refund records the child as expired and paying '
+        'nothing, since the budget went back to the reserve', () async {
+      await apply();
+
+      await relay(SubmissionPurpose.claimRefund, const []);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.expired.name);
+      expect(settled.fee, 0);
+      expect(settled.payout, 0);
+      expect(settled.settleTransaction, _settleTx);
+    });
+
+    test('a release without the child job event leaves fee and payout '
+        'unset', () async {
+      await apply();
+
+      await relay(SubmissionPurpose.release, [completed(jobId: 99)]);
+
+      final settled = await line();
+      expect(settled.state, HireStatus.completed.name);
+      expect(settled.fee, isNull);
+      expect(settled.payout, isNull);
+    });
+
+    test(
+      'a verdict already settled the line: the relay writes nothing',
+      () async {
+        await apply();
+        await effects.onChildSettled(
+          _submission(
+            childHireId,
+            purpose: SubmissionPurpose.childReject,
+            transactionHash: _createTx,
+          ),
+          const [],
+        );
+
+        await relay(SubmissionPurpose.release);
+
+        expect((await line()).state, HireStatus.rejected.name);
+        expect((await line()).settleTransaction, _createTx);
+      },
+    );
+
+    test('a hire without a receipt line, such as a plain hire, changes '
+        'nothing', () async {
+      await relay(SubmissionPurpose.release, null, childHireId + 100);
+
+      expect((await line()).state, ReceiptLineState.pending);
+    });
+
+    test('a hire without a stored hire id changes nothing', () async {
+      await effects.onRelaySettled(
+        _submission(null, purpose: SubmissionPurpose.release),
+        const [],
+      );
     });
   });
 }

@@ -326,7 +326,22 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         `submit`. Candidate for T6.4.4 or a follow-up.
       - (B, already true) The gate is check-then-act, not a lock.
       - (C) The `chain_busy` message gives the model no hint to wait and retry.
-    - [ ] **T6.4.3** Record relay `release` / `claim_refund` on the child's receipt line.
+    - [x] **T6.4.3** Record relay `release` / `claim_refund` on the child's receipt line.
+      Route: inline. A new `EscrowEffects.onRelaySettled` runs on a successful relay call before
+      it is confirmed:
+      - `release` records the line `completed`, with the `JobCompleted` fee and payout;
+      - `claim_refund` records it `expired` with 0 and 0, because the budget went back to the
+        reserve;
+      - a line a verdict already settled is not changed;
+      - a plain hire has no line, so nothing is written.
+
+      Without `ChildJobEffects`, which is production until T6.4.5, the effect does nothing
+      instead of throwing, so plain releases still confirm. An exception now leaves a relay call
+      `submitted` for a retry, as it already does for the verdicts. RED: the tests failed to
+      compile (`onRelaySettled` was undefined). GREEN: focused 123 passed, server
+      unit+hire+ledger 1398 passed, integration 211 passed, analyze clean. Risk: none. The
+      tracker's relay path also serves plain hires: pinned by the no-children test and the
+      tracker tests.
     - [ ] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
       parent runs, orphan `HireRequestConflict`, a throwing `childrenOpen`, and bounded
       `LedgerException` retries.
@@ -375,4 +390,4 @@ StellarExpert.
 - 2026-11-23: resumed after a power cut (tree clean at `da49afb`). T6.4.2 done with decision B
   (signer read from the stored envelope, no migration). Native review of `c30c7d7` (lenses resilience
   and reliability, lineage `review-453dd25ab4c54ba9`) granted, approved and acknowledged; the
-  reviewed boundary is now `c30c7d7`. Next: T6.4.3.
+  reviewed boundary is now `c30c7d7`. T6.4.3 done. Next: T6.4.4.

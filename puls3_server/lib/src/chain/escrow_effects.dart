@@ -122,6 +122,20 @@ abstract interface class EscrowEffects {
     List<JobCompletedEvent> completed,
   );
 
+  /// After a successful relay `release` or `claim_refund`
+  /// ([SubmissionPurpose.release], [SubmissionPurpose.claimRefund]) of any
+  /// hire, before the submission is confirmed: when the hire is a child
+  /// job, records its settlement on its receipt line (ADR-0011 D3; a
+  /// `release` pays B, a `claim_refund` returns the budget to the parent's
+  /// reserve). [completed] are the transaction's valid `job_completed`
+  /// events. A plain hire has no line, so nothing changes. The submission
+  /// is confirmed whatever the line says; an exception leaves it
+  /// `submitted` and is retried.
+  Future<void> onRelaySettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  );
+
   /// After a successful `give_feedback` ([SubmissionPurpose.giveFeedback]).
   ///
   /// No event is needed: the signed envelope is the one the server prepared
@@ -196,6 +210,12 @@ final class NoopEscrowEffects implements EscrowEffects {
 
   @override
   Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {}
+
+  @override
+  Future<void> onRelaySettled(
     StoredSubmission submission,
     List<JobCompletedEvent> completed,
   ) async {}

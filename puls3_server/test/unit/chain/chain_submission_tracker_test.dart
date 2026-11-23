@@ -1257,6 +1257,59 @@ void main() {
     });
   });
 
+  group('relay settlements (T6.4.3)', () {
+    final released = JobCompletedEvent(
+      jobId: 4,
+      evaluator: _address,
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: true,
+    );
+
+    for (final purpose in [
+      SubmissionPurpose.release,
+      SubmissionPurpose.claimRefund,
+    ]) {
+      test('a successful ${purpose.wireName} records the settlement, then '
+          'confirms', () async {
+        final s = await submit(purpose);
+        ledger.lookups[s.transactionHash] = _success(jobCompleted: [released]);
+
+        final summary = await tracker.pass(store);
+
+        expect(summary.confirmed, 1);
+        expect(effects.relaySettled, [s.id]);
+        expect(
+          effects.relaySettledEvents.single.single.payout,
+          released.payout,
+        );
+        await expectState(s, SubmissionState.confirmed);
+      });
+    }
+
+    test('an effect that throws leaves the relay call submitted', () async {
+      final s = await submit(SubmissionPurpose.release);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.error = StateError('receipt table locked');
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+    });
+
+    test('a failed relay call is stored failed without the effect', () async {
+      final s = await submit(SubmissionPurpose.claimRefund);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.relaySettled, isEmpty);
+    });
+  });
+
   group('child verdicts (ADR-0011 D3)', () {
     final completed = JobCompletedEvent(
       jobId: 4,
