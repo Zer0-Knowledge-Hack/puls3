@@ -28,6 +28,7 @@ import 'package:puls3_client/src/protocol/health/backend_health.dart'
     as _iur07860;
 import 'package:puls3_client/src/protocol/hire/hire_summary.dart' as _i295g4r8;
 import 'package:puls3_client/src/protocol/hire_detail.dart' as _iytku71p;
+import 'package:puls3_client/src/protocol/hire_terms.dart' as _is0bhgg8;
 import 'package:puls3_client/src/protocol/prepared_transaction.dart'
     as _iy6q6dct;
 import 'package:puls3_client/src/protocol/studio/agent_hire_started.dart'
@@ -342,6 +343,19 @@ class EndpointHire extends _isc.EndpointRef {
       'allowRelatedParty': allowRelatedParty,
     },
   );
+
+  /// What the consumer may fund beside the price before hiring [agentId]:
+  /// the platform's subcontract reserve ceiling, and the max children and
+  /// suggested reserve of the agent's current manifest (ADR-0011 D1, D8).
+  /// Read-only public terms, but behind login like every hire method, since
+  /// the app reads them on the hire form. A hidden or unknown agent is
+  /// `AgentNotFound`, like [createHire].
+  _ida.Future<_is0bhgg8.HireTerms> getHireTerms(int agentId) =>
+      caller.callServerEndpoint<_is0bhgg8.HireTerms>(
+        'hire',
+        'getHireTerms',
+        {'agentId': agentId},
+      );
 
   /// A fresh unsigned `create_job` for a hire that has no job yet.
   _ida.Future<_iy6q6dct.PreparedTransaction> prepareCreateJob(int hireId) =>

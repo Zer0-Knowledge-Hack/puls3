@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../domain/agent.dart';
+import '../domain/usdc.dart';
 import '../state/wallet_controller.dart';
 import '../wallet/wallet_port.dart';
 import 'hire_flow_store.dart';
@@ -57,6 +58,14 @@ class HireFlowController extends ChangeNotifier {
   /// same request id with another task is `IdempotencyKeyReused`.
   String? _task;
 
+  /// The subcontract reserve and related-party flag sent with `createHire`,
+  /// fixed with the task: a retry with other values is also
+  /// `IdempotencyKeyReused` (#334).
+  int? _reserve;
+  bool? _allowRelatedParty;
+
+  SubcontractTerms _terms = SubcontractTerms.none;
+
   HireStep _step = HireStep.review;
   String? _error;
   bool _running = false;
@@ -71,8 +80,21 @@ class HireFlowController extends ChangeNotifier {
   /// The `createHire` idempotency key of this hire.
   String get requestId => _requestId;
 
-  /// Whether the task can still change: not once the hire was started.
+  /// Whether the task, the reserve and the related-party flag can still
+  /// change: not once the hire was started.
   bool get canEditTask => _task == null;
+
+  /// What the agent lets the consumer fund beside the price; none until
+  /// [loadTerms] read them, or when they could not be read.
+  SubcontractTerms get terms => _terms;
+
+  /// The reserve of the started or resumed hire, in USDC stroops; 0 before
+  /// it starts and for a plain hire.
+  int get subcontractReserve => _reserve ?? 0;
+
+  /// The related-party flag of the started or resumed hire; true before it
+  /// starts.
+  bool get allowRelatedParty => _allowRelatedParty ?? true;
 
   HireStep get step => _step;
   bool get isRunning => _running;
@@ -102,19 +124,49 @@ class HireFlowController extends ChangeNotifier {
     if (pending != null) {
       _requestId = pending.requestId;
       _resumedInput = _task = pending.input;
+      _reserve = pending.subcontractReserve;
+      _allowRelatedParty = pending.allowRelatedParty;
       _notify();
     }
     return _resumedInput;
   }
 
+  /// Reads the agent's subcontract terms (#334). A failure never blocks a
+  /// plain hire: the terms stay none, so no reserve is offered.
+  Future<void> loadTerms() async {
+    final agentId = agent.registryId;
+    if (agentId == null) return;
+    try {
+      _terms = await _gateway.hireTerms(agentId);
+    } on Object catch (e) {
+      _terms = SubcontractTerms.none;
+      debugPrint('Hire terms not loaded: ${e.runtimeType}');
+    }
+    _notify();
+  }
+
   /// Starts the flow, or resumes it after an error, with [input] as the
-  /// work request. A resumed hire keeps its own task.
-  Future<void> run(String input) async {
+  /// work request, [subcontractReserve] (USDC stroops) funded beside the
+  /// price, and [allowRelatedParty]. A resumed hire keeps its own task,
+  /// reserve and flag.
+  Future<void> run(
+    String input, {
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
+  }) async {
     if (_running || _step == HireStep.done) return;
     _running = true;
     _error = null;
     _notify();
     try {
+      // A new reserve must fit the agent's terms before anything is
+      // signed; a resumed hire keeps the one it was created with.
+      if (canEditTask && !_terms.allows(subcontractReserve)) {
+        throw HireRejected(
+          'The subcontract reserve must be from 0 to '
+          '${formatUsdc(_terms.reserveMaxStroops)} USDC.',
+        );
+      }
       await _wallet.connect();
       final consumer = _wallet.address!;
       final agentId = agent.registryId;
@@ -127,8 +179,10 @@ class HireFlowController extends ChangeNotifier {
       // included (F5-2). A resumed hire may have paid already, so its
       // balance says nothing: the server decides.
       restore(consumer);
+      // The reserve is funded with the price, so both must be there.
+      final reserve = _reserve ?? subcontractReserve;
       if (_fund == null && _resumedInput == null) {
-        await _gateway.checkFunds(consumer, agent.priceUsdcStroops);
+        await _gateway.checkFunds(consumer, agent.priceUsdcStroops + reserve);
       }
       // The server only accepts calls from a signed-in wallet (#136).
       _set(HireStep.signingIn);
@@ -137,9 +191,18 @@ class HireFlowController extends ChangeNotifier {
       // until this hire is paid.
       restore(consumer);
       final task = _task ??= input;
+      final reserveToFund = _reserve ??= reserve;
+      // The flag means nothing without a reserve: keep the server default.
+      final relatedParty = _allowRelatedParty ??=
+          reserveToFund == 0 || allowRelatedParty;
       _store.write(
         _storeKey!,
-        PendingHire(requestId: _requestId, input: task),
+        PendingHire(
+          requestId: _requestId,
+          input: task,
+          subcontractReserve: reserveToFund,
+          allowRelatedParty: relatedParty,
+        ),
       );
 
       var hireId = _hireId;
@@ -150,6 +213,8 @@ class HireFlowController extends ChangeNotifier {
           consumer: consumer,
           input: task,
           requestId: _requestId,
+          subcontractReserve: reserveToFund,
+          allowRelatedParty: relatedParty,
         );
         hireId = _hireId = start.hireId;
         _createJob = start.createJob;
@@ -241,6 +306,8 @@ class HireFlowController extends ChangeNotifier {
     _requestId = _newRequestId();
     _resumedInput = null;
     _task = null;
+    _reserve = null;
+    _allowRelatedParty = null;
     _hireId = null;
     _createJob = null;
     _createJobSent = false;

@@ -1024,6 +1024,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studioErrCannotSave => 'This agent cannot be saved.';
 
   @override
+  String get studioSubcontractSection => 'Subcontracting';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Allow this agent to subcontract other agents';
+
+  @override
+  String get studioSubcontractHelper =>
+      'During a task, your agent can hire other agents from the marketplace. The consumer funds a reserve when hiring, and what is not spent is refunded.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'Subcontracting needs a Claude model: the free model cannot call tools.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Most agents per task';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'From 1 to $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Suggested reserve';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Asked of the consumer on top of the price. Leave empty for none.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Choose from 1 to $max agents.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck => 'Check the subcontracting settings.';
+
+  @override
   String get playgroundDemoLead => 'Demo test runner: no model answers yet.';
 
   @override
@@ -1607,4 +1645,123 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get agentHireDetailConnect =>
       'Connect the wallet that owns this agent to see this hire.';
+
+  @override
+  String get hireSubcontractTitle => 'Subcontracting';
+
+  @override
+  String hireSubcontractLead(int count) {
+    return 'This agent can hire up to $count other agents for parts of your task. They are paid from a reserve you fund now, on top of the price.';
+  }
+
+  @override
+  String get hireSubcontractReserveLabel => 'Subcontract reserve (USDC)';
+
+  @override
+  String hireSubcontractReserveHelper(String max) {
+    return 'Up to $max USDC. Enter 0 to hire without subcontracting.';
+  }
+
+  @override
+  String hireSubcontractReserveInvalid(String max) {
+    return 'Enter an amount from 0 to $max USDC.';
+  }
+
+  @override
+  String get hireSubcontractRelatedParty => 'Allow agents with the same owner';
+
+  @override
+  String get hireSubcontractRelatedPartyNotice =>
+      'A subcontracted agent may share an owner with this agent. If it does, the receipt shows it.';
+
+  @override
+  String get hireSubcontractConsent =>
+      'I understand that a completed subcontract is paid even if I reject the result.';
+
+  @override
+  String get hireSubcontractReserveRow => 'Subcontract reserve';
+
+  @override
+  String get hireSubcontractTotal => 'Total';
+
+  @override
+  String get hireSubcontractRefundNote =>
+      'The unspent reserve is refunded to you when the hire ends.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontracts';
+
+  @override
+  String get hireReceiptReserve => 'Reserve funded';
+
+  @override
+  String get hireReceiptSpent => 'Spent';
+
+  @override
+  String get hireReceiptEmpty => 'No subcontracts yet.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agent #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Related party';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Related party: this agent has the same builder as the agent you hired.';
+
+  @override
+  String get hireReceiptBudget => 'Budget';
+
+  @override
+  String get hireReceiptFee => 'Fee';
+
+  @override
+  String get hireReceiptPayout => 'Paid to the agent';
+
+  @override
+  String get hireReceiptJustification => 'Why this agent';
+
+  @override
+  String get hireReceiptOpened => 'Opened on chain';
+
+  @override
+  String get hireReceiptSettled => 'Settled on chain';
+
+  @override
+  String get hireReceiptExplorerHint =>
+      'Opens the transaction on StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Opening on chain';
+
+  @override
+  String get hireReceiptStateNotOpened => 'Not opened';
+
+  @override
+  String get hireReceiptStateUnverified => 'Being verified';
+
+  @override
+  String get hireReceiptStateOpen => 'Open';
+
+  @override
+  String get hireReceiptStateFunded => 'In progress';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Delivered';
+
+  @override
+  String get hireReceiptStateCompleted => 'Completed';
+
+  @override
+  String get hireReceiptStateRejected => 'Rejected';
+
+  @override
+  String get hireReceiptStateExpired => 'Expired';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Related party: this agent has the same builder as your agent.';
 }

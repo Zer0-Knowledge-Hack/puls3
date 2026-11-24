@@ -31,3 +31,7 @@ fields:
   ### Null when the rating failed or was never prepared.
   feedbackScore: int?
   paymentExplorerUrl: String?
+  ### The hire's itemized subcontract receipt (ADR-0011 D6), oldest first;
+  ### empty when the hire opened no child job. Only the hire's consumer
+  ### reads it, through the same ownership check as the rest of the detail.
+  receipt: List<HireReceiptLine>?

@@ -1039,6 +1039,45 @@ class AppLocalizationsEs extends AppLocalizations {
   String get studioErrCannotSave => 'Este agente no se puede guardar.';
 
   @override
+  String get studioSubcontractSection => 'Subcontratación';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Permitir que este agente subcontrate a otros agentes';
+
+  @override
+  String get studioSubcontractHelper =>
+      'Durante una tarea, tu agente puede contratar a otros agentes del marketplace. El consumidor financia una reserva al contratar y lo que no se gasta se reembolsa.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'La subcontratación requiere un modelo Claude: el modelo gratuito no puede usar herramientas.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Máximo de agentes por tarea';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'De 1 a $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Reserva sugerida';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Se pide al consumidor además del precio. Déjala vacía si no hace falta.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Elige de 1 a $max agentes.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck =>
+      'Revisa la configuración de subcontratación.';
+
+  @override
   String get playgroundDemoLead =>
       'Prueba de demostración: el modelo todavía no responde.';
 
@@ -1634,4 +1673,122 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get agentHireDetailConnect =>
       'Conecta la billetera dueña de este agente para ver esta contratación.';
+
+  @override
+  String get hireSubcontractTitle => 'Subcontratación';
+
+  @override
+  String hireSubcontractLead(int count) {
+    return 'Este agente puede contratar hasta $count agentes más para partes de tu tarea. Se pagan con una reserva que fondeas ahora, además del precio.';
+  }
+
+  @override
+  String get hireSubcontractReserveLabel => 'Reserva de subcontratación (USDC)';
+
+  @override
+  String hireSubcontractReserveHelper(String max) {
+    return 'Hasta $max USDC. Ingresa 0 para contratar sin subcontratación.';
+  }
+
+  @override
+  String hireSubcontractReserveInvalid(String max) {
+    return 'Ingresa un monto de 0 a $max USDC.';
+  }
+
+  @override
+  String get hireSubcontractRelatedParty => 'Permitir agentes del mismo dueño';
+
+  @override
+  String get hireSubcontractRelatedPartyNotice =>
+      'Un agente subcontratado puede tener el mismo dueño que este agente. Si es así, el recibo lo indica.';
+
+  @override
+  String get hireSubcontractConsent =>
+      'Entiendo que una subcontratación completada se paga aunque rechace el resultado.';
+
+  @override
+  String get hireSubcontractReserveRow => 'Reserva de subcontratación';
+
+  @override
+  String get hireSubcontractTotal => 'Total';
+
+  @override
+  String get hireSubcontractRefundNote =>
+      'La reserva no usada se te reembolsa cuando termina la contratación.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontrataciones';
+
+  @override
+  String get hireReceiptReserve => 'Reserva fondeada';
+
+  @override
+  String get hireReceiptSpent => 'Gastado';
+
+  @override
+  String get hireReceiptEmpty => 'Aún no hay subcontrataciones.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agente #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Parte relacionada';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Parte relacionada: este agente tiene el mismo creador que el agente que contrataste.';
+
+  @override
+  String get hireReceiptBudget => 'Presupuesto';
+
+  @override
+  String get hireReceiptFee => 'Comisión';
+
+  @override
+  String get hireReceiptPayout => 'Pagado al agente';
+
+  @override
+  String get hireReceiptJustification => 'Por qué este agente';
+
+  @override
+  String get hireReceiptOpened => 'Abierta en la cadena';
+
+  @override
+  String get hireReceiptSettled => 'Liquidada en la cadena';
+
+  @override
+  String get hireReceiptExplorerHint => 'Abre la transacción en StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Abriéndose en la cadena';
+
+  @override
+  String get hireReceiptStateNotOpened => 'No abierta';
+
+  @override
+  String get hireReceiptStateUnverified => 'En verificación';
+
+  @override
+  String get hireReceiptStateOpen => 'Abierta';
+
+  @override
+  String get hireReceiptStateFunded => 'En curso';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Entregada';
+
+  @override
+  String get hireReceiptStateCompleted => 'Completada';
+
+  @override
+  String get hireReceiptStateRejected => 'Rechazada';
+
+  @override
+  String get hireReceiptStateExpired => 'Vencida';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tiene el mismo creador que tu agente.';
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,7 @@ import '../ui/atoms/copy_to_clipboard.dart';
 import '../ui/atoms/primary_button.dart';
 import '../ui/organisms/agent_hire_panel.dart';
 import '../ui/organisms/hire_payment_view.dart';
+import '../ui/organisms/hire_subcontract_section.dart';
 import 'agent_hire_tracker.dart';
 
 export '../hire/hire_flow_controller.dart' show walletErrorMessage;
@@ -64,8 +66,42 @@ class _PayingAgent {
   final String name;
 }
 
+/// The subcontract part of the form as the sheet reads it (#334).
+class _SubcontractForm {
+  const _SubcontractForm({
+    required this.shown,
+    required this.locked,
+    required this.reserve,
+    required this.typed,
+    this.error,
+  });
+
+  /// The section is shown: the agent offers a reserve, or the started hire
+  /// has one.
+  final bool shown;
+
+  /// The hire was started: its reserve and flag are fixed.
+  final bool locked;
+
+  /// The reserve to fund, in USDC stroops; 0 while [error] is set.
+  final int reserve;
+
+  /// What the consumer typed, in USDC stroops, even when it cannot be
+  /// funded.
+  final int typed;
+  final String? error;
+}
+
 class _HireSheetState extends State<HireSheet> {
   final _input = TextEditingController();
+
+  /// The subcontract reserve, in USDC (#334).
+  final _reserve = TextEditingController();
+  bool _reservePrefilled = false;
+  bool _allowRelatedParty = true;
+
+  /// "A completed subcontract is paid even if you reject the result."
+  bool _subcontractConsent = false;
   HireFlowController? _flow;
 
   /// The user's live agents that can pay instead of the user's wallet.
@@ -99,6 +135,8 @@ class _HireSheetState extends State<HireSheet> {
         unawaited(_loadPayingAgents(consumer));
       }
       _showResumedTask();
+      // Without the terms the hire goes on as a plain one.
+      unawaited(flow.loadTerms());
     }
   }
 
@@ -106,13 +144,67 @@ class _HireSheetState extends State<HireSheet> {
   void dispose() {
     _flow?.dispose();
     _input.dispose();
+    _reserve.dispose();
     super.dispose();
   }
 
-  /// Shows the task of the unfinished hire this sheet resumes.
+  /// Shows the task, the reserve and the flag of the unfinished hire this
+  /// sheet resumes, or prefills the reserve once the terms are read.
   void _showResumedTask() {
-    final task = _flow?.resumedInput;
+    final flow = _flow;
+    if (flow == null) return;
+    final task = flow.resumedInput;
     if (task != null && _input.text != task) _input.text = task;
+    if (!flow.canEditTask) {
+      final reserve = flow.subcontractReserve;
+      if (parseUsdcToStroops(_reserve.text) != reserve) {
+        _reserve.text = formatUsdc(reserve);
+      }
+      _allowRelatedParty = flow.allowRelatedParty;
+    } else if (!_reservePrefilled && flow.terms.offered) {
+      _reservePrefilled = true;
+      _reserve.text = formatUsdc(flow.terms.prefillStroops);
+    }
+  }
+
+  _SubcontractForm _subcontract(HireFlowController flow) {
+    final terms = flow.terms;
+    if (!flow.canEditTask) {
+      final reserve = flow.subcontractReserve;
+      return _SubcontractForm(
+        shown: reserve > 0,
+        locked: true,
+        reserve: reserve,
+        typed: reserve,
+      );
+    }
+    if (!terms.offered) {
+      return const _SubcontractForm(
+        shown: false,
+        locked: false,
+        reserve: 0,
+        typed: 0,
+      );
+    }
+    final text = _reserve.text.trim();
+    final typed = text.isEmpty ? 0 : parseUsdcToStroops(text);
+    if (typed == null || !terms.allows(typed)) {
+      return _SubcontractForm(
+        shown: true,
+        locked: false,
+        reserve: 0,
+        typed: typed ?? 0,
+        error: context.l10n.hireSubcontractReserveInvalid(
+          formatUsdc(terms.reserveMaxStroops),
+        ),
+      );
+    }
+    return _SubcontractForm(
+      shown: true,
+      locked: false,
+      reserve: typed,
+      typed: typed,
+    );
   }
 
   int? get _hiredAgentId =>
@@ -190,7 +282,17 @@ class _HireSheetState extends State<HireSheet> {
     }
   }
 
-  void _run() => unawaited(_flow!.run(_input.text.trim()));
+  void _run() {
+    final flow = _flow!;
+    final subcontract = _subcontract(flow);
+    unawaited(
+      flow.run(
+        _input.text.trim(),
+        subcontractReserve: subcontract.reserve,
+        allowRelatedParty: _allowRelatedParty,
+      ),
+    );
+  }
 
   void _backToMarketplace() => _leaveTo('/market');
 
@@ -215,7 +317,7 @@ class _HireSheetState extends State<HireSheet> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
             child: ListenableBuilder(
-              listenable: flow,
+              listenable: Listenable.merge([flow, _reserve]),
               builder: (context, _) {
                 final payer = _payer;
                 // The choice is offered before anything is signed or paid.
@@ -371,7 +473,35 @@ class _HireSheetState extends State<HireSheet> {
 
   Widget _walletPayment(HireFlowController flow) {
     final hash = flow.payment?.transactionHash;
+    final subcontract = _subcontract(flow);
+    // Policy 1: a new hire with a reserve needs the consent; a started one
+    // already had it.
+    final needsConsent = !subcontract.locked && subcontract.typed > 0;
+    final terms = flow.terms;
     return HirePaymentView(
+      subcontractSection: subcontract.shown
+          ? HireSubcontractSection(
+              maxChildren: terms.maxChildren,
+              reserveMaxStroops: max(
+                terms.reserveMaxStroops,
+                subcontract.reserve,
+              ),
+              reserveController: _reserve,
+              reserveError: subcontract.error,
+              allowRelatedParty: _allowRelatedParty,
+              onAllowRelatedPartyChanged: (value) =>
+                  setState(() => _allowRelatedParty = value),
+              showConsent: needsConsent,
+              consented: _subcontractConsent,
+              onConsentChanged: (value) =>
+                  setState(() => _subcontractConsent = value),
+              locked: subcontract.locked,
+              enabled: !flow.isRunning,
+            )
+          : null,
+      reserveUsdcStroops: subcontract.reserve,
+      canConfirm:
+          subcontract.error == null && (!needsConsent || _subcontractConsent),
       phase: _phase(flow),
       agentName: widget.agent.name,
       priceUsdcStroops: widget.agent.priceUsdcStroops,

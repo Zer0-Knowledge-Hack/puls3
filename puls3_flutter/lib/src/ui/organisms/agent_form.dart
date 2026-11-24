@@ -40,6 +40,10 @@ class AgentForm extends StatelessWidget {
     this.promptEdited = false,
     this.briefError,
     this.errors = const {},
+    this.subcontract = false,
+    this.onSubcontractChanged,
+    this.subcontractChildrenController,
+    this.subcontractReserveController,
   });
 
   final TextEditingController nameController;
@@ -78,6 +82,13 @@ class AgentForm extends StatelessWidget {
 
   /// The problem to show under each field.
   final Map<StudioField, String> errors;
+
+  /// Whether the agent may subcontract other agents (#334), and how to change
+  /// it. Without [onSubcontractChanged] the section is not shown.
+  final bool subcontract;
+  final ValueChanged<bool>? onSubcontractChanged;
+  final TextEditingController? subcontractChildrenController;
+  final TextEditingController? subcontractReserveController;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +341,70 @@ class AgentForm extends StatelessWidget {
                 ],
               );
             },
+          ),
+          if (onSubcontractChanged != null) ...[
+            const SizedBox(height: Puls3Spacing.lg),
+            _subcontractSection(context),
+          ],
+        ],
+      ],
+    );
+  }
+
+  /// The opt-in to hire other agents during a run. A free model cannot call
+  /// tools, so the toggle is off and disabled while one is selected.
+  Widget _subcontractSection(BuildContext context) {
+    final l10n = context.l10n;
+    final toolsMissing = selectedModel?.isFree ?? false;
+    final on = subcontract && !toolsMissing;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionLabel(l10n.studioSubcontractSection),
+        const SizedBox(height: Puls3Spacing.sm),
+        SwitchListTile(
+          key: const Key('agent-subcontract-toggle'),
+          contentPadding: EdgeInsets.zero,
+          value: on,
+          onChanged: toolsMissing ? null : onSubcontractChanged,
+          title: Text(l10n.studioSubcontractToggle, style: Puls3Text.body),
+          subtitle: Text(
+            toolsMissing
+                ? l10n.studioSubcontractNeedsTools
+                : l10n.studioSubcontractHelper,
+            style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
+          ),
+        ),
+        if (on) ...[
+          const SizedBox(height: Puls3Spacing.sm),
+          TextField(
+            key: const Key('agent-subcontract-children-field'),
+            controller: subcontractChildrenController,
+            style: Puls3Text.data,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.studioSubcontractMaxChildren,
+              helperText: l10n.studioSubcontractMaxChildrenHelper(
+                studioSubcontractMaxChildren,
+              ),
+              errorText: errors[StudioField.subcontractChildren],
+            ),
+          ),
+          const SizedBox(height: Puls3Spacing.md),
+          TextField(
+            key: const Key('agent-subcontract-reserve-field'),
+            controller: subcontractReserveController,
+            style: Puls3Text.data,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: l10n.studioSubcontractReserve,
+              hintText: '0.50',
+              suffixText: 'USDC',
+              suffixStyle: Puls3Text.data,
+              helperText: l10n.studioSubcontractReserveHelper,
+              helperMaxLines: 2,
+              errorText: errors[StudioField.subcontractReserve],
+            ),
           ),
         ],
       ],
