@@ -43,6 +43,9 @@ final class _FakeIndex implements AgentIndexRepository {
   Future<void> upsertAll(List<AgentSummary> agents) async {}
 
   @override
+  Future<void> removeAll(Set<int> registryIds) async {}
+
+  @override
   Future<int?> lastProcessedLedger() async => null;
 
   @override
