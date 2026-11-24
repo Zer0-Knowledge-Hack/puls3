@@ -52,6 +52,8 @@ import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_summary.dart' as _izumcaty;
 import 'hire/hire_view.dart' as _ivruwodq;
 import 'hire_detail.dart' as _ipbsq2gs;
+import 'hire_receipt_line_view.dart' as _i404ykkm;
+import 'hire_terms.dart' as _ij38jwy0;
 import 'ledger/terminal_job_fact.dart' as _itxj7opn;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
@@ -98,6 +100,8 @@ export 'hire/hire_request_invalid.dart';
 export 'hire/hire_summary.dart';
 export 'hire/hire_view.dart';
 export 'hire_detail.dart';
+export 'hire_receipt_line_view.dart';
+export 'hire_terms.dart';
 export 'ledger/terminal_job_fact.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
@@ -1902,6 +1906,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ipbsq2gs.HireDetail) {
       return _ipbsq2gs.HireDetail.fromJson(data) as T;
     }
+    if (t == _i404ykkm.HireReceiptLine) {
+      return _i404ykkm.HireReceiptLine.fromJson(data) as T;
+    }
+    if (t == _ij38jwy0.HireTerms) {
+      return _ij38jwy0.HireTerms.fromJson(data) as T;
+    }
     if (t == _itxj7opn.TerminalJobFact) {
       return _itxj7opn.TerminalJobFact.fromJson(data) as T;
     }
@@ -2071,6 +2081,13 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _is.getType<_ipbsq2gs.HireDetail?>()) {
       return (data != null ? _ipbsq2gs.HireDetail.fromJson(data) : null) as T;
     }
+    if (t == _is.getType<_i404ykkm.HireReceiptLine?>()) {
+      return (data != null ? _i404ykkm.HireReceiptLine.fromJson(data) : null)
+          as T;
+    }
+    if (t == _is.getType<_ij38jwy0.HireTerms?>()) {
+      return (data != null ? _ij38jwy0.HireTerms.fromJson(data) : null) as T;
+    }
     if (t == _is.getType<_itxj7opn.TerminalJobFact?>()) {
       return (data != null ? _itxj7opn.TerminalJobFact.fromJson(data) : null)
           as T;
@@ -2147,6 +2164,20 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_i404ykkm.HireReceiptLine>) {
+      return (data as List)
+              .map((e) => deserialize<_i404ykkm.HireReceiptLine>(e))
+              .toList()
+          as T;
+    }
+    if (t == _is.getType<List<_i404ykkm.HireReceiptLine>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i404ykkm.HireReceiptLine>(e))
+                    .toList()
+              : null)
+          as T;
     }
     if (t == Map<String, String>) {
       return (data as Map).map(
@@ -2241,6 +2272,8 @@ class Protocol extends _is.DatabaseSerializationManager {
       _izumcaty.HireSummary => 'HireSummary',
       _ivruwodq.HireView => 'HireView',
       _ipbsq2gs.HireDetail => 'HireDetail',
+      _i404ykkm.HireReceiptLine => 'HireReceiptLine',
+      _ij38jwy0.HireTerms => 'HireTerms',
       _itxj7opn.TerminalJobFact => 'TerminalJobFact',
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
@@ -2330,6 +2363,10 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'HireView';
       case _ipbsq2gs.HireDetail():
         return 'HireDetail';
+      case _i404ykkm.HireReceiptLine():
+        return 'HireReceiptLine';
+      case _ij38jwy0.HireTerms():
+        return 'HireTerms';
       case _itxj7opn.TerminalJobFact():
         return 'TerminalJobFact';
       case _ikmm2vup.Payment():
@@ -2476,6 +2513,12 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'HireDetail') {
       return deserialize<_ipbsq2gs.HireDetail>(data['data']);
+    }
+    if (dataClassName == 'HireReceiptLine') {
+      return deserialize<_i404ykkm.HireReceiptLine>(data['data']);
+    }
+    if (dataClassName == 'HireTerms') {
+      return deserialize<_ij38jwy0.HireTerms>(data['data']);
     }
     if (dataClassName == 'TerminalJobFact') {
       return deserialize<_itxj7opn.TerminalJobFact>(data['data']);

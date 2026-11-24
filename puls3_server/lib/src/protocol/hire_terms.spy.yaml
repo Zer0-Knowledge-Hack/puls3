@@ -1,0 +1,15 @@
+### What a consumer may fund beside the price before hiring one agent
+### (`HireEndpoint.getHireTerms`, ADR-0011 D1 and D8). Read before the hire,
+### so the app shows the subcontract section only when both caps allow it.
+class: HireTerms
+fields:
+  ### The platform ceiling of a hire's subcontract reserve, in USDC stroops
+  ### (`PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`). 0 when unset or unreadable:
+  ### this network refuses any reserve.
+  reserveMaxStroops: int
+  ### How many children one hire of the agent's current manifest may open:
+  ### its `max_children` capped by the platform. 0 without the opt-in or
+  ### when the manifest is unknown.
+  maxChildren: int
+  ### The manifest's `suggested_reserve`, in USDC stroops. 0 without it.
+  suggestedReserveStroops: int

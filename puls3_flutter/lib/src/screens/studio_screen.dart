@@ -56,11 +56,16 @@ class _StudioScreenState extends State<StudioScreen> {
   final _inputMax = TextEditingController();
   final _outputMax = TextEditingController();
   final _price = TextEditingController();
+  final _subcontractChildren = TextEditingController();
+  final _subcontractReserve = TextEditingController();
   final _skillInput = TextEditingController();
 
   StudioModelOption? _model;
   OutputType _outputType = OutputType.text;
   final List<String> _skills = [];
+
+  /// Whether the agent may subcontract other agents (#334).
+  bool _subcontract = false;
 
   /// Whether the builder has edited the generated description or prompt.
   /// While false, each follows the brief.
@@ -111,6 +116,8 @@ class _StudioScreenState extends State<StudioScreen> {
     _inputMax: StudioField.input,
     _outputMax: StudioField.output,
     _price: StudioField.price,
+    _subcontractChildren: StudioField.subcontractChildren,
+    _subcontractReserve: StudioField.subcontractReserve,
   };
 
   /// The default limits for a new agent: a non-technical builder never has to
@@ -123,6 +130,7 @@ class _StudioScreenState extends State<StudioScreen> {
     super.initState();
     _inputMax.text = _defaultInputMax;
     _outputMax.text = _defaultOutputMax;
+    _subcontractChildren.text = const StudioFormValues().subcontractMaxChildren;
     _outputType = OutputType.markdown;
     _model = studioModelOptions.first;
     for (final MapEntry(key: controller, value: field) in _fieldOf.entries) {
@@ -205,6 +213,9 @@ class _StudioScreenState extends State<StudioScreen> {
     outputType: _outputType,
     outputMaxChars: _outputMax.text,
     price: _price.text,
+    subcontract: _subcontract,
+    subcontractMaxChildren: _subcontractChildren.text,
+    subcontractReserve: _subcontractReserve.text,
   );
 
   void _addSkill(String raw) {
@@ -291,6 +302,9 @@ class _StudioScreenState extends State<StudioScreen> {
         ? _defaultOutputMax
         : values.outputMaxChars;
     _price.text = values.price;
+    _subcontract = values.subcontract;
+    _subcontractChildren.text = values.subcontractMaxChildren;
+    _subcontractReserve.text = values.subcontractReserve;
     _model = values.model ?? studioModelOptions.first;
     _outputType = values.outputType;
     _skills
@@ -378,7 +392,9 @@ class _StudioScreenState extends State<StudioScreen> {
     StudioField.model ||
     StudioField.systemPrompt ||
     StudioField.input ||
-    StudioField.output => true,
+    StudioField.output ||
+    StudioField.subcontractChildren ||
+    StudioField.subcontractReserve => true,
     _ => false,
   };
 
@@ -512,6 +528,15 @@ class _StudioScreenState extends State<StudioScreen> {
       promptEdited: _promptEdited,
       briefError: briefError,
       errors: shown,
+      subcontract: _subcontract,
+      onSubcontractChanged: (on) => setState(() {
+        _subcontract = on;
+        _serverErrors
+          ..remove(StudioField.subcontractChildren)
+          ..remove(StudioField.subcontractReserve);
+      }),
+      subcontractChildrenController: _subcontractChildren,
+      subcontractReserveController: _subcontractReserve,
     );
 
     final name = _name.text.trim();

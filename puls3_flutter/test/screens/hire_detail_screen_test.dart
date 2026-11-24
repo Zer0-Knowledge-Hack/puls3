@@ -133,7 +133,13 @@ class _ProgressGateway implements HireGateway {
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   }) => throw UnimplementedError();
+
+  @override
+  Future<SubcontractTerms> hireTerms(int agentId) async =>
+      SubcontractTerms.none;
 
   @override
   Future<EscrowPreparation> prepareCreateJob(int hireId) =>
@@ -512,6 +518,62 @@ void main() {
       find.text('Waiting for the payment to confirm on Stellar.'),
       findsOneWidget,
     );
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a plain hire shows no subcontract receipt (#334)', (
+    tester,
+  ) async {
+    await _pumpDetail(
+      tester,
+      gateway: _ProgressGateway([_hire(status: 'completed', result: 'Done')]),
+    );
+    expect(find.byKey(const ValueKey('hire-receipt')), findsNothing);
+    expect(find.text('No subcontracts yet.'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a hire with a reserve shows its receipt and opens a line on '
+      'StellarExpert (#334)', (tester) async {
+    const hash =
+        'c0ffee0000000000000000000000000000000000000000000000000000000001';
+    final base = _hire(status: 'completed', result: 'Done');
+    await _pumpDetail(
+      tester,
+      gateway: _ProgressGateway([
+        HireProgress(
+          hireId: base.hireId,
+          agentName: base.agentName,
+          priceUsdcStroops: base.priceUsdcStroops,
+          input: base.input,
+          status: base.status,
+          result: base.result,
+          paymentTransaction: base.paymentTransaction,
+          subcontractReserveUsdcStroops: 30000000,
+          receipt: [
+            HireReceiptEntry(
+              id: 1,
+              providerAgentId: 19,
+              providerWallet: 'GPROVIDER',
+              budgetUsdcStroops: 20000000,
+              state: 'funded',
+              createTransaction: hash,
+              relatedParty: true,
+              justification: 'Best rated translator',
+              createdAt: DateTime.utc(2026, 11, 24),
+            ),
+          ],
+        ),
+      ]),
+    );
+    expect(find.byKey(const ValueKey('hire-receipt-line-1')), findsOneWidget);
+    expect(find.text('Related party'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('hire-receipt-opened-1')),
+    );
+    await tester.tap(find.byKey(const ValueKey('hire-receipt-opened-1')));
+    await tester.pump();
+    expect(_opened.single.toString(), endsWith('/tx/$hash'));
     await tester.pumpWidget(const SizedBox());
   });
 

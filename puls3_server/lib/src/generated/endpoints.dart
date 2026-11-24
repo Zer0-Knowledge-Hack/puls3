@@ -439,6 +439,25 @@ class Endpoints extends _is.EndpointDispatch {
                     allowRelatedParty: params['allowRelatedParty'],
                   ),
         ),
+        'getHireTerms': _is.MethodConnector(
+          name: 'getHireTerms',
+          params: {
+            'agentId': _is.ParameterDescription(
+              name: 'agentId',
+              type: _is.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['hire'] as _icdhibuq.HireEndpoint).getHireTerms(
+                    session,
+                    params['agentId'],
+                  ),
+        ),
         'prepareCreateJob': _is.MethodConnector(
           name: 'prepareCreateJob',
           params: {

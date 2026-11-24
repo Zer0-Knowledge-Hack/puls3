@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:puls3_domain/puls3_domain.dart';
 
+import '../studio/studio_agent_version.dart';
 import '../studio/studio_model_policy.dart';
 import 'run_manifest.dart';
 
@@ -16,6 +17,19 @@ final class StudioRunManifestSource implements RunManifestSource {
     required this._lookup,
     required this._fallback,
   });
+
+  /// A source over the published versions in [versions].
+  factory StudioRunManifestSource.onVersions(
+    AgentVersionStore versions, {
+    required RunManifestSource fallback,
+  }) => StudioRunManifestSource(
+    lookup: (agentId, version) async {
+      final row = await versions.find(agentId, version);
+      if (row == null) return null;
+      return (manifestJson: row.manifestJson, owner: row.owner);
+    },
+    fallback: fallback,
+  );
 
   /// The snapshot and its owner for one registry agent and version.
   final Future<({String? manifestJson, String owner})?> Function(

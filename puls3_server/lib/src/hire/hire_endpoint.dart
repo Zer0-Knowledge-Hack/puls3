@@ -102,6 +102,28 @@ class HireEndpoint extends Endpoint {
     }
   }
 
+  /// What the consumer may fund beside the price before hiring [agentId]:
+  /// the platform's subcontract reserve ceiling, and the max children and
+  /// suggested reserve of the agent's current manifest (ADR-0011 D1, D8).
+  /// Read-only public terms, but behind login like every hire method, since
+  /// the app reads them on the hire form. A hidden or unknown agent is
+  /// `AgentNotFound`, like [createHire].
+  Future<HireTerms> getHireTerms(Session session, int agentId) async {
+    await _wallet.requireLogin(session);
+    try {
+      AgentId(agentId);
+    } on InvalidAgentId {
+      throw Puls3ApiException(code: 'InvalidAgentId');
+    }
+    try {
+      return await _servicesOn(session).hires.hireTerms(agentId);
+    } on AgentUnavailable {
+      throw Puls3ApiException(code: 'AgentNotFound');
+    } on HireLedgerUnavailable {
+      throw Puls3ApiException(code: 'ChainUnavailable');
+    }
+  }
+
   /// A fresh unsigned `create_job` for a hire that has no job yet.
   Future<PreparedTransaction> prepareCreateJob(Session session, int hireId) =>
       _prepare(

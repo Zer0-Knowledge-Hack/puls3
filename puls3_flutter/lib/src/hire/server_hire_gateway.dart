@@ -5,6 +5,7 @@ import 'package:puls3_client/puls3_client.dart';
 
 import '../data/typed_api_error.dart';
 import 'hire_gateway.dart';
+import 'hire_receipt_mapping.dart';
 import 'wallet_funds.dart';
 import 'wallet_session.dart';
 
@@ -14,8 +15,13 @@ typedef CreateHireCall =
       int agentId,
       String consumer,
       String input,
-      String requestId,
-    );
+      String requestId, {
+      int? subcontractReserve,
+      bool? allowRelatedParty,
+    });
+
+/// `client.hire.getHireTerms`.
+typedef GetHireTermsCall = Future<HireTerms> Function(int agentId);
 
 /// `client.hire.prepareCreateJob`, `prepareFund` or `prepareComplete`.
 typedef PrepareEscrowCall = Future<PreparedTransaction> Function(int hireId);
@@ -74,6 +80,7 @@ class ServerHireGateway implements HireGateway {
     required this._prepareFeedback,
     required this._submitFeedback,
     this._listMyHires,
+    this._getHireTerms,
     this._session,
     this._readFunds,
     this.callTimeout = const Duration(seconds: 30),
@@ -95,6 +102,10 @@ class ServerHireGateway implements HireGateway {
   /// Lists the session wallet's hires. Without it, My hires reports the
   /// server as unavailable.
   final ListMyHiresCall? _listMyHires;
+
+  /// Reads the subcontract terms of an agent (#334). Without it, no reserve
+  /// is offered.
+  final GetHireTermsCall? _getHireTerms;
 
   /// The wallet session (#136). Without it, the server is called with no
   /// session and answers `NotAuthenticated`.
@@ -148,14 +159,38 @@ class ServerHireGateway implements HireGateway {
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   }) async {
+    // A plain hire sends no subcontract terms, so the server keeps its
+    // defaults (no reserve, related party allowed), exactly as before #334.
+    final reserved = subcontractReserve > 0;
     final result = await _call(
-      () => _createHire(agentId, consumer, input, requestId),
+      () => _createHire(
+        agentId,
+        consumer,
+        input,
+        requestId,
+        subcontractReserve: reserved ? subcontractReserve : null,
+        allowRelatedParty: reserved ? allowRelatedParty : null,
+      ),
     );
     final prepared = result.preparedCreateJob;
     return HireStart(
       hireId: result.hire.id,
       createJob: prepared == null ? null : _preparation(prepared),
+    );
+  }
+
+  @override
+  Future<SubcontractTerms> hireTerms(int agentId) async {
+    final read = _getHireTerms;
+    if (read == null) return SubcontractTerms.none;
+    final terms = await _call(() => read(agentId));
+    return SubcontractTerms(
+      reserveMaxStroops: terms.reserveMaxStroops,
+      maxChildren: terms.maxChildren,
+      suggestedReserveStroops: terms.suggestedReserveStroops,
     );
   }
 
@@ -343,6 +378,8 @@ class ServerHireGateway implements HireGateway {
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,
+      subcontractReserveUsdcStroops: hire.subcontractReserve,
+      receipt: hireReceiptEntries(detail.receipt),
     );
   }
 

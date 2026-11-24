@@ -62,3 +62,8 @@ final studioModelPolicy = ModelPolicy(
       if (!option.isFree) option.provider,
   },
 );
+
+/// The most agents one hire may subcontract (ADR-0011 D8). The server is the
+/// authority (`subcontractMaxChildrenCap`); the Studio mirrors it so the
+/// builder is never offered more than a hire can open.
+const studioSubcontractMaxChildren = 2;

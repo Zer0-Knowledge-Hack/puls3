@@ -14,6 +14,7 @@ void main() {
     ListDraftsCall? listDrafts,
     TestRunCall? testRun,
     SaveProviderCredentialCall? saveProviderCredential,
+    GetAgentHireCall? getAgentHire,
   }) => ServerStudioGateway(
     wallet: _IdleWallet(),
     saveDraft:
@@ -32,7 +33,100 @@ void main() {
             api.TestRunResult(output: 'ok', remainingDailyRuns: 19)),
     saveProviderCredential:
         saveProviderCredential ?? ((provider, secret, accountId) async {}),
+    getAgentHire: getAgentHire,
   );
+
+  api.HireDetail agentHire({
+    int subcontractReserve = 0,
+    List<api.HireReceiptLine>? receipt,
+  }) => api.HireDetail(
+    hire: api.Hire(
+      id: 8,
+      agentId: 9,
+      consumer: 'GHIRINGAGENT',
+      price: 45000000,
+      manifestVersion: 1,
+      status: 'funded',
+      subcontractReserve: subcontractReserve,
+    ),
+    agent: api.AgentSummary(
+      id: 'agt-009',
+      registryId: 9,
+      name: 'Support Relay',
+      description: 'Answers support tickets',
+      skills: ['support'],
+      priceUsdcStroops: 45000000,
+    ),
+    input: 'Answer this ticket',
+    receipt: receipt,
+  );
+
+  group('getAgentHire subcontract receipt (#334)', () {
+    test('maps the reserve and the receipt lines of the agent hire', () async {
+      final created = DateTime.utc(2026, 11, 24, 10);
+      final progress =
+          await gateway(
+            getAgentHire: (agentId, hireId) async => agentHire(
+              subcontractReserve: 30000000,
+              receipt: [
+                api.HireReceiptLine(
+                  id: 7,
+                  childHireId: 41,
+                  childJobId: 52,
+                  providerAgentId: 19,
+                  providerWallet: 'GPROVIDER',
+                  budget: 12000000,
+                  fee: 600000,
+                  payout: 11400000,
+                  state: 'completed',
+                  createTransaction: 'c0ffee',
+                  createExplorerUrl: 'https://example.test/tx/c0ffee',
+                  settleTransaction: '5e771e',
+                  settleExplorerUrl: 'https://example.test/tx/5e771e',
+                  deliverableHash: 'd311',
+                  relatedParty: true,
+                  justification: 'Best rated translator',
+                  createdAt: created,
+                ),
+              ],
+            ),
+          ).getAgentHire(
+            hiringAgentId: 9,
+            hireId: 8,
+            owner: 'GOWNER',
+          );
+
+      expect(progress.subcontractReserveUsdcStroops, 30000000);
+      final line = progress.receipt.single;
+      expect(line.id, 7);
+      expect(line.childHireId, 41);
+      expect(line.childJobId, 52);
+      expect(line.providerAgentId, 19);
+      expect(line.providerWallet, 'GPROVIDER');
+      expect(line.budgetUsdcStroops, 12000000);
+      expect(line.feeUsdcStroops, 600000);
+      expect(line.payoutUsdcStroops, 11400000);
+      expect(line.state, 'completed');
+      expect(line.createTransaction, 'c0ffee');
+      expect(line.createExplorerUrl, 'https://example.test/tx/c0ffee');
+      expect(line.settleTransaction, '5e771e');
+      expect(line.settleExplorerUrl, 'https://example.test/tx/5e771e');
+      expect(line.deliverableHash, 'd311');
+      expect(line.relatedParty, isTrue);
+      expect(line.justification, 'Best rated translator');
+      expect(line.createdAt, created);
+    });
+
+    test('a plain agent hire has no receipt and no reserve', () async {
+      final progress = await gateway(
+        getAgentHire: (agentId, hireId) async => agentHire(),
+      ).getAgentHire(hiringAgentId: 9, hireId: 8, owner: 'GOWNER');
+
+      expect(progress.receipt, isEmpty);
+      expect(progress.subcontractReserveUsdcStroops, 0);
+      expect(progress.status, 'funded');
+    });
+  });
 
   test(
     'saveDraft keeps the prompt and the revision the server returns',

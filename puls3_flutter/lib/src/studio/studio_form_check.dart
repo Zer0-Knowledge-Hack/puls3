@@ -16,6 +16,8 @@ enum StudioField {
   input,
   output,
   price,
+  subcontractChildren,
+  subcontractReserve,
 }
 
 /// What the builder typed, as typed.
@@ -30,6 +32,9 @@ class StudioFormValues {
     this.outputType = OutputType.text,
     this.outputMaxChars = '',
     this.price = '',
+    this.subcontract = false,
+    this.subcontractMaxChildren = '1',
+    this.subcontractReserve = '',
   });
 
   final String name;
@@ -45,6 +50,17 @@ class StudioFormValues {
 
   /// USDC, for example `0.50`.
   final String price;
+
+  /// Whether the agent may subcontract other agents (#334). Only a model
+  /// with tool calling can: with a free model the opt-in is left out.
+  final bool subcontract;
+
+  /// At most this many subcontracts per hire, from 1 to
+  /// [studioSubcontractMaxChildren].
+  final String subcontractMaxChildren;
+
+  /// USDC the consumer is asked to reserve for subcontracts; empty is none.
+  final String subcontractReserve;
 }
 
 /// The result of checking the form against the domain manifest rules.
@@ -110,6 +126,26 @@ StudioFormCheck checkStudioForm(
   }
 
   final inputMax = count(values.inputMaxChars, StudioField.input);
+
+  // A free model cannot call tools, so it never subcontracts (#334 T5.1).
+  final subcontracting = values.subcontract && !(values.model?.isFree ?? false);
+  int? maxChildren;
+  int? reserve;
+  if (subcontracting) {
+    maxChildren = int.tryParse(values.subcontractMaxChildren.trim());
+    if (maxChildren == null || maxChildren > studioSubcontractMaxChildren) {
+      error(
+        StudioField.subcontractChildren,
+        copy.studioSubcontractErrChildren(studioSubcontractMaxChildren),
+      );
+    }
+    reserve = values.subcontractReserve.trim().isEmpty
+        ? 0
+        : parseUsdcToStroops(values.subcontractReserve);
+    if (reserve == null) {
+      error(StudioField.subcontractReserve, copy.studioErrPriceFormat);
+    }
+  }
   final outputMax = count(values.outputMaxChars, StudioField.output);
 
   String? text(String value) => value.trim().isEmpty ? null : value.trim();
@@ -129,6 +165,12 @@ StudioFormCheck checkStudioForm(
       outputType: values.outputType,
       outputMaxChars: outputMax,
       price: price,
+      subcontract: maxChildren == null || reserve == null
+          ? null
+          : SubcontractOptIn(
+              maxChildren: maxChildren,
+              suggestedReserve: reserve,
+            ),
     );
     if (errors.isEmpty) saved = draft;
     final rules = policy ?? studioModelPolicy;
@@ -156,6 +198,7 @@ StudioFormCheck checkStudioForm(
 /// (F8, F10). A model the Studio no longer offers is left unselected.
 StudioFormValues studioFormValuesFor(AgentManifestDraft draft) {
   final model = draft.model;
+  final optIn = draft.subcontract;
   return StudioFormValues(
     name: draft.name ?? '',
     description: draft.description ?? '',
@@ -173,6 +216,11 @@ StudioFormValues studioFormValuesFor(AgentManifestDraft draft) {
       final price? => formatUsdc(price.stroops),
       null => '',
     },
+    subcontract: optIn != null,
+    subcontractMaxChildren: optIn?.maxChildren.toString() ?? '1',
+    subcontractReserve: optIn == null || optIn.suggestedReserve == 0
+        ? ''
+        : formatUsdc(optIn.suggestedReserve),
   );
 }
 
@@ -187,13 +235,22 @@ String skillIdFor(String name) => canonicalSkillId(name);
 ]) {
   final copy = l10n ?? AppLocalizationsEn();
   return switch (problem) {
-    ManifestProblem.nameMissing => (StudioField.name, copy.studioErrNameMissing),
+    ManifestProblem.nameMissing => (
+      StudioField.name,
+      copy.studioErrNameMissing,
+    ),
     ManifestProblem.nameTooShort => (
       StudioField.name,
       copy.studioErrNameTooShort,
     ),
-    ManifestProblem.nameTooLong => (StudioField.name, copy.studioErrNameTooLong),
-    ManifestProblem.nameMalformed => (StudioField.name, copy.studioErrNameCheck),
+    ManifestProblem.nameTooLong => (
+      StudioField.name,
+      copy.studioErrNameTooLong,
+    ),
+    ManifestProblem.nameMalformed => (
+      StudioField.name,
+      copy.studioErrNameCheck,
+    ),
     ManifestProblem.descriptionMissing => (
       StudioField.description,
       copy.studioErrDescMissing,
@@ -288,7 +345,8 @@ String skillIdFor(String name) => canonicalSkillId(name);
       StudioField.output,
       copy.studioErrOutputTooHigh,
     ),
-    ManifestProblem.outputMalformed || ManifestProblem.outputTypeUnsupported => (
+    ManifestProblem.outputMalformed ||
+    ManifestProblem.outputTypeUnsupported => (
       StudioField.output,
       copy.studioErrOutputCheck,
     ),
@@ -309,12 +367,19 @@ String skillIdFor(String name) => canonicalSkillId(name);
     ManifestProblem.toolsNotSupported ||
     ManifestProblem.versionInDraft ||
     ManifestProblem.schemaUnsupported ||
-    ManifestProblem.versionInvalid ||
-    // The Studio form has no subcontract field yet (#334 T7).
-    ManifestProblem.subcontractMalformed ||
-    ManifestProblem.subcontractInvalid => (
+    ManifestProblem.versionInvalid => (
       StudioField.name,
       copy.studioErrCannotSave,
+    ),
+    // The domain refuses fewer than one child or a negative reserve; a
+    // reserve typed in the form is never negative.
+    ManifestProblem.subcontractInvalid => (
+      StudioField.subcontractChildren,
+      copy.studioSubcontractErrChildren(studioSubcontractMaxChildren),
+    ),
+    ManifestProblem.subcontractMalformed => (
+      StudioField.subcontractChildren,
+      copy.studioSubcontractErrCheck,
     ),
   };
 }
