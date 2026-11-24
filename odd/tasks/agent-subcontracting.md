@@ -131,10 +131,37 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     Source `0c0c346` on base `e5b151e` (assessed high, consent medium, granted, reliability lens,
     approved and acknowledged, lineage `review-11982293292aec6a`); two advisory suggestions in
     `run_manifest_test.dart:144-163` and `studio_form_check.dart:312-315`.
-  - [ ] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
+  - [x] **T5.1** Tool calling in the model adapters: `ToolSpec`, conversation messages, `ModelTurn`
     (final text or tool calls), `converse()` beside `complete()` for Anthropic and Workers AI.
-  - [ ] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
+    Evidence: RED (5 new test files failed to load) then GREEN; runtime 161 passed, server
+    unit+hire 1124 passed, analyze clean. `ConversationRuntime implements ModelRuntime` keeps
+    other implementers compiling. Workers AI: Cloudflare documents `tool_calls` without a call id
+    and no way to return tool results
+    (developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/), so
+    `WorkersAiRuntime.converse` throws `tools_unsupported` with tools; subcontracting is
+    Anthropic-only. Anthropic assistant `content` is kept as opaque `providerContent` and replayed
+    verbatim; T5.3 must persist it in the transcript.
+    Source `30663b6` on base `70bc765` (consent medium, granted, reliability lens, approved and
+    acknowledged, lineage `review-0479630263c40896`); one advisory suggestion in
+    `agent_runner.dart:72-84`.
+  - [x] **T5.2** Bounded tool loop with `search_agents` (T4) and `subcontract` behind a
     `SubcontractPort`.
+    Evidence: RED (both new test files failed to load) then GREEN; the two new files pass 29
+    tests, server unit+hire 1153 passed, analyze clean. `ToolLoop.start` / `resume` return a sealed
+    `LoopOutcome` (`LoopCompleted`, `LoopAwaitingChild`, `LoopFailed`) carrying an immutable
+    `ToolLoopState`. `defaultMaxLoopTurns = 8`, counted across resumes; the deadline is checked
+    before each segment. Tools are offered only with `effectiveMaxChildren > 0` on Anthropic;
+    otherwise a single `AgentRunner.run`. Untrusted text goes in `<untrusted_data>` with `<` and `>`
+    escaped as JSON unicode escapes. Price comes from the search snapshot, never the model.
+    T5.3 must persist the full `ToolLoopState`, the pending call id, the child hire id and the
+    `ChildRequest`, and needs a tool-capable runner for Studio (`OwnedRunManifest`) runs.
+    Source `4170668` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-525194518622257e`) raised two warnings, fixed in `d80a465`: `subcontract` is
+    refused with `no_turns_left` or `no_time_left` before the port is called when no follow-up
+    segment is possible, so no child is paid without being consumed; and an in-turn duplicate call
+    id runs no call and gets exactly one `duplicate_call_id` result. Fix reviewed (consent medium,
+    granted, reliability lens, approved and acknowledged, lineage `review-dafe0e08a5ee9316`);
+    server unit+hire 1158 passed, runtime 195 passed.
   - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
     turns persisted (migration), and `HireRunner` resumes paused runs.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
