@@ -4,7 +4,7 @@
 # Pages runs this from the repository root. It installs the Flutter version
 # pinned for this branch and builds the web app into puls3_flutter/build/web
 # (the Pages output directory). Keep FLUTTER_VERSION in sync with the
-# `flutter-version` in .github/workflows/ci.yml; the test
+# `flutter-version` in .github/actions/setup-flutter/action.yml; the test
 # scripts/tests/cloudflare-pages-build.test.sh fails when they drift.
 set -euo pipefail
 

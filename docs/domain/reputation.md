@@ -22,11 +22,17 @@ This document is the source of truth for the formula and its parameters.
 4. **A score is an integer from 1 to 5** and the comment is at most 500
    characters (`I16`, `I17`).
 5. **The catalog ranks agents by a Bayesian average**, not by the raw mean.
+6. **One client is one rating** ([ADR-0012](../adr/0012-one-rating-per-client.md), #324).
+   A client who rated the agent several times counts once, with the mean of
+   their scores. Repeated hires from one wallet, such as an owner's second
+   wallet, therefore cannot add up.
 
 ## Formula
 
-An agent's reputation `R` is the Bayesian average of its `n` scores, drawn
-toward a prior mean `m` by a prior weight `C`:
+An agent's reputation `R` is the Bayesian average of the scores of its `n`
+clients, drawn toward a prior mean `m` by a prior weight `C`. `sᵢ` is client
+`i`'s score, or the mean of their scores when they rated the agent more than
+once (rule 6):
 
 ```
         C · m + Σ sᵢ
@@ -61,6 +67,10 @@ the plain mean, so the formula never hides a long, consistent record.
 | **New agent**, no reviews | — | 0 | 0 | 4.0000 | **4.00** |
 | **Few reviews**, one 5-star | `[5]` | 1 | 5 | 4.1666… | **4.17** |
 | **Many reviews**, 100 reviews averaging 4.80 | 80×`5` + 20×`4` | 100 | 480 | 4.7619… | **4.76** |
+| **One wallet, 20 hires**, all 5-star | 20×`5`, one client | 1 | 5 | 4.1666… | **4.17** |
+
+Each row's clients are distinct, except the last. Counted per hire, the last
+row would be 4.80; counted per client, it is the same as a single review.
 
 **Anti-gaming check.** A plain mean would rank the one 5-star agent (`5.00`)
 above the established agent (`4.80`). The Bayesian average ranks the new agent
@@ -84,8 +94,9 @@ Consistent with ADR-0002 (#6) and ADR-0005 D5. [ADR-0008](../adr/0008-reputation
 
 ## Implementation
 
-- `reputationOf(Iterable<Feedback>)` — the Bayesian average above, rounded to
-  two decimals; empty input returns `reputationPriorMean`.
+- `reputationOf(Iterable<Feedback>)` — the Bayesian average above, one value
+  per client, rounded to two decimals; empty input returns
+  `reputationPriorMean`.
 - `reputationPriorMean`, `reputationPriorWeight` — the parameters `m` and `C`.
 - `isSelfRating(Feedback, {required StellarAddress owner})` and
   `rejectSelfRating(...)` — rule 3.
