@@ -11,11 +11,13 @@ const RERUN_HINT =
 
 const OPT_OUT_LABEL = 'no-issue';
 const CLOSING = '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)';
-const CLOSES_RE = new RegExp(`(?<![\\w-])${CLOSING}:?\\s+#(\\d+)\\b`, 'gi');
-const REFS_RE = /(?<![\w-])(?:refs?|related to|part of):?\s+#(\d+)\b/gi;
+// An optional `owner/repo` prefix is captured: GitHub closes `owner/repo#N` too.
+const ISSUE_REF = '([\\w.-]+/[\\w.-]+)?#(\\d+)\\b';
+const CLOSES_RE = new RegExp(`(?<![\\w-])${CLOSING}:?\\s+${ISSUE_REF}`, 'gi');
+const REFS_RE = new RegExp(`(?<![\\w-])(?:refs?|related to|part of):?\\s+${ISSUE_REF}`, 'gi');
 
 // Paths that never need an issue on their own.
-const DOCS_RE = /(^|\/)(LICENSE|CODEOWNERS)$|\.(md|mdx|txt|png|jpe?g|gif|svg)$|^docs\/|^\.github\/(ISSUE_TEMPLATE|pull_request_template\.md)/i;
+const DOCS_RE = /(^|\/)(LICENSE|CODEOWNERS)$|\.(md|mdx|png|jpe?g|gif|svg)$|^docs\/|^\.github\/(ISSUE_TEMPLATE|pull_request_template\.md)/i;
 
 function stripNoise(text) {
   return String(text || '')
@@ -24,10 +26,19 @@ function stripNoise(text) {
     .replace(/`[^`\n]*`/g, '');
 }
 
-function collect(re, text) {
-  const found = [];
-  for (const m of text.matchAll(re)) found.push(Number(m[1]));
-  return found;
+// Splits matches into this repo's issue numbers and other-repo references.
+// A prefix naming another repo (or any prefix when `repo` is unknown) is foreign.
+function collect(re, text, repo) {
+  const local = [];
+  const foreign = [];
+  for (const m of text.matchAll(re)) {
+    if (m[1] && (!repo || m[1].toLowerCase() !== repo.toLowerCase())) {
+      foreign.push(`${m[1]}#${m[2]}`);
+    } else {
+      local.push(Number(m[2]));
+    }
+  }
+  return { local, foreign };
 }
 
 function unique(list) {
@@ -35,30 +46,52 @@ function unique(list) {
 }
 
 // A number that is both closed and referenced counts as closed.
-function parseReferences(body) {
+// `repo` is "owner/name" of the PR's repository; `foreign` lists closing
+// references to other repositories, which the gate cannot verify.
+function parseReferences(body, repo) {
   const text = stripNoise(body);
-  const closes = unique(collect(CLOSES_RE, text));
-  const refs = unique(collect(REFS_RE, text)).filter((n) => !closes.includes(n));
-  return { closes, refs };
+  const c = collect(CLOSES_RE, text, repo);
+  const closes = unique(c.local);
+  const refs = unique(collect(REFS_RE, text, repo).local).filter((n) => !closes.includes(n));
+  return { closes, refs, foreign: unique(c.foreign) };
 }
 
-// Returns the checkbox items under `### <heading>` (until the next heading),
-// or null when the section does not exist or has no checkboxes.
+// Returns the checkbox items under the heading named `heading`, or null when
+// the section does not exist or has no checkboxes. The section ends at the next
+// heading of the same or a higher level (sub-headings stay inside it); fenced
+// code blocks are skipped, so a `#` line or a checkbox inside one is ignored.
 function parseChecklist(issueBody, heading) {
   const lines = String(issueBody || '').replace(/\r\n?/g, '\n').split('\n');
   const want = heading.trim().toLowerCase();
   let inside = false;
+  let level = 0;
   let found = false;
+  let fence = null;
   const items = [];
   for (const line of lines) {
-    const h = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+    const f = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (f && f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (f) {
+      fence = f[1];
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line);
     if (h) {
-      inside = h[1].trim().toLowerCase() === want;
-      found = found || inside;
+      const name = h[2].trim().replace(/:$/, '').trim().toLowerCase();
+      if (name === want && (!inside || h[1].length <= level)) {
+        inside = true;
+        level = h[1].length;
+        found = true;
+      } else if (inside && h[1].length <= level) {
+        inside = false;
+      }
       continue;
     }
     if (!inside) continue;
-    const c = /^\s*[-*+]\s+\[([ xX])\]\s+(.*\S)\s*$/.exec(line);
+    const c = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*\S)\s*$/.exec(line);
     if (c) items.push({ checked: c[1] !== ' ', text: c[2] });
   }
   return found && items.length > 0 ? items : null;
@@ -85,7 +118,7 @@ function bullets(items) {
 //          issues: { [number]: string | null } }  (null = not found / not an issue)
 // output: { status: 'pass' | 'fail', failures: string[], notices: string[],
 //           comment: string | null }
-function evaluate({ body, labels = [], author = '', files = [], issues = {} }) {
+function evaluate({ body, repo, labels = [], author = '', files = [], issues = {} }) {
   const out = { status: 'pass', failures: [], notices: [], comment: null };
   if (/^dependabot(\[bot\])?$/i.test(author)) {
     out.notices.push('Skipped: Dependabot pull request.');
@@ -96,12 +129,23 @@ function evaluate({ body, labels = [], author = '', files = [], issues = {} }) {
     return out;
   }
 
-  const { closes, refs } = parseReferences(body);
+  const { closes, refs, foreign } = parseReferences(body, repo);
 
-  if (closes.length === 0 && refs.length === 0) {
+  for (const f of foreign) {
+    out.failures.push(
+      `This pull request closes \`${f}\` in another repository, which this gate cannot ` +
+        `verify. Use \`Refs\` for it, or ask a maintainer to add the \`${OPT_OUT_LABEL}\` label.`,
+    );
+  }
+
+  // A reference only counts when it resolves to a real issue in this repo
+  // (not a PR number, not a missing or deleted issue).
+  const resolved = [...closes, ...refs].filter((n) => issues[n] != null);
+  if (resolved.length === 0 && foreign.length === 0) {
     if (touchesCode(files)) {
       out.failures.push(
-        'This pull request changes code but references no issue. Add `Closes #N` ' +
+        'This pull request changes code but references no issue (a reference to a pull ' +
+          'request or to a missing issue does not count). Add `Closes #N` ' +
           '(every acceptance criterion met) or `Refs #N` (partial work) to the ' +
           `description, or ask a maintainer to add the \`${OPT_OUT_LABEL}\` label.`,
       );

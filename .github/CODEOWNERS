@@ -1,0 +1,3 @@
+# Changes to the issue gate itself need an owner review.
+/.github/workflows/issue-gate.yml @moises-cisneros
+/.github/scripts/ @moises-cisneros

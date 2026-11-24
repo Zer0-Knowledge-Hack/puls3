@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { MARKER, parseReferences, parseChecklist, evaluate } = require('./issue-gate.js');
+const { MARKER, parseReferences, parseChecklist, touchesCode, evaluate } = require('./issue-gate.js');
 
 const issue = (criteria, deliverables = ['- [x] Thing']) =>
   `### Summary\nx\n\n### Deliverables\n${deliverables.join('\n')}\n\n### Acceptance criteria\n${criteria.join('\n')}\n\n### How to verify\n- [ ] not part of criteria\n`;
@@ -96,7 +96,7 @@ test('other labels do not opt out', () => {
 
 test('parseReferences ignores HTML comments, code and the template placeholder', () => {
   const body = 'Closes #\n<!-- Use "Closes #9" only if ... -->\n`Closes #10`\nRefs #11\nCloses #12 Refs #12';
-  assert.deepEqual(parseReferences(body), { closes: [12], refs: [11] });
+  assert.deepEqual(parseReferences(body), { closes: [12], refs: [11], foreign: [] });
 });
 
 test('parseChecklist stops at the next heading and handles CRLF', () => {
@@ -112,4 +112,91 @@ test('Closes failure tells the author to re-run the job after ticking criteria',
   const r = evaluate({ body: 'Closes #3', files: CODE, issues: { 3: issue(['- [ ] A']) } });
   assert.equal(r.status, 'fail');
   assert.match(r.failures[0], /re-run the `Issue gate \/ gate` job/);
+});
+
+const REPO = 'Zer0-Knowledge-Hack/puls3';
+
+test('Closes owner/repo#N for this repo is parsed and verified', () => {
+  const body = `Closes ${REPO}#12\nRefs #1`;
+  assert.deepEqual(parseReferences(body, REPO).closes, [12]);
+  const r = evaluate({
+    body,
+    repo: REPO,
+    files: CODE,
+    issues: { 12: issue(['- [ ] A']), 1: issue(['- [x] A']) },
+  });
+  assert.equal(r.status, 'fail');
+  assert.match(r.failures[0], /#12/);
+});
+
+test('owner/repo prefix match is case-insensitive', () => {
+  assert.deepEqual(parseReferences('Closes zer0-knowledge-hack/PULS3#5', REPO).closes, [5]);
+});
+
+test('Closes in another repository fails: the gate cannot verify it', () => {
+  const r = evaluate({
+    body: 'Closes other/repo#9\nRefs #1',
+    repo: REPO,
+    files: CODE,
+    issues: { 1: issue(['- [x] A']) },
+  });
+  assert.equal(r.status, 'fail');
+  assert.match(r.failures.join('\n'), /other\/repo#9/);
+});
+
+test('a heading nested under the section does not end it', () => {
+  const body = '### Acceptance criteria\n- [x] a\n#### Backend\n- [ ] b\n### Other\n- [ ] c\n';
+  assert.deepEqual(parseChecklist(body, 'Acceptance criteria'), [
+    { checked: true, text: 'a' },
+    { checked: false, text: 'b' },
+  ]);
+  const r = evaluate({ body: 'Closes #1', files: CODE, issues: { 1: body } });
+  assert.equal(r.status, 'fail');
+});
+
+test('a higher-level heading ends the section', () => {
+  const body = '### Acceptance criteria\n- [x] a\n## Next\n- [ ] z\n';
+  assert.deepEqual(parseChecklist(body, 'Acceptance criteria'), [{ checked: true, text: 'a' }]);
+});
+
+test('a # line inside a code fence neither ends the section nor yields items', () => {
+  const body = '### Acceptance criteria\n- [x] a\n```sh\n# comment\n- [ ] fake\n```\n- [ ] b\n';
+  assert.deepEqual(parseChecklist(body, 'Acceptance criteria'), [
+    { checked: true, text: 'a' },
+    { checked: false, text: 'b' },
+  ]);
+});
+
+test('heading with a trailing colon is still found', () => {
+  assert.deepEqual(parseChecklist('### Acceptance criteria:\n- [ ] a\n', 'Acceptance criteria'), [
+    { checked: false, text: 'a' },
+  ]);
+});
+
+test('numbered checklist items are read', () => {
+  const body = '### Acceptance criteria\n1. [x] a\n2) [ ] b\n';
+  assert.deepEqual(parseChecklist(body, 'Acceptance criteria'), [
+    { checked: true, text: 'a' },
+    { checked: false, text: 'b' },
+  ]);
+});
+
+test('Closes pointing at a PR or a missing issue counts as referencing no issue', () => {
+  for (const issues of [{ 5: null }, {}]) {
+    const r = evaluate({ body: 'Closes #5', files: CODE, issues });
+    assert.equal(r.status, 'fail');
+    assert.match(r.failures[0], /references no issue/);
+  }
+  const docs = evaluate({ body: 'Refs #5', files: ['README.md'], issues: { 5: null } });
+  assert.equal(docs.status, 'pass');
+});
+
+test('Closes with one unresolved and one valid issue still verifies the valid one', () => {
+  const r = evaluate({ body: 'Closes #5, closes #6', files: CODE, issues: { 5: null, 6: issue(['- [x] A']) } });
+  assert.equal(r.status, 'pass');
+});
+
+test('.txt files are not docs-only', () => {
+  assert.equal(touchesCode(['requirements.txt']), true);
+  assert.equal(touchesCode(['README.md', 'docs/a.png']), false);
 });

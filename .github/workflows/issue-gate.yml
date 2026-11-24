@@ -5,9 +5,18 @@ name: Issue gate
 # a sticky comment listing what remains. Rules: CONTRIBUTING.md, "Closes vs Refs".
 # Logic and tests: .github/scripts/issue-gate.js. Make `Issue gate / gate` a
 # required status check (repository admin).
+#
+# SECURITY: this uses `pull_request_target`, so the workflow file AND the
+# checked-out code both come from the base branch. A PR (same-repo or fork)
+# cannot edit the gate that judges it. Never check out or execute PR-controlled
+# code here (no `ref: pull_request.head.*`); the PR body, title and labels are
+# read as data inside github-script and never interpolated into a shell.
+# Consequence: a PR that changes the gate is judged and unit-tested by the
+# current base version; its new tests run once it is merged. CODEOWNERS makes
+# such PRs require an owner review.
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
     types: [opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
@@ -28,44 +37,33 @@ jobs:
       issues: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      # A PR must not be able to edit the gate that judges it: run the script
-      # from the base ref when it exists there. Only a PR that introduces the
-      # gate (bootstrap) falls back to its own copy.
+      # Default ref under pull_request_target is the base branch tip.
       - name: Check out base gate scripts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base-gate
           sparse-checkout: .github/scripts
           persist-credentials: false
-      - name: Select gate scripts
-        run: |
-          if [ -f base-gate/.github/scripts/issue-gate.js ]; then
-            echo "GATE_DIR=$GITHUB_WORKSPACE/base-gate/.github/scripts" >> "$GITHUB_ENV"
-          else
-            echo "::notice::Base ref has no issue gate yet; using the PR's own copy (bootstrap)."
-            echo "GATE_DIR=$GITHUB_WORKSPACE/.github/scripts" >> "$GITHUB_ENV"
-          fi
       # The runner image ships Node 20+, so no setup action is needed.
       - name: Unit tests
-        run: node --test "$GATE_DIR/issue-gate.test.js"
+        run: node --test .github/scripts/issue-gate.test.js
       - name: Check issue deliverables
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { evaluate, parseReferences, MARKER } = require(`${process.env.GATE_DIR}/issue-gate.js`);
+            const { evaluate, parseReferences, MARKER } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-gate.js`);
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
+            const slug = `${owner}/${repo}`;
 
-            const { closes, refs } = parseReferences(pr.body);
+            const { closes, refs } = parseReferences(pr.body, slug);
             const issues = {};
             for (const n of [...closes, ...refs]) {
               try {
                 const { data } = await github.rest.issues.get({ owner, repo, issue_number: n });
                 issues[n] = data.pull_request ? null : (data.body || '');
               } catch (e) {
-                if (e.status !== 404) throw e;
+                // 404 not found, 410 deleted issue: nothing to verify.
+                if (e.status !== 404 && e.status !== 410) throw e;
                 issues[n] = null;
               }
             }
@@ -77,16 +75,18 @@ jobs:
               labels: pr.labels.map((l) => l.name),
               author: pr.user.login,
               files,
+              repo: slug,
               issues,
             });
             for (const n of result.notices) core.notice(n);
 
-            // One sticky comment, found by marker. Fork PRs get a read-only
+            // One sticky comment, found by marker and bot author. Fork PRs get a read-only
             // token, so a failed write is a warning, never a gate failure.
             try {
               const comments = await github.paginate(github.rest.issues.listComments,
                 { owner, repo, issue_number: pr.number, per_page: 100 });
-              const existing = comments.find((c) => c.body && c.body.includes(MARKER));
+              const existing = comments.find((c) =>
+                c.user && c.user.login === 'github-actions[bot]' && c.body && c.body.includes(MARKER));
               if (result.comment && existing) {
                 await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: result.comment });
               } else if (result.comment) {
