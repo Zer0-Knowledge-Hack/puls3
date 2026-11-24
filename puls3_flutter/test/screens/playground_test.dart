@@ -56,14 +56,23 @@ void main() {
     );
   }
 
-  Future<void> pumpLive(WidgetTester tester, StudioGateway gateway) async {
+  Future<void> pumpLive(
+    WidgetTester tester,
+    StudioGateway gateway, {
+    StudioDraft? draft,
+  }) async {
     Puls3Fonts.useGoogleFonts = false;
-    draft = savedDraft(1);
+    final current = draft ?? savedDraft(1, provider: 'anthropic');
+    draft = current;
     await tester.pumpWidget(
       localizedTestApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: Playground(draft: draft, gateway: gateway, owner: testOwner),
+            child: Playground(
+              draft: current,
+              gateway: gateway,
+              owner: testOwner,
+            ),
           ),
         ),
       ),
@@ -174,17 +183,18 @@ void main() {
     expect(run(tester).onPressed, isNull);
   });
 
-  testWidgets('a live runner asks for the provider account before it runs', (
+  testWidgets('a live runner asks for the provider key before it runs', (
     tester,
   ) async {
     Puls3Fonts.useGoogleFonts = false;
-    final studio = _LiveGateway(seed: [(testOwner, savedDraft(1))]);
+    final paid = savedDraft(1, provider: 'anthropic');
+    final studio = _LiveGateway(seed: [(testOwner, paid)]);
     await tester.pumpWidget(
       localizedTestApp(
         home: Scaffold(
           body: SingleChildScrollView(
             child: Playground(
-              draft: savedDraft(1),
+              draft: paid,
               gateway: studio,
               owner: testOwner,
             ),
@@ -194,24 +204,21 @@ void main() {
     );
     await tester.enterText(find.byKey(const Key('playground-input')), 'hello');
     await tester.pump();
+    expect(find.text('ADVANCED'), findsOneWidget);
     expect(run(tester).onPressed, isNull);
 
     await tester.enterText(
       find.byKey(const Key('playground-credential')),
       'builder-token',
     );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
-    );
     await tester.pump();
     expect(run(tester).onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('playground-run')));
     await tester.pump();
-    expect(studio.provider, 'workers-ai');
+    expect(studio.provider, 'anthropic');
     expect(studio.secret, 'builder-token');
-    expect(studio.accountId, 'builder-account');
+    expect(studio.accountId, isNull);
     expect(find.byKey(const Key('playground-result')), findsOneWidget);
     expect(
       find.descendant(
@@ -220,6 +227,36 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('a live free-model run needs no credential and shows none', (
+    tester,
+  ) async {
+    var savedCredentials = 0;
+    var runs = 0;
+    final gateway = serverGateway(
+      saveProviderCredential: (_, _, _) async => savedCredentials++,
+      testRun: (_, _) async {
+        runs++;
+        return api.TestRunResult(output: 'free answer', remainingDailyRuns: 19);
+      },
+    );
+    await pumpLive(tester, gateway, draft: savedDraft(1));
+    await type(tester, 'hello');
+
+    expect(find.byKey(const Key('playground-credential')), findsNothing);
+    expect(find.byKey(const Key('playground-account')), findsNothing);
+    expect(find.text('ADVANCED'), findsNothing);
+    expect(run(tester).onPressed, isNotNull);
+
+    await tapRun(tester);
+    await tester.pump();
+    await tester.pump();
+
+    expect(savedCredentials, 0);
+    expect(runs, 1);
+    expect(find.text('free answer'), findsOneWidget);
+    expect(find.text('19 runs left today'), findsOneWidget);
   });
 
   testWidgets('a live server run asks for a credential before it starts', (
@@ -244,14 +281,6 @@ void main() {
       find.byKey(const Key('playground-credential-missing')),
       findsNothing,
     );
-    // Workers AI also needs the account id.
-    expect(run(tester).onPressed, isNull);
-
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
-    );
-    await tester.pump();
     expect(run(tester).onPressed, isNotNull);
   });
 
@@ -284,19 +313,15 @@ void main() {
       find.byKey(const Key('playground-credential')),
       'builder-token',
     );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
-    );
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('playground-run')));
     await tester.pump();
     await tester.pump();
 
-    expect(provider, 'workers-ai');
+    expect(provider, 'anthropic');
     expect(secret, 'builder-token');
-    expect(accountId, 'builder-account');
+    expect(accountId, isNull);
     expect(sentDraft, 1);
     expect(sentInput, 'A long note.');
     expect(find.byKey(const Key('playground-result')), findsOneWidget);
@@ -317,10 +342,6 @@ void main() {
     await tester.enterText(
       find.byKey(const Key('playground-credential')),
       'builder-token',
-    );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
     );
     await tester.pump();
 
@@ -350,10 +371,6 @@ void main() {
       find.byKey(const Key('playground-credential')),
       'not-a-token',
     );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
-    );
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('playground-run')));
@@ -368,7 +385,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('playground-credential')), findsOneWidget);
-    expect(find.byKey(const Key('playground-account')), findsOneWidget);
   });
 
   testWidgets('an unsupported provider stays on screen', (tester) async {
@@ -383,10 +399,6 @@ void main() {
     await tester.enterText(
       find.byKey(const Key('playground-credential')),
       'builder-token',
-    );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
     );
     await tester.pump();
 
@@ -418,10 +430,6 @@ void main() {
     await tester.enterText(
       find.byKey(const Key('playground-credential')),
       'builder-token',
-    );
-    await tester.enterText(
-      find.byKey(const Key('playground-account')),
-      'builder-account',
     );
     await tester.pump();
 

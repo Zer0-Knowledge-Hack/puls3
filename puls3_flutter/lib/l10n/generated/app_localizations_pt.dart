@@ -1040,6 +1040,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do provedor';
 
   @override
@@ -1056,9 +1059,6 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get playgroundProviderUnsupported =>
       'Este provedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'Executando… Para ao chegar no tempo limite.';
@@ -1251,6 +1251,35 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
 
   @override
   String get hireRejectReasonHint => 'Motivo (opcional)';
@@ -2636,6 +2665,9 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do provedor';
 
   @override
@@ -2652,9 +2684,6 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get playgroundProviderUnsupported =>
       'Este provedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'Executando… Para ao chegar no tempo limite.';
@@ -2847,6 +2876,35 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
 
   @override
   String get hireRejectReasonHint => 'Motivo (opcional)';
@@ -4236,6 +4294,9 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   String get playgroundLiveLead => 'Os testes são grátis e têm limite por dia.';
 
   @override
+  String get playgroundAdvanced => 'Avançado';
+
+  @override
   String get playgroundProviderToken => 'Token do fornecedor';
 
   @override
@@ -4252,9 +4313,6 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get playgroundProviderUnsupported =>
       'Este fornecedor não é compatível. Escolha outro modelo.';
-
-  @override
-  String get playgroundAccountId => 'Id da conta Cloudflare';
 
   @override
   String get playgroundRunning => 'A executar… Para ao chegar ao tempo limite.';
@@ -4447,6 +4505,35 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get hireRejectRefund => 'Rejeitar e reembolsar';
+
+  @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'O agente terminou; registrando o resultado na Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'O agente terminou. Aguardando o registro do resultado na Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'O agente não conseguiu concluir esta tarefa. Rejeite para reembolsar agora ou reclame o reembolso quando o trabalho expirar.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'Não foi possível registrar o resultado na Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'O trabalho expirou. Reclame o reembolso com sua carteira; não é necessária a chave do servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
 
   @override
   String get hireRejectReasonHint => 'Motivo (opcional)';

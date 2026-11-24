@@ -34,6 +34,11 @@ const _credential = BuilderProviderCredential(
   accountId: _account,
 );
 
+const _paidCredential = BuilderProviderCredential(
+  provider: 'anthropic',
+  secret: 'builder-anthropic-key',
+);
+
 final class _TeamModel implements ModelRuntime {
   final tasks = <RuntimeTask>[];
 
@@ -178,7 +183,40 @@ void main() {
     });
 
     test(
-      'a Studio run reads the persisted credential, not the team token',
+      'a paid Studio run reads the persisted credential, not the team token',
+      () async {
+        await store().save(owner: _builder, credential: _paidCredential);
+        final team = _TeamModel();
+        final builderCalls = <BuilderProviderCredential>[];
+        final execute = runExecutor(
+          team: AgentRunner(runtime: team, timeout: const Duration(seconds: 1)),
+          credentials: store().find,
+          builder: (task, credential) async {
+            builderCalls.add(credential);
+            return 'builder';
+          },
+        );
+
+        final output = await execute(
+          const OwnedRunManifest(
+            owner: _builder,
+            provider: 'anthropic',
+            modelId: 'claude-haiku-5-5',
+            systemPrompt: 'You rewrite one paragraph in a calmer voice.',
+            inputMaxChars: 1000,
+            outputMaxChars: 1000,
+          ),
+          'Make this calmer',
+        );
+
+        expect(output, 'builder');
+        expect(builderCalls.single.secret, _paidCredential.secret);
+        expect(team.tasks, isEmpty);
+      },
+    );
+
+    test(
+      'a free Studio run uses the team token and ignores a stored credential',
       () async {
         await store().save(owner: _builder, credential: _credential);
         final team = _TeamModel();
@@ -204,10 +242,9 @@ void main() {
           'Make this calmer',
         );
 
-        expect(output, 'builder');
-        expect(builderCalls.single.secret, _token);
-        expect(builderCalls.single.accountId, _account);
-        expect(team.tasks, isEmpty);
+        expect(output, 'team');
+        expect(team.tasks, hasLength(1));
+        expect(builderCalls, isEmpty);
       },
     );
   });

@@ -51,6 +51,10 @@ abstract interface class HireGateway {
   /// be empty.
   Future<EscrowPreparation> prepareReject(int hireId, String reason);
 
+  /// The unsigned `claim_refund` of a funded hire past `expired_at`, so the
+  /// consumer can recover the USDC without the server's relay key.
+  Future<EscrowPreparation> prepareClaimRefund(int hireId);
+
   /// The unsigned `give_feedback` of a completed hire (F7), with [score]
   /// (1 to 5) and an optional [comment].
   Future<EscrowPreparation> prepareFeedback(
@@ -157,6 +161,11 @@ enum HireStage {
   /// Funded; the agent is working.
   running,
 
+  /// Funded; the run finished, but the result is hidden until the escrow
+  /// `submit` lands. The app says the agent finished and the result is being
+  /// recorded (#277).
+  recording,
+
   /// Funded and the run finished with a result, which the agent has not
   /// submitted on chain yet.
   delivered,
@@ -193,6 +202,9 @@ class HireProgress {
     this.paymentTransaction,
     this.paymentExplorerUrl,
     this.approvalDeadline,
+    this.expiresAt,
+    this.runFinished = false,
+    this.submitErrorCode,
     this.decisionTransaction,
     this.decisionExplorerUrl,
     this.feedbackTransaction,
@@ -236,6 +248,18 @@ class HireProgress {
   /// The job's `approval_deadline`, set once the agent submitted.
   final DateTime? approvalDeadline;
 
+  /// The job's `expired_at`, after which the consumer can claim the refund.
+  final DateTime? expiresAt;
+
+  /// Whether the agent run succeeded, even while its result is still hidden
+  /// before the escrow `submit` (#277).
+  final bool runFinished;
+
+  /// Why the server says the agent's `submit` cannot land while the hire is
+  /// funded: `AgentCannotDeliver`, `SubmitSimulationRejected`,
+  /// `EscrowCallFailed` or `OutcomeUnknown`. Null while it may still land.
+  final String? submitErrorCode;
+
   /// Lowercase hex hash of the confirmed `complete` or `reject` transaction.
   final String? decisionTransaction;
 
@@ -267,6 +291,7 @@ class HireProgress {
     // A succeeded run stays `running` until its `submit` lands (api.md,
     // "Hire escrow states"): the result says it finished.
     'funded' when result != null => HireStage.delivered,
+    'funded' when runFinished => HireStage.recording,
     'funded' when runtimeStatus == 'running' => HireStage.running,
     'funded' => HireStage.queued,
     'submitted' => HireStage.submitted,
@@ -275,6 +300,42 @@ class HireProgress {
     'expired' => HireStage.expired,
     _ => HireStage.awaitingPayment,
   };
+
+  /// The server says the escrow cannot record the result for this hire.
+  bool get submitBlocked => submitErrorCode != null;
+
+  /// `OutcomeUnknown` blocks every new preparation, so even a reject would
+  /// be refused until the record is resolved.
+  bool get submitOutcomeUnknown => submitErrorCode == 'OutcomeUnknown';
+
+  /// A stuck submit the consumer can still reject from `funded`.
+  bool get canRejectStuckSubmit =>
+      status == 'funded' && submitBlocked && !submitOutcomeUnknown;
+
+  /// Why the result is not recorded, safe to show. Null when it can still
+  /// land.
+  String? get submitBlockedReason => switch (submitErrorCode) {
+    'AgentCannotDeliver' =>
+      'This agent cannot deliver this hire: the server cannot sign its '
+          'result.',
+    'SubmitSimulationRejected' =>
+      'The escrow can no longer record the result: the job expired or the '
+          'submit was too late.',
+    'EscrowCallFailed' =>
+      'The result could not be recorded on Stellar after several attempts.',
+    'OutcomeUnknown' =>
+      'The result may have been recorded, but its status is unknown. Wait '
+          'for the job to expire, then claim the refund.',
+    _ => null,
+  };
+
+  /// F6 Claim refund: the job is still funded past `expired_at`, and no
+  /// unknown outcome blocks a new preparation.
+  bool canClaimRefundAt(DateTime now) {
+    if (status != 'funded' || submitOutcomeUnknown) return false;
+    final expires = expiresAt;
+    return expires != null && !now.toUtc().isBefore(expires.toUtc());
+  }
 
   /// A reject before any payment: the app calls it cancelled.
   bool get isCancelled => status == 'rejected' && rejectedFrom == 'open';
@@ -314,9 +375,11 @@ class HireProgress {
   bool get feedbackPending =>
       feedbackTransaction != null && feedbackState == 'submitted';
 
-  /// F6 Reject: a failed run, or submitted before the deadline.
+  /// F6 Reject: a failed run, a funded hire whose submit cannot land, or
+  /// submitted before the deadline.
   bool showRejectAt(DateTime now) {
     if (stage == HireStage.runFailed) return true;
+    if (canRejectStuckSubmit) return true;
     return stage == HireStage.submitted && approvalWindowOpen(now);
   }
 }

@@ -134,6 +134,15 @@ final class EscrowRelayService {
     String reason,
   ) => _prepare(wallet, hireId, SubmissionPurpose.reject, reason: reason);
 
+  /// The unsigned `claim_refund` of a funded hire past `expired_at`, signed
+  /// by its consumer. `claim_refund` is permissionless: this returns the
+  /// USDC without `escrowRelaySigningKey` (the tracker's automatic refund is
+  /// the same contract call, signed by the relay account).
+  Future<PreparedTransaction> prepareClaimRefund(
+    StellarAddress wallet,
+    int hireId,
+  ) => _prepare(wallet, hireId, SubmissionPurpose.claimRefund);
+
   /// The unsigned `give_feedback` of a completed hire. [call] is built by
   /// the feedback service: the registry contract is not the escrow.
   Future<PreparedTransaction> prepareFeedback(
@@ -162,6 +171,13 @@ final class EscrowRelayService {
       throw _api('InvalidRejectReason');
     }
     if (!_allows(purpose, hire.status)) throw _invalidTransition(hire, purpose);
+    // The contract refuses a refund before `expired_at`; check the stored
+    // expiry first so the app gets a stable code instead of a simulation
+    // failure.
+    if (purpose == SubmissionPurpose.claimRefund &&
+        _nowSeconds < hire.expiredAt) {
+      throw _invalidTransition(hire, purpose);
+    }
     final records = await _submissions.listByHire(hire.id);
     if (records.any((r) => r.state == SubmissionState.submitted)) {
       throw _api('SubmissionInProgress');
@@ -191,6 +207,14 @@ final class EscrowRelayService {
           function: feedbackCall.function,
           args: feedbackCall.args,
           contract: feedbackCall.contract,
+        );
+      case SubmissionPurpose.claimRefund:
+        final jobId = hire.jobId ?? (throw _invalidTransition(hire, purpose));
+        draft = await _draft(
+          wallet: wallet,
+          purpose: purpose,
+          function: 'claim_refund',
+          args: [ScArg.u64(jobId)],
         );
       default:
         draft = await _draft(
@@ -624,6 +648,7 @@ final class EscrowRelayService {
           status == HireStatus.open ||
               status == HireStatus.funded ||
               status == HireStatus.submitted,
+        SubmissionPurpose.claimRefund => status == HireStatus.funded,
         _ => false,
       };
 

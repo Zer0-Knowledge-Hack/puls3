@@ -231,6 +231,10 @@ class ScriptedHireGateway implements HireGateway {
       _prep('reject');
 
   @override
+  Future<EscrowPreparation> prepareClaimRefund(int hireId) async =>
+      _prep('claimRefund');
+
+  @override
   Future<EscrowPreparation> prepareFeedback(
     int hireId,
     int score,

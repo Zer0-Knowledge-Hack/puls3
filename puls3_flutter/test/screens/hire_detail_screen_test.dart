@@ -42,6 +42,9 @@ HireProgress _hire({
   String? paymentTransaction = _fundHash,
   String? paymentExplorerUrl,
   DateTime? approvalDeadline,
+  DateTime? expiresAt,
+  bool runFinished = false,
+  String? submitErrorCode,
   String? decisionTransaction,
   String? decisionExplorerUrl,
   String? feedbackTransaction,
@@ -61,6 +64,9 @@ HireProgress _hire({
   paymentTransaction: paymentTransaction,
   paymentExplorerUrl: paymentExplorerUrl,
   approvalDeadline: approvalDeadline,
+  expiresAt: expiresAt,
+  runFinished: runFinished,
+  submitErrorCode: submitErrorCode,
   decisionTransaction: decisionTransaction,
   decisionExplorerUrl: decisionExplorerUrl,
   feedbackTransaction: feedbackTransaction,
@@ -154,6 +160,16 @@ class _ProgressGateway implements HireGateway {
       preparationId: 'prep-reject',
       purpose: 'reject',
       unsignedTransaction: 'AAAA-reject',
+    );
+  }
+
+  @override
+  Future<EscrowPreparation> prepareClaimRefund(int hireId) async {
+    prepared.add(('claimRefund', ''));
+    return const EscrowPreparation(
+      preparationId: 'prep-claimRefund',
+      purpose: 'claimRefund',
+      unsignedTransaction: 'AAAA-claimRefund',
     );
   }
 
@@ -285,12 +301,12 @@ Finder _status(String label) => find.descendant(
 );
 
 void main() {
-  testWidgets('follows a funded hire from queued to the result, then stops '
-      'polling', (tester) async {
+  testWidgets('follows a funded hire from queued to finished, then shows the '
+      'failed run and stops', (tester) async {
     final gateway = _ProgressGateway([
       _hire(runtimeStatus: 'queued'),
       _hire(runtimeStatus: 'running'),
-      _hire(runtimeStatus: 'running', result: 'Ticket 42 answered.'),
+      _hire(runtimeStatus: 'running', runFinished: true),
       _hire(runtimeStatus: 'failed', failureReason: 'must not be read'),
     ]);
     await _pumpDetail(tester, gateway: gateway);
@@ -310,8 +326,16 @@ void main() {
 
     await tester.pump(_poll);
     await tester.pump();
-    expect(_status('Funded · Result ready'), findsOneWidget);
-    expect(find.text('Ticket 42 answered.'), findsOneWidget);
+    expect(_status('Funded · Recording'), findsOneWidget);
+    expect(
+      find.text(
+        'The agent finished. Waiting for the result to be recorded on '
+        'Stellar.',
+      ),
+      findsOneWidget,
+    );
+    // The result stays hidden until `submit` confirms.
+    expect(find.byKey(const ValueKey('hire-detail-result')), findsNothing);
     expect(gateway.reads, hasLength(3));
 
     // Still waiting for the agent's submit: it keeps polling.
@@ -326,6 +350,71 @@ void main() {
     await tester.pump();
     expect(gateway.reads, hasLength(5));
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a submit that cannot land shows the reason and offers Reject '
+      'and refund', (tester) async {
+    final gateway = _ProgressGateway([
+      _hire(
+        runtimeStatus: 'running',
+        runFinished: true,
+        submitErrorCode: 'EscrowCallFailed',
+        expiresAt: _now.add(const Duration(hours: 20)),
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway);
+
+    expect(_status('Funded · Recording'), findsOneWidget);
+    expect(
+      find.text(
+        'The result could not be recorded on Stellar after several attempts.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('hire-detail-reject')), findsOneWidget);
+    // Not expired yet: no claim refund button.
+    expect(find.byKey(const ValueKey('hire-detail-claim')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-reject')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(gateway.prepared, contains(('reject', '')));
+    expect(
+      gateway.submitted,
+      contains((3, 'reject', 'signed:AAAA-reject')),
+    );
+  });
+
+  testWidgets('a funded hire past expiry offers a claim refund signed by the '
+      'consumer', (tester) async {
+    final gateway = _ProgressGateway([
+      _hire(
+        runtimeStatus: 'running',
+        runFinished: true,
+        expiresAt: _now.subtract(const Duration(minutes: 1)),
+      ),
+    ]);
+    await _pumpDetail(tester, gateway: gateway);
+
+    expect(find.byKey(const ValueKey('hire-detail-claim')), findsOneWidget);
+    expect(
+      find.text(
+        'The job expired. Claim the refund with your wallet; no server key '
+        'is needed.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('hire-detail-claim')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(gateway.prepared, contains(('claimRefund', '')));
+    expect(
+      gateway.submitted,
+      contains((3, 'claimRefund', 'signed:AAAA-claimRefund')),
+    );
   });
 
   testWidgets('Copy copies the result; the payment opens on StellarExpert', (
@@ -363,8 +452,9 @@ void main() {
     expect(_opened.single.toString(), 'https://example.test/tx/1');
   });
 
-  testWidgets('a failed run shows its reason and says the funds stay in the '
-      'escrow', (tester) async {
+  testWidgets('a failed run shows its reason and how to get the refund back', (
+    tester,
+  ) async {
     await _pumpDetail(
       tester,
       gateway: _ProgressGateway([
@@ -374,7 +464,7 @@ void main() {
     expect(_status('Funded · Run failed'), findsOneWidget);
     expect(find.text('The model timed out.'), findsOneWidget);
     expect(
-      find.textContaining('Your USDC stays in the escrow'),
+      find.textContaining('Reject it to refund now'),
       findsOneWidget,
     );
   });

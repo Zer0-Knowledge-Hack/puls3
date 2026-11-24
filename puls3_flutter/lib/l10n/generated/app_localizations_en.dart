@@ -1030,6 +1030,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playgroundLiveLead => 'Test runs are free and limited per day.';
 
   @override
+  String get playgroundAdvanced => 'Advanced';
+
+  @override
   String get playgroundProviderToken => 'Provider token';
 
   @override
@@ -1046,9 +1049,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get playgroundProviderUnsupported =>
       'This provider is not supported. Pick another model.';
-
-  @override
-  String get playgroundAccountId => 'Cloudflare account id';
 
   @override
   String get playgroundRunning => 'Running… It stops at the runtime timeout.';
@@ -1238,6 +1238,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hireRejectRefund => 'Reject and refund';
+
+  @override
+  String get hireStatusRecording => 'Funded · Recording';
+
+  @override
+  String get hireStepRecording =>
+      'The agent finished; recording the result on Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'The agent finished. Waiting for the result to be recorded on Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'The agent could not finish this task. Reject it to refund now, or claim the refund after the job expires.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'The result could not be recorded on Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'The job expired. Claim the refund with your wallet; no server key is needed.';
+
+  @override
+  String get hireClaimRefund => 'Claim refund';
+
+  @override
+  String get hireClaimingRefund => 'Claiming refund…';
 
   @override
   String get hireRejectReasonHint => 'Optional reason';

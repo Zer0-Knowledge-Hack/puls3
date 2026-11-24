@@ -137,6 +137,13 @@ void main() {
       (await rig.hire(status: HireStatus.open)).id,
       'not what I asked for',
     ),
+    'prepareClaimRefund': () async {
+      rig.clock = DateTime.utc(2028);
+      return endpoint.prepareClaimRefund(
+        session,
+        (await rig.hire(status: HireStatus.funded)).id,
+      );
+    },
     'getHire': () async => endpoint.getHire(
       session,
       (await rig.hire(status: HireStatus.funded)).id,
@@ -548,6 +555,11 @@ void main() {
     test(
       'prepareReject',
       () => _notOwned(() => endpoint.prepareReject(session, foreign, 'no')),
+    );
+
+    test(
+      'prepareClaimRefund',
+      () => _notOwned(() => endpoint.prepareClaimRefund(session, foreign)),
     );
 
     test(

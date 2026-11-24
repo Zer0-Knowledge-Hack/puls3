@@ -130,6 +130,16 @@ class HireEndpoint extends Endpoint {
     (relay, wallet) => relay.prepareReject(wallet, hireId, reason),
   );
 
+  /// The unsigned `claim_refund` of a funded hire past `expired_at`, so the
+  /// consumer can recover the USDC without the server's relay key.
+  Future<PreparedTransaction> prepareClaimRefund(
+    Session session,
+    int hireId,
+  ) => _prepare(
+    session,
+    (relay, wallet) => relay.prepareClaimRefund(wallet, hireId),
+  );
+
   /// The hire [hireId] as its [consumer] sees it: escrow status, run
   /// progress and result (F6). Read-only, so the app polls it.
   Future<HireDetail> getHire(

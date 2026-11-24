@@ -113,9 +113,9 @@ final class ModelPolicy {
       : paidProviders.contains(model.provider);
 
   /// Whether [provider] is a paid provider rather than the Workers AI free
-  /// tier. For display and pricing only: every builder agent runs on the
-  /// builder's own account, so deploy needs a stored credential for any
-  /// provider (ADR-0004 amendment).
+  /// tier. For display and pricing only: free `workers-ai` agents run on the
+  /// platform account, while paid providers need the builder's stored
+  /// credential (ADR-0004 amendment, #318).
   bool isPaid(String provider) => provider != freeProvider;
 }
 

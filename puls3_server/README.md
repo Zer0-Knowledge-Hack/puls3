@@ -158,8 +158,13 @@ the same transaction. Each pass:
    two runners never run the same hire;
 3. loads the manifest the hire pinned and calls the model through
    `AgentRunner` (input and output limits, timeout that aborts the call);
+   a free-model (`workers-ai`) run first reserves one slot for the agent on
+   the UTC day, and above 10 slots it fails with `team_run_quota_exceeded`
+   before calling the model. This covers every free-model agent, including
+   the seeded demo agents; a run that fails after reserving keeps its slot;
 4. stores the result, or a safe failure code such as `timeout`,
-   `provider_error:<type>` or `manifest_unavailable`.
+   `provider_error:<type>`, `manifest_unavailable` or
+   `team_run_quota_exceeded`.
 
 For the subcontracting tool loop (#334, ADR-0011 D8) the model layer also
 holds conversations with tools: `ConversationRuntime.converse` returns one
@@ -198,9 +203,10 @@ provider; a provider without credentials fails the run as
 
 With neither provider configured the loop does not start, even when enabled.
 
-The server-wide `workersAiApiToken` is for the seeded demo agents only. Builder
-agents run on the builder's own provider account (ADR-0004 amendment, #142),
-resolved from the deploy record once #18/#35 land.
+The server-wide `workersAiApiToken` serves every free `workers-ai` agent:
+seeded demos and Studio deploys, for test runs and paid hires (#318). Paid
+providers (for example Anthropic) still run on the builder's own key
+(ADR-0004 amendment), resolved from the deploy record.
 
 It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr
@@ -274,9 +280,20 @@ with `ChildrenOpen` stores nothing and is retried, so it never burns an
 attempt. Agent-signed calls (`submit`, `createChildJob` and the verdicts) are
 kept one in flight at a time.
 
-**Not wired in production yet.** `startAgentRuntime` passes no
-`SubcontractSetup` until T6.4, so no run is offered the tools, an opted-in
-manifest runs as one plain segment, and no run pauses. Tests inject fakes.
+**Wired in production (T6.4.5).** `startAgentRuntime` builds the setup, the
+port, the result source, the reconciler and `childrenOpen` per pass
+(`buildSubcontractServices`), and the chain tracker passes `ChildJobEffects`.
+It is on only where the submit wiring is on (custodied keys) and
+`PULS3_HIRE_JOB_DURATION_SECONDS` is set; the log line says
+`subcontracting on` or `subcontracting off`. A hire carries a reserve only
+with `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, and a run is offered the tools
+only when its manifest opted in (`subcontractEnabled`). With subcontracting on,
+`staleAfter` is `timeout * 8 + 1 min` and the pass timeout
+`2 * batch * 8 * timeout + 1 min`; with it off a run is one model call, so they
+stay `timeout + 1 min` and `2 * batch * timeout + 1 min`
+(`agentRuntimeTimings`). With it off, runs still `awaitingChild` from an
+earlier deployment are counted in a startup log line and wait for their escrow
+to expire.
 
 ### Hire configuration
 

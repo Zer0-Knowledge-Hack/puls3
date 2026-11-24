@@ -494,6 +494,29 @@ void main() {
       expect(stored!.submittedAt, isNotNull);
     });
 
+    test('a claim_refund preparation is submitted end to end', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      rig.clock = DateTime.utc(2028);
+      final prepared = await rig.service.prepareClaimRefund(_wallet, hire.id);
+      final xdr = FakeEnvelopeCodec.sign(prepared.unsignedTransactionXdr!);
+
+      final detail = await rig.service.submitEscrowCall(
+        _wallet,
+        hire.id,
+        prepared.preparationId,
+        xdr,
+      );
+
+      expect(detail.escrowSubmission!.purpose, 'claimRefund');
+      expect(detail.escrowSubmission!.preparationId, prepared.preparationId);
+      expect(detail.escrowSubmission!.state, 'submitted');
+      expect(rig.sender.resent, [xdr]);
+      final stored = await rig.preparations.findByPreparationId(
+        prepared.preparationId,
+      );
+      expect(stored!.submittedAt, isNotNull);
+    });
+
     test('a DUPLICATE answer counts as sent', () async {
       final p = await prepareFund();
       final xdr = signed(p.prepared);

@@ -142,6 +142,10 @@ final class SdkWorld {
         studioTasks.add(task);
         return 'echo: ${task.input}';
       },
+      runTeam: (task) async {
+        studioTasks.add(task);
+        return 'echo: ${task.input}';
+      },
     );
   }
 

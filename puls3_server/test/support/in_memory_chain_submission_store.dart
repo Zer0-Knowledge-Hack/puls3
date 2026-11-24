@@ -119,6 +119,7 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
       _rows.values.any(
         (r) =>
             r.state == SubmissionState.submitted &&
+            r.preparationId == null &&
             purposes.contains(r.purpose),
       );
 

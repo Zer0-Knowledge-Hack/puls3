@@ -1920,6 +1920,12 @@ abstract class AppLocalizations {
   /// **'Test runs are free and limited per day.'**
   String get playgroundLiveLead;
 
+  /// No description provided for @playgroundAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get playgroundAdvanced;
+
   /// No description provided for @playgroundProviderToken.
   ///
   /// In en, this message translates to:
@@ -1949,12 +1955,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This provider is not supported. Pick another model.'**
   String get playgroundProviderUnsupported;
-
-  /// No description provided for @playgroundAccountId.
-  ///
-  /// In en, this message translates to:
-  /// **'Cloudflare account id'**
-  String get playgroundAccountId;
 
   /// No description provided for @playgroundRunning.
   ///
@@ -2285,6 +2285,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reject and refund'**
   String get hireRejectRefund;
+
+  /// No description provided for @hireStatusRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Funded · Recording'**
+  String get hireStatusRecording;
+
+  /// No description provided for @hireStepRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent finished; recording the result on Stellar.'**
+  String get hireStepRecording;
+
+  /// No description provided for @hireNoteRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent finished. Waiting for the result to be recorded on Stellar.'**
+  String get hireNoteRecording;
+
+  /// No description provided for @hireNoteRunFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent could not finish this task. Reject it to refund now, or claim the refund after the job expires.'**
+  String get hireNoteRunFailed;
+
+  /// No description provided for @hireSubmitBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'The result could not be recorded on Stellar.'**
+  String get hireSubmitBlocked;
+
+  /// No description provided for @hireClaimNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The job expired. Claim the refund with your wallet; no server key is needed.'**
+  String get hireClaimNote;
+
+  /// No description provided for @hireClaimRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim refund'**
+  String get hireClaimRefund;
+
+  /// No description provided for @hireClaimingRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Claiming refund…'**
+  String get hireClaimingRefund;
 
   /// No description provided for @hireRejectReasonHint.
   ///

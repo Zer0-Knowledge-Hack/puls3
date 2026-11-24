@@ -13,6 +13,8 @@ import 'src/health/health_endpoint.dart';
 import 'src/runtime/agent_runtime_wiring.dart';
 import 'src/studio/registration_route.dart';
 import 'src/studio/studio_deploy_wiring.dart';
+import 'src/studio/studio_endpoint.dart';
+import 'src/studio/team_task_runner.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -91,6 +93,20 @@ void run(List<String> args) async {
         ),
       ),
       '/app/**',
+    );
+  }
+
+  // The free Studio model runs on the platform's Workers AI account (#318).
+  // Paid providers keep each builder's own key.
+  final teamTestRunner = teamTestRunnerFromEnvironment(
+    Platform.environment,
+    workersAiToken: pod.getPassword(workersAiTokenPassword),
+  );
+  StudioEndpoint.teamTestRunner = teamTestRunner;
+  if (teamTestRunner == null) {
+    stdout.writeln(
+      '[studio] free-model test runs are off: $workersAiAccountVariable or '
+      'the "$workersAiTokenPassword" password is missing',
     );
   }
 

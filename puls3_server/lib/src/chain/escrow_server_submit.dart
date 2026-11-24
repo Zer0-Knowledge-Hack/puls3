@@ -123,7 +123,9 @@ final class RelayEscrowCallSender implements EscrowServerCallSender {
     final failed = existing
         .where(
           (row) =>
-              row.purpose == purpose && row.state == SubmissionState.failed,
+              row.purpose == purpose &&
+              row.state == SubmissionState.failed &&
+              row.preparationId == null,
         )
         .length;
     if (failed >= maxEscrowCallAttempts) return;

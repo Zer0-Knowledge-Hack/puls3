@@ -25,12 +25,15 @@ class HireDetailView extends StatelessWidget {
     this.onOpenDecision,
     this.onApprove,
     this.onReject,
+    this.onClaimRefund,
     this.rejectReasonController,
     this.showApprove = false,
     this.showReject = false,
+    this.showClaimRefund = false,
     this.deadlinePassed = false,
     this.approving = false,
     this.rejecting = false,
+    this.claiming = false,
     this.onRate,
     this.onOpenFeedback,
     this.ratedScore,
@@ -52,12 +55,17 @@ class HireDetailView extends StatelessWidget {
 
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+
+  /// Recovers a `funded` job past `expired_at` with the consumer's signature.
+  final VoidCallback? onClaimRefund;
   final TextEditingController? rejectReasonController;
   final bool showApprove;
   final bool showReject;
+  final bool showClaimRefund;
   final bool deadlinePassed;
   final bool approving;
   final bool rejecting;
+  final bool claiming;
 
   /// Opens S10. Null hides **Rate** (the hire is not completed, or it is
   /// already rated).
@@ -71,16 +79,17 @@ class HireDetailView extends StatelessWidget {
   final int? ratedScore;
   final bool isDemo;
 
-  bool get _acting => approving || rejecting;
+  bool get _acting => approving || rejecting || claiming;
 
   /// Shown above the steps, for example when a refresh failed.
   final Widget? banner;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final stage = hire.stage;
     final result = hire.result;
-    final note = _note(stage);
+    final note = _note(stage, l10n);
     final payment = hire.paymentTransaction;
     final banner = this.banner;
     return Column(
@@ -99,7 +108,7 @@ class HireDetailView extends StatelessWidget {
         ScreenHeader(
           title: 'Hire #${hire.hireId}',
           subtitle: hire.agentName,
-          trailing: _StatusChip(label: statusLabel(hire), stage: stage),
+          trailing: _StatusChip(label: statusLabel(hire, l10n), stage: stage),
         ),
         const SizedBox(height: Puls3Spacing.lg),
         if (banner != null) ...[
@@ -108,13 +117,21 @@ class HireDetailView extends StatelessWidget {
         ],
         const SectionLabel('Progress'),
         const SizedBox(height: Puls3Spacing.xs),
-        ..._steps(),
+        ..._steps(l10n),
         if (note != null) ...[
           const SizedBox(height: Puls3Spacing.sm),
           Text(
             note,
             key: const ValueKey('hire-detail-note'),
             style: Puls3Text.bodyMuted,
+          ),
+        ],
+        if (hire.submitErrorCode != null) ...[
+          const SizedBox(height: Puls3Spacing.sm),
+          Text(
+            hire.submitBlockedReason ?? l10n.hireSubmitBlocked,
+            key: const ValueKey('hire-detail-submit-blocked'),
+            style: Puls3Text.bodyMuted.copyWith(color: Puls3Colors.accent),
           ),
         ],
         if (!stage.isFinal) ...[
@@ -194,6 +211,23 @@ class HireDetailView extends StatelessWidget {
             variant: PrimaryButtonVariant.outline,
             expand: true,
             onPressed: onOpenPayment,
+          ),
+        ],
+        if (showClaimRefund) ...[
+          const SizedBox(height: Puls3Spacing.md),
+          Text(
+            l10n.hireClaimNote,
+            key: const ValueKey('hire-detail-claim-note'),
+            style: Puls3Text.bodyMuted,
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+          PrimaryButton(
+            key: const ValueKey('hire-detail-claim'),
+            label: claiming ? l10n.hireClaimingRefund : l10n.hireClaimRefund,
+            icon: Icons.savings_outlined,
+            expand: true,
+            isLoading: claiming,
+            onPressed: _acting ? null : onClaimRefund,
           ),
         ],
         ..._decision(context),
@@ -347,28 +381,31 @@ class HireDetailView extends StatelessWidget {
   }
 
   /// The status as #10 names it, with the run while the hire is funded.
-  static String statusLabel(HireProgress hire) => switch (hire.stage) {
-    HireStage.awaitingPayment => 'Awaiting payment',
-    HireStage.queued => 'Funded · Queued',
-    HireStage.running => 'Funded · Running',
-    HireStage.delivered => 'Funded · Result ready',
-    HireStage.runFailed => 'Funded · Run failed',
-    HireStage.submitted => 'Submitted',
-    HireStage.completed => 'Completed',
-    HireStage.rejected => hire.isCancelled ? 'Cancelled' : 'Rejected',
-    HireStage.expired => 'Expired',
-  };
+  static String statusLabel(HireProgress hire, AppLocalizations l10n) =>
+      switch (hire.stage) {
+        HireStage.awaitingPayment => 'Awaiting payment',
+        HireStage.queued => 'Funded · Queued',
+        HireStage.running => 'Funded · Running',
+        HireStage.recording => l10n.hireStatusRecording,
+        HireStage.delivered => 'Funded · Result ready',
+        HireStage.runFailed => 'Funded · Run failed',
+        HireStage.submitted => 'Submitted',
+        HireStage.completed => 'Completed',
+        HireStage.rejected => hire.isCancelled ? 'Cancelled' : 'Rejected',
+        HireStage.expired => 'Expired',
+      };
 
   static bool _holdsFunds(HireStage stage) => switch (stage) {
     HireStage.queued ||
     HireStage.running ||
+    HireStage.recording ||
     HireStage.delivered ||
     HireStage.runFailed ||
     HireStage.submitted => true,
     _ => false,
   };
 
-  List<Widget> _steps() {
+  List<Widget> _steps(AppLocalizations l10n) {
     final stage = hire.stage;
     final paid = switch (stage) {
       HireStage.awaitingPayment => StepStatus.active,
@@ -377,10 +414,9 @@ class HireDetailView extends StatelessWidget {
     };
     final run = switch (stage) {
       HireStage.queued || HireStage.running => StepStatus.active,
+      HireStage.recording || HireStage.delivered => StepStatus.done,
       HireStage.runFailed => StepStatus.failed,
-      HireStage.delivered ||
-      HireStage.submitted ||
-      HireStage.completed => StepStatus.done,
+      HireStage.submitted || HireStage.completed => StepStatus.done,
       _ => hire.result != null ? StepStatus.done : StepStatus.pending,
     };
     final submitted =
@@ -406,6 +442,7 @@ class HireDetailView extends StatelessWidget {
         description: switch (stage) {
           HireStage.queued => 'Queued: the agent starts shortly.',
           HireStage.running => 'The agent is working on your task.',
+          HireStage.recording => l10n.hireStepRecording,
           _ => hire.failureReason ?? 'The agent could not finish this task.',
         },
       ),
@@ -422,13 +459,12 @@ class HireDetailView extends StatelessWidget {
     ];
   }
 
-  String? _note(HireStage stage) => switch (stage) {
+  String? _note(HireStage stage, AppLocalizations l10n) => switch (stage) {
+    HireStage.recording => l10n.hireNoteRecording,
     HireStage.delivered =>
       'The agent finished. Your USDC stays in the escrow until the result '
           'is recorded on Stellar and approved.',
-    HireStage.runFailed =>
-      'The agent could not finish this task. Your USDC stays in the escrow '
-          'and returns to you when the job expires.',
+    HireStage.runFailed => l10n.hireNoteRunFailed,
     HireStage.rejected when hire.isCancelled =>
       'This hire was cancelled before any payment.',
     HireStage.rejected =>
@@ -449,6 +485,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = switch (stage) {
       HireStage.completed || HireStage.delivered => Puls3Colors.success,
+      HireStage.recording || HireStage.running => Puls3Colors.lavender,
       HireStage.runFailed ||
       HireStage.rejected ||
       HireStage.expired => Puls3Colors.accent,
