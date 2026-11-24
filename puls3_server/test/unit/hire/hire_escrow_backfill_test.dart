@@ -2,6 +2,7 @@ import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/hire/hire_escrow_backfill.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
+import 'package:puls3_server/src/ledger/xdr_invoke_encoder.dart';
 import 'package:test/test.dart';
 
 const _escrow = 'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2';
@@ -41,6 +42,13 @@ final class _Rows implements HireEscrowRows {
     for (final hire in all)
       if (!escrows.containsKey(hire.hireId)) hire,
   ];
+
+  /// Confirmed `create_job` envelopes by hire id.
+  final Map<int, String> envelopes = {};
+
+  @override
+  Future<String?> confirmedCreateJobEnvelope(int hireId) async =>
+      envelopes[hireId];
 
   @override
   Future<bool> setEscrowIfEmpty(int hireId, String escrow) async {
@@ -142,6 +150,63 @@ void main() {
         BackfillOutcome.matched,
       ]);
       expect(rows.escrows, {2: _escrow});
+    });
+
+    group('an archived job and the create_job envelope (#384 review)', () {
+      String envelope(String contract, String function) => encodeInvokeEnvelope(
+        source: StellarAddress.parse(_alice),
+        fee: 100,
+        sequence: 1,
+        contract: StellarAddress.parse(contract),
+        function: function,
+        args: [ScArg.u64(34)],
+      );
+
+      test('created on this escrow: matched and written', () async {
+        final rows = _Rows([_hire(1, 34)])
+          ..envelopes[1] = envelope(_escrow, 'create_job');
+        final jobs = _Jobs({}, archived: {34});
+
+        final lines = await _backfill(rows, jobs).run(apply: true);
+
+        expect(lines.single.outcome, BackfillOutcome.matchedFromEnvelope);
+        expect(lines.single.written, isTrue);
+        expect(rows.escrows, {1: _escrow});
+      });
+
+      test('created on another escrow: left empty', () async {
+        final rows = _Rows([_hire(1, 34)])
+          ..envelopes[1] = envelope(_other, 'create_job');
+        final jobs = _Jobs({}, archived: {34});
+
+        final lines = await _backfill(rows, jobs).run(apply: true);
+
+        expect(lines.single.outcome, BackfillOutcome.archived);
+        expect(rows.escrows, isEmpty);
+      });
+
+      test('an envelope of another call proves nothing', () async {
+        final rows = _Rows([_hire(1, 34)])
+          ..envelopes[1] = envelope(_escrow, 'fund');
+        final jobs = _Jobs({}, archived: {34});
+
+        final lines = await _backfill(rows, jobs).run(apply: true);
+
+        expect(lines.single.outcome, BackfillOutcome.archived);
+        expect(rows.escrows, isEmpty);
+      });
+
+      test('a dry run writes nothing for an envelope match', () async {
+        final rows = _Rows([_hire(1, 34)])
+          ..envelopes[1] = envelope(_escrow, 'create_job');
+        final jobs = _Jobs({}, archived: {34});
+
+        final lines = await _backfill(rows, jobs).run(apply: false);
+
+        expect(lines.single.outcome, BackfillOutcome.matchedFromEnvelope);
+        expect(lines.single.written, isFalse);
+        expect(rows.escrows, isEmpty);
+      });
     });
 
     test('a hire with its own escrow is never read or changed', () async {

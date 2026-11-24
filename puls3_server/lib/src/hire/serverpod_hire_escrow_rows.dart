@@ -1,5 +1,6 @@
 import 'package:serverpod/serverpod.dart';
 
+import '../chain/submission_values.dart';
 import '../generated/protocol.dart';
 import 'hire_escrow_backfill.dart';
 
@@ -35,5 +36,19 @@ final class ServerpodHireEscrowRows implements HireEscrowRows {
       where: (t) => t.id.equals(hireId) & t.escrow.equals(null),
     );
     return updated.isNotEmpty;
+  }
+
+  @override
+  Future<String?> confirmedCreateJobEnvelope(int hireId) async {
+    final row = await ChainSubmission.db.findFirstRow(
+      session,
+      where: (t) =>
+          t.hireId.equals(hireId) &
+          t.purpose.equals(SubmissionPurpose.createJob.wireName) &
+          t.state.equals(SubmissionState.confirmed.wireName),
+      orderBy: (t) => t.id,
+    );
+    final envelope = row?.signedEnvelopeXdr;
+    return envelope == null || envelope.isEmpty ? null : envelope;
   }
 }

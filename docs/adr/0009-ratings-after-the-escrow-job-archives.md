@@ -44,7 +44,9 @@ A rating names its job as `puls3:job:v1:<escrow>:<job id>`, so a job is its escr
 4. **Before the first rotation, old hires get their escrow from the chain (#307).** In each environment that has hires, an operator runs `puls3_server/tool/backfill_hire_escrow.dart --escrow <the escrow they were funded on>`, first as a dry run and then with `--apply`. For every hire with a job and no escrow, it reads `get_job` on that escrow and writes the address only when the job is there for the same client and agent. Anything else stays empty and is reported:
    - no such job;
    - a job for another client or agent;
-   - an archived job.
+   - an archived job whose hire has no confirmed `create_job` on that escrow.
+
+   **An archived job is not a hole** (#384 review). `get_job` cannot read it, so the tool reads the hire's confirmed `create_job` submission, whose signed envelope the server already stores (`chain_submission`). When that envelope invoked `create_job` on the escrow passed in, the job was created there, and the address is written (`matchedFromEnvelope`). That covers the oldest hires, which are the ones most likely to archive first. It does not depend on how #336 keeps rated jobs alive.
 
    **Why not a migration.** A migration runs on every database, local and test ones included, whose hires may come from another escrow, and a wrong backfill is hard to undo. This tool writes only what the chain confirms, never overwrites a hire's own escrow, and can be rerun. It is the reason an escrow rotation's checklist starts with this run.
 

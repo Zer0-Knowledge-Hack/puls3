@@ -55,5 +55,37 @@ void main() {
       expect(emptyNow!.escrow, _escrow);
       expect(ownNow!.escrow, _other);
     });
+
+    test('reads only the confirmed create_job envelope of the hire', () async {
+      final session = sessionBuilder.build();
+      Future<void> submission(
+        int hireId,
+        String purpose,
+        String state,
+        String envelope,
+        String tx,
+      ) => ChainSubmission.db.insertRow(
+        session,
+        ChainSubmission(
+          preparationId: 'prep-$tx',
+          purpose: purpose,
+          transaction: tx,
+          state: state,
+          updatedAt: DateTime.utc(2026, 11, 24),
+          hireId: hireId,
+          signedEnvelopeXdr: envelope,
+        ),
+      );
+      String tx(String c) => c * 64;
+      await submission(9301, 'createJob', 'failed', 'FAILED', tx('a'));
+      await submission(9301, 'createJob', 'confirmed', 'CREATED', tx('b'));
+      await submission(9301, 'fund', 'confirmed', 'FUNDED', tx('c'));
+      await submission(9302, 'createJob', 'submitted', 'PENDING', tx('d'));
+      final rows = ServerpodHireEscrowRows(session);
+
+      expect(await rows.confirmedCreateJobEnvelope(9301), 'CREATED');
+      expect(await rows.confirmedCreateJobEnvelope(9302), isNull);
+      expect(await rows.confirmedCreateJobEnvelope(9399), isNull);
+    });
   });
 }

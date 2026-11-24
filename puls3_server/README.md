@@ -539,6 +539,10 @@ dart run tool/backfill_hire_escrow.dart --escrow <escrow the hires were funded o
 - It never overwrites a hire that already has an escrow.
 - It signs nothing, and can be rerun.
 
+- For a job that is already archived, it reads the hire's confirmed `create_job` envelope instead, and writes the address when that envelope invoked this escrow (`matchedFromEnvelope`).
+
+The tool starts Serverpod with that config, so it binds the configured ports: run it from a machine that is not running the server with the same config.
+
 Hires it cannot match are listed (`noSuchJob`, `otherJob`, `archived`) and stay empty. See [ADR-0009](../docs/adr/0009-ratings-after-the-escrow-job-archives.md#escrow-rotation-273-item-3).
 
 ## Deploy to Serverpod Cloud
