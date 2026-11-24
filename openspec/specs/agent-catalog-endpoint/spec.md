@@ -47,6 +47,46 @@ The server MUST define a serializable `AgentSummary` with the fields `id` (metad
 - WHEN `get` is called with `agt-999`
 - THEN it returns `null`
 
+### Requirement: A catalog id belongs to its first owner
+
+When several valid registrations carry the same metadata id, the catalog and its index MUST keep the newest one whose `owner_of` equals the owner of the first registration of that id. A registration by any other owner MUST be ignored, and so MUST one whose owner, or whose first registration's owner, cannot be read (fail closed). Owners MUST be read only for an id that repeats. This stops anyone from taking over an agent's catalog entry, its hires and its payments by registering a copy of its metadata (audit 2026-10-25, I-1, #206).
+
+#### Scenario: A copy by another owner is ignored
+
+- GIVEN registry id 0 has metadata id `agt-001`, owned by A
+- AND registry id 1 has metadata id `agt-001`, owned by B
+- WHEN the catalog is built or indexed
+- THEN `agt-001` is registry id 0
+
+#### Scenario: A redeploy by the same owner supersedes
+
+- GIVEN registry ids 0 and 2 have metadata id `agt-001`, both owned by A, and registry id 1 has it too, owned by B
+- WHEN the catalog is built
+- THEN `agt-001` is registry id 2
+
+### Requirement: A Studio id belongs to its draft's owner
+
+A Studio id is `studio-<draftId>`, and draft ids are sequential, so the next one can be guessed and registered before its builder deploys it. The first-registrant rule would then lock the real agent out. For a metadata id that starts with `studio-`, the catalog and its index therefore MUST keep the newest registration whose `owner_of` equals the owner of `studio_draft` row `<draftId>`, whatever the registration order (#381).
+
+- No registration holds a `studio-` id whose draft does not exist, nor one that is not `studio-` followed by a positive integer.
+- Every other id keeps the first-registrant rule above.
+- A draft store that cannot be read MUST NOT empty the catalog: the last list is served, as for an unreadable chain.
+- The indexer MUST delete an indexed row it no longer accepts, so a registration indexed before this rule stops shadowing the right one.
+
+#### Scenario: Registering a Studio id first does not take it
+
+- GIVEN draft 31 is owned by A
+- AND registry id 0 has metadata id `studio-31`, owned by B, and registry id 1 has it too, owned by A
+- WHEN the catalog is built or indexed
+- THEN `studio-31` is registry id 1, and registry id 0 is not indexed
+
+#### Scenario: A Studio id without a draft is held by nobody
+
+- GIVEN no draft 99 exists
+- AND a registration has metadata id `studio-99`
+- WHEN the catalog is built or indexed
+- THEN no agent has id `studio-99`
+
 ### Requirement: Enumeration and orphan skipping
 
 The catalog service MUST enumerate registry ids `0` through `total-1`, where `total` comes from `totalAgents`. An agent whose metadata is missing or invalid MUST be skipped without failing the list. Invalid means any required key (`id`, `name`, `description`, `skills`, `priceUsdcStroops`) is absent or fails the parsing rules below. Skipping MUST NOT be reported as unavailability.
