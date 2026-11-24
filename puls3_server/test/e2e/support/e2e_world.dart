@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
+import 'package:puls3_server/src/agent/aes_gcm_secret_cipher.dart';
 import 'package:puls3_server/src/agent/agent_catalog_wiring.dart';
 import 'package:puls3_server/src/agent/agent_endpoint.dart';
 import 'package:puls3_server/src/chain/agent_submit_sender.dart';
@@ -53,6 +54,7 @@ final class E2eWorld {
     required this.agentId,
     required this.events,
     required this.startLedger,
+    required this.custody,
     required _SessionAs wallet,
   }) : _wallet = wallet,
        endpoint = HireEndpoint(),
@@ -77,6 +79,9 @@ final class E2eWorld {
   /// The ledger before this run did anything: events from it on are the run's.
   final int startLedger;
 
+  /// The cipher that seals the custody rows of this run's agents.
+  final AesGcmSecretCipher custody;
+
   final HireEndpoint endpoint;
   final ServerpodHireRepository hires;
   final ServerpodChainSubmissionStore submissions;
@@ -84,8 +89,12 @@ final class E2eWorld {
 
   /// Boots the stack, registers one agent on the sandbox and funds the
   /// consumer and the agent wallet from the local Friendbot.
-  static Future<E2eWorld> start() async {
-    final sandbox = await LocalSandbox.connect();
+  ///
+  /// [environment] overrides the sandbox settings for this run.
+  static Future<E2eWorld> start({
+    Map<String, String> environment = const {},
+  }) async {
+    final sandbox = await LocalSandbox.connect(overrides: environment);
     final events = ContractEventLog(
       SorobanRpcClient(
         httpClient: http.Client(),
@@ -106,7 +115,8 @@ final class E2eWorld {
     );
     await pod.start();
     final session = await pod.createSession();
-    await custodyAgentKey(session, agent.account);
+    final custody = randomCustodyCipher();
+    await custodyAgentKey(session, agent.account, cipher: custody);
     final tracker = startChainTracker(pod, sandbox.environment);
     if (tracker == null) {
       await session.close();
@@ -139,8 +149,25 @@ final class E2eWorld {
       agentId: agent.id,
       events: events,
       startLedger: startLedger,
+      custody: custody,
       wallet: wallet,
     );
+  }
+
+  /// Registers one more agent priced [priceStroops], with its key in custody
+  /// as a Studio deploy leaves it, so it can be hired.
+  Future<RegisteredAgent> registerCustodiedAgent({
+    required int priceStroops,
+    String? name,
+    List<String> skills = const ['research'],
+  }) async {
+    final agent = await sandbox.registerAgent(
+      priceStroops: priceStroops,
+      name: name,
+      skills: skills,
+    );
+    await custodyAgentKey(session, agent.account, cipher: custody);
+    return agent;
   }
 
   /// The wallet the server sees as signed in.
@@ -179,13 +206,21 @@ final class E2eWorld {
 
   /// Creates a hire and walks it to `funded`, with every envelope signed by the
   /// consumer unchanged. Returns the hire id and its escrow job id.
-  Future<({int hireId, int jobId})> fundedHire() async {
+  ///
+  /// [subcontractReserve] (stroops) makes it a hire with a subcontract
+  /// reserve: its `fund` is the `fund_with_reserve` the server prepares.
+  Future<({int hireId, int jobId})> fundedHire({
+    int? subcontractReserve,
+    String input = 'e2e hire',
+    int? agent,
+  }) async {
     final created = await endpoint.createHire(
       session,
-      agentId,
+      agent ?? agentId,
       consumer.address.value,
-      'e2e hire',
+      input,
       'e2e-${DateTime.now().microsecondsSinceEpoch}',
+      subcontractReserve: subcontractReserve,
     );
     final hireId = created.hire.id;
     final prepared = created.preparedCreateJob!;
