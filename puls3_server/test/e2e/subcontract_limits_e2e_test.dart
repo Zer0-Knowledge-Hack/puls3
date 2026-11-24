@@ -5,7 +5,7 @@ library;
 import 'package:puls3_domain/puls3_domain.dart'
     show HireStatus, RelatedPartyJustification;
 import 'package:puls3_server/src/hire/escrow_relay_service.dart'
-    show SubcontractRejected;
+    show EscrowRelayService, SubcontractRejected;
 import 'package:puls3_server/src/hire/serverpod_hire_receipt_store.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart'
@@ -35,6 +35,7 @@ void main() {
 
   late RegisteredAgent worker;
   late RegisteredAgent capParent;
+  late RegisteredAgent platformCapParent;
   late RegisteredAgent reserveParent;
   late RegisteredAgent depth1; // provider of the first child
   late RegisteredAgent depth2; // provider of the second child
@@ -54,6 +55,9 @@ void main() {
     capParent = await world.registerCustodiedAgent(
       priceStroops: e2ePriceStroops,
     );
+    platformCapParent = await world.registerCustodiedAgent(
+      priceStroops: e2ePriceStroops,
+    );
     reserveParent = await world.registerCustodiedAgent(
       priceStroops: e2ePriceStroops,
     );
@@ -65,6 +69,13 @@ void main() {
     manifests = ScriptedManifests()
       // One child at most, whatever the platform cap is.
       ..opensChildren(capParent.id, 'caps-children', maxChildren: 1)
+      // A manifest that asks for more than the platform allows: the cap of
+      // ADR-0011 D8 (`subcontractMaxChildrenCap`) is what stops it.
+      ..opensChildren(
+        platformCapParent.id,
+        'caps-at-platform',
+        maxChildren: subcontractMaxChildrenCap + 3,
+      )
       ..opensChildren(
         reserveParent.id,
         'spends-the-reserve',
@@ -80,6 +91,10 @@ void main() {
                 skill: skill,
                 wanted: [workerName, workerName],
               ),
+              'caps-at-platform': Delegator(
+                skill: skill,
+                wanted: List.filled(subcontractMaxChildrenCap + 1, workerName),
+              ),
               'spends-the-reserve': Delegator(
                 skill: skill,
                 wanted: [workerName, workerName],
@@ -91,6 +106,7 @@ void main() {
           )
           ..serve(worker.account)
           ..serve(capParent.account)
+          ..serve(platformCapParent.account)
           ..serve(reserveParent.account);
     await runtime.discardStaleRuns();
   });
@@ -104,6 +120,52 @@ void main() {
         await runtime.approvalWindow() -
         childExpiryMarginSeconds;
   }
+
+  /// Opens a child of [parentJobId] for [child] straight on the escrow with
+  /// the production draft, signed by [parent], and returns its job id. For
+  /// chains the server never builds: a child with its own sub-reserve.
+  Future<int> openChild({
+    required E2eAccount parent,
+    required int parentJobId,
+    required RegisteredAgent child,
+    required int reserveForChild,
+  }) async {
+    final expiry = await latestChildExpiry(parentJobId);
+    await runtime.withRelay((relay) async {
+      final draft = await relay.draftCreateChildJob(
+        parentProvider: parent.address,
+        parentJobId: parentJobId,
+        provider: child.account.address,
+        evaluator: parent.address,
+        expiredAt: expiry,
+        agentId: child.id,
+        budget: e2ePriceStroops,
+        reserve: reserveForChild,
+      );
+      await runtime.sendDirect(parent, draft.envelope);
+    });
+    final events = await until('the child of job $parentJobId', () async {
+      final all = await runtime.escrowEvents();
+      final created = all.forJob('child_job_created', parentJobId);
+      return created.isEmpty ? null : created;
+    });
+    return readU64(events.single.data['child_job_id']);
+  }
+
+  /// Expects [draft] to be refused by the escrow with [error].
+  Future<void> expectRejected(
+    Future<Object?> Function(EscrowRelayService relay) draft,
+    EscrowSubcontractError error,
+  ) => runtime.withRelay((relay) async {
+    await expectLater(
+      draft(relay),
+      throwsA(
+        isA<SubcontractRejected>()
+            .having((e) => e.error, 'error', error)
+            .having((e) => e.error.code, 'code', error.code),
+      ),
+    );
+  });
 
   test(
     'reserve: a child above the unspent reserve is refused with #124',
@@ -174,10 +236,7 @@ void main() {
       expect(job.reserve, BigInt.from(reserve));
       expect(job.openChildren, 0);
       expect(
-        (await runtime.escrowEvents()).forJob(
-          'child_job_created',
-          hire.jobId,
-        ),
+        (await runtime.escrowEvents()).forJob('child_job_created', hire.jobId),
         isEmpty,
       );
     },
@@ -247,6 +306,40 @@ void main() {
     },
   );
 
+  test(
+    'cycle: an ancestor coming back deeper in the chain is refused with #127',
+    () async {
+      // A (the root's provider) hires B with a sub-reserve, and B tries to
+      // hire A again: not B's own parent, but still an ancestor (ADR-0011 D5).
+      final hire = await world.fundedHire(
+        subcontractReserve: reserveFor(2),
+        input: 'e2e journey of #374: cycle through an ancestor',
+      );
+      final first = await openChild(
+        parent: world.agentAccount,
+        parentJobId: hire.jobId,
+        child: depth1,
+        reserveForChild: e2ePriceStroops,
+      );
+      final expiry = await latestChildExpiry(first);
+      await expectRejected(
+        (relay) => relay.draftCreateChildJob(
+          parentProvider: depth1.account.address,
+          parentJobId: first,
+          provider: world.agentAccount.address,
+          evaluator: depth1.account.address,
+          expiredAt: expiry,
+          agentId: world.agentId,
+          budget: e2ePriceStroops,
+        ),
+        EscrowSubcontractError.subcontractCycle,
+      );
+      final job = (await world.wiring.ledger.escrowJob(first))!;
+      expect(job.openChildren, 0);
+      expect(job.reserve, BigInt.from(e2ePriceStroops));
+    },
+  );
+
   test('depth: a child below the maximum depth is refused with #126', () async {
     // The server only draws children at depth 1 with a sub-reserve of 0, so
     // no run can go deeper. The chain below is built straight on the escrow
@@ -260,34 +353,6 @@ void main() {
     );
     final root = hire.jobId;
 
-    Future<int> openChild({
-      required E2eAccount parent,
-      required int parentJobId,
-      required RegisteredAgent child,
-      required int reserveForChild,
-    }) async {
-      final expiry = await latestChildExpiry(parentJobId);
-      await runtime.withRelay((relay) async {
-        final draft = await relay.draftCreateChildJob(
-          parentProvider: parent.address,
-          parentJobId: parentJobId,
-          provider: child.account.address,
-          evaluator: parent.address,
-          expiredAt: expiry,
-          agentId: child.id,
-          budget: e2ePriceStroops,
-          reserve: reserveForChild,
-        );
-        await runtime.sendDirect(parent, draft.envelope);
-      });
-      final events = await until('the child of job $parentJobId', () async {
-        final all = await runtime.escrowEvents();
-        final created = all.forJob('child_job_created', parentJobId);
-        return created.isEmpty ? null : created;
-      });
-      return readU64(events.single.data['child_job_id']);
-    }
-
     final first = await openChild(
       parent: world.agentAccount,
       parentJobId: root,
@@ -297,6 +362,26 @@ void main() {
     final firstJob = (await world.wiring.ledger.escrowJob(first))!;
     expect(firstJob.depth, 1);
     expect(firstJob.reserve, price);
+
+    // At the maximum depth a child may not carry a sub-reserve of its own. The
+    // parent holds a whole price, so the amounts would fit: only the depth
+    // rule stops it, and it is checked before the reserve (#126, not #124).
+    final deepExpiry = await latestChildExpiry(first);
+    await expectRejected(
+      (relay) => relay.draftCreateChildJob(
+        parentProvider: depth1.account.address,
+        parentJobId: first,
+        provider: depth2.account.address,
+        evaluator: depth1.account.address,
+        expiredAt: deepExpiry,
+        agentId: depth2.id,
+        budget: e2ePriceStroops - 1,
+        reserve: 1,
+      ),
+      EscrowSubcontractError.depthExceeded,
+    );
+    expect((await world.wiring.ledger.escrowJob(first))!.openChildren, 0);
+
     final second = await openChild(
       parent: depth1.account,
       parentJobId: first,
@@ -340,14 +425,39 @@ void main() {
     expect(readU32(createdSecond.data['depth']), 2);
   });
 
+  test('children cap: a second subcontract past max_children is refused by '
+      'the loop', () async {
+    final hire = await world.fundedHire(
+      subcontractReserve: reserveFor(2),
+      input: 'e2e journey of #374: children cap',
+      agent: capParent.id,
+    );
+    await runtime.passUntil('the parent hire to be submitted', () async {
+      final row = await world.hires.findHire(hire.hireId);
+      return row?.status == HireStatus.submitted ? row : null;
+    });
+    final receipts = ServerpodHireReceiptStore(world.session);
+    final lines = await receipts.listByParent(hire.hireId);
+    expect(lines, hasLength(1), reason: 'one child, the second was refused');
+    expect(lines.single.state, HireStatus.completed.name);
+    final run = (await ServerpodHireRunStore(world.session).find(hire.hireId))!;
+    expect(run.result, contains(workerOutput));
+    expect(run.result, contains('refused max_children_reached'));
+    final events = await runtime.escrowEvents();
+    expect(events.forJob('child_job_created', hire.jobId), hasLength(1));
+    final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
+    expect(job.openChildren, 0);
+    expect(job.reserve, BigInt.from(e2ePriceStroops));
+  });
+
   test(
-    'children cap: a second subcontract past max_children is refused by '
-    'the loop',
+    'children cap: the platform cap bounds a manifest that asks for more',
     () async {
+      final asked = subcontractMaxChildrenCap + 1;
       final hire = await world.fundedHire(
-        subcontractReserve: reserveFor(2),
-        input: 'e2e journey of #374: children cap',
-        agent: capParent.id,
+        subcontractReserve: reserveFor(asked),
+        input: 'e2e journey of #374: platform children cap',
+        agent: platformCapParent.id,
       );
       await runtime.passUntil('the parent hire to be submitted', () async {
         final row = await world.hires.findHire(hire.hireId);
@@ -355,44 +465,44 @@ void main() {
       });
       final receipts = ServerpodHireReceiptStore(world.session);
       final lines = await receipts.listByParent(hire.hireId);
-      expect(lines, hasLength(1), reason: 'one child, the second was refused');
-      expect(lines.single.state, HireStatus.completed.name);
+      expect(
+        lines,
+        hasLength(subcontractMaxChildrenCap),
+        reason: 'the manifest allows more, the platform cap does not',
+      );
       final run = (await ServerpodHireRunStore(
         world.session,
       ).find(hire.hireId))!;
-      expect(run.result, contains(workerOutput));
       expect(run.result, contains('refused max_children_reached'));
       final events = await runtime.escrowEvents();
-      expect(events.forJob('child_job_created', hire.jobId), hasLength(1));
+      expect(
+        events.forJob('child_job_created', hire.jobId),
+        hasLength(subcontractMaxChildrenCap),
+      );
       final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
       expect(job.openChildren, 0);
       expect(job.reserve, BigInt.from(e2ePriceStroops));
     },
   );
 
-  test(
-    'reserve in the loop: a subcontract the reserve no longer covers is '
-    'refused before it reaches the chain',
-    () async {
-      final hire = await world.fundedHire(
-        subcontractReserve: reserveFor(1),
-        input: 'e2e journey of #374: reserve spent',
-        agent: reserveParent.id,
-      );
-      await runtime.passUntil('the parent hire to be submitted', () async {
-        final row = await world.hires.findHire(hire.hireId);
-        return row?.status == HireStatus.submitted ? row : null;
-      });
-      final receipts = ServerpodHireReceiptStore(world.session);
-      expect(await receipts.listByParent(hire.hireId), hasLength(1));
-      final run = (await ServerpodHireRunStore(
-        world.session,
-      ).find(hire.hireId))!;
-      expect(run.result, contains('refused over_reserve'));
-      final events = await runtime.escrowEvents();
-      expect(events.forJob('child_job_created', hire.jobId), hasLength(1));
-      final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
-      expect(job.reserve, BigInt.zero);
-    },
-  );
+  test('reserve in the loop: a subcontract the reserve no longer covers is '
+      'refused before it reaches the chain', () async {
+    final hire = await world.fundedHire(
+      subcontractReserve: reserveFor(1),
+      input: 'e2e journey of #374: reserve spent',
+      agent: reserveParent.id,
+    );
+    await runtime.passUntil('the parent hire to be submitted', () async {
+      final row = await world.hires.findHire(hire.hireId);
+      return row?.status == HireStatus.submitted ? row : null;
+    });
+    final receipts = ServerpodHireReceiptStore(world.session);
+    expect(await receipts.listByParent(hire.hireId), hasLength(1));
+    final run = (await ServerpodHireRunStore(world.session).find(hire.hireId))!;
+    expect(run.result, contains('refused over_reserve'));
+    final events = await runtime.escrowEvents();
+    expect(events.forJob('child_job_created', hire.jobId), hasLength(1));
+    final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
+    expect(job.reserve, BigInt.zero);
+  });
 }
