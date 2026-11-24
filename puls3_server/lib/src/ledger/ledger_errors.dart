@@ -63,3 +63,35 @@ int? contractErrorCode(String simulationError) {
   final code = _contractError.firstMatch(simulationError)?.group(1);
   return code == null ? null : int.parse(code);
 }
+
+/// The escrow errors of agent subcontracting (ADR-0011, escrow v0.2.0).
+enum EscrowSubcontractError {
+  /// `create_child_job` asked for more than the parent's unspent reserve.
+  reserveExceeded(124),
+
+  /// `submit` on a parent while a child job is still open (D4).
+  childrenOpen(125),
+
+  /// A child below `MAX_DEPTH`, or a sub-reserve at it (D5).
+  depthExceeded(126),
+
+  /// The child's provider or agent is already in the ancestor chain (D5).
+  subcontractCycle(127);
+
+  const EscrowSubcontractError(this.code);
+
+  /// The `Error(Contract, #code)` number.
+  final int code;
+
+  /// The error with [code], or `null` when it is not a subcontract error.
+  static EscrowSubcontractError? fromCode(int code) {
+    for (final error in values) {
+      if (error.code == code) return error;
+    }
+    return null;
+  }
+
+  /// The subcontract error [error] reports, or `null`.
+  static EscrowSubcontractError? of(LedgerContractError error) =>
+      fromCode(error.code);
+}

@@ -24,6 +24,18 @@ import 'hire_relay_config.dart';
 /// The catalog entry of an agent, or `null` when there is none.
 typedef AgentSummaryLookup = Future<AgentSummary?> Function(int registryId);
 
+/// The escrow refused a `create_child_job` simulation with one of the
+/// subcontract errors of ADR-0011 (reserve, depth or cycle). Repeating the
+/// same call gives the same answer.
+final class SubcontractRejected implements Exception {
+  const SubcontractRejected(this.error);
+
+  final EscrowSubcontractError error;
+
+  @override
+  String toString() => 'SubcontractRejected: ${error.name} (#${error.code})';
+}
+
 /// An unsigned envelope built for a hire that may not be stored yet
 /// (`createHire` prepares first and persists hire and preparation together).
 final class PreparationDraft {
@@ -212,7 +224,7 @@ final class EscrowRelayService {
   }) => _draft(
     wallet: wallet,
     purpose: SubmissionPurpose.createJob,
-    function: 'create_job',
+    function: SubmissionPurpose.createJob.contractFunction,
     args: [
       ScArg.address(wallet),
       ScArg.address(provider),
@@ -227,6 +239,53 @@ final class EscrowRelayService {
     ],
     jobExpiredAt: expiredAt,
   );
+
+  /// Builds the `create_child_job` that the parent's provider
+  /// [parentProvider] (agent A's custodied wallet) signs to draw a child job
+  /// for [provider] from the reserve of [parentJobId] (ADR-0011 D2).
+  ///
+  /// Nothing is persisted and nothing is signed: the subcontract executor
+  /// signs through custody and records the submission. The simulation is
+  /// read raw, so a reserve, depth or cycle refusal is a
+  /// [SubcontractRejected] and any other contract refusal stays a
+  /// [LedgerContractError]. [reserve] is the child's own sub-reserve; the
+  /// server passes 0 until depth 2 is enabled (D5).
+  Future<PreparationDraft> draftCreateChildJob({
+    required StellarAddress parentProvider,
+    required int parentJobId,
+    required StellarAddress provider,
+    required StellarAddress evaluator,
+    required int expiredAt,
+    required int agentId,
+    required int budget,
+    int reserve = 0,
+  }) async {
+    try {
+      return await _draft(
+        wallet: parentProvider,
+        purpose: SubmissionPurpose.createChildJob,
+        function: SubmissionPurpose.createChildJob.contractFunction,
+        args: [
+          ScArg.address(parentProvider),
+          ScArg.u64(parentJobId),
+          ScArg.address(provider),
+          ScArg.address(evaluator),
+          ScArg.u64(expiredAt),
+          // The subtask stays off-chain, like the create_job description.
+          const ScArg.string(''),
+          ScArg.u32(agentId),
+          ScArg.i128(budget),
+          ScArg.i128(reserve),
+        ],
+        jobExpiredAt: expiredAt,
+        rawSimulation: true,
+      );
+    } on LedgerContractError catch (e) {
+      final refused = EscrowSubcontractError.of(e);
+      if (refused != null) throw SubcontractRejected(refused);
+      rethrow;
+    }
+  }
 
   /// The row to store for [draft] once its [hireId] is known.
   NewPreparation newPreparation(
@@ -451,6 +510,7 @@ final class EscrowRelayService {
     StellarAddress? contract,
     int? jobExpiredAt,
     String? rejectReason,
+    bool rawSimulation = false,
   }) async {
     // Both settings are read before the chain is, so a missing one fails
     // before anything is read or stored.
@@ -469,7 +529,12 @@ final class EscrowRelayService {
     );
     final SimulationData simulation;
     try {
-      simulation = await _accounts.simulate(spec);
+      simulation = rawSimulation
+          ? await _accounts.simulateRaw(spec)
+          : await _accounts.simulate(spec);
+    } on LedgerContractError {
+      if (rawSimulation) rethrow;
+      throw chainUnavailable();
     } on LedgerException {
       // A wallet-signed prepare reports an unreadable or rejected simulation
       // as ChainUnavailable, as before. Only the server-signed submit sender

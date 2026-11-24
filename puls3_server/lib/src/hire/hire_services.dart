@@ -6,6 +6,7 @@ import 'package:serverpod/serverpod.dart';
 import '../agent/agent_catalog_service.dart';
 import '../agent/agent_catalog_wiring.dart' show catalogConsoleLog;
 import '../agent/custodied_wallets.dart';
+import '../agent/hidden_agents.dart';
 import '../agent/serverpod_agent_index_repository.dart';
 import '../agent/studio_draft_owners.dart';
 import '../chain/serverpod_chain_submission_store.dart';
@@ -66,6 +67,7 @@ final class HireWiring {
     required this.accounts,
     required this.sender,
     required this.config,
+    required this.hidden,
   });
 
   /// Builds the wiring from [environment] (the process environment when
@@ -97,6 +99,7 @@ final class HireWiring {
       accounts: RpcChainAccounts(rpc),
       sender: SorobanSubmissionLedger(rpc, escrow: stellar.escrow),
       config: HireRelayConfig(env),
+      hidden: HiddenAgents.fromEnvironment(env),
     );
   }
 
@@ -107,6 +110,9 @@ final class HireWiring {
   final ChainAccounts accounts;
   final SubmissionLedger sender;
   final HireRelayConfig config;
+
+  /// The agents `PULS3_HIDDEN_AGENT_IDS` hides from new hires.
+  final HiddenAgents hidden;
 
   /// The services of one request, with stores on [session].
   HireServices servicesOn(Session session) {
@@ -143,6 +149,7 @@ final class HireWiring {
         custody: custodyOn(session),
         unpublished: publicationOn(session),
         config: config,
+        hidden: hidden,
         agentOf: agentOf,
       ),
       relay: relay,
