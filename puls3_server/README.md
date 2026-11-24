@@ -29,7 +29,8 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW`, `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated: the
 escrows `PULS3_STELLAR_ESCROW` replaced, whose jobs still make a rating count)
 and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
-times out after 8 seconds.
+times out after 8 seconds. To move to a new escrow, follow
+[Rotating the escrow](../docs/operations/escrow-rotation.md).
 
 `PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
 (#14). Its testnet default is the deployed registry

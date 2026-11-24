@@ -1,0 +1,100 @@
+name: E2E browser
+
+# #372, follow-up of #256 and #298. Drives the Flutter web app in headless Chrome
+# through the hire flow against the real server and the local Soroban sandbox
+# (scripts/e2e-flutter-local.sh). It is its own workflow so that a flaky browser
+# never marks the server E2E job (e2e.yml) as failed, and the other way round.
+#
+# Non-gating: it is not part of the `gate` job in ci.yml. It follows the same
+# promotion rule as e2e.yml (#371).
+#
+# Contracts-only and docs-only changes do not run it: the paths below are the
+# ones the hire flow in the browser depends on.
+
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - 'puls3_flutter/**'
+      - 'puls3_client/**'
+      - 'puls3_domain/**'
+      - 'puls3_server/**'
+      - 'scripts/e2e-flutter-local.sh'
+      - 'scripts/setup-local-soroban.sh'
+      - 'scripts/setup-local-secrets.sh'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/e2e-browser.yml'
+  pull_request:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: {flutter-version: '3.44.4', cache: true}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          rustup target add wasm32v1-none
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          workspaces: contracts -> target
+      - name: Install Stellar CLI
+        env:
+          STELLAR_SHA256: 207544486734fccb4df1afc4a7745478f9f1e21688b2f9506f0ef36f60ce3fdc
+        run: |
+          archive="$RUNNER_TEMP/stellar.tar.gz"
+          curl --fail --silent --show-error --location --output "$archive" \
+            https://github.com/stellar/stellar-cli/releases/download/v28.0.0/stellar-cli-28.0.0-x86_64-unknown-linux-gnu.tar.gz
+          echo "$STELLAR_SHA256  $archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Install workspace
+        run: flutter pub get --enforce-lockfile
+      - name: Generate throwaway local secrets
+        run: bash scripts/setup-local-secrets.sh
+      - name: Start the sandbox, Postgres and Redis
+        # The quickstart image is pinned by digest in docker-compose.yaml.
+        run: |
+          docker compose -f puls3_server/docker-compose.yaml up -d --wait --wait-timeout 300 \
+            soroban_standalone postgres_test redis_test
+      - name: Deploy the contracts on the sandbox
+        run: bash scripts/setup-local-soroban.sh
+      - name: Run the browser suite
+        env:
+          PULS3_E2E_LOG_DIR: ${{ runner.temp }}/e2e-browser-logs
+        # The runner ships Chrome and a matching chromedriver; the runner sets
+        # CHROMEWEBDRIVER to the directory that holds it.
+        run: CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" bash scripts/e2e-flutter-local.sh
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-browser-logs
+          path: ${{ runner.temp }}/e2e-browser-logs
+          if-no-files-found: warn
+      - name: Show sandbox logs on failure
+        if: failure()
+        run: docker compose -f puls3_server/docker-compose.yaml logs --tail 200 soroban_standalone
+      - name: Stop the sandbox
+        if: always()
+        run: docker compose -f puls3_server/docker-compose.yaml down -v
