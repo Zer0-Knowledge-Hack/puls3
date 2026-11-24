@@ -42,6 +42,8 @@ import 'hire/hire_request_invalid.dart' as _i1txwkfs;
 import 'hire/hire_summary.dart' as _izumcaty;
 import 'hire/hire_view.dart' as _ivruwodq;
 import 'hire_detail.dart' as _ipbsq2gs;
+import 'hire_receipt_line_view.dart' as _i404ykkm;
+import 'hire_terms.dart' as _ij38jwy0;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
 import 'puls3_api_error_details.dart' as _i6knfj5b;
@@ -73,6 +75,8 @@ export 'hire/hire_request_invalid.dart';
 export 'hire/hire_summary.dart';
 export 'hire/hire_view.dart';
 export 'hire_detail.dart';
+export 'hire_receipt_line_view.dart';
+export 'hire_terms.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
 export 'puls3_api_error_details.dart';
@@ -179,6 +183,12 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _ipbsq2gs.HireDetail) {
       return _ipbsq2gs.HireDetail.fromJson(data) as T;
+    }
+    if (t == _i404ykkm.HireReceiptLine) {
+      return _i404ykkm.HireReceiptLine.fromJson(data) as T;
+    }
+    if (t == _ij38jwy0.HireTerms) {
+      return _ij38jwy0.HireTerms.fromJson(data) as T;
     }
     if (t == _ikmm2vup.Payment) {
       return _ikmm2vup.Payment.fromJson(data) as T;
@@ -294,6 +304,13 @@ class Protocol extends _isc.SerializationManager {
     if (t == _isc.getType<_ipbsq2gs.HireDetail?>()) {
       return (data != null ? _ipbsq2gs.HireDetail.fromJson(data) : null) as T;
     }
+    if (t == _isc.getType<_i404ykkm.HireReceiptLine?>()) {
+      return (data != null ? _i404ykkm.HireReceiptLine.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_ij38jwy0.HireTerms?>()) {
+      return (data != null ? _ij38jwy0.HireTerms.fromJson(data) : null) as T;
+    }
     if (t == _isc.getType<_ikmm2vup.Payment?>()) {
       return (data != null ? _ikmm2vup.Payment.fromJson(data) : null) as T;
     }
@@ -342,6 +359,20 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == List<_i404ykkm.HireReceiptLine>) {
+      return (data as List)
+              .map((e) => deserialize<_i404ykkm.HireReceiptLine>(e))
+              .toList()
+          as T;
+    }
+    if (t == _isc.getType<List<_i404ykkm.HireReceiptLine>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i404ykkm.HireReceiptLine>(e))
+                    .toList()
+              : null)
+          as T;
     }
     if (t == Map<String, String>) {
       return (data as Map).map(
@@ -424,6 +455,8 @@ class Protocol extends _isc.SerializationManager {
       _izumcaty.HireSummary => 'HireSummary',
       _ivruwodq.HireView => 'HireView',
       _ipbsq2gs.HireDetail => 'HireDetail',
+      _i404ykkm.HireReceiptLine => 'HireReceiptLine',
+      _ij38jwy0.HireTerms => 'HireTerms',
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
       _i6knfj5b.Puls3ApiErrorDetails => 'Puls3ApiErrorDetails',
@@ -489,6 +522,10 @@ class Protocol extends _isc.SerializationManager {
         return 'HireView';
       case _ipbsq2gs.HireDetail():
         return 'HireDetail';
+      case _i404ykkm.HireReceiptLine():
+        return 'HireReceiptLine';
+      case _ij38jwy0.HireTerms():
+        return 'HireTerms';
       case _ikmm2vup.Payment():
         return 'Payment';
       case _i83uy5s0.PreparedTransaction():
@@ -592,6 +629,12 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'HireDetail') {
       return deserialize<_ipbsq2gs.HireDetail>(data['data']);
+    }
+    if (dataClassName == 'HireReceiptLine') {
+      return deserialize<_i404ykkm.HireReceiptLine>(data['data']);
+    }
+    if (dataClassName == 'HireTerms') {
+      return deserialize<_ij38jwy0.HireTerms>(data['data']);
     }
     if (dataClassName == 'Payment') {
       return deserialize<_ikmm2vup.Payment>(data['data']);

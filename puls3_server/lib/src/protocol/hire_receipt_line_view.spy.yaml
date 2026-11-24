@@ -1,0 +1,39 @@
+### One line of a parent hire's itemized receipt (ADR-0011 D6), as its
+### consumer reads it on `HireDetail.receipt`: one child job paid from the
+### hire's subcontract reserve. The stored row is `HireReceiptLineRecord`.
+class: HireReceiptLine
+fields:
+  id: int
+  ### The child hire, once it is stored.
+  childHireId: int?
+  ### Escrow id of the child job, set once create_child_job is confirmed.
+  childJobId: int?
+  ### Registry id of the subcontracted agent.
+  providerAgentId: int
+  ### StrKey of the subcontracted agent's payment wallet.
+  providerWallet: String
+  ### USDC stroops drawn from the parent reserve as the child budget.
+  budget: int
+  ### USDC stroops of platform fee, set when the child settles.
+  fee: int?
+  ### USDC stroops paid to the provider, set when the child settles.
+  payout: int?
+  ### `pending`, `not_opened`, `unverified`, or the child's HireStatus name:
+  ### open, funded, submitted, completed, rejected, expired.
+  state: String
+  ### The create_child_job transaction hash, lowercase hex.
+  createTransaction: String?
+  ### StellarExpert link of [createTransaction]; null without one or on a
+  ### network StellarExpert does not show.
+  createExplorerUrl: String?
+  ### The transaction that settled the child, lowercase hex.
+  settleTransaction: String?
+  ### StellarExpert link of [settleTransaction], like [createExplorerUrl].
+  settleExplorerUrl: String?
+  ### The child's deliverable hash, lowercase hex, once it is submitted.
+  deliverableHash: String?
+  ### True when the provider has the same owner as the parent's agent (D10).
+  relatedParty: bool
+  ### The parent agent's justification of the pick, against the ranking.
+  justification: String
+  createdAt: DateTime

@@ -2,7 +2,14 @@ import 'dart:io';
 
 import 'package:puls3_domain/puls3_domain.dart' hide AgentManifestDraft, Hire;
 import 'package:puls3_server/src/generated/protocol.dart';
+import 'package:puls3_server/src/agent/agent_catalog_service.dart';
 import 'package:puls3_server/src/hire/agent_hire_service.dart';
+import 'package:puls3_server/src/hire/hire_endpoint.dart';
+import 'package:puls3_server/src/hire/hire_query_service.dart';
+import 'package:puls3_server/src/hire/hire_receipt_store.dart';
+import 'package:puls3_server/src/hire/hire_relay_config.dart';
+import 'package:puls3_server/src/hire/hire_service.dart';
+import 'package:puls3_server/src/hire/hire_services.dart';
 import 'package:puls3_server/src/hire/session_wallet.dart';
 import 'package:puls3_server/src/runtime/runtime_task.dart';
 import 'package:puls3_server/src/studio/builder_credential.dart';
@@ -16,6 +23,10 @@ import 'package:puls3_server/src/studio/test_run_quota.dart';
 import 'package:serverpod/serverpod.dart'
     show AuthenticationFailureReason, NotAuthorizedException, Session;
 import 'package:test/test.dart';
+
+import '../support/in_memory_hire_receipt_store.dart';
+import '../support/in_memory_hire_run_store.dart';
+import '../support/relay_rig.dart' as relay;
 
 final class _UnusedSession implements Session {
   @override
@@ -671,6 +682,61 @@ void main() {
           refused('HiringAgentNotOwned'),
         );
         expect(reads, isEmpty);
+      });
+
+      test('includes the receipt of the hire its agent made (#334)', () async {
+        await deployed();
+        final rig = relay.RelayRig();
+        final receipts = InMemoryHireReceiptStore();
+        HireEndpoint.servicesBuilder = (_) => HireServices(
+          hires: HireService(
+            hires: rig.hires,
+            preparations: rig.preparations,
+            relay: rig.service,
+            registry: rig.ledger,
+            catalog: AgentCatalogService(rig.ledger),
+            custody: rig.custodyOf,
+            config: HireRelayConfig(relay.relayEnvironment()),
+          ),
+          relay: rig.service,
+          query: HireQueryService(
+            hires: rig.hires,
+            runs: InMemoryHireRunStore(),
+            submissions: rig.submissions,
+            preparations: rig.preparations,
+            agents: (registryId) async => AgentSummary(
+              id: 'agt-042',
+              registryId: registryId,
+              name: 'Summarizer',
+              description: 'Summarises text.',
+              skills: const ['summarize'],
+              priceUsdcStroops: relay.price,
+            ),
+            receipts: receipts,
+          ),
+        );
+        addTearDown(() => HireEndpoint.servicesBuilder = null);
+        final hire = await rig.hire(
+          status: HireStatus.funded,
+          consumer: agentWallet,
+        );
+        await receipts.insert(
+          NewReceiptLine(
+            parentHireId: hire.id,
+            childHireId: 77,
+            providerAgentId: 9,
+            providerWallet: stranger,
+            budget: 1000000,
+            relatedParty: true,
+            justification: 'Own suite, cheapest.',
+          ),
+        );
+
+        final detail = await endpoint.getAgentHire(session, 7, hire.id);
+
+        expect(detail.receipt, hasLength(1));
+        expect(detail.receipt!.single.childHireId, 77);
+        expect(detail.receipt!.single.relatedParty, isTrue);
       });
 
       test('a hire whose client is another wallet is HireNotOwned', () async {

@@ -31,12 +31,19 @@ class FakeHireGateway implements HireGateway {
   @override
   Future<void> checkFunds(String consumer, int priceUsdcStroops) async {}
 
+  /// The demo offers no subcontract reserve.
+  @override
+  Future<SubcontractTerms> hireTerms(int agentId) async =>
+      SubcontractTerms.none;
+
   @override
   Future<HireStart> createHire({
     required int agentId,
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   }) async {
     await Future<void>.delayed(delay);
     final hireId = _nextHire++;

@@ -15,6 +15,7 @@ import 'package:serverpod_client/serverpod_client.dart' as _isc;
 import 'agent/agent_summary.dart' as _ipe500bk;
 import 'chain/chain_submission.dart' as _iz6hnyrm;
 import 'hire.dart' as _ibbrviw7;
+import 'hire_receipt_line_view.dart' as _i404ykkm;
 import 'payment.dart' as _ikmm2vup;
 
 /// Everything the app shows about one hire (docs/architecture/api.md,
@@ -37,6 +38,7 @@ abstract class HireDetail
     this.feedbackSubmission,
     this.feedbackScore,
     this.paymentExplorerUrl,
+    this.receipt,
   }) : runFinished = runFinished ?? false;
 
   factory HireDetail({
@@ -55,6 +57,7 @@ abstract class HireDetail
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
     int? feedbackScore,
     String? paymentExplorerUrl,
+    List<_i404ykkm.HireReceiptLine>? receipt,
   }) = _HireDetailImpl;
 
   factory HireDetail.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -98,6 +101,11 @@ abstract class HireDetail
             ),
       feedbackScore: jsonSerialization['feedbackScore'] as int?,
       paymentExplorerUrl: jsonSerialization['paymentExplorerUrl'] as String?,
+      receipt: jsonSerialization['receipt'] == null
+          ? null
+          : _ihzwmcdm.Protocol().deserialize<List<_i404ykkm.HireReceiptLine>>(
+              jsonSerialization['receipt'],
+            ),
     );
   }
 
@@ -145,6 +153,11 @@ abstract class HireDetail
 
   String? paymentExplorerUrl;
 
+  /// The hire's itemized subcontract receipt (ADR-0011 D6), oldest first;
+  /// empty when the hire opened no child job. Only the hire's consumer
+  /// reads it, through the same ownership check as the rest of the detail.
+  List<_i404ykkm.HireReceiptLine>? receipt;
+
   /// Returns a shallow copy of this [HireDetail]
   /// with some or all fields replaced by the given arguments.
   @_isc.useResult
@@ -164,6 +177,7 @@ abstract class HireDetail
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
     int? feedbackScore,
     String? paymentExplorerUrl,
+    List<_i404ykkm.HireReceiptLine>? receipt,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -187,6 +201,8 @@ abstract class HireDetail
         'feedbackSubmission': feedbackSubmission?.toJson(),
       if (feedbackScore != null) 'feedbackScore': feedbackScore,
       if (paymentExplorerUrl != null) 'paymentExplorerUrl': paymentExplorerUrl,
+      if (receipt != null)
+        'receipt': receipt?.toJson(valueToJson: (v) => v.toJson()),
     };
   }
 
@@ -212,6 +228,8 @@ abstract class HireDetail
         'feedbackSubmission': feedbackSubmission?.toJsonForProtocol(),
       if (feedbackScore != null) 'feedbackScore': feedbackScore,
       if (paymentExplorerUrl != null) 'paymentExplorerUrl': paymentExplorerUrl,
+      if (receipt != null)
+        'receipt': receipt?.toJson(valueToJson: (v) => v.toJsonForProtocol()),
     };
   }
 
@@ -240,6 +258,7 @@ class _HireDetailImpl extends HireDetail {
     _iz6hnyrm.ChainSubmission? feedbackSubmission,
     int? feedbackScore,
     String? paymentExplorerUrl,
+    List<_i404ykkm.HireReceiptLine>? receipt,
   }) : super._(
          hire: hire,
          agent: agent,
@@ -256,6 +275,7 @@ class _HireDetailImpl extends HireDetail {
          feedbackSubmission: feedbackSubmission,
          feedbackScore: feedbackScore,
          paymentExplorerUrl: paymentExplorerUrl,
+         receipt: receipt,
        );
 
   /// Returns a shallow copy of this [HireDetail]
@@ -278,6 +298,7 @@ class _HireDetailImpl extends HireDetail {
     Object? feedbackSubmission = _Undefined,
     Object? feedbackScore = _Undefined,
     Object? paymentExplorerUrl = _Undefined,
+    Object? receipt = _Undefined,
   }) {
     return HireDetail(
       hire: hire ?? this.hire.copyWith(),
@@ -307,6 +328,9 @@ class _HireDetailImpl extends HireDetail {
       paymentExplorerUrl: paymentExplorerUrl is String?
           ? paymentExplorerUrl
           : this.paymentExplorerUrl,
+      receipt: receipt is List<_i404ykkm.HireReceiptLine>?
+          ? receipt
+          : this.receipt?.map((e0) => e0.copyWith()).toList(),
     );
   }
 }

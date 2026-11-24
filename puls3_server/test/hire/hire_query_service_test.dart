@@ -6,13 +6,17 @@ import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/feedback/reputation_calls.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart' show HireRow;
+import 'package:puls3_server/src/hire/explorer_links.dart';
 import 'package:puls3_server/src/hire/hire_query_service.dart';
+import 'package:puls3_server/src/hire/hire_receipt_store.dart';
 import 'package:puls3_server/src/ledger/escrow_job.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
+import 'package:puls3_server/src/ledger/stellar_config.dart';
 import 'package:puls3_server/src/runtime/hire_run_store.dart';
 import 'package:test/test.dart';
 
 import '../support/fake_envelope_codec.dart';
+import '../support/in_memory_hire_receipt_store.dart';
 import '../support/in_memory_hire_run_store.dart';
 import '../support/relay_rig.dart';
 
@@ -33,6 +37,8 @@ void main() {
   late InMemoryHireRunStore runs;
   late Future<AgentSummary?> Function(int) agents;
 
+  late InMemoryHireReceiptStore receipts;
+
   HireQueryService query({EscrowJobReader? jobs, CustodyLookup? custody}) =>
       HireQueryService(
         hires: rig.hires,
@@ -42,6 +48,10 @@ void main() {
         agents: (id) => agents(id),
         jobs: jobs,
         custody: custody,
+        receipts: receipts,
+        transactionUrl: stellarExpertTransactionUrls(
+          StellarConfig.testnet.networkPassphrase,
+        ),
       );
 
   void queue(int hireId) => runs.enqueue(
@@ -58,6 +68,7 @@ void main() {
   setUp(() {
     rig = RelayRig();
     runs = InMemoryHireRunStore();
+    receipts = InMemoryHireReceiptStore(now: () => rig.clock);
     agents = (id) async => id == 7 ? _agent : null;
   });
 
@@ -494,6 +505,152 @@ void main() {
       expect(detail.feedbackSubmission?.state, 'failed');
     });
   });
+
+  group('receipt (#334, ADR-0011 D6)', () {
+    final createHash = 'a' * 64;
+    final settleHash = 'b' * 64;
+    final deliverable = 'c' * 64;
+
+    Future<ReceiptLine> line(
+      int parentHireId, {
+      required int childHireId,
+      bool relatedParty = false,
+    }) => receipts.insert(
+      NewReceiptLine(
+        parentHireId: parentHireId,
+        childHireId: childHireId,
+        providerAgentId: 9,
+        providerWallet: stranger,
+        budget: 1500000,
+        relatedParty: relatedParty,
+        justification: 'Best ranked translator.',
+      ),
+    );
+
+    test('lists the parent hire lines oldest first, with every field and '
+        'the explorer links of both transactions', () async {
+      final parent = await rig.hire(
+        status: HireStatus.funded,
+        subcontractReserve: 3000000,
+      );
+      final settled = await line(parent.id, childHireId: 41);
+      await receipts.markOpened(
+        41,
+        childJobId: 12,
+        createTransaction: createHash,
+        state: 'funded',
+      );
+      await receipts.recordDeliverable(41, deliverable);
+      await receipts.markSettled(
+        41,
+        state: 'completed',
+        fee: 37500,
+        payout: 1462500,
+        settleTransaction: settleHash,
+      );
+      final pending = await line(
+        parent.id,
+        childHireId: 42,
+        relatedParty: true,
+      );
+      final other = await rig.hire(status: HireStatus.funded);
+      await line(other.id, childHireId: 43);
+
+      final detail = await query().getHire(rig.wallet, parent.id);
+
+      final receipt = detail.receipt!;
+      expect(receipt.map((l) => l.id), [settled.id, pending.id]);
+      final first = receipt.first;
+      expect(first.childHireId, 41);
+      expect(first.childJobId, 12);
+      expect(first.providerAgentId, 9);
+      expect(first.providerWallet, stranger);
+      expect(first.budget, 1500000);
+      expect(first.fee, 37500);
+      expect(first.payout, 1462500);
+      expect(first.state, 'completed');
+      expect(first.createTransaction, createHash);
+      expect(first.settleTransaction, settleHash);
+      expect(first.deliverableHash, deliverable);
+      expect(first.relatedParty, isFalse);
+      expect(first.justification, 'Best ranked translator.');
+      expect(first.createdAt, settled.createdAt);
+      expect(
+        first.createExplorerUrl,
+        'https://stellar.expert/explorer/testnet/tx/$createHash',
+      );
+      expect(
+        first.settleExplorerUrl,
+        'https://stellar.expert/explorer/testnet/tx/$settleHash',
+      );
+      final second = receipt.last;
+      expect(second.childHireId, 42);
+      expect(second.childJobId, isNull);
+      expect(second.state, ReceiptLineState.pending);
+      expect(second.relatedParty, isTrue);
+      expect(second.fee, isNull);
+      expect(second.payout, isNull);
+      expect(second.createTransaction, isNull);
+      expect(second.createExplorerUrl, isNull);
+      expect(second.settleExplorerUrl, isNull);
+    });
+
+    test('is an empty list when the hire has no lines', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+
+      final detail = await query().getHire(rig.wallet, hire.id);
+
+      expect(detail.receipt, isEmpty);
+    });
+
+    test('another consumer cannot read the lines: HireNotOwned', () async {
+      final theirs = await rig.hire(
+        status: HireStatus.funded,
+        consumer: stranger,
+      );
+      await line(theirs.id, childHireId: 44);
+
+      await expectLater(
+        query().getHire(rig.wallet, theirs.id),
+        _apiError('HireNotOwned'),
+      );
+    });
+
+    test('leaves every other field of getHire unchanged', () async {
+      final hire = await rig.hire(status: HireStatus.funded);
+      queue(hire.id);
+      final withoutReceipts = HireQueryService(
+        hires: rig.hires,
+        runs: runs,
+        submissions: rig.submissions,
+        preparations: rig.preparations,
+        agents: (id) => agents(id),
+      );
+
+      final before = await withoutReceipts.getHire(rig.wallet, hire.id);
+      final after = await query().getHire(rig.wallet, hire.id);
+
+      expect(before.receipt, isNull);
+      expect(after.receipt, isEmpty);
+      expect(after.toJson()..remove('receipt'), before.toJson());
+    });
+  });
+
+  test(
+    'the explorer links follow the network, and other networks get none',
+    () {
+      expect(
+        stellarExpertTransactionUrls(
+          'Public Global Stellar Network ; September 2015',
+        )!('ab'),
+        'https://stellar.expert/explorer/public/tx/ab',
+      );
+      expect(
+        stellarExpertTransactionUrls('Standalone Network ; February 2017'),
+        isNull,
+      );
+    },
+  );
 
   test(
     'an invalid id, a missing hire or another consumer is refused',

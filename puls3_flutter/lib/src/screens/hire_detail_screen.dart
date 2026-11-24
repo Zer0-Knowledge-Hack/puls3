@@ -432,6 +432,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
         onOpenFeedback: hire.feedbackTransaction == null
             ? null
             : () => _openFeedback(hire),
+        onOpenReceiptUrl: (url) => unawaited(widget.openUrl(Uri.parse(url))),
         ratedScore: _ratedScore,
         isDemo: AppScope.of(context).hireGateway.isDemo,
         banner: error == null
