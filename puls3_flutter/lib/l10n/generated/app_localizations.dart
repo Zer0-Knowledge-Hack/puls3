@@ -1908,6 +1908,66 @@ abstract class AppLocalizations {
   /// **'This agent cannot be saved.'**
   String get studioErrCannotSave;
 
+  /// No description provided for @studioSubcontractSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontracting'**
+  String get studioSubcontractSection;
+
+  /// No description provided for @studioSubcontractToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this agent to subcontract other agents'**
+  String get studioSubcontractToggle;
+
+  /// No description provided for @studioSubcontractHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'During a task, your agent can hire other agents from the marketplace. The consumer funds a reserve when hiring, and what is not spent is refunded.'**
+  String get studioSubcontractHelper;
+
+  /// No description provided for @studioSubcontractNeedsTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontracting needs a Claude model: the free model cannot call tools.'**
+  String get studioSubcontractNeedsTools;
+
+  /// No description provided for @studioSubcontractMaxChildren.
+  ///
+  /// In en, this message translates to:
+  /// **'Most agents per task'**
+  String get studioSubcontractMaxChildren;
+
+  /// No description provided for @studioSubcontractMaxChildrenHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'From 1 to {max}'**
+  String studioSubcontractMaxChildrenHelper(int max);
+
+  /// No description provided for @studioSubcontractReserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested reserve'**
+  String get studioSubcontractReserve;
+
+  /// No description provided for @studioSubcontractReserveHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Asked of the consumer on top of the price. Leave empty for none.'**
+  String get studioSubcontractReserveHelper;
+
+  /// No description provided for @studioSubcontractErrChildren.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from 1 to {max} agents.'**
+  String studioSubcontractErrChildren(int max);
+
+  /// No description provided for @studioSubcontractErrCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the subcontracting settings.'**
+  String get studioSubcontractErrCheck;
+
   /// No description provided for @playgroundDemoLead.
   ///
   /// In en, this message translates to:

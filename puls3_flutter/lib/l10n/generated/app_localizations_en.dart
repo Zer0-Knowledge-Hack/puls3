@@ -1024,6 +1024,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get studioErrCannotSave => 'This agent cannot be saved.';
 
   @override
+  String get studioSubcontractSection => 'Subcontracting';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Allow this agent to subcontract other agents';
+
+  @override
+  String get studioSubcontractHelper =>
+      'During a task, your agent can hire other agents from the marketplace. The consumer funds a reserve when hiring, and what is not spent is refunded.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'Subcontracting needs a Claude model: the free model cannot call tools.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Most agents per task';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'From 1 to $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Suggested reserve';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Asked of the consumer on top of the price. Leave empty for none.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Choose from 1 to $max agents.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck => 'Check the subcontracting settings.';
+
+  @override
   String get playgroundDemoLead => 'Demo test runner: no model answers yet.';
 
   @override

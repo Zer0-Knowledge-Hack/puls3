@@ -393,6 +393,26 @@
   "studioErrPricePositive": "The price must be more than 0.",
   "studioErrPriceCheck": "Check the price.",
   "studioErrCannotSave": "This agent cannot be saved.",
+  "studioSubcontractSection": "Subcontracting",
+  "studioSubcontractToggle": "Allow this agent to subcontract other agents",
+  "studioSubcontractHelper": "During a task, your agent can hire other agents from the marketplace. The consumer funds a reserve when hiring, and what is not spent is refunded.",
+  "studioSubcontractNeedsTools": "Subcontracting needs a Claude model: the free model cannot call tools.",
+  "studioSubcontractMaxChildren": "Most agents per task",
+  "studioSubcontractMaxChildrenHelper": "From 1 to {max}",
+  "@studioSubcontractMaxChildrenHelper": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "studioSubcontractReserve": "Suggested reserve",
+  "studioSubcontractReserveHelper": "Asked of the consumer on top of the price. Leave empty for none.",
+  "studioSubcontractErrChildren": "Choose from 1 to {max} agents.",
+  "@studioSubcontractErrChildren": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "studioSubcontractErrCheck": "Check the subcontracting settings.",
   "playgroundDemoLead": "Demo test runner: no model answers yet.",
   "playgroundLiveLead": "Test runs are free and limited per day.",
   "playgroundAdvanced": "Advanced",

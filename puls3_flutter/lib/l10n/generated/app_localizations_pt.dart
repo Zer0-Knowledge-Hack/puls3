@@ -1033,6 +1033,45 @@ class AppLocalizationsPt extends AppLocalizations {
   String get studioErrCannotSave => 'Este agente não pode ser salvo.';
 
   @override
+  String get studioSubcontractSection => 'Subcontratação';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Permitir que este agente subcontrate outros agentes';
+
+  @override
+  String get studioSubcontractHelper =>
+      'Durante uma tarefa, seu agente pode contratar outros agentes do marketplace. O consumidor financia uma reserva ao contratar, e o que não for gasto é reembolsado.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'De 1 a $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Reserva sugerida';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Pedida ao consumidor além do preço. Deixe vazia se não precisar.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Escolha de 1 a $max agentes.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck =>
+      'Verifique a configuração de subcontratação.';
+
+  @override
   String get playgroundDemoLead =>
       'Teste de demonstração: o modelo ainda não responde.';
 
@@ -2656,6 +2695,45 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get studioErrCannotSave => 'Este agente não pode ser salvo.';
+
+  @override
+  String get studioSubcontractSection => 'Subcontratação';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Permitir que este agente subcontrate outros agentes';
+
+  @override
+  String get studioSubcontractHelper =>
+      'Durante uma tarefa, seu agente pode contratar outros agentes do marketplace. O consumidor financia uma reserva ao contratar, e o que não for gasto é reembolsado.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'De 1 a $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Reserva sugerida';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Pedida ao consumidor além do preço. Deixe vazia se não precisar.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Escolha de 1 a $max agentes.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck =>
+      'Verifique a configuração de subcontratação.';
 
   @override
   String get playgroundDemoLead =>
@@ -4285,6 +4363,45 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get studioErrCannotSave => 'Este agente não pode ser guardado.';
+
+  @override
+  String get studioSubcontractSection => 'Subcontratação';
+
+  @override
+  String get studioSubcontractToggle =>
+      'Permitir que este agente subcontrate outros agentes';
+
+  @override
+  String get studioSubcontractHelper =>
+      'Durante uma tarefa, o seu agente pode contratar outros agentes do marketplace. O consumidor financia uma reserva ao contratar, e o que não for gasto é reembolsado.';
+
+  @override
+  String get studioSubcontractNeedsTools =>
+      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+
+  @override
+  String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';
+
+  @override
+  String studioSubcontractMaxChildrenHelper(int max) {
+    return 'De 1 a $max';
+  }
+
+  @override
+  String get studioSubcontractReserve => 'Reserva sugerida';
+
+  @override
+  String get studioSubcontractReserveHelper =>
+      'Pedida ao consumidor além do preço. Deixe vazia se não for necessária.';
+
+  @override
+  String studioSubcontractErrChildren(int max) {
+    return 'Escolha de 1 a $max agentes.';
+  }
+
+  @override
+  String get studioSubcontractErrCheck =>
+      'Verifique a configuração de subcontratação.';
 
   @override
   String get playgroundDemoLead =>
