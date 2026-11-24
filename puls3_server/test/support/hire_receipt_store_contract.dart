@@ -69,6 +69,75 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
     expect([for (final l in lines) l.id], [first.id, second.id]);
   });
 
+  test('listUnsettled lists a line only while it is opened and not '
+      'settled', () async {
+    // Other fixtures may share the store: only this parent's lines count.
+    Future<List<int>> unsettled() async => [
+      for (final line in await f.store.listUnsettled())
+        if (line.parentHireId == f.parentHireId) line.childHireId!,
+    ];
+    await f.store.insert(_line(f));
+    expect(await unsettled(), isEmpty, reason: 'a pending line is not opened');
+
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+    expect(await unsettled(), [f.childHireId]);
+
+    await f.store.markSettled(
+      f.childHireId,
+      state: 'completed',
+      fee: 1,
+      payout: 2,
+      settleTransaction: 'ef' * 32,
+    );
+    expect(await unsettled(), isEmpty, reason: 'a settled line is final');
+  });
+
+  test('listUnopened lists a pending or unverified line, never an opened '
+      'one', () async {
+    Future<List<String>> unopened() async => [
+      for (final line in await f.store.listUnopened())
+        if (line.parentHireId == f.parentHireId) line.state,
+    ];
+    await f.store.insert(_line(f));
+    expect(await unopened(), [ReceiptLineState.pending]);
+
+    await f.store.markUnverified(f.childHireId);
+    expect(await unopened(), [ReceiptLineState.unverified]);
+
+    await f.store.reopenUnverified(f.childHireId);
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+    expect(await unopened(), isEmpty);
+  });
+
+  test('reopenUnverified moves an unverified line back to pending once, so '
+      'it can be opened or closed', () async {
+    await f.store.insert(_line(f));
+    expect(
+      await f.store.reopenUnverified(f.childHireId),
+      isFalse,
+      reason: 'a pending line is not unverified',
+    );
+    await f.store.markUnverified(f.childHireId);
+
+    expect(await f.store.reopenUnverified(f.childHireId), isTrue);
+    expect(await f.store.reopenUnverified(f.childHireId), isFalse);
+    expect(
+      (await f.store.findByChildHire(f.childHireId))?.state,
+      ReceiptLineState.pending,
+    );
+    expect(await f.store.markNotOpened(f.childHireId), isTrue);
+  });
+
   test('markNotOpened moves a pending line once', () async {
     await f.store.insert(_line(f));
 
@@ -78,6 +147,116 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
       (await f.store.findByChildHire(f.childHireId))?.state,
       ReceiptLineState.notOpened,
     );
+  });
+
+  test('markUnverified moves a pending line once', () async {
+    await f.store.insert(_line(f));
+
+    expect(await f.store.markUnverified(f.childHireId), isTrue);
+    expect(await f.store.markUnverified(f.childHireId), isFalse);
+    expect(await f.store.markNotOpened(f.childHireId), isFalse);
+    expect(
+      (await f.store.findByChildHire(f.childHireId))?.state,
+      ReceiptLineState.unverified,
+    );
+  });
+
+  test('markOpened records the child job on a pending line once', () async {
+    await f.store.insert(_line(f));
+
+    final opened = await f.store.inTransaction(
+      (transaction) => f.store.markOpened(
+        f.childHireId,
+        childJobId: 44,
+        createTransaction: 'cd' * 32,
+        state: 'funded',
+        transaction: transaction,
+      ),
+    );
+
+    expect(opened, isTrue);
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.childJobId, 44);
+    expect(line?.createTransaction, 'cd' * 32);
+    expect(line?.state, 'funded');
+    expect(
+      await f.store.markOpened(
+        f.childHireId,
+        childJobId: 45,
+        createTransaction: 'ef' * 32,
+        state: 'funded',
+      ),
+      isFalse,
+    );
+    expect(await f.store.markNotOpened(f.childHireId), isFalse);
+    expect((await f.store.findByChildHire(f.childHireId))?.childJobId, 44);
+  });
+
+  test('markSettled records the settlement of an opened line once', () async {
+    await f.store.insert(_line(f));
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'completed',
+        fee: 1,
+        payout: 2,
+        settleTransaction: 'ef' * 32,
+      ),
+      isFalse,
+      reason: 'a pending line is not settled',
+    );
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'completed',
+        fee: 10000,
+        payout: 490000,
+        settleTransaction: 'ef' * 32,
+      ),
+      isTrue,
+    );
+    expect(
+      await f.store.markSettled(
+        f.childHireId,
+        state: 'rejected',
+        fee: 0,
+        payout: 0,
+        settleTransaction: '12' * 32,
+      ),
+      isFalse,
+    );
+
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.state, 'completed');
+    expect(line?.fee, 10000);
+    expect(line?.payout, 490000);
+    expect(line?.settleTransaction, 'ef' * 32);
+    expect(line?.childJobId, 44);
+  });
+
+  test('recordDeliverable sets the deliverable hash once', () async {
+    await f.store.insert(_line(f));
+
+    final first = await f.store.inTransaction(
+      (transaction) => f.store.recordDeliverable(
+        f.childHireId,
+        '34' * 32,
+        transaction: transaction,
+      ),
+    );
+
+    expect(first, isTrue);
+    expect(await f.store.recordDeliverable(f.childHireId, '56' * 32), isFalse);
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.deliverableHash, '34' * 32);
+    expect(line?.state, ReceiptLineState.pending);
   });
 
   test('inTransaction rolls the insert back when the body throws', () async {

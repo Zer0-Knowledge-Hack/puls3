@@ -165,6 +165,21 @@ final class ServerpodChainSubmissionStore implements ChainSubmissionStore {
   }
 
   @override
+  Future<List<String?>> submittedEnvelopes(
+    Set<SubmissionPurpose> purposes,
+  ) async {
+    if (purposes.isEmpty) return const [];
+    final rows = await ChainSubmission.db.find(
+      _session,
+      where: (t) =>
+          t.state.equals(SubmissionState.submitted.wireName) &
+          t.purpose.inSet({for (final p in purposes) p.wireName}),
+      orderBy: (t) => t.id,
+    );
+    return [for (final row in rows) row.signedEnvelopeXdr];
+  }
+
+  @override
   Future<bool> markConfirmed(int id) =>
       _transition(id, SubmissionState.confirmed, null);
 

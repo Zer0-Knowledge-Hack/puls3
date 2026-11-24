@@ -227,10 +227,56 @@ the conversation on the builder's credential (`runnerLease`). The stored
 state is bounded by the loop's input cap (`input.max_chars` plus 32,000
 characters of headroom) plus provider content: tens of kilobytes.
 
-**Not wired in production yet.** There is no real `SubcontractPort` or
-`ChildResultSource` until T6, so `startAgentRuntime` passes no setup: no run is
-offered the tools, an opted-in manifest runs as one plain segment, and no run
-pauses. Tests inject fakes.
+### Child verdicts (#334, T6.3)
+
+`EscrowChildResultSource` is the real `ChildResultSource`. Once the child's
+facts are final, the parent agent A judges its child B with one server rule
+(ADR-0011 D3) and A's custodied wallet signs the verdict as the child's
+evaluator: a `childComplete` or `childReject` submission (server-signed; it
+calls the escrow's `complete` or `reject`). The 32-byte `reason` is the
+SHA-256 of the UTF-8 reason code:
+
+| Code | When | Call |
+|---|---|---|
+| `child_complete` | B's `submit` confirmed and its output is non-blank | `complete` from `Submitted` |
+| `child_output_empty` | B's submitted output is empty or blank | `reject` from `Submitted` |
+| `child_run_failed` | B's run failed | `reject` from `Funded` |
+| `child_not_submitted` | B's run succeeded but its `submit` can never land | `reject` from `Funded` |
+
+Length is never a reason to reject. B's run already fails an output over its
+own manifest's `output.max_chars`, which no manifest may set above 16,000
+(domain invariant I30), so a stored output is work B delivered within its own
+terms. "Malformed" and "off the subtask" (D3) are not checked either, on
+purpose: they would need a model call that B's output could steer, so anything
+non-blank is paid.
+
+The parent's loop gets B's stored output (`ChildDelivered`) after a confirmed
+`complete` or a deadline-relay `release`, and `ChildFailed` with the reason
+code after a confirmed `reject`, `child_expired` after `claim_refund`, and
+`child_not_opened` for a child whose `create_child_job` never landed. When
+the parent's run fails, its open children are still judged by the same rule on
+every runtime pass. The reserve backs B's work until B finishes, whoever hired
+the parent. A
+delivered output that would push the parent's conversation past its limit
+(`input.max_chars` plus the loop's headroom) is cut to the longest prefix that
+fits and labelled with `truncated` and `output_runes`, so the paid result never
+fails the parent's next segment with `input_too_long`. A
+`pending` or `unverified` receipt line keeps the parent waiting. One verdict
+is in flight per child; a failed one is built again up to three attempts,
+after which the deadline relay settles the child. On confirmation the tracker
+fills the receipt line's `state`, `fee`, `payout` (from `JobCompleted`; 0 for
+a reject) and `settleTransaction`; the complete verdict stores B's
+`deliverableHash` when it is sent.
+
+`AgentSubmitSender` takes an optional `childrenOpen` check (`OpenChildren`)
+and does not submit a parent hire while a child is open; a simulation refused
+with `ChildrenOpen` stores nothing and is retried, so it never burns an
+attempt. Agent-signed calls (`submit`, `createChildJob` and the verdicts) are
+kept one in flight at a time.
+
+**Not wired in production yet.** `startAgentRuntime` passes no
+`SubcontractSetup` until T6.4, so no run is offered the tools, an opted-in
+manifest runs as one plain segment, and no run pauses. Tests inject fakes.
 
 ### Hire configuration
 

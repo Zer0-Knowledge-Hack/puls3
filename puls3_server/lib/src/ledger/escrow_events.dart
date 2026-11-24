@@ -94,6 +94,45 @@ List<JobFundedEvent> allJobFunded(
   );
 });
 
+/// The escrow `JobCompleted` event: job [jobId] paid [payout] to its
+/// provider and [fee] to the treasury, through `complete` or (with
+/// [autoReleased]) the permissionless `release`.
+final class JobCompletedEvent {
+  const JobCompletedEvent({
+    required this.jobId,
+    required this.evaluator,
+    required this.payout,
+    required this.fee,
+    required this.autoReleased,
+  });
+
+  final int jobId;
+  final StellarAddress evaluator;
+
+  /// In the token's smallest unit (stroops for USDC).
+  final BigInt payout;
+  final BigInt fee;
+  final bool autoReleased;
+}
+
+/// Every `job_completed` event that [escrow] emitted in a successful [tx],
+/// in order. Events of other contracts and malformed events are skipped.
+List<JobCompletedEvent> allJobCompleted(
+  Map<String, Object?> tx, {
+  required StellarAddress escrow,
+}) => _all(
+  tx,
+  escrow,
+  'job_completed',
+  (jobId, fields) => JobCompletedEvent(
+    jobId: jobId,
+    evaluator: readAddress(fields('evaluator')),
+    payout: readI128(fields('payout')),
+    fee: readI128(fields('fee')),
+    autoReleased: readBool(fields('auto_released')),
+  ),
+);
+
 /// The escrow `ReserveFunded` event: `fund_with_reserve` put a non-zero
 /// subcontract reserve on job [jobId] (ADR-0011 D6).
 final class ReserveFundedEvent {

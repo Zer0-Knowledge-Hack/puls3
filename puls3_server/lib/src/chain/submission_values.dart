@@ -26,7 +26,16 @@ enum SubmissionPurpose {
 
   /// A child job drawn from the parent's reserve, signed by the parent's
   /// provider through custody (ADR-0011 D2).
-  createChildJob;
+  createChildJob,
+
+  /// The parent agent's `complete` of its child job, signed through custody
+  /// as the child's evaluator (ADR-0011 D3). A consumer's `complete` stays
+  /// [complete], which a wallet signs from a preparation.
+  childComplete,
+
+  /// The parent agent's `reject` of its child job, signed through custody
+  /// as the child's evaluator (ADR-0011 D3).
+  childReject;
 
   String get wireName => name;
 
@@ -45,6 +54,8 @@ enum SubmissionPurpose {
     release => 'release',
     claimRefund => 'claim_refund',
     createChildJob => 'create_child_job',
+    childComplete => 'complete',
+    childReject => 'reject',
   };
 
   /// Signed by the server, never prepared for a wallet, so it has no
@@ -53,7 +64,9 @@ enum SubmissionPurpose {
       this == submit ||
       this == release ||
       this == claimRefund ||
-      this == createChildJob;
+      this == createChildJob ||
+      this == childComplete ||
+      this == childReject;
 
   /// The purpose whose [wireName] is exactly [wire], or `null`.
   static SubmissionPurpose? tryParse(String wire) => _byWire(values, wire);
@@ -63,6 +76,16 @@ enum SubmissionPurpose {
       tryParse(wire) ??
       (throw FormatException('Unknown submission purpose', wire));
 }
+
+/// Purposes a custodied agent wallet signs. Two envelopes built against the
+/// same account sequence would be `txBadSeq`, so the senders keep one of
+/// them in flight at a time.
+const agentSignedPurposes = {
+  SubmissionPurpose.submit,
+  SubmissionPurpose.createChildJob,
+  SubmissionPurpose.childComplete,
+  SubmissionPurpose.childReject,
+};
 
 /// Where a submission is. [wireName] is the lowercase value of
 /// `ChainSubmission.state`.

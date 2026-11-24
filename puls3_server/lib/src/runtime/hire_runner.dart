@@ -187,6 +187,16 @@ final class HireRunner {
         });
         if (rateLimited) break;
       }
+      // A failed parent never resumes, so its open children are judged here
+      // (T6.4.4). It makes no model call, so a rate limit does not skip it.
+      try {
+        await setup.children.judgeOrphans();
+      } on Object catch (e) {
+        _log(
+          ChainLogLevel.error,
+          'Verdicts of children of failed parents deferred: ${e.runtimeType}',
+        );
+      }
     }
     // The provider is rate limited: the rest of the batch would only hit
     // the same limit, so it waits for a later pass.
@@ -381,7 +391,13 @@ final class HireRunner {
     // continues a transcript whose last tool call has its result, so the
     // paid child's output is never lost or asked for again.
     final child = result;
-    final resumed = ToolLoop.resumedState(awaiting, child);
+    // The runner's loop keeps the default headroom (`_drive`).
+    final resumed = ToolLoop.resumedState(
+      awaiting,
+      child,
+      maxConversationChars:
+          manifest.inputMaxChars + defaultConversationHeadroomChars,
+    );
     if (!await runs.markResumed(
       paused.hireId,
       _now(),

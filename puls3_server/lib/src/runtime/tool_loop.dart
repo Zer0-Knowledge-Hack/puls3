@@ -212,7 +212,12 @@ final class ToolLoop {
     LoopAwaitingChild paused,
     ChildToolResult result,
   ) {
-    final state = resumedState(paused, result);
+    final state = resumedState(
+      paused,
+      result,
+      maxConversationChars:
+          run.manifest.inputMaxChars + conversationHeadroomChars,
+    );
     final ledger = SubcontractLedger(
       childrenUsed: state.childrenUsed,
       remainingReserveStroops: state.remainingReserveStroops,
@@ -226,18 +231,30 @@ final class ToolLoop {
   /// as it resumes, so a retry before the next segment ends still continues
   /// from a transcript whose last tool call has its result
   /// ([continueFrom]), and the paid child's output is never lost.
+  ///
+  /// A delivered output is cut so the whole transcript stays within
+  /// [maxConversationChars] (the limit each later segment is checked
+  /// against), and the cut is labelled for the model with `truncated` and
+  /// `output_runes`. Otherwise a long, heavily escaped output would fail A's
+  /// next segment with `input_too_long` after B was already paid.
   static ToolLoopState resumedState(
     LoopAwaitingChild paused,
-    ChildToolResult result,
-  ) {
+    ChildToolResult result, {
+    required int maxConversationChars,
+  }) {
     final state = paused.state;
     final callId = paused.pendingToolCallId;
+    final used = state.transcript.fold(
+      0,
+      (sum, message) => sum + message.length,
+    );
     final transcript = [
       ...state.transcript,
       switch (result) {
-        ChildDelivered(:final output) => ToolResultMessage(
-          callId: callId,
-          content: delimitAsData('child_output', {'output': output}),
+        ChildDelivered(:final output) => _childOutputResult(
+          callId,
+          output,
+          room: maxConversationChars - used,
         ),
         ChildFailed(:final code) => toolError(
           callId,
@@ -253,6 +270,42 @@ final class ToolLoop {
       remainingReserveStroops: state.remainingReserveStroops,
       searches: state.searches,
     );
+  }
+
+  /// The tool result for a delivered child [output]: whole when it fits in
+  /// [room] characters, else the longest prefix (whole runes) that fits,
+  /// labelled as cut. With no room at all the prefix is empty.
+  static ToolResultMessage _childOutputResult(
+    String callId,
+    String output, {
+    required int room,
+  }) {
+    ToolResultMessage message(Map<String, Object?> data) => ToolResultMessage(
+      callId: callId,
+      content: delimitAsData('child_output', data),
+    );
+    final whole = message({'output': output});
+    if (whole.length <= room) return whole;
+
+    final runes = output.runes.toList();
+    ToolResultMessage cut(int keep) => message({
+      'output': String.fromCharCodes(runes.take(keep)),
+      'truncated': true,
+      'output_runes': runes.length,
+    });
+    // The escaped length grows with the prefix, so the longest fitting
+    // prefix is found by bisection.
+    var low = 0;
+    var high = runes.length;
+    while (low < high) {
+      final mid = (low + high + 1) ~/ 2;
+      if (cut(mid).length <= room) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return cut(low);
   }
 
   /// Continues [state] as stored after a retryable [LoopFailed] (T5.3): the

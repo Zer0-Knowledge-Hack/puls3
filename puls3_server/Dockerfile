@@ -6,13 +6,14 @@ FROM dart:3.12.2 AS build
 
 # Create a minimal workspace that preserves locked server dependency versions.
 # `dart pub get` also resolves dev dependencies, and the server's SDK contract
-# tests (#375) use puls3_client and puls3_sdk, so both are copied too. Neither
-# reaches the runtime image: only the compiled bundle does.
+# tests (#375) use puls3_client, puls3_sdk and puls3_mcp, so they are copied
+# too. None reaches the runtime image: only the compiled bundle does.
 WORKDIR /app
 COPY pubspec.lock .
 COPY puls3_domain puls3_domain
 COPY puls3_client puls3_client
 COPY puls3_sdk puls3_sdk
+COPY puls3_mcp puls3_mcp
 COPY puls3_server puls3_server
 RUN printf '%s\n' \
   'name: _' \
@@ -22,6 +23,7 @@ RUN printf '%s\n' \
   '  - puls3_domain' \
   '  - puls3_client' \
   '  - puls3_sdk' \
+  '  - puls3_mcp' \
   '  - puls3_server' \
   > pubspec.yaml
 RUN dart pub get

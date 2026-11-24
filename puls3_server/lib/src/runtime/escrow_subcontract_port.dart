@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:puls3_domain/puls3_domain.dart' show HireStatus, StellarAddress;
 
 import '../agent/agent_wallet_custody.dart';
+import '../chain/agent_call_gate.dart';
 import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
 import '../chain/escrow_deadline.dart';
@@ -55,7 +56,10 @@ typedef ChildAgentLookup = Future<ChildAgent?> Function(int registryId);
 /// from the parent's reserve, and A is the child's evaluator.
 ///
 /// Every check that can refuse runs before anything is stored, signed or
-/// sent, and every refusal is a [SubcontractRefused]. The child hire, its
+/// sent, and every refusal is a [SubcontractRefused]. While another call A
+/// signed is in flight (`agentCallInFlight`) it refuses with `chain_busy`
+/// before drafting, because the new envelope would reuse A's sequence; the
+/// model may subcontract again once that call settled. The child hire, its
 /// receipt line and the signed `submitted` record are stored in one
 /// transaction, then the envelope is sent; the tracker binds the child job
 /// once it confirms (T6.2).
@@ -71,6 +75,7 @@ final class EscrowSubcontractPort implements SubcontractPort {
     required ChainSubmissionStore submissions,
     required EscrowJobReader jobs,
     required EscrowRelayService relay,
+    required EnvelopeCodec codec,
     required HireRelayConfig config,
     required ChildAgentLookup childAgent,
     required EscrowApprovalWindow approvalWindow,
@@ -92,6 +97,7 @@ final class EscrowSubcontractPort implements SubcontractPort {
        _submissions = submissions,
        _jobs = jobs,
        _relay = relay,
+       _codec = codec,
        _config = config,
        _childAgent = childAgent,
        _approvalWindow = approvalWindow,
@@ -106,6 +112,7 @@ final class EscrowSubcontractPort implements SubcontractPort {
   final ChainSubmissionStore _submissions;
   final EscrowJobReader _jobs;
   final EscrowRelayService _relay;
+  final EnvelopeCodec _codec;
   final HireRelayConfig _config;
   final ChildAgentLookup _childAgent;
   final EscrowApprovalWindow _approvalWindow;
@@ -173,6 +180,14 @@ final class EscrowSubcontractPort implements SubcontractPort {
     if (agent == null) throw const SubcontractRefused('agent_unavailable');
     if (agent.priceStroops != budget) {
       throw const SubcontractRefused('price_changed');
+    }
+
+    if (await agentCallInFlight(
+      submissions: _submissions,
+      codec: _codec,
+      signer: job.provider,
+    )) {
+      throw const SubcontractRefused('chain_busy');
     }
 
     final PreparationDraft draft;
@@ -260,7 +275,11 @@ final class EscrowSubcontractPort implements SubcontractPort {
     } on HireRequestConflict {
       // A concurrent retry of the same call stored the child first.
       final won = await _storedChild(parent.id, requestId);
-      if (won == null) rethrow;
+      // Another hire of this wallet holds the request id and is not a child
+      // of this parent. Everything rolled back, so nothing is held. It is a
+      // refusal, not an error: an escaping exception would fail the whole
+      // parent run (T6.4.4).
+      if (won == null) throw const SubcontractRefused('request_conflict');
       return _reuse(won);
     } on ChainSubmissionConflict {
       // The same envelope is already stored: another child drafted on the

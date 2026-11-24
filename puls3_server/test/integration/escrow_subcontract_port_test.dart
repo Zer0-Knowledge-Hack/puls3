@@ -71,6 +71,7 @@ final class _Stack {
       submissions: submissions,
       jobs: ledger,
       relay: relay,
+      codec: codec,
       config: const HireRelayConfig(_env),
       childAgent: (registryId) async => registryId == _childRegistryId
           ? ChildAgent(
@@ -227,6 +228,10 @@ void main() {
           childId,
         );
         expect(stack.sent, hasLength(1));
+
+        // This group commits: leave no call of A in flight, or the
+        // per-wallet gate holds A in the next test.
+        await stack.submissions.markConfirmed(submission.id!);
       });
 
       test(
@@ -234,7 +239,15 @@ void main() {
         'receipt line, so a retry of the call opens it',
         () async {
           final parent = await stack.parent();
-          await stack.port.requestChild(_request(parent.id, 'call-1'));
+          final first = await stack.port.requestChild(
+            _request(parent.id, 'call-1'),
+          );
+          // call-1 is no longer in flight, so the per-wallet gate lets
+          // call-2 through, as in a race between two passes. The chain
+          // sequence has not moved yet.
+          await stack.submissions.markConfirmed(
+            (await stack.submissions.listByHire(first)).single.id,
+          );
 
           // The same sequence and arguments draft the same envelope: the
           // submission insert conflicts after the hire and the line.
