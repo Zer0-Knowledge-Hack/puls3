@@ -34,6 +34,14 @@ client and agent, once per job. The full list of reasons is in
 predates #201 (its record has no job reference, so it no longer counts). See
 [`docs/security/issue-201/`](../security/issue-201/README.md).
 
+**Amended by #324 (ADR-0012):** one client is one rating. `reputationOf`
+groups the counted records by client and uses the mean of each client's
+scores, then runs the Bayesian average over clients. Every counted record
+still reaches the formula ("equal scores from one client all count" above),
+but several from one client count as one value. `scripts/verify_reputation.dart`
+calls the same `reputationOf`, so it applies the rule with no change. To check a
+score by hand, average each client's scores first.
+
 The four reasons a record did not count before #201:
 
 | Reason | When |

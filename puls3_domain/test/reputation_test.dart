@@ -27,8 +27,51 @@ Feedback feedback({
   score: score,
 );
 
+/// A valid account address (G...) whose key bytes encode [n]: a distinct
+/// client per [n].
+StellarAddress clientNumber(int n) {
+  final payload = [
+    6 << 3,
+    ...List<int>.filled(29, 0),
+    n >> 16,
+    n >> 8 & 255,
+    n & 255,
+  ];
+  var crc = 0;
+  for (final byte in payload) {
+    crc ^= byte << 8;
+    for (var i = 0; i < 8; i++) {
+      crc = crc & 0x8000 != 0
+          ? (crc << 1 ^ 0x1021) & 0xffff
+          : crc << 1 & 0xffff;
+    }
+  }
+  final bytes = [...payload, crc & 255, crc >> 8];
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  final out = StringBuffer();
+  var buffer = 0;
+  var bits = 0;
+  for (final byte in bytes) {
+    buffer = buffer << 8 | byte;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out.write(alphabet[buffer >> bits & 31]);
+    }
+  }
+  return StellarAddress.parse('$out');
+}
+
+/// One feedback per score, each from its own client.
 List<Feedback> scores(List<int> values) => [
-  for (final value in values) feedback(score: value),
+  for (var i = 0; i < values.length; i++)
+    feedback(client: clientNumber(i + 1), score: values[i]),
+];
+
+/// Every score from the same client, as from one wallet hiring again and
+/// again.
+List<Feedback> fromOneClient(List<int> values) => [
+  for (final value in values) feedback(client: consumer, score: value),
 ];
 
 /// A hire that reached `completed` only through valid transitions.
@@ -91,6 +134,36 @@ void main() {
 
     test('five 3-stars (a below-prior mean) -> 3.50', () {
       expect(reputationOf(scores([3, 3, 3, 3, 3])), 3.50);
+    });
+  });
+
+  group('one client is one rating (ADR-0012, #324)', () {
+    test('twenty 5-stars from one wallet count as one -> 4.17', () {
+      // The same as a single 5-star, not the 4.80 that twenty separate
+      // ratings would give.
+      expect(reputationOf(fromOneClient(List.filled(20, 5))), 4.17);
+      expect(reputationOf(scores(List.filled(20, 5))), 4.80);
+    });
+
+    test('a client with several ratings counts with their mean', () {
+      // One client gave 5 and 3 (mean 4), another gave 5:
+      // (5 * 4.0 + 4 + 5) / (5 + 2) = 4.14.
+      final feedback = [
+        ...fromOneClient([5, 3]),
+        ...scores([5]),
+      ];
+      expect(reputationOf(feedback), 4.14);
+    });
+
+    test('the order of the feedback does not change the rating', () {
+      final feedback = [
+        ...scores([4, 2]),
+        ...fromOneClient([5, 1, 3]),
+      ];
+      expect(
+        reputationOf(feedback.reversed),
+        reputationOf(feedback),
+      );
     });
   });
 
