@@ -28,13 +28,23 @@ abstract interface class HireGateway {
   /// `fund` stays the check. A demo does nothing.
   Future<void> checkFunds(String consumer, int priceUsdcStroops);
 
+  /// What the consumer may fund beside the price before hiring [agentId]
+  /// (`HireEndpoint.getHireTerms`, #334). A demo offers no reserve.
+  Future<SubcontractTerms> hireTerms(int agentId);
+
   /// Creates the hire (idempotent per [requestId]) and returns it with the
   /// unsigned `create_job`. [agentId] is the on-chain registry id.
+  /// [subcontractReserve] (USDC stroops) is funded beside the price for the
+  /// agent's subcontracts, and [allowRelatedParty] lets it subcontract an
+  /// agent of the same owner. A retry with the same [requestId] must send
+  /// the same values, or the server refuses it (`IdempotencyKeyReused`).
   Future<HireStart> createHire({
     required int agentId,
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   });
 
   /// A fresh unsigned `create_job`, after the previous one expired or failed.
@@ -382,6 +392,47 @@ class HireProgress {
     if (canRejectStuckSubmit) return true;
     return stage == HireStage.submitted && approvalWindowOpen(now);
   }
+}
+
+/// What a consumer may fund beside the price before hiring one agent
+/// (api.md `HireTerms`, ADR-0011 D1 and D8).
+class SubcontractTerms {
+  const SubcontractTerms({
+    required this.reserveMaxStroops,
+    required this.maxChildren,
+    required this.suggestedReserveStroops,
+  });
+
+  /// No subcontracting: the agent did not opt in, the network refuses any
+  /// reserve, or the terms could not be read.
+  static const none = SubcontractTerms(
+    reserveMaxStroops: 0,
+    maxChildren: 0,
+    suggestedReserveStroops: 0,
+  );
+
+  /// The platform ceiling of the reserve, in USDC stroops.
+  final int reserveMaxStroops;
+
+  /// How many agents one hire may subcontract; 0 without the opt-in.
+  final int maxChildren;
+
+  /// The agent's suggested reserve, in USDC stroops.
+  final int suggestedReserveStroops;
+
+  /// The hire form offers a reserve only when both caps allow one.
+  bool get offered => maxChildren > 0 && reserveMaxStroops > 0;
+
+  /// The reserve the form starts with: the suggestion, capped by the
+  /// ceiling.
+  int get prefillStroops =>
+      offered ? suggestedReserveStroops.clamp(0, reserveMaxStroops).toInt() : 0;
+
+  /// Whether [reserveStroops] may be funded: 0 always, otherwise up to the
+  /// ceiling of an offered reserve.
+  bool allows(int reserveStroops) =>
+      reserveStroops == 0 ||
+      (offered && reserveStroops > 0 && reserveStroops <= reserveMaxStroops);
 }
 
 /// A created hire and its first escrow call.

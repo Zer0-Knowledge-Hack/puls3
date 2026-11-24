@@ -99,8 +99,19 @@ Future<void> _journey(WidgetTester tester, List<String> trace) async {
       locale: const Locale('en'),
       initialLocation: '/market',
       hireGateway: ServerHireGateway(
-        createHire: (a, b, c, d) =>
-            logged('createHire', () => client.hire.createHire(a, b, c, d)),
+        createHire: (a, b, c, d, {subcontractReserve, allowRelatedParty}) =>
+            logged(
+              'createHire',
+              () => client.hire.createHire(
+                a,
+                b,
+                c,
+                d,
+                subcontractReserve: subcontractReserve,
+                allowRelatedParty: allowRelatedParty,
+              ),
+            ),
+        getHireTerms: client.hire.getHireTerms,
         prepareCreateJob: (a) =>
             logged('prepareCreateJob', () => client.hire.prepareCreateJob(a)),
         prepareFund: (a) =>

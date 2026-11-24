@@ -133,7 +133,13 @@ class _ProgressGateway implements HireGateway {
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   }) => throw UnimplementedError();
+
+  @override
+  Future<SubcontractTerms> hireTerms(int agentId) async =>
+      SubcontractTerms.none;
 
   @override
   Future<EscrowPreparation> prepareCreateJob(int hireId) =>

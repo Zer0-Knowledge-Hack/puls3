@@ -2969,6 +2969,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connect the wallet that owns this agent to see this hire.'**
   String get agentHireDetailConnect;
+
+  /// No description provided for @hireSubcontractTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontracting'**
+  String get hireSubcontractTitle;
+
+  /// No description provided for @hireSubcontractLead.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent can hire up to {count} other agents for parts of your task. They are paid from a reserve you fund now, on top of the price.'**
+  String hireSubcontractLead(int count);
+
+  /// No description provided for @hireSubcontractReserveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontract reserve (USDC)'**
+  String get hireSubcontractReserveLabel;
+
+  /// No description provided for @hireSubcontractReserveHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} USDC. Enter 0 to hire without subcontracting.'**
+  String hireSubcontractReserveHelper(String max);
+
+  /// No description provided for @hireSubcontractReserveInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount from 0 to {max} USDC.'**
+  String hireSubcontractReserveInvalid(String max);
+
+  /// No description provided for @hireSubcontractRelatedParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow agents with the same owner'**
+  String get hireSubcontractRelatedParty;
+
+  /// No description provided for @hireSubcontractRelatedPartyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'A subcontracted agent may share an owner with this agent. If it does, the receipt shows it.'**
+  String get hireSubcontractRelatedPartyNotice;
+
+  /// No description provided for @hireSubcontractConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'I understand that a completed subcontract is paid even if I reject the result.'**
+  String get hireSubcontractConsent;
+
+  /// No description provided for @hireSubcontractReserveRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontract reserve'**
+  String get hireSubcontractReserveRow;
+
+  /// No description provided for @hireSubcontractTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get hireSubcontractTotal;
+
+  /// No description provided for @hireSubcontractRefundNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The unspent reserve is refunded to you when the hire ends.'**
+  String get hireSubcontractRefundNote;
 }
 
 class _AppLocalizationsDelegate

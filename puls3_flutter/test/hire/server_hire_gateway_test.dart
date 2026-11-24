@@ -83,15 +83,18 @@ ServerHireGateway _gateway({
   PrepareFeedbackCall? prepareFeedback,
   SubmitFeedbackCall? submitFeedback,
   ReadWalletFunds? readFunds,
+  GetHireTermsCall? getHireTerms,
   Duration confirmationTimeout = const Duration(seconds: 1),
 }) => ServerHireGateway(
   readFunds: readFunds,
+  getHireTerms: getHireTerms,
   createHire:
       createHire ??
-      (_, _, _, _) async => CreateHireResult(
-        hire: _hire(3),
-        preparedCreateJob: _prepared('createJob'),
-      ),
+      (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+          CreateHireResult(
+            hire: _hire(3),
+            preparedCreateJob: _prepared('createJob'),
+          ),
   prepareCreateJob: prepareCreateJob ?? (_) async => _prepared('createJob'),
   prepareFund: prepareFund ?? (_) async => _prepared('fund'),
   prepareComplete: prepareComplete ?? (_) async => _prepared('complete'),
@@ -251,8 +254,9 @@ void main() {
       'an agent whose payee is not custodied is HireAgentCannotDeliver',
       () async {
         final gateway = _gateway(
-          createHire: (_, _, _, _) async =>
-              throw Puls3ApiException(code: 'AgentCannotDeliver'),
+          createHire:
+              (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+                  throw Puls3ApiException(code: 'AgentCannotDeliver'),
         );
 
         await expectLater(
@@ -293,14 +297,24 @@ void main() {
       'createHire passes the request through and returns the create_job',
       () async {
         final calls = <List<Object>>[];
+        final named = <(int?, bool?)>[];
         final gateway = _gateway(
-          createHire: (agentId, consumer, input, requestId) async {
-            calls.add([agentId, consumer, input, requestId]);
-            return CreateHireResult(
-              hire: _hire(3),
-              preparedCreateJob: _prepared('createJob'),
-            );
-          },
+          createHire:
+              (
+                agentId,
+                consumer,
+                input,
+                requestId, {
+                subcontractReserve,
+                allowRelatedParty,
+              }) async {
+                calls.add([agentId, consumer, input, requestId]);
+                named.add((subcontractReserve, allowRelatedParty));
+                return CreateHireResult(
+                  hire: _hire(3),
+                  preparedCreateJob: _prepared('createJob'),
+                );
+              },
         );
         final start = await gateway.createHire(
           agentId: 9,
@@ -309,6 +323,8 @@ void main() {
           requestId: 'req-1',
         );
         expect(calls.single, [9, _consumer, 'Audit this', 'req-1']);
+        // A plain hire sends no subcontract terms, exactly as before #334.
+        expect(named.single, (null, null));
         expect(start.hireId, 3);
         expect(start.createJob!.purpose, 'createJob');
         expect(start.createJob!.unsignedTransaction, 'AAAA-unsigned');
@@ -316,10 +332,68 @@ void main() {
       },
     );
 
+    test('createHire sends the subcontract reserve and the related-party '
+        'flag', () async {
+      final named = <(int?, bool?)>[];
+      final gateway = _gateway(
+        createHire:
+            (
+              _,
+              _,
+              _,
+              _, {
+              subcontractReserve,
+              allowRelatedParty,
+            }) async {
+              named.add((subcontractReserve, allowRelatedParty));
+              return CreateHireResult(
+                hire: _hire(3),
+                preparedCreateJob: _prepared('createJob'),
+              );
+            },
+      );
+
+      await gateway.createHire(
+        agentId: 9,
+        consumer: _consumer,
+        input: 'Audit this',
+        requestId: 'req-1',
+        subcontractReserve: 10000000,
+        allowRelatedParty: false,
+      );
+
+      expect(named.single, (10000000, false));
+    });
+
+    test('hireTerms maps the server terms', () async {
+      final gateway = _gateway(
+        getHireTerms: (agentId) async {
+          expect(agentId, 9);
+          return HireTerms(
+            reserveMaxStroops: 20000000,
+            maxChildren: 2,
+            suggestedReserveStroops: 30000000,
+          );
+        },
+      );
+
+      final terms = await gateway.hireTerms(9);
+
+      expect(terms.reserveMaxStroops, 20000000);
+      expect(terms.maxChildren, 2);
+      expect(terms.suggestedReserveStroops, 30000000);
+      expect(terms.offered, isTrue);
+    });
+
+    test('hireTerms without the call offers no reserve', () async {
+      expect((await _gateway().hireTerms(9)).offered, isFalse);
+    });
+
     test('no wallet session yet is a clear "not signed in" error', () async {
       final gateway = _gateway(
-        createHire: (_, _, _, _) async =>
-            throw Puls3ApiException(code: 'AuthenticationUnavailable'),
+        createHire:
+            (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+                throw Puls3ApiException(code: 'AuthenticationUnavailable'),
       );
       await expectLater(
         gateway.createHire(
@@ -334,7 +408,9 @@ void main() {
 
     test('a session that cannot refresh asks for a new sign-in', () async {
       final gateway = _gateway(
-        createHire: (_, _, _, _) async => throw ServerpodClientUnauthorized(),
+        createHire:
+            (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+                throw ServerpodClientUnauthorized(),
       );
       await expectLater(
         gateway.createHire(
@@ -374,8 +450,9 @@ void main() {
 
     test('a bad request that is not a typed error is a server error', () async {
       final gateway = _gateway(
-        createHire: (_, _, _, _) async =>
-            throw ServerpodClientBadRequest('<html>nope</html>'),
+        createHire:
+            (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+                throw ServerpodClientBadRequest('<html>nope</html>'),
       );
       await expectLater(
         gateway.createHire(
@@ -390,8 +467,9 @@ void main() {
 
     test('a network failure is still a retryable server error', () async {
       final gateway = _gateway(
-        createHire: (_, _, _, _) async =>
-            throw const ServerpodClientNetworkException('offline'),
+        createHire:
+            (_, _, _, _, {subcontractReserve, allowRelatedParty}) async =>
+                throw const ServerpodClientNetworkException('offline'),
       );
       await expectLater(
         gateway.createHire(
@@ -597,7 +675,8 @@ void main() {
 
     test('a server that does not answer is a retryable error', () async {
       final gateway = ServerHireGateway(
-        createHire: (_, _, _, _) => Completer<CreateHireResult>().future,
+        createHire: (_, _, _, _, {subcontractReserve, allowRelatedParty}) =>
+            Completer<CreateHireResult>().future,
         prepareCreateJob: (_) async => _prepared('createJob'),
         prepareFund: (_) async => _prepared('fund'),
         prepareComplete: (_) async => _prepared('complete'),

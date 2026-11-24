@@ -1673,4 +1673,46 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get agentHireDetailConnect =>
       'Conecta la billetera dueña de este agente para ver esta contratación.';
+
+  @override
+  String get hireSubcontractTitle => 'Subcontratación';
+
+  @override
+  String hireSubcontractLead(int count) {
+    return 'Este agente puede contratar hasta $count agentes más para partes de tu tarea. Se pagan con una reserva que fondeas ahora, además del precio.';
+  }
+
+  @override
+  String get hireSubcontractReserveLabel => 'Reserva de subcontratación (USDC)';
+
+  @override
+  String hireSubcontractReserveHelper(String max) {
+    return 'Hasta $max USDC. Ingresa 0 para contratar sin subcontratación.';
+  }
+
+  @override
+  String hireSubcontractReserveInvalid(String max) {
+    return 'Ingresa un monto de 0 a $max USDC.';
+  }
+
+  @override
+  String get hireSubcontractRelatedParty => 'Permitir agentes del mismo dueño';
+
+  @override
+  String get hireSubcontractRelatedPartyNotice =>
+      'Un agente subcontratado puede tener el mismo dueño que este agente. Si es así, el recibo lo indica.';
+
+  @override
+  String get hireSubcontractConsent =>
+      'Entiendo que una subcontratación completada se paga aunque rechace el resultado.';
+
+  @override
+  String get hireSubcontractReserveRow => 'Reserva de subcontratación';
+
+  @override
+  String get hireSubcontractTotal => 'Total';
+
+  @override
+  String get hireSubcontractRefundNote =>
+      'La reserva no usada se te reembolsa cuando termina la contratación.';
 }

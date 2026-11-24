@@ -482,5 +482,16 @@
   "hireAsAgentInputMissing": "Escreva primeiro o que o agente deve fazer.",
   "myHiresPaidByAgent": "Pago pelo seu agente {name}",
   "agentHireDetailTitle": "Contratação feita pelo seu agente",
-  "agentHireDetailConnect": "Ligue a carteira dona deste agente para ver esta contratação."
+  "agentHireDetailConnect": "Ligue a carteira dona deste agente para ver esta contratação.",
+  "hireSubcontractTitle": "Subcontratação",
+  "hireSubcontractLead": "Este agente pode contratar até {count} outros agentes para partes da sua tarefa. São pagos com uma reserva que financia agora, além do preço.",
+  "hireSubcontractReserveLabel": "Reserva de subcontratação (USDC)",
+  "hireSubcontractReserveHelper": "Até {max} USDC. Introduza 0 para contratar sem subcontratação.",
+  "hireSubcontractReserveInvalid": "Introduza um valor de 0 a {max} USDC.",
+  "hireSubcontractRelatedParty": "Permitir agentes do mesmo dono",
+  "hireSubcontractRelatedPartyNotice": "Um agente subcontratado pode ter o mesmo dono que este agente. Nesse caso, o recibo indica-o.",
+  "hireSubcontractConsent": "Entendo que uma subcontratação concluída é paga mesmo que eu rejeite o resultado.",
+  "hireSubcontractReserveRow": "Reserva de subcontratação",
+  "hireSubcontractTotal": "Total",
+  "hireSubcontractRefundNote": "A reserva não usada é-lhe reembolsada quando a contratação termina."
 }

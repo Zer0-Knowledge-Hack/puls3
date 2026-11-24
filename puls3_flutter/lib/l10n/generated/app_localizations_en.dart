@@ -1645,4 +1645,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get agentHireDetailConnect =>
       'Connect the wallet that owns this agent to see this hire.';
+
+  @override
+  String get hireSubcontractTitle => 'Subcontracting';
+
+  @override
+  String hireSubcontractLead(int count) {
+    return 'This agent can hire up to $count other agents for parts of your task. They are paid from a reserve you fund now, on top of the price.';
+  }
+
+  @override
+  String get hireSubcontractReserveLabel => 'Subcontract reserve (USDC)';
+
+  @override
+  String hireSubcontractReserveHelper(String max) {
+    return 'Up to $max USDC. Enter 0 to hire without subcontracting.';
+  }
+
+  @override
+  String hireSubcontractReserveInvalid(String max) {
+    return 'Enter an amount from 0 to $max USDC.';
+  }
+
+  @override
+  String get hireSubcontractRelatedParty => 'Allow agents with the same owner';
+
+  @override
+  String get hireSubcontractRelatedPartyNotice =>
+      'A subcontracted agent may share an owner with this agent. If it does, the receipt shows it.';
+
+  @override
+  String get hireSubcontractConsent =>
+      'I understand that a completed subcontract is paid even if I reject the result.';
+
+  @override
+  String get hireSubcontractReserveRow => 'Subcontract reserve';
+
+  @override
+  String get hireSubcontractTotal => 'Total';
+
+  @override
+  String get hireSubcontractRefundNote =>
+      'The unspent reserve is refunded to you when the hire ends.';
 }

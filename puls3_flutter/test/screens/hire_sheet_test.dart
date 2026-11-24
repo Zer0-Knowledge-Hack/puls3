@@ -95,6 +95,8 @@ class _ScriptedHire {
   _ScriptedHire(this.id);
 
   final int id;
+  int subcontractReserve = 0;
+  bool allowRelatedParty = true;
   bool createJobSubmitted = false;
   bool fundSubmitted = false;
 }
@@ -105,6 +107,14 @@ class _ScriptedHire {
 class ScriptedHireGateway implements HireGateway {
   final requestIds = <String>[];
   final inputs = <String>[];
+
+  /// The `subcontractReserve` and `allowRelatedParty` of each `createHire`.
+  final reserves = <int>[];
+  final relatedPartyFlags = <bool>[];
+
+  /// What `hireTerms` answers; [failTerms] makes it throw instead.
+  SubcontractTerms terms = SubcontractTerms.none;
+  Object? failTerms;
   final submitted = <String>[];
   var createJobPreparations = 0;
   var fundPreparations = 0;
@@ -186,25 +196,43 @@ class ScriptedHireGateway implements HireGateway {
     required String consumer,
     required String input,
     required String requestId,
+    int subcontractReserve = 0,
+    bool allowRelatedParty = true,
   }) async {
     calls.add('createHire');
     requestIds.add(requestId);
     inputs.add(input);
+    reserves.add(subcontractReserve);
+    relatedPartyFlags.add(allowRelatedParty);
     final failure = failCreate;
     if (failure != null) {
       failCreate = null;
       throw failure;
     }
     final hire = _byRequest.putIfAbsent(requestId, () {
-      final created = _ScriptedHire(_nextHire++);
+      final created = _ScriptedHire(_nextHire++)
+        ..subcontractReserve = subcontractReserve
+        ..allowRelatedParty = allowRelatedParty;
       _byId[created.id] = created;
       return created;
     });
+    // Like the server: the same request id with other terms is refused.
+    if (hire.subcontractReserve != subcontractReserve ||
+        hire.allowRelatedParty != allowRelatedParty) {
+      throw const HireRejected('IdempotencyKeyReused');
+    }
     return HireStart(
       hireId: hire.id,
       // Null once the create_job was submitted, as the server does.
       createJob: hire.createJobSubmitted ? null : _prep('createJob'),
     );
+  }
+
+  @override
+  Future<SubcontractTerms> hireTerms(int agentId) async {
+    final failure = failTerms;
+    if (failure != null) throw failure;
+    return terms;
   }
 
   @override
@@ -996,6 +1024,194 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('collab-progress')), findsNothing);
+    });
+  });
+
+  group('Subcontract reserve on the hire form (#334)', () {
+    const offered = SubcontractTerms(
+      reserveMaxStroops: 20000000,
+      maxChildren: 2,
+      suggestedReserveStroops: 30000000,
+    );
+    const section = ValueKey('hire-subcontract');
+    const reserveField = ValueKey('hire-subcontract-reserve');
+    const consentBox = ValueKey('hire-subcontract-consent');
+    const relatedSwitch = ValueKey('hire-subcontract-related-party');
+
+    Future<ScriptedHireGateway> open(
+      WidgetTester tester, {
+      SubcontractTerms terms = offered,
+      Object? failTerms,
+      WalletPort? wallet,
+      HireFlowStore? store,
+    }) async {
+      final gateway = ScriptedHireGateway()
+        ..terms = terms
+        ..failTerms = failTerms;
+      await pumpSheet(
+        tester,
+        wallet: wallet ?? TestWallet(initialAddress: 'GUSER123'),
+        gateway: gateway,
+        store: store,
+      );
+      await settle(tester);
+      return gateway;
+    }
+
+    Future<void> setReserve(WidgetTester tester, String amount) async {
+      await tester.ensureVisible(find.byKey(reserveField));
+      await tester.enterText(find.byKey(reserveField), amount);
+      await tester.pump();
+    }
+
+    Future<void> tick(WidgetTester tester, ValueKey<String> key) async {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.pump();
+      await tester.tap(find.byKey(key));
+      await tester.pump();
+    }
+
+    String reserveText(WidgetTester tester) =>
+        tester.widget<TextField>(find.byKey(reserveField)).controller!.text;
+
+    testWidgets('is hidden when the agent did not opt in', (tester) async {
+      await open(
+        tester,
+        terms: const SubcontractTerms(
+          reserveMaxStroops: 20000000,
+          maxChildren: 0,
+          suggestedReserveStroops: 0,
+        ),
+      );
+      expect(find.byKey(section), findsNothing);
+    });
+
+    testWidgets('is hidden when the platform ceiling is 0', (tester) async {
+      await open(
+        tester,
+        terms: const SubcontractTerms(
+          reserveMaxStroops: 0,
+          maxChildren: 2,
+          suggestedReserveStroops: 30000000,
+        ),
+      );
+      expect(find.byKey(section), findsNothing);
+    });
+
+    testWidgets('is hidden when the terms fail to load, and the hire still '
+        'goes through without a reserve', (tester) async {
+      final gateway = await open(
+        tester,
+        failTerms: const HireBackendUnavailable('down'),
+      );
+      expect(find.byKey(section), findsNothing);
+
+      await confirm(tester);
+
+      expect(gateway.reserves, [0]);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+
+    testWidgets('is prefilled with the suggested reserve capped by the '
+        'ceiling', (tester) async {
+      await open(tester);
+      expect(find.byKey(section), findsOneWidget);
+      expect(reserveText(tester), '2.00');
+    });
+
+    testWidgets('a reserve above the ceiling is refused', (tester) async {
+      final gateway = await open(tester);
+      await setReserve(tester, '2.5');
+
+      expect(find.text('Enter an amount from 0 to 2.00 USDC.'), findsOneWidget);
+      await tick(tester, consentBox);
+      await confirm(tester);
+      expect(gateway.calls, isEmpty);
+    });
+
+    testWidgets('the consent is required only while there is a reserve', (
+      tester,
+    ) async {
+      final gateway = await open(tester);
+      expect(find.byKey(consentBox), findsOneWidget);
+      await confirm(tester);
+      expect(gateway.calls, isEmpty);
+
+      await setReserve(tester, '0');
+      expect(find.byKey(consentBox), findsNothing);
+      await confirm(tester);
+      expect(gateway.calls, contains('createHire'));
+      expect(gateway.reserves, [0]);
+    });
+
+    testWidgets('the total and the funds check use the price plus the '
+        'reserve, and createHire gets the reserve and the flag', (
+      tester,
+    ) async {
+      final gateway = await open(tester);
+      await setReserve(tester, '1');
+
+      expect(find.byKey(const ValueKey('hire-total')), findsOneWidget);
+      expect(find.text('5.50 USDC'), findsOneWidget);
+      expect(
+        find.text('The unspent reserve is refunded to you when the hire ends.'),
+        findsOneWidget,
+      );
+
+      await tick(tester, relatedSwitch);
+      await tick(tester, consentBox);
+      await confirm(tester);
+
+      expect(gateway.fundsChecks, [45000000 + 10000000]);
+      expect(gateway.reserves, [10000000]);
+      expect(gateway.relatedPartyFlags, [false]);
+    });
+
+    testWidgets('a plain hire shows the same summary and sends no reserve', (
+      tester,
+    ) async {
+      final gateway = await open(tester, terms: SubcontractTerms.none);
+      expect(find.byKey(const ValueKey('hire-total')), findsNothing);
+      expect(find.text('Subcontract reserve'), findsNothing);
+
+      await confirm(tester);
+
+      expect(gateway.fundsChecks, [45000000]);
+      expect(gateway.reserves, [0]);
+      expect(gateway.relatedPartyFlags, [true]);
+    });
+
+    testWidgets('a started hire shows its reserve and flag read-only, and a '
+        'resume reuses them', (tester) async {
+      final store = MemoryHireFlowStore();
+      final wallet = TestWallet(initialAddress: 'GUSER123')
+        ..rejectPayloadOnce = 'AAAA-fund';
+      final gateway = await open(tester, wallet: wallet, store: store);
+      await setReserve(tester, '1');
+      await tick(tester, relatedSwitch);
+      await tick(tester, consentBox);
+      await confirm(tester);
+      expect(find.text('Payment failed'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await pumpSheet(tester, wallet: wallet, gateway: gateway, store: store);
+      await settle(tester);
+
+      expect(reserveText(tester), '1.00');
+      expect(
+        tester.widget<TextField>(find.byKey(reserveField)).readOnly,
+        isTrue,
+      );
+      expect(
+        tester.widget<SwitchListTile>(find.byKey(relatedSwitch)).onChanged,
+        isNull,
+      );
+      await tap(tester, 'Confirm & sign');
+
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+      expect(gateway.requestIds.toSet(), hasLength(1));
+      expect(gateway.reserves, [10000000, 10000000]);
+      expect(gateway.relatedPartyFlags, [false, false]);
     });
   });
 }

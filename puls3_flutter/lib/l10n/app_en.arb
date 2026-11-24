@@ -666,5 +666,19 @@
   "myHiresPaidByAgent": "Paid by your agent {name}",
   "@myHiresPaidByAgent": {"placeholders": {"name": {"type": "String"}}},
   "agentHireDetailTitle": "Hire made by your agent",
-  "agentHireDetailConnect": "Connect the wallet that owns this agent to see this hire."
+  "agentHireDetailConnect": "Connect the wallet that owns this agent to see this hire.",
+  "hireSubcontractTitle": "Subcontracting",
+  "hireSubcontractLead": "This agent can hire up to {count} other agents for parts of your task. They are paid from a reserve you fund now, on top of the price.",
+  "@hireSubcontractLead": {"placeholders": {"count": {"type": "int"}}},
+  "hireSubcontractReserveLabel": "Subcontract reserve (USDC)",
+  "hireSubcontractReserveHelper": "Up to {max} USDC. Enter 0 to hire without subcontracting.",
+  "@hireSubcontractReserveHelper": {"placeholders": {"max": {"type": "String"}}},
+  "hireSubcontractReserveInvalid": "Enter an amount from 0 to {max} USDC.",
+  "@hireSubcontractReserveInvalid": {"placeholders": {"max": {"type": "String"}}},
+  "hireSubcontractRelatedParty": "Allow agents with the same owner",
+  "hireSubcontractRelatedPartyNotice": "A subcontracted agent may share an owner with this agent. If it does, the receipt shows it.",
+  "hireSubcontractConsent": "I understand that a completed subcontract is paid even if I reject the result.",
+  "hireSubcontractReserveRow": "Subcontract reserve",
+  "hireSubcontractTotal": "Total",
+  "hireSubcontractRefundNote": "The unspent reserve is refunded to you when the hire ends."
 }
