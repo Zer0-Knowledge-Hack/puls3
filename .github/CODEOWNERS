@@ -1,3 +1,6 @@
-# Changes to the issue gate itself need an owner review.
+# Owners of the issue gate. This has NO effect today: it only takes effect once
+# "Require review from Code Owners" is enabled on `main` AND a second code owner
+# exists (a PR author cannot approve their own PR).
 /.github/workflows/issue-gate.yml @moises-cisneros
 /.github/scripts/ @moises-cisneros
+/.github/CODEOWNERS @moises-cisneros

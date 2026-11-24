@@ -7,17 +7,18 @@
 const MARKER = '<!-- issue-deliverables-gate -->';
 const RERUN_HINT =
   'Editing an issue does not trigger this check: after ticking criteria, re-run the ' +
-  '`Issue gate / gate` job (Actions tab, "Re-run jobs") or edit the PR description.';
+  '`Issue gate / issue-gate` job (Actions tab, "Re-run jobs") or edit the PR description.';
 
 const OPT_OUT_LABEL = 'no-issue';
-const CLOSING = '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)';
-// An optional `owner/repo` prefix is captured: GitHub closes `owner/repo#N` too.
+// Which issues a PR closes is NOT parsed from the body: the workflow reads GitHub's own
+// `closingIssuesReferences` (keyword forms, URL forms and Development-sidebar links) and
+// passes it to evaluate() as `closing`. Only `Refs` is read from the body.
+// An optional `owner/repo` prefix is captured.
 const ISSUE_REF = '([\\w.-]+/[\\w.-]+)?#(\\d+)\\b';
-const CLOSES_RE = new RegExp(`(?<![\\w-])${CLOSING}:?\\s+${ISSUE_REF}`, 'gi');
 const REFS_RE = new RegExp(`(?<![\\w-])(?:refs?|related to|part of):?\\s+${ISSUE_REF}`, 'gi');
 
 // Paths that never need an issue on their own.
-const DOCS_RE = /(^|\/)(LICENSE|CODEOWNERS)$|\.(md|mdx|png|jpe?g|gif|svg)$|^docs\/|^\.github\/(ISSUE_TEMPLATE|pull_request_template\.md)/i;
+const DOCS_RE = /(^|\/)(LICENSE|CODEOWNERS)$|\.(md|mdx|png|jpe?g|gif|svg)$|^docs\/|^\.github\/(ISSUE_TEMPLATE\/|pull_request_template\.md$)/i;
 
 function stripNoise(text) {
   return String(text || '')
@@ -45,15 +46,23 @@ function unique(list) {
   return [...new Set(list)];
 }
 
-// A number that is both closed and referenced counts as closed.
-// `repo` is "owner/name" of the PR's repository; `foreign` lists closing
-// references to other repositories, which the gate cannot verify.
+// Reads the `Refs` references of this repo from the PR body. `repo` is "owner/name".
 function parseReferences(body, repo) {
   const text = stripNoise(body);
-  const c = collect(CLOSES_RE, text, repo);
-  const closes = unique(c.local);
-  const refs = unique(collect(REFS_RE, text, repo).local).filter((n) => !closes.includes(n));
-  return { closes, refs, foreign: unique(c.foreign) };
+  return { refs: unique(collect(REFS_RE, text, repo).local) };
+}
+
+// Splits GitHub's closing-issue list ([{ number, repo: "owner/name" }]) into this
+// repo's issue numbers and foreign references ("owner/name#N"), which the gate
+// cannot verify. An entry without a known repo on either side counts as foreign.
+function splitClosing(closing, repo) {
+  const closes = [];
+  const foreign = [];
+  for (const c of closing || []) {
+    if (c.repo && repo && c.repo.toLowerCase() === repo.toLowerCase()) closes.push(Number(c.number));
+    else foreign.push(`${c.repo || '?'}#${c.number}`);
+  }
+  return { closes: unique(closes), foreign: unique(foreign) };
 }
 
 // Returns the checkbox items under the heading named `heading`, or null when
@@ -67,8 +76,26 @@ function parseChecklist(issueBody, heading) {
   let level = 0;
   let found = false;
   let fence = null;
+  let inComment = false;
   const items = [];
-  for (const line of lines) {
+  for (const raw of lines) {
+    let line = raw;
+    // HTML comments (single or multi-line) are invisible when rendered: skip them.
+    // Fenced code is checked first so a literal `<!--` inside a fence is left alone.
+    if (!fence) {
+      if (inComment) {
+        const end = line.indexOf('-->');
+        if (end === -1) continue;
+        inComment = false;
+        line = line.slice(end + 3);
+      }
+      line = line.replace(/<!--.*?-->/g, '');
+      const open = line.indexOf('<!--');
+      if (open !== -1) {
+        inComment = true;
+        line = line.slice(0, open);
+      }
+    }
     const f = /^\s*(`{3,}|~{3,})/.exec(line);
     if (fence) {
       if (f && f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
@@ -114,11 +141,12 @@ function bullets(items) {
   return items.map((i) => `- [ ] ${i.text}`).join('\n');
 }
 
-// input: { body, labels: string[], author, files: string[],
+// input: { body, repo, labels: string[], author, files: string[],
+//          closing: [{ number, repo }]   (GitHub's closingIssuesReferences),
 //          issues: { [number]: string | null } }  (null = not found / not an issue)
 // output: { status: 'pass' | 'fail', failures: string[], notices: string[],
 //           comment: string | null }
-function evaluate({ body, repo, labels = [], author = '', files = [], issues = {} }) {
+function evaluate({ body, repo, labels = [], author = '', files = [], issues = {}, closing = [] }) {
   const out = { status: 'pass', failures: [], notices: [], comment: null };
   if (/^dependabot(\[bot\])?$/i.test(author)) {
     out.notices.push('Skipped: Dependabot pull request.');
@@ -129,7 +157,8 @@ function evaluate({ body, repo, labels = [], author = '', files = [], issues = {
     return out;
   }
 
-  const { closes, refs, foreign } = parseReferences(body, repo);
+  const { closes, foreign } = splitClosing(closing, repo);
+  const refs = parseReferences(body, repo).refs.filter((n) => !closes.includes(n));
 
   for (const f of foreign) {
     out.failures.push(
