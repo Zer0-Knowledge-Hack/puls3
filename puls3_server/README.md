@@ -171,7 +171,8 @@ as `tools_unsupported`, so subcontracting is Anthropic-only.
 
 Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
-`running`, `failed`), with the `result` and `failureReason`.
+`running`, `failed`; a run in `awaitingChild` shows `running`), with the
+`result` and `failureReason`.
 
 A successful run stores the result and, when agent-wallet custody is
 configured, the runtime signs escrow `submit` with the custodied provider
@@ -205,11 +206,37 @@ It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 (warnings).
 
+### Run phases (#334, T5.3)
+
+With a `SubcontractSetup` (search, `SubcontractPort`, `ChildResultSource`
+and a `RunnerLease`), `HireRunner` runs an opted-in Anthropic manifest
+through `ToolLoop`. A run that opens a child moves `running` →
+`awaitingChild`: the loop state is stored in `hire_run` (`loopState`, versioned
+JSON from `tool_loop_codec.dart`: the transcript with each turn's opaque
+`providerContent`, turns and children used, the remaining reserve and the
+search snapshots; plus `pendingToolCallId`, `childHireId` and `childRequest`
+with the justification, D10 verdict and ranking), the model call has ended,
+and nothing holds the timeout. Each pass first asks `ChildResultSource` about
+every paused run; once the child delivered or failed, the run goes back to
+`running` and the loop continues with that result. An awaiting run is never
+swept as `interrupted`, shows `runtimeStatus` `running`, and its hire stays
+`funded` (ADR-0011 D7). A retryable provider failure mid-loop stores the
+conversation and the next attempt continues it, so no finished turn is
+repeated and no child is opened twice. Studio (`OwnedRunManifest`) runs hold
+the conversation on the builder's credential (`runnerLease`). The stored
+state is bounded by the loop's input cap (`input.max_chars` plus 32,000
+characters of headroom) plus provider content: tens of kilobytes.
+
+**Not wired in production yet.** There is no real `SubcontractPort` or
+`ChildResultSource` until T6, so `startAgentRuntime` passes no setup: no run is
+offered the tools, an opted-in manifest runs as one plain segment, and no run
+pauses. Tests inject fakes.
+
 ### Hire configuration
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `172800`. |
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `259200`: a hire that subcontracts needs two approval windows plus the escrow's 600 s `CHILD_EXPIRY_MARGIN`, because a child job must expire one window plus 600 s before the parent's and still leave the child a full window to submit, so `172800` leaves no room for a child. |
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
@@ -261,7 +288,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
+PULS3_HIRE_JOB_DURATION_SECONDS=259200 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
@@ -298,7 +325,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
+PULS3_HIRE_JOB_DURATION_SECONDS=259200 \
 PULS3_E2E_SERVERPOD_MODE=development \
 dart run tool/e2e_submit_testnet.dart
 ```
@@ -692,7 +719,7 @@ per project.
    scloud variable set PULS3_INDEXER_ENABLED true
    scloud variable set PULS3_RUNTIME_ENABLED true
    scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
-   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 172800
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 259200
    scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
    scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
    scloud variable set PULS3_PLATFORM_FEE_BPS 0

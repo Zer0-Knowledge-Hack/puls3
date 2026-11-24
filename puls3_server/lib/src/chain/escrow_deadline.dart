@@ -1,5 +1,24 @@
+import 'package:puls3_domain/puls3_domain.dart' show StellarAddress;
+
+import '../ledger/contract_reader.dart';
 import '../ledger/escrow_job.dart';
+import '../ledger/sc_val_json.dart';
 import 'submission_values.dart';
+
+/// The escrow's `approval_window` in seconds: how long a consumer has to
+/// approve a submitted job before `release` (ADR-0005). The contract owns the
+/// value and `set_approval_window` can change it, so the server reads it
+/// instead of configuring a copy.
+typedef EscrowApprovalWindow = Future<int> Function();
+
+/// [EscrowApprovalWindow] read from the escrow at [escrow] with one
+/// `approval_window` simulation. Throws a `LedgerException` when the read
+/// fails, and [FormatException] for a value that is not a `u64`.
+EscrowApprovalWindow contractApprovalWindow(
+  ContractReader reader, {
+  required StellarAddress escrow,
+}) =>
+    () async => readU64(await reader.read(escrow, 'approval_window', const []));
 
 /// How many failed envelopes of one server call a hire may accumulate
 /// before the deadline pass stops building another.

@@ -113,7 +113,7 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   approved and acknowledged, lineage `review-4bcab53db6eb5cf2`). Advisory, non-blocking follow-ups:
   ancestor wallets read from the catalog (`agent_search_service.dart:71-77`, warning), untested
   chain cap, non-ASCII query matching, and untested wiring.
-- [ ] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
+- [x] **T5** Runtime tool loop (Workers AI and Anthropic tool calling, bounded turns) with
   `search_agents` and `subcontract` tools, plus run phases (run → waiting for a child → resume).
   Route: delegated writer, one work unit and one stacked PR each (user approved 2026-11-18).
   Defaults: 8 turns max per hire; `max_children` with a platform cap of 2, both config with
@@ -162,10 +162,72 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     id runs no call and gets exactly one `duplicate_call_id` result. Fix reviewed (consent medium,
     granted, reliability lens, approved and acknowledged, lineage `review-dafe0e08a5ee9316`);
     server unit+hire 1158 passed, runtime 195 passed.
-  - [ ] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
+  - [x] **T5.3** Run phases `running` → `awaitingChild` → `running`: transcript, child hire id and
     turns persisted (migration), and `HireRunner` resumes paused runs.
+    Evidence: RED (three new test files failed to load) then GREEN; server unit+hire 1183
+    passed, runtime 219, integration 193, analyze clean on server and client, a second
+    `serverpod generate` changed nothing. Source `171ae66`, generated + migration
+    `20261119030418895-hire-run-phases` in `d4e9ef8` (four nullable `hire_run` columns).
+    `awaitingChild` maps to runtime status `running`, so the hire stays `funded` (D7). The
+    `tool_loop_codec` is version 1; an unreadable state fails as `loop_state_unreadable`. A
+    retryable mid-loop failure continues from the stored state via `ToolLoop.continueFrom`.
+    Studio runs reach the loop through `runnerLease` / `withBuilderRunner`. Production wires
+    `subcontracting: null`, so no tools are offered until T6. T6 must implement `SubcontractPort`,
+    `ChildResultSource`, wire `SubcontractSetup`, raise `staleAfter` and `TrackerLoop.passTimeout`
+    for multi-segment runs, and reconcile half-opened children after `internal_error`.
+    Review of `171ae66` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-cc09f7096e96ab6f`) raised two warnings, fixed in `67ed0ee`: `markResumed`
+    now stores the loop state with the child's tool result in the same conditional write, so a
+    lease failure before the first segment cannot lose a paid child's result; and
+    `listAwaitingChild` returns damaged rows as `DamagedAwaitingRun`, which the runner fails as
+    `loop_state_unreadable` or `not_runnable`, so they cannot starve the batch. Fix reviewed
+    (lineage `review-96d9662ed6bd2465`, approved and acknowledged); its warning that
+    `_failDamaged` skips hire settlement does not hold, because `_fail` does not settle either
+    (`hire_runner.dart:552-570`); releasing an already-opened child stays a T6 item. Server
+    unit+hire 1191 passed, runtime 227, integration 194.
 - [ ] **T6** Subcontract executor: runtime → child job from the reserve, A evaluates B, A's run
-  resumes with B's result, receipt stored. Route: delegated writer.
+  resumes with B's result, receipt stored. Route: delegated writer, one work unit and one
+  stacked PR each (user approved 2026-11-19; the chain is now 15 slices).
+  Defaults: the verdict is a server rule (D3): reject when B's run failed, its output is empty or
+  over the output limit, otherwise complete; the reason hash is sha256 of the reason code. An
+  undecided child is released by the existing deadline relay. Child `expired_at =
+  min(now + job duration, parent.expired_at − approval_window − 600)`; `subcontract` refuses with
+  `parent_too_short` before opening a child that could not submit in time. The child reserve is 0
+  (depth 1, D5). The example job duration becomes 259200 s: with the testnet 24 h
+  `approval_window`, a parent needs two windows plus the 600 s margin, so 172800 leaves no room for
+  a child (`set_approval_window` can shorten the window later; that is a deploy choice for T8).
+  - [x] **T6.1** Real `SubcontractPort`: child hire + receipt line, A-signed `create_child_job`,
+    contract refusals as tool errors, idempotent per tool call.
+    Evidence: RED (port test failed to load) then GREEN; server unit+hire 1217 passed,
+    integration 199 (receipt store on Postgres), analyze clean. Source `16c1297`.
+    `EscrowSubcontractPort` checks the chain job, drafts and signs with A before any write, then
+    one transaction stores the child hire (`requestId = child:<parentHireId>:<toolCallId>`), the
+    receipt line and the submitted `createChildJob` record; the envelope is sent after it. The
+    approval window is read live from the contract (`contractApprovalWindow`).
+    `childRunHeadroom = 30 min`; `parent_too_short` when `childExpiry <= now + window + headroom`.
+    A node refusal marks the line `not_opened`; an unreachable node leaves it `pending`.
+    Open items: T6.2 confirms the job and moves the line from `pending`; T6.4 builds
+    `ChildAgentLookup`, wires `contractApprovalWindow`, and must serialize A's account sequence
+    with other submits (`txBadSeq` today ends as `chain_refused`). `tool_loop_codec` does not
+    store `ChildRequest.toolCallId`, which only matters if a restored request is re-sent.
+    Review of `16c1297` (consent medium, granted, reliability lens, approved and acknowledged,
+    lineage `review-d42625275e3c0841`) raised three warnings. Two are fixed in `f3f7df6`: the
+    stored-child lookup now runs first and reads only the database (`listByParent` plus the
+    child's `requestId`), so a retry after a chain failure or a parent state change returns the
+    stored child instead of risking a duplicate; and an integration test against the Serverpod
+    stores proves the child hire, receipt line and submission roll back together (it fails when
+    `insertHire` leaves the transaction). The reserve race does not hold: a hire has one run
+    (`hire_run` unique on `hireId`, conditional writes), the loop refuses a second `subcontract`
+    in a turn, and the contract checks the reserve. Fix reviewed (lineage
+    `review-bfbfb6031598701e`, approved and acknowledged); its warning that a child hire without
+    a receipt line rethrows a raw `HireRequestConflict` is a T6.4 item (map it to
+    `SubcontractRefused`). Server unit+hire 1221 passed, integration 201.
+  - [ ] **T6.2** Track `createChildJob`: bind the child job, record the payment (payer A, payee B)
+    so B's run is enqueued, update the receipt line.
+  - [ ] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
+    settlement fields, and no parent `submit` while children are open.
+  - [ ] **T6.4** Production wiring of `SubcontractSetup`, `staleAfter` and `passTimeout` for
+    multi-segment runs, and reconciliation of half-opened children and children of failed runs.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A

@@ -543,7 +543,42 @@ final class _RacingStore implements HireRunStore {
     String reason, {
     required DateTime notBefore,
     required DateTime at,
-  }) => inner.markRetry(hireId, reason, notBefore: notBefore, at: at);
+    String? loopState,
+  }) => inner.markRetry(
+    hireId,
+    reason,
+    notBefore: notBefore,
+    at: at,
+    loopState: loopState,
+  );
+
+  @override
+  Future<List<AwaitingChildEntry>> listAwaitingChild({int limit = 10}) =>
+      inner.listAwaitingChild(limit: limit);
+
+  @override
+  Future<bool> markAwaitingChild(
+    int hireId, {
+    required String loopState,
+    required String pendingToolCallId,
+    required int childHireId,
+    required String childRequest,
+    required DateTime at,
+  }) => inner.markAwaitingChild(
+    hireId,
+    loopState: loopState,
+    pendingToolCallId: pendingToolCallId,
+    childHireId: childHireId,
+    childRequest: childRequest,
+    at: at,
+  );
+
+  @override
+  Future<bool> markResumed(
+    int hireId,
+    DateTime at, {
+    required String loopState,
+  }) => inner.markResumed(hireId, at, loopState: loopState);
 
   @override
   Future<bool> markSucceeded(int hireId, String result, DateTime at) =>
