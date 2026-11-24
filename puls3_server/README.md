@@ -287,8 +287,13 @@ It is on only where the submit wiring is on (custodied keys) and
 `PULS3_HIRE_JOB_DURATION_SECONDS` is set; the log line says
 `subcontracting on` or `subcontracting off`. A hire carries a reserve only
 with `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, and a run is offered the tools
-only when its manifest opted in. `staleAfter` is `timeout * 8 + 1 min` and the
-pass timeout `2 * batch * 8 * timeout + 1 min` (`runtimeTimings`).
+only when its manifest opted in (`subcontractEnabled`). With subcontracting on,
+`staleAfter` is `timeout * 8 + 1 min` and the pass timeout
+`2 * batch * 8 * timeout + 1 min`; with it off a run is one model call, so they
+stay `timeout + 1 min` and `2 * batch * timeout + 1 min`
+(`agentRuntimeTimings`). With it off, runs still `awaitingChild` from an
+earlier deployment are counted in a startup log line and wait for their escrow
+to expire.
 
 ### Hire configuration
 

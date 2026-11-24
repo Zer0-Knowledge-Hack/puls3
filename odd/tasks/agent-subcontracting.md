@@ -502,3 +502,10 @@ StellarExpert.
 
   Next: T6.4.5 production wiring. It should also wire `UnverifiedChildReconciler.reconcile` into
   the runtime pass.
+- 2026-11-24: T6.4.5 shipped as #407 (moises-cisneros, `59a1ba2`). TOMOKI977's review asked for
+  one-call timings with subcontracting off (a hung pass could hold the queue for over 5 h) and
+  tests for the fail-closed gate and the tracker's child effects. moises fixed both in `c125bba`
+  (`subcontractEnabled`/`subcontractOffReason`, `agentRuntimeTimings`, `hireEscrowEffects`, a
+  startup count of runs left `awaitingChild`, search on the injected `env`). A parallel local fix
+  of the same review was dropped in favour of it (kept as `backup/407-our-fix`). README updated to
+  the new timings. Next: T7.
