@@ -476,6 +476,28 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     Hire detail receipt tree: one row per line with provider, related-party badge,
     budget, fee, payout, state, justification and explorer links, on the consumer's and the
     agent-hire detail. Depends on T7.1.
+- [x] **T8.0** (done 2026-11-24: `6d10d5d` runtime, policies, docs, ADR; `d7f12cb` Studio.
+  RED: the converse test failed to load (`workersAiToolModels` missing), the per-model gate test
+  failed, the Studio tests failed on `supportsTools` and the new copy, and the policy test failed on
+  Mistral. GREEN: server unit 1683 passed (5 e2e skipped), Flutter 586 passed, CLI 112 passed;
+  `dart analyze` and `flutter analyze --fatal-infos` clean. Live check of the real
+  `WorkersAiRuntime` with `subcontractToolSpecs` against Cloudflare: 3/3 searched, subcontracted
+  once and answered with the result. Assessed medium, `under_budget`, so no native review yet.
+  Risk: none (a model is added to the allow-lists; the Anthropic and llama paths are pinned by
+  tests).) Subcontracting on the Workers AI free tier (user, 2026-11-24: "no tenemos fondos
+  para contratar alguna api key de cualquier AI, por eso estamos probando o bueno queremos probar
+  todo con workers ai, usando su capa gratuita"; scope approved: "Dale, sigamos con ese alcance").
+  Route: inline (one understood change, no writer reason). Branch `feat/334-t8-workers-ai-tools`.
+  1. `WorkersAiRuntime.converse` with tools, or replaying tool calls/results, uses the
+     OpenAI-compatible `/ai/v1/chat/completions` endpoint (call ids, `role: "tool"` results) for the
+     models in `workersAiToolModels`; any other Workers AI model still fails as `tools_unsupported`
+     with no call. Plain `complete()` and tool-free conversations are unchanged.
+  2. The tool loop offers tools per model, not per provider: Anthropic, or a Workers AI model in
+     `workersAiToolModels`.
+  3. `@cf/mistralai/mistral-small-3.1-24b-instruct` joins the allowed models (server, app, CLI); the
+     Studio enables the subcontract opt-in only for a model that calls tools.
+  4. ADR-0011 D8 amended: Anthropic or a verified Workers AI tool model.
+  Evidence for the model choice: the spike of 2026-11-24 (Progress).
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
   `docs/verification/334-agent-subcontracting.md`.
@@ -558,3 +580,26 @@ StellarExpert.
   receipt (`feat/334-t7-receipt`). Order is T7.2 first because T7.2 and T7.3 append to the same ARB
   files. Each slice is above 400 lines (tests are about half) and asks for `size:exception`. CI
   runs only on #411 until each base merges. Next: reviews, then T8.
+- 2026-11-24: T7 merged: #412-#414 into #411, then #411 into `main` as `c2350d6` (user: "Si, baja
+  ambas reglas por un momento"; review rules restored in the same command).
+- 2026-11-24: T8 plan. User: "no directo a produccion, sino que debemos de hacer primero todo en
+  local, una vez tengamos evidencia de que si funciona, ya recien podemos mandar todo a
+  produccion". Findings: the web signs only on Testnet (`FreighterWallet.connect`), so the local
+  run is the server and web on this machine against testnet with a new v0.2.0 escrow; production
+  keeps its escrow until the user approves. User: "Mejor levanta todo en local, yo mismo hare las
+  pruebas, ya que no se usara ninguna api de antrophic, sino todo sera con workers ai", and "no
+  tenemos fondos para contratar alguna api key de cualquier AI". Subcontracting was Anthropic-only
+  (D8, T5.1), so this adds T8.0.
+- 2026-11-24: Workers AI tool-calling spike (scratch script, platform token and account from
+  `passwords.yaml` `test`, never printed), with stub `search_agents`/`subcontract` tools:
+  `/ai/v1/chat/completions` returns `tool_calls` with ids and accepts `role: "tool"` with
+  `tool_call_id`. `@cf/mistralai/mistral-small-3.1-24b-instruct` 10/10 (search, one subcontract to
+  the right agent, clean final) and 5/5 not subcontracting a task within its own skill, ~4 s per run.
+  `llama-3.3-70b` 1/3 (malformed first call, subcontracts twice, `$\boxed{}$` output); `glm-4.7-flash`
+  ignores tools; `llama-4-scout` prints calls as text; `granite-4.0-h-micro` fakes results;
+  `hermes-2-pro-mistral-7b` and `qwen3-30b-a3b-fp8` are deprecated (HTTP 410). The native `/ai/run`
+  `tool_calls` have no id, which is why T5.1 refused tools.
+- 2026-11-24: T8.0 done on `feat/334-t8-workers-ai-tools` (`6d10d5d`, `d7f12cb`), not pushed.
+  Next: T8 local run: Docker sandbox for Postgres, a v0.2.0 escrow on testnet, the server and web on
+  this machine against it, agent A on Mistral (opt-in) and B on llama or Mistral, then the user's
+  own hire with Varial (Freighter). Production stays on its escrow until the user approves.
