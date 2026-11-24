@@ -439,7 +439,30 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       not run: Docker needs `puls3_server/.env`, which this agent may not read. Commit: see git log.
       Risk: item 5.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
-  tree on hire detail. Route: delegated writer.
+  tree on hire detail. Route: delegated writer. Branch `feat/334-web-subcontract` from `main`
+  `6708683`. Mapped 2026-11-24 by a read-only explorer: `createHire` already takes
+  `subcontractReserve` and `allowRelatedParty`; no endpoint exposes the reserve ceiling, the
+  manifest opt-in, or the receipt lines (`HireReceiptLineRecord` is `serverOnly`); the Studio form
+  drops `subcontract` on edit (`studio_form_check.dart:157-180`).
+  - [ ] **T7.1** Server read API. A new `HireEndpoint.getHireTerms(agentId)` (reserve ceiling from
+    `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, 0 when unset, plus the agent's `max_children` and
+    `suggested_reserve` from its manifest, 0 without the opt-in), and `HireDetail.receipt`: the
+    parent's receipt lines (`listByParent`) as a public `HireReceiptLine`, readable only by the
+    parent hire's consumer, also on `StudioEndpoint.getAgentHire`. Regenerated client, `api.md`.
+    Route: delegated writer, parallel with T7.2 (trigger: two independent units, disjoint
+    surfaces, each several files and 200+ lines). Risk: none expected (adds an endpoint and
+    optional fields).
+  - [ ] **T7.2** Studio form opt-in: `max_children` and `suggested_reserve` in Advanced, mapped
+    both ways so an edit keeps the opt-in, and `subcontractMalformed`/`subcontractInvalid` shown
+    on the new field. Route: delegated writer, parallel with T7.1. Risk: none expected.
+  - [ ] **T7.3** Hire form: a subcontract section only when the agent opted in and the ceiling is
+    above 0, prefilled with `suggested_reserve`, capped by the ceiling, a related-party switch
+    (default allowed, with notice), the "a completed subcontract is paid even if you reject the
+    result" consent, and price plus reserve in the total and the funds check. The reserve and the
+    flag are stored with the pending hire so a resume reuses them. Depends on T7.1.
+  - [ ] **T7.4** Hire detail receipt tree: one row per line with provider, related-party badge,
+    budget, fee, payout, state, justification and explorer links, on the consumer's and the
+    agent-hire detail. Depends on T7.1.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
   `docs/verification/334-agent-subcontracting.md`.
@@ -509,3 +532,8 @@ StellarExpert.
   startup count of runs left `awaitingChild`, search on the injected `env`). A parallel local fix
   of the same review was dropped in favour of it (kept as `backup/407-our-fix`). README updated to
   the new timings. Next: T7.
+- 2026-11-24: user: "Si, ahora si, podemos arrancar" (T7). T7 split into T7.1-T7.4 after a
+  read-only map. Choices made without a product question: the hire form shows the subcontract
+  section only for agents that opted in and only where the ceiling is above 0; the ceiling and the
+  opt-in come from a new pre-hire read (`getHireTerms`) instead of new `AgentSummary` fields, so
+  the catalog does not read manifests. T7.1 and T7.2 start in parallel.
