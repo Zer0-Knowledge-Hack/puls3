@@ -1,6 +1,8 @@
 # ADR-0007: Developer SDK (`puls3_sdk`)
 
 - **Status:** Accepted. The catalog part is implemented (#229). The session is option A′, decided on #222 and implemented in [#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259) ([D5](#d5-wallet-sessions-for-programs-a)).
+- **Status note:** D1 is amended by [ADR-0010](0010-npm-sdk-signs-with-a-developer-key.md) (#314) for the npm SDK. The decision text below is unchanged; D1 carries a note.
+- **Amended by:** [ADR-0010](0010-npm-sdk-signs-with-a-developer-key.md)
 - **Date:** 2026-11-05
 - **Issue:** #222 (week 2 of the developer platform)
 - **Clients of this package:** the `puls3` CLI (#224), the MCP server (#226)
@@ -21,6 +23,8 @@ The server endpoints already exist. This ADR decides the shape of the library ov
 - It does not import Flutter, `puls3_server` or `puls3_domain`.
 - **It never signs or submits a transaction.** Each `prepare*` call returns the server's unsigned envelope (`PreparedTransaction`). Signing stays in the wallet: the app today, and anything later only by a new decision.
 - A TypeScript SDK is out of this milestone.
+
+> **Amended by [ADR-0010](0010-npm-sdk-signs-with-a-developer-key.md) D1 to D4 (#314, SOW week 3):** the npm SDK (#302) is the primary SDK and signs, with a key the developer supplies and that never leaves the process, the wallet-signed envelopes the server prepares (login, deploy, a hire the developer pays, feedback), after checking each one locally. `puls3_sdk` (Dart) keeps this decision and does not sign. Agent custody is unchanged.
 
 ### D2. Public operations
 
