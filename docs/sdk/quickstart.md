@@ -58,9 +58,10 @@ dependency_overrides:
 ```
 
 A relative path such as `../puls3_sdk` only works inside the repository's
-workspace. Keep the checkout intact: `puls3_sdk` depends on its sibling
-`puls3_client`, and the override above keeps that resolution on the checkout even
-after `puls3_sdk` moves to a hosted `puls3_client` version.
+workspace. Since [#388](https://github.com/Zer0-Knowledge-Hack/puls3/pull/388),
+`puls3_sdk` depends on `puls3_client: ^0.1.0` from pub.dev instead of the sibling
+path, and that version is not published yet, so the `dependency_overrides` block
+keeps both packages on the checkout. Remove it once #300 publishes them.
 
 ```bash
 dart pub get
@@ -198,7 +199,7 @@ the session wallet and need a [CLI session](sessions.md).
 | Call | Returns | Server endpoint |
 |---|---|---|
 | `createHire(agentId, consumer, input, requestId)` | `CreateHireResult`: the hire plus the unsigned `create_job` envelope | `HireEndpoint.createHire` |
-| `prepareCreateJob(hireId)` | an unsigned `PreparedTransaction` for `create_job` | `HireEndpoint.prepareCreateJob` |
+| `prepareCreateJob(hireId)` | re-prepares the unsigned `create_job` when the first envelope expired or was lost | `HireEndpoint.prepareCreateJob` |
 | `prepareFund(hireId)` | an unsigned `PreparedTransaction` for `fund` | `HireEndpoint.prepareFund` |
 | `getHire(hireId, consumer)` | `HireDetail` with the hire, its agent, the result and the payment | `HireEndpoint.getHire` |
 | `prepareComplete(hireId)` | an unsigned `PreparedTransaction` for the evaluator's `complete` | `HireEndpoint.prepareComplete` |
@@ -252,19 +253,27 @@ SDK:
 ```dart
 final consumer = Platform.environment['PULS3_CONSUMER']!;
 const agentId = 7; // a registry id from `sdk.listAgents()`
+
+// 1. Start the hire. `createHire` returns the unsigned `create_job` with it.
 final started = await sdk.createHire(
   agentId,
   consumer,
   'Summarize this transaction.',
   'quickstart-${DateTime.now().millisecondsSinceEpoch}',
 );
-final createJob = await sdk.prepareCreateJob(started.hire.id);
+final createJob = started.preparedCreateJob;
+// Sign and submit `createJob` from the wallet, and wait until it is confirmed.
+
+// 2. The hire is `open` from then on, so the server can prepare `fund`.
 final fund = await sdk.prepareFund(started.hire.id);
+// Sign and submit `fund` the same way.
 ```
 
 `requestId` is the server's idempotency key: reuse it with the same agent and
-input to retry safely, but do not reuse it for a different hire. Sign and
-submit `createJob`, then `fund`, from the wallet before the agent runs.
+input to retry safely, but do not reuse it for a different hire. Because
+`createHire` already returns `create_job`, call `prepareCreateJob` only when that
+envelope expired or was lost. `prepareFund` answers `InvalidHireTransition`
+until `create_job` is on chain, so submit the two envelopes in that order.
 
 The Studio calls work the same way: `testRun(draftId, input)` runs a saved draft
 once, and `hireAgentAs(...)` lets one of the session wallet's live agents hire
