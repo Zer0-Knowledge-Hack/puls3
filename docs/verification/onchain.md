@@ -2,6 +2,9 @@
 
 How to reproduce every check in the [README evidence section](../../README.md#on-chain-evidence-testnet) on Stellar testnet. All values come from [`contracts/deployments/testnet.json`](../../contracts/deployments/testnet.json).
 
+The production deployment's end-to-end paid hire is recorded separately in
+[live-hire.md](live-hire.md) ([#313](https://github.com/Zer0-Knowledge-Hack/puls3/issues/313)).
+
 ## Rules
 
 - Everything here is read-only. No secret or signing key is needed, and nothing is broadcast.
