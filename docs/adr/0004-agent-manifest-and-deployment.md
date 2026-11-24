@@ -59,3 +59,12 @@ Made while implementing the domain model. It adds to the decisions above and cha
 7. **Integers on the web.** dart2js cannot tell `3.0` from `3`, so the wire reader and the canonical form accept integral numbers (within 2^53-1) as integers and reject all other numbers.
 
 The manifest design follows [bnb-chain/bnbagent-sdk](https://github.com/bnb-chain/bnbagent-sdk) (declarative config, no secrets in it), adapted to Stellar and keeping ERC-8004 identity and ERC-8183 jobs ([ADR-0005](0005-align-agent-commerce-with-erc-8183-and-erc-8004.md)).
+
+## Amendment (#318): free models on the platform Workers AI account
+
+Made for the SOW testing phase. It changes amendment items 1–3 for the free `workers-ai` provider only.
+
+1. **Free models run on the platform account.** A manifest whose provider is `workers-ai` uses the server's team `workersAiApiToken` and `PULS3_WORKERS_AI_ACCOUNT_ID` for both test runs and paid hires. A builder needs no Cloudflare account, token or account id for the free model, and the Studio hides those fields. A `workers-ai` credential saved by an older client is accepted but ignored.
+2. **Paid providers keep BYOK.** A paid provider (for example Anthropic) still runs on the builder's own key. Its key field stays under **Advanced**, and a missing or invalid key still fails the test run or paid hire.
+3. **Demo agents are unchanged.** They already used the team account; now every free-model agent does, not only the seeded demos.
+4. **Cost exposure is bounded.** The existing 20 test runs per wallet per UTC day still applies, and a paid agent has a cap of 10 paid test runs per UTC day. Free-model hires also run on the platform account, so each agent is limited to 10 team-account hire runs per UTC day; a run above the cap fails with `team_run_quota_exceeded` and the hire stays funded, so the consumer can reject it for a refund. Paid-provider hires use the builder's key and are not counted. The hire cap applies to every `workers-ai` agent, including the seeded demo agents, which are published with the free provider. A run that fails after reserving its slot still counts, and the caps and counts are in-memory per server process, like the existing quota: a restart clears them and several processes each allow 10.

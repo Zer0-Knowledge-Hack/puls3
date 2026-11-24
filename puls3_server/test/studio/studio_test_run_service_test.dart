@@ -26,7 +26,9 @@ void main() {
   })
   harness({
     StudioTestRunner? run,
-    MemoryTestRunQuota? quota,
+    StudioTeamTestRunner? runTeam,
+    TestRunQuota? quota,
+    PaidRunQuota? paidQuota,
     MemoryBuilderCredentialStore? credentials,
   }) {
     final store = MemoryStudioDraftStore();
@@ -38,13 +40,19 @@ void main() {
         now: () => DateTime.utc(2026, 10, 14, 15),
       ),
       quota: quota ?? MemoryTestRunQuota(),
+      paidQuota: paidQuota,
       credentials: credentials ?? MemoryBuilderCredentialStore(),
       policy: studioServerModelPolicy,
       now: () => DateTime.utc(2026, 10, 14, 15),
+      runTeam:
+          runTeam ??
+          (task) async {
+            tasks.add(task);
+            return 'five bullets';
+          },
       run:
           run ??
           (task, credential) async {
-            tasks.add(task);
             secrets.add(credential.secret);
             return 'five bullets';
           },
@@ -52,7 +60,7 @@ void main() {
     return (runs: runs, tasks: tasks, secrets: secrets, drafts: store);
   }
 
-  Map<String, Object?> document() => {
+  Map<String, Object?> document({String provider = 'workers-ai'}) => {
     'name': 'Brief Bot',
     'description':
         'Summarizes long text into a short brief with the key points.',
@@ -65,8 +73,10 @@ void main() {
       },
     ],
     'model': {
-      'provider': 'workers-ai',
-      'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      'provider': provider,
+      'id': provider == 'workers-ai'
+          ? '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+          : 'claude-haiku-5-5',
     },
     'system_prompt': prompt,
     'input': {'type': 'text', 'max_chars': 100},
@@ -74,26 +84,32 @@ void main() {
     'price': {'asset': 'USDC', 'amount': 1000000},
   };
 
-  Future<int> save(MemoryStudioDraftStore drafts) async {
+  Future<int> save(
+    MemoryStudioDraftStore drafts, {
+    String provider = 'workers-ai',
+  }) async {
     final saved = await StudioDraftService(drafts).save(
       owner: wallet(owner),
-      document: document(),
+      document: document(provider: provider),
     );
     return saved.draftId;
   }
 
-  Future<void> storeCredential(StudioTestRunService runs) =>
-      runs.saveCredential(
-        owner: wallet(owner),
-        credential: const BuilderProviderCredential(
-          provider: 'workers-ai',
-          secret: builderToken,
-          accountId: 'builder-account',
-        ),
-      );
+  Future<void> storeCredential(
+    StudioTestRunService runs, {
+    String provider = 'workers-ai',
+  }) => runs.saveCredential(
+    owner: wallet(owner),
+    credential: BuilderProviderCredential(
+      provider: provider,
+      secret: builderToken,
+      accountId: provider == 'workers-ai' ? 'builder-account' : null,
+    ),
+  );
 
   test(
-    'a test run uses the builder credential and does not spend a hire',
+    'a free-model test run uses the team runner, ignores a stored credential '
+    'and does not spend a hire',
     () async {
       final box = harness();
       final id = await save(box.drafts);
@@ -110,29 +126,50 @@ void main() {
       expect(box.tasks, hasLength(1));
       expect(box.tasks.single.systemPrompt, prompt);
       expect(box.tasks.single.input, 'A long note.');
+      expect(box.secrets, isEmpty);
+    },
+  );
+
+  test(
+    'a paid-provider test run uses the builder credential',
+    () async {
+      final box = harness();
+      final id = await save(box.drafts, provider: 'anthropic');
+      await storeCredential(box.runs, provider: 'anthropic');
+
+      final result = await box.runs.testRun(
+        owner: wallet(owner),
+        draftId: id,
+        input: 'A long note.',
+      );
+
+      expect(result.output, 'five bullets');
+      expect(box.tasks, isEmpty);
       expect(box.secrets.single, builderToken);
     },
   );
 
   test(
-    'no credential never calls the model and does not spend quota',
+    'no paid credential never calls the model and does not spend quota',
     () async {
       final box = harness();
-      final id = await save(box.drafts);
+      final id = await save(box.drafts, provider: 'anthropic');
 
       await expectLater(
         () => box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi'),
         throwsA(isA<StudioCredentialMissing>()),
       );
       expect(box.tasks, isEmpty);
+      expect(box.secrets, isEmpty);
 
-      await storeCredential(box.runs);
+      await storeCredential(box.runs, provider: 'anthropic');
       final result = await box.runs.testRun(
         owner: wallet(owner),
         draftId: id,
         input: 'Hi',
       );
       expect(result.remainingDailyRuns, studioDailyTestRuns - 1);
+      expect(box.secrets, [builderToken]);
     },
   );
 
@@ -208,7 +245,6 @@ void main() {
   test('another wallet gets no prompt and no run', () async {
     final box = harness();
     final id = await save(box.drafts);
-    await storeCredential(box.runs);
     try {
       await box.runs.testRun(owner: wallet(other), draftId: id, input: 'Hi');
       fail('expected StudioDraftNotOwned');
@@ -223,7 +259,6 @@ void main() {
     () async {
       final box = harness();
       final id = await save(box.drafts);
-      await storeCredential(box.runs);
       await expectLater(
         () => box.runs.testRun(
           owner: wallet(owner),
@@ -250,7 +285,6 @@ void main() {
         owner: wallet(owner),
         document: {'name': 'Brief Bot'},
       );
-      await storeCredential(box.runs);
       await expectLater(
         () => box.runs.testRun(
           owner: wallet(owner),
@@ -266,7 +300,6 @@ void main() {
   test('the 21st run is the quota error and does not call the model', () async {
     final box = harness();
     final id = await save(box.drafts);
-    await storeCredential(box.runs);
     for (var i = 0; i < studioDailyTestRuns; i++) {
       await box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi');
     }
@@ -286,11 +319,9 @@ void main() {
 
   test('a provider failure spends the run and hides the prompt', () async {
     final quota = MemoryTestRunQuota();
-    final credentials = MemoryBuilderCredentialStore();
     final failing = harness(
       quota: quota,
-      credentials: credentials,
-      run: (task, credential) async {
+      runTeam: (task) async {
         throw const RuntimeProviderFailed(
           status: 503,
           errorType: 'unavailable',
@@ -298,7 +329,6 @@ void main() {
       },
     );
     final id = await save(failing.drafts);
-    await storeCredential(failing.runs);
     try {
       await failing.runs.testRun(
         owner: wallet(owner),
@@ -314,11 +344,62 @@ void main() {
     final next = await StudioTestRunService(
       drafts: StudioDraftService(failing.drafts),
       quota: quota,
-      credentials: credentials,
+      credentials: MemoryBuilderCredentialStore(),
       policy: studioServerModelPolicy,
       now: () => DateTime.utc(2026, 10, 14, 15),
+      runTeam: (task) async => 'ok',
       run: (task, credential) async => 'ok',
     ).testRun(owner: wallet(owner), draftId: id, input: 'Hi');
     expect(next.remainingDailyRuns, studioDailyTestRuns - 2);
   });
+
+  test('a paid agent stops at the daily paid-run cap', () async {
+    final box = harness(paidQuota: MemoryPaidRunQuota());
+    final id = await save(box.drafts, provider: 'anthropic');
+    await storeCredential(box.runs, provider: 'anthropic');
+
+    for (var i = 0; i < studioDailyPaidRunsPerAgent; i++) {
+      await box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi');
+    }
+    expect(box.secrets, hasLength(studioDailyPaidRunsPerAgent));
+
+    await expectLater(
+      () => box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi'),
+      throwsA(isA<StudioTestQuotaExceeded>()),
+    );
+    expect(box.secrets, hasLength(studioDailyPaidRunsPerAgent));
+  });
+
+  test('a full wallet does not burn a paid agent slot', () async {
+    final paid = _RecordingPaidQuota();
+    final box = harness(quota: _FullQuota(), paidQuota: paid);
+    final id = await save(box.drafts, provider: 'anthropic');
+    await storeCredential(box.runs, provider: 'anthropic');
+
+    await expectLater(
+      () => box.runs.testRun(owner: wallet(owner), draftId: id, input: 'Hi'),
+      throwsA(isA<StudioTestQuotaExceeded>()),
+    );
+    expect(paid.calls, isEmpty);
+  });
+}
+
+final class _FullQuota implements TestRunQuota {
+  @override
+  Future<int> reserve({required String owner, required DateTime now}) async {
+    throw StudioTestQuotaExceeded(DateTime.utc(2026, 10, 15));
+  }
+}
+
+final class _RecordingPaidQuota implements PaidRunQuota {
+  final calls = <int>[];
+
+  @override
+  Future<void> reserve({
+    required String owner,
+    required int draftId,
+    required DateTime now,
+  }) async {
+    calls.add(draftId);
+  }
 }

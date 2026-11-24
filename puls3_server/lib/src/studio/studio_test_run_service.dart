@@ -17,9 +17,15 @@ final class StudioTestRunResult {
   final int remainingDailyRuns;
 }
 
+/// Runs a saved draft on the platform's Workers AI account. Free models no
+/// longer need a builder credential (#318).
+typedef StudioTeamTestRunner = Future<String> Function(RuntimeTask task);
+
 /// Runs a saved draft on the builder's own provider account.
 ///
-/// No hire and no payment. The team Workers AI token is not read here.
+/// Paid providers keep the builder's credential. A free (`workers-ai`) model
+/// runs on [StudioTestRunService.runTeam] instead, and creates no hire and no
+/// payment.
 typedef StudioTestRunner =
     Future<String> Function(
       RuntimeTask task,
@@ -34,12 +40,16 @@ final class StudioTestRunService {
     required BuilderCredentialStore credentials,
     required ModelPolicy policy,
     required StudioTestRunner run,
+    required StudioTeamTestRunner runTeam,
+    PaidRunQuota? paidQuota,
     DateTime Function()? now,
   }) : _drafts = drafts,
        _quota = quota,
        _credentials = credentials,
        _policy = policy,
        _run = run,
+       _runTeam = runTeam,
+       _paidQuota = paidQuota ?? MemoryPaidRunQuota(),
        _now = now ?? DateTime.now;
 
   final StudioDraftService _drafts;
@@ -47,11 +57,15 @@ final class StudioTestRunService {
   final BuilderCredentialStore _credentials;
   final ModelPolicy _policy;
   final StudioTestRunner _run;
+  final StudioTeamTestRunner _runTeam;
+  final PaidRunQuota _paidQuota;
   final DateTime Function() _now;
 
   /// Stores [credential] for [owner]. An empty secret or a Workers AI
   /// credential without an account id is refused, and the previous
-  /// credential, if any, stays. Secrets and account ids are trimmed so a
+  /// credential, if any, stays. A `workers-ai` credential saved by an older
+  /// client is accepted but ignored: free-model runs use the platform account
+  /// and never read it. Secrets and account ids are trimmed so a
   /// blank-but-not-empty value cannot pass.
   Future<void> saveCredential({
     required StellarAddress owner,
@@ -95,28 +109,41 @@ final class StudioTestRunService {
     if (input.runes.length > manifest.inputMaxChars) {
       throw const StudioInputTooLong();
     }
-    final stored = await _credentials.find(
-      owner: owner.value,
-      provider: manifest.model.provider,
-    );
-    final credential = stored == null ? null : _usable(stored);
-    if (credential == null) throw const StudioCredentialMissing();
+    final free = manifest.model.provider == ModelPolicy.freeProvider;
+    final BuilderProviderCredential? credential;
+    if (free) {
+      credential = null;
+    } else {
+      final stored = await _credentials.find(
+        owner: owner.value,
+        provider: manifest.model.provider,
+      );
+      credential = stored == null ? null : _usable(stored);
+      if (credential == null) throw const StudioCredentialMissing();
+    }
     final remaining = await _quota.reserve(
       owner: owner.value,
       now: _now(),
     );
-    try {
-      final output = await _run(
-        RuntimeTask(
-          provider: manifest.model.provider,
-          modelId: manifest.model.id,
-          systemPrompt: manifest.systemPrompt,
-          input: input,
-          maxInputChars: manifest.inputMaxChars,
-          maxOutputChars: manifest.outputMaxChars,
-        ),
-        credential,
+    if (!free) {
+      await _paidQuota.reserve(
+        owner: owner.value,
+        draftId: draftId,
+        now: _now(),
       );
+    }
+    final task = RuntimeTask(
+      provider: manifest.model.provider,
+      modelId: manifest.model.id,
+      systemPrompt: manifest.systemPrompt,
+      input: input,
+      maxInputChars: manifest.inputMaxChars,
+      maxOutputChars: manifest.outputMaxChars,
+    );
+    try {
+      final output = free
+          ? await _runTeam(task)
+          : await _run(task, credential!);
       return StudioTestRunResult(
         output: output,
         remainingDailyRuns: remaining,

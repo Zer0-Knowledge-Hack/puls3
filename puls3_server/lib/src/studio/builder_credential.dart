@@ -1,6 +1,7 @@
-/// A builder's provider account (ADR-0004 amendment). The secret is the
-/// Cloudflare token or the paid provider's key. It is never part of the
-/// manifest and never the team Workers AI token.
+/// A builder's account for a paid provider (ADR-0004 amendment, #318). The
+/// secret is the paid provider's key. Free `workers-ai` models run on the team
+/// account and never read this store, and no credential is part of the
+/// manifest.
 final class BuilderProviderCredential {
   const BuilderProviderCredential({
     required this.provider,

@@ -1920,6 +1920,12 @@ abstract class AppLocalizations {
   /// **'Test runs are free and limited per day.'**
   String get playgroundLiveLead;
 
+  /// No description provided for @playgroundAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get playgroundAdvanced;
+
   /// No description provided for @playgroundProviderToken.
   ///
   /// In en, this message translates to:
@@ -1949,12 +1955,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This provider is not supported. Pick another model.'**
   String get playgroundProviderUnsupported;
-
-  /// No description provided for @playgroundAccountId.
-  ///
-  /// In en, this message translates to:
-  /// **'Cloudflare account id'**
-  String get playgroundAccountId;
 
   /// No description provided for @playgroundRunning.
   ///

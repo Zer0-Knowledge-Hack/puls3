@@ -54,8 +54,9 @@ final class RunManifest {
   );
 }
 
-/// A [RunManifest] whose model call uses the builder's credential, not the
-/// team provider token. [owner] is the builder wallet that stored it.
+/// A [RunManifest] whose model call may use the builder's credential. A free
+/// `workers-ai` manifest runs on the team account instead (#318). [owner] is
+/// the builder wallet that stored the credential.
 final class OwnedRunManifest extends RunManifest {
   const OwnedRunManifest({
     required this.owner,
