@@ -66,9 +66,14 @@ typedef BackfillLine = ({
 ///
 /// Each hire is checked against the chain first: its escrow is written only
 /// when [jobs] (reading [escrow]) has that job id for the same client and
-/// agent. Anything else stays empty and is reported, so a wrong address
-/// writes nothing. A hire that already has an escrow is never read or
-/// changed. Without [apply] nothing is written at all.
+/// agent. When the job is archived, so `get_job` cannot read it, the hire's
+/// confirmed `create_job` envelope decides instead: the escrow is written
+/// only when that envelope invoked `create_job` on [escrow]. The relay
+/// stores that envelope after checking it is the one it prepared for this
+/// hire, and only a confirmed one is read. Anything else stays empty and is
+/// reported, so a wrong address writes nothing. A hire that already has an
+/// escrow is never read or changed. Without [apply] nothing is written at
+/// all.
 ///
 /// A chain that cannot be read stops the run with the [LedgerException]; the
 /// rows written before it stay correct, and a rerun skips them.
