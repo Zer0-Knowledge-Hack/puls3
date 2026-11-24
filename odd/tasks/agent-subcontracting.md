@@ -462,7 +462,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     switch is disabled for the free model, which cannot call tools.) Studio form opt-in: `max_children` and `suggested_reserve` in Advanced, mapped
     both ways so an edit keeps the opt-in, and `subcontractMalformed`/`subcontractInvalid` shown
     on the new field. Route: delegated writer, parallel with T7.1. Risk: none expected.
-  - [ ] **T7.3** Hire form: a subcontract section only when the agent opted in and the ceiling is
+  - [x] **T7.3** (done 2026-11-24, `fb261d3`; delegated writer. RED: four test files failed to
+    load. GREEN: `flutter test` 566, analyze clean. Choices: with reserve 0 the flag is sent as
+    true; a resumed hire does not ask the consent again; terms that fail to load hide the section.)
+    Hire form: a subcontract section only when the agent opted in and the ceiling is
     above 0, prefilled with `suggested_reserve`, capped by the ceiling, a related-party switch
     (default allowed, with notice), the "a completed subcontract is paid even if you reject the
     result" consent, and price plus reserve in the total and the funds check. The reserve and the
