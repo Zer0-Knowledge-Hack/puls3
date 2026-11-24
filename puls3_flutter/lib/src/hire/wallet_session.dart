@@ -68,6 +68,11 @@ class WalletSession {
   final String? homeDomain;
   final String? webAuthDomain;
 
+  /// Whether the stored session belongs to [wallet]: authenticated, and the
+  /// wallet the session was created for is still [wallet].
+  Future<bool> isSignedInAs(String wallet) async =>
+      _isAuthenticated() && await _walletStore.read() == wallet;
+
   /// Makes sure the stored session belongs to [wallet], signing in with
   /// [sign] when it does not. A session of another wallet is dropped first.
   ///
