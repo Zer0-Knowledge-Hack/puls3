@@ -453,9 +453,12 @@ void main() {
   test(
     'children cap: the platform cap bounds a manifest that asks for more',
     () async {
-      final asked = subcontractMaxChildrenCap + 1;
       final hire = await world.fundedHire(
-        subcontractReserve: reserveFor(asked),
+        // The suite's reserve ceiling allows one price per child up to the
+        // cap, so the reserve covers exactly the cap. The loop checks the
+        // children count before the reserve (`subcontract_tools.dart`), so
+        // the third request meets `max_children_reached`, not `over_reserve`.
+        subcontractReserve: reserveFor(subcontractMaxChildrenCap),
         input: 'e2e journey of #374: platform children cap',
         agent: platformCapParent.id,
       );
@@ -481,7 +484,8 @@ void main() {
       );
       final job = (await world.wiring.ledger.escrowJob(hire.jobId))!;
       expect(job.openChildren, 0);
-      expect(job.reserve, BigInt.from(e2ePriceStroops));
+      expect(job.reserve, BigInt.zero);
+      expect(run.result, isNot(contains('over_reserve')));
     },
   );
 
