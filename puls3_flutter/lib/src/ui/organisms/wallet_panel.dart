@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:puls3_client/puls3_client.dart' as api;
 
 import '../../domain/stellar_format.dart';
 import '../../state/wallet_controller.dart';
@@ -22,6 +23,10 @@ class WalletPanel extends StatelessWidget {
     this.error,
     this.onInstall,
     this.onCopyCliSession,
+    this.cliSessions,
+    this.onRevokeCliSession,
+    this.onRetryCliSessions,
+    this.cliSessionsError,
   });
 
   final WalletStatus status;
@@ -38,6 +43,19 @@ class WalletPanel extends StatelessWidget {
   /// Creates a session for the puls3 CLI (#259); null hides the action.
   final VoidCallback? onCopyCliSession;
 
+  /// The caller's live CLI sessions, oldest first; null while there is no
+  /// server session or they have not loaded.
+  final List<api.CliSession>? cliSessions;
+
+  /// Revokes one CLI session after the container confirms it.
+  final ValueChanged<api.CliSession>? onRevokeCliSession;
+
+  /// Loads the list again after an error.
+  final VoidCallback? onRetryCliSessions;
+
+  /// Why the CLI session list could not be refreshed; the list is kept.
+  final String? cliSessionsError;
+
   @override
   Widget build(BuildContext context) {
     final address = this.address;
@@ -50,6 +68,10 @@ class WalletPanel extends StatelessWidget {
         signed: status == WalletStatus.signed,
         onDisconnect: onDisconnect,
         onCopyCliSession: onCopyCliSession,
+        cliSessions: cliSessions,
+        onRevokeCliSession: onRevokeCliSession,
+        onRetryCliSessions: onRetryCliSessions,
+        cliSessionsError: cliSessionsError,
       ),
       WalletStatus.connecting => _Connecting(walletName: walletName),
       WalletStatus.signing => _Signing(walletName: walletName),
@@ -233,6 +255,10 @@ class _Connected extends StatelessWidget {
     required this.onDisconnect,
     this.signed = false,
     this.onCopyCliSession,
+    this.cliSessions,
+    this.onRevokeCliSession,
+    this.onRetryCliSessions,
+    this.cliSessionsError,
   });
 
   final String address;
@@ -241,6 +267,10 @@ class _Connected extends StatelessWidget {
   final bool signed;
   final VoidCallback onDisconnect;
   final VoidCallback? onCopyCliSession;
+  final List<api.CliSession>? cliSessions;
+  final ValueChanged<api.CliSession>? onRevokeCliSession;
+  final VoidCallback? onRetryCliSessions;
+  final String? cliSessionsError;
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +338,42 @@ class _Connected extends StatelessWidget {
           ),
           const SizedBox(height: Puls3Spacing.sm),
         ],
+        if (cliSessions case final sessions? when sessions.isNotEmpty) ...[
+          const SizedBox(height: Puls3Spacing.xs),
+          Text('CLI sessions', style: _title.copyWith(fontSize: 14)),
+          const SizedBox(height: Puls3Spacing.xs),
+          for (final session in sessions)
+            _CliSessionRow(
+              session: session,
+              onRevoke: onRevokeCliSession == null
+                  ? null
+                  : () => onRevokeCliSession!(session),
+            ),
+          const SizedBox(height: Puls3Spacing.xs),
+          Text(
+            'A revoked session can still answer for up to 10 minutes. '
+            'Revoking it does not sign out this app.',
+            style: _muted.copyWith(fontSize: 12),
+          ),
+          const SizedBox(height: Puls3Spacing.sm),
+        ],
+        if (cliSessionsError case final error?) ...[
+          Text(
+            error,
+            key: const ValueKey('cli-sessions-error'),
+            style: _muted.copyWith(fontSize: 12, color: Puls3Colors.accent),
+          ),
+          if (onRetryCliSessions != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('cli-sessions-retry'),
+                onPressed: onRetryCliSessions,
+                child: const Text('Retry'),
+              ),
+            ),
+          const SizedBox(height: Puls3Spacing.sm),
+        ],
         PrimaryButton(
           label: 'Disconnect',
           icon: Icons.logout_rounded,
@@ -340,6 +406,55 @@ class _NetworkBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One live CLI session: when it was created, last used and when it ends.
+/// It never shows the token or the full session id.
+class _CliSessionRow extends StatelessWidget {
+  const _CliSessionRow({required this.session, this.onRevoke});
+
+  final api.CliSession session;
+  final VoidCallback? onRevoke;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey('cli-session-${session.id}'),
+      padding: const EdgeInsets.all(Puls3Spacing.sm),
+      margin: const EdgeInsets.only(bottom: Puls3Spacing.xs),
+      decoration: BoxDecoration(
+        color: Puls3Colors.surface,
+        borderRadius: Puls3Radius.mdAll,
+        border: Border.all(color: Puls3Colors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('CLI session', style: _title.copyWith(fontSize: 14)),
+          const SizedBox(height: 2),
+          Text(
+            'Created ${_sessionDate(session.createdAt)} · '
+            'Last used ${_sessionDate(session.lastUsedAt)} · '
+            'Ends ${_sessionDate(session.expiresAt)}',
+            style: _muted.copyWith(fontSize: 12, height: 1.5),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: ValueKey('cli-session-revoke-${session.id}'),
+              onPressed: onRevoke,
+              child: const Text('Revoke'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _sessionDate(DateTime value) {
+  final text = value.toUtc().toIso8601String().substring(0, 16);
+  return '${text.replaceFirst('T', ' ')} UTC';
 }
 
 class _Error extends StatelessWidget {
