@@ -160,26 +160,56 @@ final class ChildJobEffects {
   Future<void> onChildSettled(
     StoredSubmission submission,
     List<JobCompletedEvent> completed,
-  ) async {
+  ) => _settle(
+    submission,
+    completed,
+    paid: submission.purpose == SubmissionPurpose.childComplete,
+    unpaid: HireStatus.rejected,
+  );
+
+  /// See [EscrowEffects.onRelaySettled]. A `release` moves the line to
+  /// `completed` like a complete verdict (B is paid); a `claim_refund`
+  /// moves it to `expired` with fee and payout 0, since the budget went
+  /// back to the parent's reserve (ADR-0011 D3). The hire of a relay call
+  /// is often a plain hire with no line: then nothing is written. A line a
+  /// verdict already settled is not changed.
+  Future<void> onRelaySettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) => _settle(
+    submission,
+    completed,
+    paid: submission.purpose == SubmissionPurpose.release,
+    unpaid: HireStatus.expired,
+  );
+
+  /// Settles the line of the submission's hire: [paid] records `completed`
+  /// with the child job's `JobCompleted` fee and payout (unset when the
+  /// transaction shows none for that job), otherwise [unpaid] with both 0.
+  Future<void> _settle(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed, {
+    required bool paid,
+    required HireStatus unpaid,
+  }) async {
     final childHireId = submission.hireId;
     if (childHireId == null) return;
-    final complete = submission.purpose == SubmissionPurpose.childComplete;
     await _scope((hires, receipts, openings) async {
       final jobId = (await hires.findHire(childHireId))?.jobId;
       final events = completed.where((e) => e.jobId == jobId).toList();
       final event = events.length == 1 ? events.single : null;
       final settled = await receipts.markSettled(
         childHireId,
-        state: complete ? HireStatus.completed.name : HireStatus.rejected.name,
-        fee: complete ? event?.fee.toInt() : 0,
-        payout: complete ? event?.payout.toInt() : 0,
+        state: paid ? HireStatus.completed.name : unpaid.name,
+        fee: paid ? event?.fee.toInt() : 0,
+        payout: paid ? event?.payout.toInt() : 0,
         settleTransaction: submission.transactionHash,
       );
-      if (settled && complete && event == null) {
+      if (settled && paid && event == null) {
         _log(
           ChainLogLevel.warning,
-          'The complete of child hire $childHireId shows no JobCompleted for '
-          'job $jobId; its fee and payout stay unset',
+          'The ${submission.purpose.wireName} of child hire $childHireId '
+          'shows no JobCompleted for job $jobId; its fee and payout stay unset',
         );
       }
     });

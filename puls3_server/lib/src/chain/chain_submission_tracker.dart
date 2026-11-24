@@ -105,9 +105,10 @@ final class TrackerPassSummary {
 ///   event of the transaction, decides `confirmed` or the failure code;
 ///   `giveFeedback` needs no event. A child verdict (`childComplete`,
 ///   `childReject`) records its settlement on the receipt line through
-///   [EscrowEffects.onChildSettled], then confirms. `submit`, `complete`, `reject`,
-///   `release`, `claimRefund` and `registerFull` are confirmed when the
-///   transaction succeeds. Hire status is derived from those confirmed
+///   [EscrowEffects.onChildSettled], then confirms; a relay `release` or
+///   `claimRefund` does the same through [EscrowEffects.onRelaySettled].
+///   `submit`, `complete`, `reject` and `registerFull` are confirmed when
+///   the transaction succeeds. Hire status is derived from those confirmed
 ///   records (#208); the tracker does not write a status column.
 ///
 /// Every failure of a `createChildJob` first goes through
@@ -382,9 +383,11 @@ final class ChainSubmissionTracker {
         // confirmed once its receipt line says so.
         await _effects.onChildSettled(submission, lookup.jobCompleted);
         result = const EffectResult.ok();
+      case SubmissionPurpose.release || SubmissionPurpose.claimRefund:
+        // The relay call landed: a child job's receipt line records it.
+        await _effects.onRelaySettled(submission, lookup.jobCompleted);
+        result = const EffectResult.ok();
       case SubmissionPurpose.submit ||
-          SubmissionPurpose.release ||
-          SubmissionPurpose.claimRefund ||
           SubmissionPurpose.complete ||
           SubmissionPurpose.reject ||
           SubmissionPurpose.registerFull:

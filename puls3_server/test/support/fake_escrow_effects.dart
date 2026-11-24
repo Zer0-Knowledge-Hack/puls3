@@ -42,6 +42,12 @@ final class FakeEscrowEffects implements EscrowEffects {
   /// The `job_completed` events of every [onChildSettled] call.
   final childSettledEvents = <List<JobCompletedEvent>>[];
 
+  /// The submission ids [onRelaySettled] was called with.
+  final relaySettled = <int>[];
+
+  /// The `job_completed` events of every [onRelaySettled] call.
+  final relaySettledEvents = <List<JobCompletedEvent>>[];
+
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
@@ -92,6 +98,16 @@ final class FakeEscrowEffects implements EscrowEffects {
     _answer();
     childSettled.add(submission.id);
     childSettledEvents.add(completed);
+  }
+
+  @override
+  Future<void> onRelaySettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {
+    _answer();
+    relaySettled.add(submission.id);
+    relaySettledEvents.add(completed);
   }
 
   @override

@@ -194,6 +194,15 @@ final class HireEscrowEffects implements EscrowEffects {
   ) async =>
       await _childEffects(submission).onChildSettled(submission, completed);
 
+  /// Without [ChildJobEffects] there are no receipt lines to settle, and a
+  /// relay call of a plain hire must still confirm, so this does nothing
+  /// instead of throwing like the child-only effects.
+  @override
+  Future<void> onRelaySettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async => await _children?.onRelaySettled(submission, completed);
+
   ChildJobEffects _childEffects(StoredSubmission submission) =>
       _children ??
       (throw StateError(
