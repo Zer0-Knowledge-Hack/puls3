@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../agent/aes_gcm_secret_cipher.dart';
@@ -206,10 +208,31 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     }
   }
 
-  final timings = runtimeTimings(
+  final backfill = MissedRunBackfill(log: log);
+  final submit = _submitWiringOrNull(env, rpc, stellar, log);
+  // Subcontracting needs a custodied key to sign as agent A, so it is off
+  // wherever `submit` is.
+  final subcontract = submit == null
+      ? null
+      : _subcontractWiringOrNull(
+          pod: pod,
+          env: env,
+          rpc: rpc,
+          stellar: stellar,
+          submit: submit,
+          lease: runnerLease(
+            team: agentRunner,
+            credentials: builderCredentials,
+          ),
+          log: log,
+        );
+  // A run holds up to `defaultMaxLoopTurns` model calls only when it can
+  // pause on a child; without subcontracting it is one call, so a hung pass
+  // is not given hours.
+  final timings = agentRuntimeTimings(
     timeout: config.timeout,
     batchSize: _batchSize,
-    maxTurns: defaultMaxLoopTurns,
+    subcontracting: subcontract != null,
   );
   // One runner per pass: the subcontract setup holds the stores of that
   // pass's database session. Without a setup a run is one plain segment.
@@ -241,24 +264,6 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     log: log,
     batchSize: _batchSize,
   );
-  final backfill = MissedRunBackfill(log: log);
-  final submit = _submitWiringOrNull(env, rpc, stellar, log);
-  // Subcontracting needs a custodied key to sign as agent A, so it is off
-  // wherever `submit` is.
-  final subcontract = submit == null
-      ? null
-      : _subcontractWiringOrNull(
-          pod: pod,
-          env: env,
-          rpc: rpc,
-          stellar: stellar,
-          submit: submit,
-          lease: runnerLease(
-            team: agentRunner,
-            credentials: builderCredentials,
-          ),
-          log: log,
-        );
   final loop = TrackerLoop(
     interval: loopConfig.interval,
     passTimeout: timings.passTimeout,
@@ -292,6 +297,9 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     },
     onStop: () async => httpClient.close(),
   )..start();
+  if (subcontract == null) {
+    unawaited(_reportAwaitingChildRuns(pod, log));
+  }
   log(
     ChainLogLevel.info,
     'Agent runtime started, every ${loopConfig.interval.inSeconds}s, '
@@ -301,6 +309,33 @@ TrackerLoop? startAgentRuntime(Serverpod pod, Map<String, String> env) {
     '${subcontract == null ? '; subcontracting off' : '; subcontracting on'}',
   );
   return loop;
+}
+
+/// With subcontracting off, a run left `awaitingChild` by an earlier
+/// deployment stays untouched until its escrow expires (it fails closed).
+/// A startup line with their count makes that visible.
+Future<void> _reportAwaitingChildRuns(Serverpod pod, ChainLog log) async {
+  const limit = 100;
+  try {
+    final session = await pod.createSession();
+    try {
+      final waiting = await ServerpodHireRunStore(
+        session,
+      ).listAwaitingChild(limit: limit);
+      if (waiting.isNotEmpty) {
+        log(
+          ChainLogLevel.warning,
+          'Subcontracting is off with ${waiting.length}'
+          '${waiting.length == limit ? '+' : ''} run(s) awaiting a child; '
+          'they stay paused until their escrow expires',
+        );
+      }
+    } finally {
+      await session.close();
+    }
+  } on Object catch (e) {
+    log(ChainLogLevel.warning, 'Could not count runs awaiting a child: $e');
+  }
 }
 
 /// Custodied `submit` after a successful run, or null when the cipher or
@@ -392,6 +427,47 @@ final class _SubmitWiring {
   }
 }
 
+/// Why subcontracting is off, or null when it is on. It needs a custodied
+/// key to sign as agent A, so it is off wherever submit is, and the job
+/// duration `HireRelayConfig` needs for a child job
+/// (`PULS3_HIRE_JOB_DURATION_SECONDS`) must be readable, so a missing value
+/// turns it off at startup instead of failing a parent run later.
+@visibleForTesting
+String? subcontractOffReason(
+  Map<String, String> env, {
+  required bool submitOn,
+}) {
+  if (!submitOn) return 'submit is off';
+  try {
+    // Fails now, not in the middle of a parent run.
+    HireRelayConfig(env).jobDurationSeconds;
+    return null;
+  } on HireConfigurationMissing catch (e) {
+    return '${e.setting} is not set';
+  } on ArgumentError catch (e) {
+    return '${e.message}';
+  }
+}
+
+/// Whether the runtime wires subcontracting: [subcontractOffReason] is null.
+@visibleForTesting
+bool subcontractEnabled(Map<String, String> env, {required bool submitOn}) =>
+    subcontractOffReason(env, submitOn: submitOn) == null;
+
+/// The runtime timings: a run holds up to `defaultMaxLoopTurns` model calls
+/// only when [subcontracting] is on; without it a run is one call and the
+/// timings are those of a runtime without the tool loop.
+@visibleForTesting
+RuntimeTimings agentRuntimeTimings({
+  required Duration timeout,
+  required int batchSize,
+  required bool subcontracting,
+}) => runtimeTimings(
+  timeout: timeout,
+  batchSize: batchSize,
+  maxTurns: subcontracting ? defaultMaxLoopTurns : 1,
+);
+
 /// The subcontract executor of production (ADR-0011), or null when its
 /// settings are missing so the runtime still runs plain hires. What
 /// `HireRelayConfig` needs for a child job
@@ -411,27 +487,22 @@ _SubcontractWiring? _subcontractWiringOrNull({
   required RunnerLease lease,
   required ChainLog log,
 }) {
-  try {
-    final config = HireRelayConfig(env);
-    // Fails now, not in the middle of a parent run.
-    config.jobDurationSeconds;
-    return _SubcontractWiring(
-      pod: pod,
-      env: env,
-      rpc: rpc,
-      stellar: stellar,
-      submit: submit,
-      config: config,
-      hidden: HiddenAgents.fromEnvironment(env),
-      lease: lease,
-      log: log,
-    );
-  } on HireConfigurationMissing catch (e) {
-    log(ChainLogLevel.info, 'Subcontracting is off: ${e.setting} is not set');
-  } on ArgumentError catch (e) {
-    log(ChainLogLevel.warning, 'Subcontracting is off: ${e.message}');
+  final reason = subcontractOffReason(env, submitOn: true);
+  if (reason != null) {
+    log(ChainLogLevel.info, 'Subcontracting is off: $reason');
+    return null;
   }
-  return null;
+  return _SubcontractWiring(
+    pod: pod,
+    env: env,
+    rpc: rpc,
+    stellar: stellar,
+    submit: submit,
+    config: HireRelayConfig(env),
+    hidden: HiddenAgents.fromEnvironment(env),
+    lease: lease,
+    log: log,
+  );
 }
 
 final class _SubcontractWiring {
@@ -507,7 +578,7 @@ final class _SubcontractWiring {
       ),
       sign: signer.sign,
       send: rpc.sendTransaction,
-      search: buildAgentSearchService(session).search,
+      search: buildAgentSearchService(session, environment: env).search,
       escrow: stellar.escrow,
       inclusionFee: submit.inclusionFee,
       validitySeconds: submit.validitySeconds,
