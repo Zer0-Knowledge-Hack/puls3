@@ -31,6 +31,9 @@ class HirePaymentView extends StatelessWidget {
     this.inputController,
     this.inputLocked = false,
     this.resumeNote,
+    this.subcontractSection,
+    this.reserveUsdcStroops = 0,
+    this.canConfirm = true,
     this.hireId,
     this.transactionHash,
     this.paymentConfirmed = false,
@@ -66,6 +69,17 @@ class HirePaymentView extends StatelessWidget {
 
   /// Shown above the summary when an unfinished hire is resumed.
   final String? resumeNote;
+
+  /// The subcontract reserve form (#334), below the task; null hides it.
+  final Widget? subcontractSection;
+
+  /// The reserve funded beside the price, in USDC stroops. Above 0 the
+  /// summary adds it and the total, and says what is refunded.
+  final int reserveUsdcStroops;
+
+  /// False while something else than the task blocks Confirm, such as a
+  /// reserve that cannot be funded or a missing consent.
+  final bool canConfirm;
 
   /// The created hire, once confirmed.
   final int? hireId;
@@ -165,6 +179,10 @@ class HirePaymentView extends StatelessWidget {
           ),
           const SizedBox(height: Puls3Spacing.md),
         ],
+        if (subcontractSection case final section?) ...[
+          section,
+          const SizedBox(height: Puls3Spacing.md),
+        ],
         Container(
           padding: const EdgeInsets.all(Puls3Spacing.md),
           decoration: BoxDecoration(
@@ -182,6 +200,25 @@ class HirePaymentView extends StatelessWidget {
                   perTask: false,
                 ),
               ),
+              if (reserveUsdcStroops > 0) ...[
+                KeyValueRow(
+                  label: l10n.hireSubcontractReserveRow,
+                  value: '',
+                  valueWidget: PriceTag(
+                    stroops: reserveUsdcStroops,
+                    perTask: false,
+                  ),
+                ),
+                KeyValueRow(
+                  key: const ValueKey('hire-total'),
+                  label: l10n.hireSubcontractTotal,
+                  value: '',
+                  valueWidget: PriceTag(
+                    stroops: priceUsdcStroops + reserveUsdcStroops,
+                    perTask: false,
+                  ),
+                ),
+              ],
               KeyValueRow(label: l10n.hireAsset, value: 'USDC'),
               KeyValueRow(label: l10n.hireNetwork, value: 'Stellar Testnet'),
               KeyValueRow(
@@ -206,11 +243,19 @@ class HirePaymentView extends StatelessWidget {
             ],
           ),
         ),
+        if (reserveUsdcStroops > 0) ...[
+          const SizedBox(height: Puls3Spacing.sm),
+          Text(
+            l10n.hireSubcontractRefundNote,
+            style: Puls3Text.bodyMuted.copyWith(fontSize: 13),
+          ),
+        ],
         const SizedBox(height: Puls3Spacing.lg),
         ListenableBuilder(
           listenable: input ?? const _Always(),
           builder: (context, _) {
-            final ready = input == null || input.text.trim().isNotEmpty;
+            final ready =
+                canConfirm && (input == null || input.text.trim().isNotEmpty);
             return PrimaryButton(
               label: signing ? l10n.hireSigning : l10n.hireConfirmSign,
               icon: Icons.lock_outline_rounded,
