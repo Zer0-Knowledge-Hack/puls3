@@ -44,6 +44,22 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
 
   Cycles and depth beyond the limit are refused. Reason: an owner ban hurts honest builders and is
   trivially evaded with a second wallet.
+- **Agent-signed calls are serialized per wallet by reading the signer from the stored envelope**
+  (user, 2026-11-23, T6.4.2: "Vamos con la B, pero que quede explicito el porque decidimos esto").
+  `chain_submission` does not record who signed a call. The options were (A) a new `source` column
+  with a migration, or (B) decoding the source account of the signed envelope that is already
+  stored. B was chosen for these reasons:
+  - It changes no persisted format, so it needs no migration and no rule for existing rows without
+    a value (option A is high-risk item 1).
+  - Every agent-signed envelope already carries its source account.
+  - The set it reads is small by design. It holds only the `submitted` rows of the four
+    agent-signed purposes, because each wallet keeps at most one in flight, so decoding them each
+    pass is cheap.
+
+  The cost is a less explicit query and one decode per in-flight row on every pass. Revisit with a
+  column if that set grows or the pass gets hot. An envelope that cannot be read fails closed: it
+  holds every wallet, which is the old global gate. The reasoning is also in the doc comment of
+  `agentCallInFlight` (`puls3_server/lib/src/chain/agent_call_gate.dart`).
 
 ## Constraints
 
@@ -283,8 +299,33 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       the longest whole-rune prefix that keeps the transcript within it, labelled with
       `truncated` and `output_runes`. RED: the new `child_result_budget_test` failed to compile.
       GREEN: server unit+hire 1304 passed, analyze clean. Risk: none.
-    - [ ] **T6.4.2** Serialize agent-signed calls per signing wallet. Risk: item 4 (concurrency),
-      which needs an independent verifier.
+    - [x] **T6.4.2** Serialize agent-signed calls per signing wallet. Risk: item 4 (concurrency),
+      which needs an independent verifier. Route: inline (one understood change). Decision B above.
+      `agentCallInFlight` reads `ChainSubmissionStore.submittedEnvelopes(agentSignedPurposes)` and
+      `EnvelopeCodec.sourceOf`. `AgentSubmitSender`, `EscrowChildResultSource` and, which is new,
+      `EscrowSubcontractPort` ask it with their own signer. Until now the port had no gate at all,
+      so a `create_child_job` could reuse a sequence that A's `submit` or verdict was still
+      holding. It now refuses with `chain_busy` before it drafts. Behavior change: if A
+      subcontracts twice before the first `create_child_job` confirms, the second call gets
+      `chain_busy`, where before it was likely a `txBadSeq` and `child_not_opened`. RED: the new
+      tests failed to compile (`sourceOf` and `submittedEnvelopes` were undefined). GREEN: focused
+      142 passed, then server unit+hire+ledger 1386 passed, analyze clean, and integration 211
+      passed. The integration suite passed in 3 of 4 runs. The red run failed in two
+      `chain_submission_store_test` `setUpAll` hooks, during database startup, not in the gate; the
+      baseline also passed. Independent verifier: no blockers. Its probes were added as
+      regressions:
+      - `sourceOf` returns null for a muxed `M` source;
+      - `agent_call_gate_test` runs the gate over the real codec and the recorded testnet
+        envelope;
+      - the verdict and the port fail closed on an unreadable envelope.
+
+      Two integration tests that commit now confirm the call of A they leave in flight.
+      Verifier notes, not fixed here:
+      - (A, already true) Custodied-key `create_job`, `fund` and `complete` (`agent_hire_service`)
+        are not in `agentSignedPurposes`, so they can share a sequence with that wallet's
+        `submit`. Candidate for T6.4.4 or a follow-up.
+      - (B, already true) The gate is check-then-act, not a lock.
+      - (C) The `chain_busy` message gives the model no hint to wait and retry.
     - [ ] **T6.4.3** Record relay `release` / `claim_refund` on the child's receipt line.
     - [ ] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
       parent runs, orphan `HireRequestConflict`, a throwing `childrenOpen`, and bounded
@@ -331,3 +372,7 @@ StellarExpert.
   `--onto` past the squash-merged slices and force-pushed with lease. Each rebased tree differs
   from its `backup/334-pre-rebase-*` branch only by the ADR-0011 change, and #360 to #368 are
   mergeable with their approvals kept. Next: T6.4 on `feat/334-subcontract-wiring`.
+- 2026-11-23: resumed after a power cut (tree clean at `da49afb`). T6.4.2 done with decision B
+  (signer read from the stored envelope, no migration). Native review of `c30c7d7` (lenses resilience
+  and reliability, lineage `review-453dd25ab4c54ba9`) granted, approved and acknowledged; the
+  reviewed boundary is now `c30c7d7`. Next: T6.4.3.

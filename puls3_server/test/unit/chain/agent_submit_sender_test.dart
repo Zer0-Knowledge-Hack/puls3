@@ -21,6 +21,9 @@ import '../../support/in_memory_chain_submission_store.dart';
 final _provider = StellarAddress.parse(
   'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H',
 );
+final _otherAgent = StellarAddress.parse(
+  'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+);
 final _escrow = StellarAddress.parse(
   'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
 );
@@ -162,6 +165,36 @@ void main() {
 
     expect(codec.built, hasLength(2));
     expect(store.all.last.hireId, 5);
+  });
+
+  test("another wallet's agent-signed call does not hold a submit", () async {
+    await store.insertSubmitted(
+      purpose: SubmissionPurpose.childComplete,
+      transactionHash: 'cd' * 32,
+      signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_otherAgent),
+      validUntil: _now.add(const Duration(minutes: 5)),
+      hireId: 9,
+    );
+
+    await sender().send(_due());
+
+    expect(codec.built, hasLength(1));
+    expect(sent, hasLength(1));
+  });
+
+  test("the provider's own agent-signed call holds its submit", () async {
+    await store.insertSubmitted(
+      purpose: SubmissionPurpose.createChildJob,
+      transactionHash: 'cd' * 32,
+      signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_provider),
+      validUntil: _now.add(const Duration(minutes: 5)),
+      hireId: 9,
+    );
+
+    await sender().send(_due());
+
+    expect(codec.built, isEmpty);
+    expect(sent, isEmpty);
   });
 
   test('a hire with a non-final escrow record is not submitted', () async {
@@ -329,17 +362,20 @@ void main() {
     });
   });
 
-  test('waits while an agent-signed child verdict is in flight', () async {
-    await store.insertSubmitted(
-      purpose: SubmissionPurpose.childComplete,
-      transactionHash: 'cd' * 32,
-      signedEnvelopeXdr: 'AAAA',
-      validUntil: _now.add(const Duration(minutes: 5)),
-      hireId: 9,
-    );
+  test(
+    'an unreadable agent-signed envelope in flight holds every submit',
+    () async {
+      await store.insertSubmitted(
+        purpose: SubmissionPurpose.childComplete,
+        transactionHash: 'cd' * 32,
+        signedEnvelopeXdr: 'AAAA',
+        validUntil: _now.add(const Duration(minutes: 5)),
+        hireId: 9,
+      );
 
-    await sender().send(_due());
+      await sender().send(_due());
 
-    expect(codec.built, isEmpty);
-  });
+      expect(codec.built, isEmpty);
+    },
+  );
 }

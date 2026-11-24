@@ -162,6 +162,12 @@ abstract interface class ChainSubmissionStore {
   /// flight, so two envelopes never share the relay account's sequence.
   Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes);
 
+  /// The stored envelope of every record of one of [purposes] that is still
+  /// `submitted`, for any hire, oldest first (by id); null for a record
+  /// stored without one. `agentCallInFlight` reads the signing account from
+  /// each, because the table does not keep it.
+  Future<List<String?>> submittedEnvelopes(Set<SubmissionPurpose> purposes);
+
   /// Sets `confirmed` if the record is still `submitted`. Returns whether
   /// it changed.
   Future<bool> markConfirmed(int id);

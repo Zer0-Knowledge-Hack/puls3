@@ -35,10 +35,11 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
     String? preparationId = 'prep-1',
     SubmissionPurpose purpose = SubmissionPurpose.fund,
     int? hireId = 7,
+    String envelope = _envelope,
   }) => repo.insertSubmitted(
     purpose: purpose,
     transactionHash: transactionHash,
-    signedEnvelopeXdr: _envelope,
+    signedEnvelopeXdr: envelope,
     validUntil: _validUntil,
     preparationId: preparationId,
     hireId: hireId,
@@ -320,6 +321,53 @@ void chainSubmissionStoreContract(ChainSubmissionStoreFactory build) {
 
       await repo.markConfirmed(release.id);
       expect(await repo.hasSubmitted({SubmissionPurpose.release}), isFalse);
+    },
+  );
+
+  test(
+    'submittedEnvelopes lists the envelopes of submitted records of the '
+    'given purposes, oldest first',
+    () async {
+      create();
+      expect(
+        await repo.submittedEnvelopes({SubmissionPurpose.submit}),
+        isEmpty,
+      );
+
+      final first = await insert(
+        preparationId: null,
+        purpose: SubmissionPurpose.submit,
+        envelope: 'first',
+      );
+      final second = await insert(
+        transactionHash: _txB,
+        preparationId: null,
+        purpose: SubmissionPurpose.childComplete,
+        envelope: 'second',
+      );
+      await insert(transactionHash: _txC, envelope: 'fund');
+
+      expect(
+        await repo.submittedEnvelopes({
+          SubmissionPurpose.submit,
+          SubmissionPurpose.childComplete,
+        }),
+        ['first', 'second'],
+      );
+      expect(await repo.submittedEnvelopes(const {}), isEmpty);
+
+      await repo.markConfirmed(first.id);
+      expect(
+        await repo.submittedEnvelopes({
+          SubmissionPurpose.submit,
+          SubmissionPurpose.childComplete,
+        }),
+        ['second'],
+      );
+
+      // Leave no agent-signed record in flight: an unreadable one holds
+      // every wallet, and the integration database is shared across files.
+      await repo.markConfirmed(second.id);
     },
   );
 

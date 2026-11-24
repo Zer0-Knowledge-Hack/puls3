@@ -209,6 +209,11 @@ abstract interface class EnvelopeCodec {
   /// Reads a client's base64 envelope. Throws [InvalidSignedEnvelope].
   SignedEnvelope parse(String base64);
 
+  /// The source account of the base64 envelope [base64], signed or not, or
+  /// null when it cannot be read or its source is not a plain `G` account.
+  /// Never throws: the agent-call gate treats null as "in flight".
+  StellarAddress? sourceOf(String base64);
+
   /// The first group, as an [EnvelopeField], in which two different bodies
   /// differ: contract, function, arguments, source, timeBounds, then other.
   /// `null` when the bodies are equal.

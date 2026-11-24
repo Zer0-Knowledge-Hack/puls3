@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart' show StellarAddress;
 
 import '../agent/agent_wallet_custody.dart';
+import '../chain/agent_call_gate.dart';
 import '../chain/agent_submit_sender.dart' show deliverableHashHex;
 import '../chain/chain_log.dart';
 import '../chain/chain_submission_store.dart';
@@ -48,8 +49,9 @@ import 'tool_loop.dart';
 /// record, so one envelope is in flight per child. A failed verdict is
 /// built again on a later pass, up to [maxEscrowCallAttempts]; then the
 /// parent waits for the deadline relay to `release` or `claim_refund` the
-/// child. Like `AgentSubmitSender`, nothing is built while any agent-signed
-/// call ([agentSignedPurposes]) is in flight, so A's sequence is not reused.
+/// child. Like `AgentSubmitSender`, nothing is built while an agent-signed
+/// call of A is in flight (`agentCallInFlight`), so A's sequence is not
+/// reused; another agent's call does not hold it.
 ///
 /// A complete verdict also stores B's deliverable hash on the line, in the
 /// same transaction as the verdict record; the tracker fills the rest of the
@@ -205,7 +207,13 @@ final class EscrowChildResultSource implements ChildResultSource {
     required int priorFailures,
     required String? deliverable,
   }) async {
-    if (await _submissions.hasSubmitted(agentSignedPurposes)) return;
+    if (await agentCallInFlight(
+      submissions: _submissions,
+      codec: _codec,
+      signer: evaluator,
+    )) {
+      return;
+    }
     final purpose = verdict.purpose;
     final until = _now().toUtc().add(Duration(seconds: validitySeconds));
     final PreparedEnvelope prepared;

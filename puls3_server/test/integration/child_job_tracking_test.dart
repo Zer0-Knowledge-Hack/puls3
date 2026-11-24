@@ -110,6 +110,10 @@ final class _OwnRecords implements ChainSubmissionStore {
       _inner.hasSubmitted(purposes);
 
   @override
+  Future<List<String?>> submittedEnvelopes(Set<SubmissionPurpose> purposes) =>
+      _inner.submittedEnvelopes(purposes);
+
+  @override
   Future<bool> markConfirmed(int id) => _inner.markConfirmed(id);
 
   @override
