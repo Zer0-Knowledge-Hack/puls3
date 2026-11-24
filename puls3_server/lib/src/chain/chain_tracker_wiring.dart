@@ -5,9 +5,12 @@ import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart' show HireConfigurationMissing;
 import '../hire/chain_accounts.dart';
+import '../hire/child_job_effects.dart';
 import '../hire/hire_escrow_effects.dart';
 import '../hire/hire_relay_config.dart';
+import '../hire/serverpod_child_job_store.dart';
 import '../hire/serverpod_escrow_preparation_store.dart';
+import '../hire/serverpod_hire_receipt_store.dart';
 import '../hire/serverpod_hire_repository.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
@@ -74,6 +77,25 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
       jobs: reader,
       usdc: stellar.usdcSac,
       escrow: stellar.escrow,
+      // A-signed `create_child_job` and child verdicts of the subcontract
+      // executor (ADR-0011). Without it those submissions would stay
+      // `submitted` for good. A deployment that never subcontracts has none.
+      children: ChildJobEffects(
+        scope: <T>(action) async {
+          final session = await pod.createSession();
+          try {
+            return await action(
+              ServerpodHireRepository(session),
+              ServerpodHireReceiptStore(session),
+              ServerpodChildJobStore(session),
+            );
+          } finally {
+            await session.close();
+          }
+        },
+        escrow: stellar.escrow,
+        log: log,
+      ),
     ),
     log: log,
   );
