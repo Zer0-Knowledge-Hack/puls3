@@ -62,6 +62,13 @@ jobs:
                 contracts=true; e2e=true ;;
               scripts/setup-local-soroban.sh|scripts/setup-local-secrets.sh|.github/workflows/e2e.yml)
                 e2e=true ;;
+              # Shared composite actions (#406): a change to one runs every job that uses it.
+              .github/actions/setup-flutter/*)
+                domain=true; server=true; app=true; sdk=true; e2e=true ;;
+              .github/actions/setup-soroban/*)
+                contracts=true; e2e=true ;;
+              .github/actions/start-sandbox/*)
+                e2e=true ;;
               .github/workflows/ci.yml)
                 domain=true; server=true; app=true; contracts=true; docker=true; sdk=true; e2e=true ;;
             esac

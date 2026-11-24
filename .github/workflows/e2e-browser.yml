@@ -25,6 +25,9 @@ on:
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - '.github/workflows/e2e-browser.yml'
+      - '.github/actions/setup-flutter/**'
+      - '.github/actions/setup-soroban/**'
+      - '.github/actions/start-sandbox/**'
   pull_request:
     branches: [main]
     paths: *paths
