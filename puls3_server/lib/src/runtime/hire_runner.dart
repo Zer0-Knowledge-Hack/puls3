@@ -103,7 +103,7 @@ final class RunPassSummary {
 /// server-signed escrow `submit` (#208) is confirmed.
 ///
 /// With a [SubcontractSetup], a manifest that opted in to subcontract on a
-/// tool-calling provider ([ToolLoop.offersTools]) runs the tool loop
+/// tool-calling model ([ToolLoop.offersTools]) runs the tool loop
 /// (ADR-0011 D8): its run pauses as `awaitingChild` when it opens a child
 /// hire, and a later pass resumes it with the child's result. Every other
 /// run, and every run without the setup, is the single plain segment it

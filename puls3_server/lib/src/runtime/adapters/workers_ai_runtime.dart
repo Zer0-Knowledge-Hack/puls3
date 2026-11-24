@@ -6,9 +6,17 @@ import 'package:http/http.dart' as http;
 
 import '../conversation.dart';
 
+/// The Workers AI models that hold a conversation with tools (ADR-0011 D8,
+/// as amended for #334 T8.0). Each one was checked against the subcontract
+/// loop: it searches, subcontracts once and answers with the result. Other
+/// Workers AI models fail as `tools_unsupported` when offered tools; llama
+/// 3.3 70B, for example, sends malformed calls and repeats them.
+const workersAiToolModels = {'@cf/mistralai/mistral-small-3.1-24b-instruct'};
+
 /// [ModelRuntime] for `model.provider: workers-ai`, the free provider of the
 /// #34 model policy: one non-streaming call to the Cloudflare Workers AI REST
-/// API (`POST /accounts/{account}/ai/run/{model}`).
+/// API (`POST /accounts/{account}/ai/run/{model}`). A conversation with tools
+/// uses the OpenAI-compatible endpoint instead (see [converse]).
 ///
 /// The timeout is applied by `AgentRunner`; when it fires, the request is
 /// aborted through its `abortTrigger`. The API token is sent only in the
@@ -83,12 +91,37 @@ final class WorkersAiRuntime implements ConversationRuntime {
     );
   }
 
-  /// A plain conversation, always a [FinalText]. Tools are not supported:
-  /// the Workers AI docs list function calling for the model, but its
-  /// `tool_calls` carry only `name` and `arguments` (no id to answer) and
-  /// no way to send a tool result back is documented. So offering tools, or
-  /// replaying tool calls or results, fails as `tools_unsupported` with no
-  /// call, and subcontracting is Anthropic-only (ADR-0011 D8).
+  /// `POST /accounts/{account}/ai/v1/chat/completions`, the OpenAI-compatible
+  /// endpoint. Unlike `/ai/run`, its `tool_calls` carry an id and it takes
+  /// tool results back as `role: "tool"` messages.
+  static Uri chatCompletionsUrl(String accountId) => Uri(
+    scheme: 'https',
+    host: 'api.cloudflare.com',
+    pathSegments: [
+      'client',
+      'v4',
+      'accounts',
+      accountId,
+      'ai',
+      'v1',
+      'chat',
+      'completions',
+    ],
+  );
+
+  /// One turn of a conversation. Without tools, and with no tool call or
+  /// result to replay, it is a plain `/ai/run` call and always a
+  /// [FinalText].
+  ///
+  /// With tools, a model in [workersAiToolModels] gets an OpenAI-compatible
+  /// chat completion: [ConversationTask.tools] as `function` tools, assistant
+  /// turns replayed with their `tool_calls`, and each tool result as a
+  /// `role: "tool"` message with its `tool_call_id`. A reply with tool calls
+  /// is a [ToolCallsTurn]; a call without an id or a name, or whose
+  /// arguments are not a JSON object, fails as
+  /// `provider_error:malformed_tool_call`. Any other Workers AI model fails
+  /// as `tools_unsupported` with no call: the native `/ai/run` `tool_calls`
+  /// carry no id to answer.
   @override
   Future<ModelTurn> converse(
     ConversationTask task, {
@@ -97,18 +130,30 @@ final class WorkersAiRuntime implements ConversationRuntime {
     if (task.provider != provider) {
       throw RuntimeUnsupportedProvider(task.provider);
     }
+    final usesTools =
+        task.tools.isNotEmpty ||
+        task.messages.any(
+          (m) =>
+              m is ToolResultMessage ||
+              (m is AssistantMessage && m.toolCalls.isNotEmpty),
+        );
+    if (usesTools) {
+      if (!workersAiToolModels.contains(task.modelId)) {
+        throw const RuntimeToolsUnsupported();
+      }
+      return _converseWithTools(task, abortTrigger);
+    }
     final messages = [
       {'role': 'system', 'content': task.systemPrompt},
     ];
-    if (task.tools.isNotEmpty) throw const RuntimeToolsUnsupported();
     for (final message in task.messages) {
       switch (message) {
         case UserMessage(:final text):
           messages.add({'role': 'user', 'content': text});
-        case AssistantMessage(:final text, :final toolCalls):
-          if (toolCalls.isNotEmpty) throw const RuntimeToolsUnsupported();
+        case AssistantMessage(:final text):
           messages.add({'role': 'assistant', 'content': text});
         case ToolResultMessage():
+          // Excluded by usesTools above.
           throw const RuntimeToolsUnsupported();
       }
     }
@@ -192,6 +237,140 @@ final class WorkersAiRuntime implements ConversationRuntime {
     final text = result is Map ? result['response'] : null;
     if (text is! String) throw malformed;
     return text;
+  }
+
+  Future<ModelTurn> _converseWithTools(
+    ConversationTask task,
+    Future<void>? abortTrigger,
+  ) async {
+    final request =
+        http.AbortableRequest(
+            'POST',
+            chatCompletionsUrl(_accountId),
+            abortTrigger: abortTrigger,
+          )
+          ..headers.addAll({
+            'content-type': 'application/json',
+            'authorization': 'Bearer $_apiToken',
+          })
+          ..body = jsonEncode({
+            'model': task.modelId,
+            'messages': _chatMessages(task),
+            'tools': [
+              for (final tool in task.tools)
+                {
+                  'type': 'function',
+                  'function': {
+                    'name': tool.name,
+                    'description': tool.description,
+                    'parameters': tool.parameters,
+                  },
+                },
+            ],
+            'max_tokens': min(maxTokensCeiling, task.maxOutputChars),
+          });
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(request));
+    } on http.RequestAbortedException {
+      throw const RuntimeProviderFailed(status: null, errorType: 'aborted');
+    } on SocketException {
+      throw const RuntimeProviderFailed(status: null, errorType: null);
+    } on http.ClientException {
+      throw const RuntimeProviderFailed(status: null, errorType: null);
+    }
+    if (response.statusCode != 200) {
+      throw RuntimeProviderFailed(
+        status: response.statusCode,
+        errorType: _errorType(response.body),
+      );
+    }
+    return _turn(response.body);
+  }
+
+  /// The chat completion `messages` of [task], system prompt first.
+  static List<Map<String, Object?>> _chatMessages(ConversationTask task) => [
+    {'role': 'system', 'content': task.systemPrompt},
+    for (final message in task.messages)
+      switch (message) {
+        UserMessage(:final text) => {'role': 'user', 'content': text},
+        AssistantMessage(:final text, :final toolCalls) => {
+          'role': 'assistant',
+          'content': text,
+          if (toolCalls.isNotEmpty)
+            'tool_calls': [
+              for (final call in toolCalls)
+                {
+                  'id': call.id,
+                  'type': 'function',
+                  'function': {
+                    'name': call.name,
+                    'arguments': jsonEncode(call.arguments),
+                  },
+                },
+            ],
+        },
+        ToolResultMessage(:final callId, :final content) => {
+          'role': 'tool',
+          'tool_call_id': callId,
+          'content': content,
+        },
+      },
+  ];
+
+  static const _malformedResponse = RuntimeProviderFailed(
+    status: 200,
+    errorType: 'malformed_response',
+  );
+  static const _malformedToolCall = RuntimeProviderFailed(
+    status: 200,
+    errorType: 'malformed_tool_call',
+  );
+
+  /// The [ModelTurn] of a chat completion body.
+  static ModelTurn _turn(String body) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      throw _malformedResponse;
+    }
+    final choices = decoded is Map ? decoded['choices'] : null;
+    final choice = choices is List && choices.isNotEmpty ? choices.first : null;
+    final message = choice is Map ? choice['message'] : null;
+    if (message is! Map) throw _malformedResponse;
+    if (choice['finish_reason'] == 'length') {
+      throw const RuntimeOutputTruncated();
+    }
+    final content = message['content'];
+    final rawCalls = message['tool_calls'];
+    if (rawCalls is List && rawCalls.isNotEmpty) {
+      return ToolCallsTurn(
+        calls: [for (final raw in rawCalls) _toolCall(raw)],
+        text: content is String ? content : '',
+      );
+    }
+    if (content is! String) throw _malformedResponse;
+    return FinalText(content);
+  }
+
+  static ToolCall _toolCall(Object? raw) {
+    final function = raw is Map ? raw['function'] : null;
+    final id = raw is Map ? raw['id'] : null;
+    final name = function is Map ? function['name'] : null;
+    if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
+      throw _malformedToolCall;
+    }
+    var arguments = (function as Map)['arguments'];
+    if (arguments is String) {
+      try {
+        arguments = jsonDecode(arguments);
+      } on FormatException {
+        throw _malformedToolCall;
+      }
+    }
+    if (arguments is! Map<String, Object?>) throw _malformedToolCall;
+    return ToolCall(id: id, name: name, arguments: arguments);
   }
 
   @override
