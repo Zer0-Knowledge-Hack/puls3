@@ -1,3 +1,5 @@
+import 'package:puls3_domain/puls3_domain.dart' show UsdcAmount;
+
 import '../generated/protocol.dart';
 
 /// The `PULS3_*` settings the escrow relay needs (P2).
@@ -21,6 +23,12 @@ final class HireRelayConfig {
   /// Seconds from hire creation to the job's `expired_at`.
   static const jobDurationKey = 'PULS3_HIRE_JOB_DURATION_SECONDS';
 
+  /// The platform ceiling of a hire's subcontract reserve, in USDC stroops
+  /// (ADR-0011 D1). Read only for a hire that asks for a reserve, so a
+  /// deployment without it hires as before and refuses any reserve.
+  static const subcontractReserveMaxKey =
+      'PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS';
+
   /// The contract's `MAX_FEE_BPS`.
   static const _maxFeeBps = 1000;
 
@@ -34,6 +42,10 @@ final class HireRelayConfig {
   int get platformFeeBps => _read(platformFeeKey, 0, _maxFeeBps);
 
   int get jobDurationSeconds => _positive(jobDurationKey);
+
+  /// 0 or more; 0 turns subcontracting off on this network.
+  int get subcontractReserveMaxStroops =>
+      _read(subcontractReserveMaxKey, 0, UsdcAmount.maxStroops);
 
   int _positive(String key) => _read(key, 1, null);
 
