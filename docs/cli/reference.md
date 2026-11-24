@@ -18,6 +18,8 @@ Hire and Studio commands act for your wallet, so they need a session of it. The 
 
 The first command saves the session in a file only you can read (mode 0600) and keeps the rotated tokens there. Later commands, and the MCP server, use that file; `PULS3_REFRESH_TOKEN` is read again only when you copy a new session. After 72 hours, or after you revoke it in the app, commands exit 77: copy a new session. A revocation takes up to 10 minutes to stop a token already in use.
 
+The same wallet sheet lists your live CLI sessions under **Copy session for CLI**. Each row shows when it was created, last used and when it ends; **Revoke** ends one. Revoking a CLI session never signs out the app itself.
+
 Without a session the catalog commands still work, and hire and Studio commands exit 77 (`SessionRequired`) before sending anything.
 
 ## Run it
