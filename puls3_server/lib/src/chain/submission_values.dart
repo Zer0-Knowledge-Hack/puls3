@@ -58,15 +58,19 @@ enum SubmissionPurpose {
     childReject => 'reject',
   };
 
-  /// Signed by the server, never prepared for a wallet, so it has no
-  /// preparation id.
+  /// Signed by the server itself, never prepared for a wallet. `claimRefund`
+  /// is permissionless instead: the relay may sign it, and the consumer may
+  /// prepare the same call for their own signature (#277).
   bool get isServerSigned =>
       this == submit ||
       this == release ||
-      this == claimRefund ||
       this == createChildJob ||
       this == childComplete ||
       this == childReject;
+
+  /// Permissionless: the server signs it for the automatic refund and the
+  /// consumer may prepare the same contract call for their own signature.
+  bool get isPermissionless => this == claimRefund;
 
   /// The purpose whose [wireName] is exactly [wire], or `null`.
   static SubmissionPurpose? tryParse(String wire) => _byWire(values, wire);

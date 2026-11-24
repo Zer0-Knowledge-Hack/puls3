@@ -28,7 +28,8 @@ final class StoredSubmission {
 
   final int id;
 
-  /// Null for server-signed purposes.
+  /// Null for server-signed purposes, or for a relay `claimRefund`; set when
+  /// the consumer prepared it.
   final String? preparationId;
   final SubmissionPurpose purpose;
 
@@ -103,7 +104,8 @@ abstract interface class ChainSubmissionStore {
   /// Throws [ChainSubmissionConflict] when [preparationId] or
   /// [transactionHash] already has a record, and [ArgumentError] when
   /// [preparationId] does not fit [purpose]: wallet-signed purposes need
-  /// one, server-signed purposes never have one.
+  /// one, server-signed purposes never have one. `claimRefund` is
+  /// permissionless: it may have one (consumer-signed) or not (relay-signed).
   ///
   /// With a [transaction] the insert joins it, so a preparation claim and
   /// this record commit or roll back together; a unique violation then
@@ -157,9 +159,11 @@ abstract interface class ChainSubmissionStore {
   /// Throws [ArgumentError] when [limit] is below 1.
   Future<List<StoredSubmission>> listSubmitted({int limit = 100});
 
-  /// Whether a record of one of [purposes] is still `submitted`, for any
-  /// hire. The deadline pass uses it to keep one relay transaction in
-  /// flight, so two envelopes never share the relay account's sequence.
+  /// Whether a record without a preparation (relay- or server-signed) of one
+  /// of [purposes] is still `submitted`, for any hire. The deadline pass uses
+  /// it to keep one relay transaction in flight, so two envelopes never share
+  /// the relay account's sequence. A consumer-prepared record is not relay
+  /// traffic and never counts here.
   Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes);
 
   /// The stored envelope of every record of one of [purposes] that is still
@@ -194,6 +198,9 @@ abstract interface class ChainSubmissionStore {
 
 /// Shared argument check of [ChainSubmissionStore.insertSubmitted].
 void checkPreparation(SubmissionPurpose purpose, String? preparationId) {
+  // `claim_refund` is permissionless: the relay signs the automatic refund
+  // (no preparation) and the consumer may prepare one from the app.
+  if (purpose.isPermissionless) return;
   if (purpose.isServerSigned && preparationId != null) {
     throw ArgumentError.value(
       preparationId,

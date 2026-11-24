@@ -12,6 +12,10 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
   /// Forces the status [findHire] reports for a hire id.
   final statusOverride = <int, HireStatus?>{};
 
+  /// The agent wallet that received the `fund` of a hire, when a test needs
+  /// the custody check to see a payee.
+  final payees = <int, String>{};
+
   /// Every stored hire, in insertion order.
   List<HireRow> get all => List.unmodifiable(_rows.values);
 
@@ -64,6 +68,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       jobId: jobId,
       escrow: escrow,
       paymentTransaction: row.paymentTransaction,
+      payee: payees[row.id],
       status: HireStatus.open,
       subcontractReserve: row.subcontractReserve,
       allowRelatedParty: row.allowRelatedParty,
@@ -114,6 +119,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
       jobId: row.jobId,
       escrow: row.escrow,
       paymentTransaction: row.paymentTransaction,
+      payee: payees[row.id],
       status: statusOverride[row.id],
       subcontractReserve: row.subcontractReserve,
       allowRelatedParty: row.allowRelatedParty,
@@ -132,6 +138,7 @@ class InMemoryHireLifecycleStore implements HireLifecycleStore {
     input: hire.input,
     jobId: null,
     paymentTransaction: null,
+    payee: null,
     status: null,
     subcontractReserve: hire.subcontractReserve,
     allowRelatedParty: hire.allowRelatedParty,

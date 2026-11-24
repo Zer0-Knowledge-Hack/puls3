@@ -64,6 +64,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   bool _busy = false;
   bool _approving = false;
   bool _rejecting = false;
+  bool _claiming = false;
 
   /// The score sent from S10 in this visit, before the next poll returns the
   /// one stored by the server (#242).
@@ -290,6 +291,45 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
     }
   }
 
+  Future<void> _claimRefund() async {
+    if (_claiming) return;
+    final hire = _hire;
+    final wallet = _wallet;
+    final address = wallet?.address;
+    if (hire == null || wallet == null || address == null) return;
+    _poll?.cancel();
+    setState(() {
+      _claiming = true;
+      _error = null;
+    });
+    try {
+      final gateway = AppScope.of(context).hireGateway;
+      await gateway.ensureSignedIn(address, wallet.signChallenge);
+      final preparation = await gateway.prepareClaimRefund(hire.hireId);
+      final signed = await wallet.signTransaction(
+        preparation.unsignedTransaction,
+      );
+      await gateway.submit(hire.hireId, preparation, signed);
+      if (!mounted) return;
+      setState(() => _claiming = false);
+      await _load();
+    } on WalletException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _claiming = false;
+        _error = e is WalletSignatureRejected
+            ? context.l10n.hireDecisionCancelled
+            : walletErrorMessage(e);
+      });
+    } on HireGatewayException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _claiming = false;
+        _error = e.message;
+      });
+    }
+  }
+
   Future<void> _copyResult(String result) async {
     await widget.copyText(result);
     if (!mounted) return;
@@ -377,9 +417,12 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
             : () => _openDecision(hire),
         onApprove: () => unawaited(_decide(approve: true)),
         onReject: () => unawaited(_decide(approve: false)),
+        onClaimRefund: () => unawaited(_claimRefund()),
         rejectReasonController: _reason,
         showApprove: hire.showApproveAt(widget.now()),
         showReject: hire.showRejectAt(widget.now()),
+        showClaimRefund: hire.canClaimRefundAt(widget.now()),
+        claiming: _claiming,
         deadlinePassed:
             hire.stage == HireStage.submitted &&
             !hire.approvalWindowOpen(widget.now()),

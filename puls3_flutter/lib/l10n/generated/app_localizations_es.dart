@@ -1260,6 +1260,35 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hireRejectRefund => 'Rechazar y reembolsar';
 
   @override
+  String get hireStatusRecording => 'Financiado · Registrando';
+
+  @override
+  String get hireStepRecording =>
+      'El agente terminó; registrando el resultado en Stellar.';
+
+  @override
+  String get hireNoteRecording =>
+      'El agente terminó. Esperando que el resultado se registre en Stellar.';
+
+  @override
+  String get hireNoteRunFailed =>
+      'El agente no pudo terminar esta tarea. Recházala para reembolsar ahora o reclama el reembolso cuando expire el trabajo.';
+
+  @override
+  String get hireSubmitBlocked =>
+      'No se pudo registrar el resultado en Stellar.';
+
+  @override
+  String get hireClaimNote =>
+      'El trabajo expiró. Reclama el reembolso con tu billetera; no se necesita la clave del servidor.';
+
+  @override
+  String get hireClaimRefund => 'Reclamar reembolso';
+
+  @override
+  String get hireClaimingRefund => 'Reclamando reembolso…';
+
+  @override
   String get hireRejectReasonHint => 'Motivo (opcional)';
 
   @override
