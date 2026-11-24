@@ -110,6 +110,30 @@ void main() {
     }
   });
 
+  test('a run waiting for a child shows running on a funded hire, with no '
+      'result and no action for the client (ADR-0011 D7)', () async {
+    final hire = await rig.hire(status: HireStatus.funded);
+    queue(hire.id);
+    await runs.markRunning(hire.id, rig.clock);
+    await runs.markAwaitingChild(
+      hire.id,
+      loopState: '{}',
+      pendingToolCallId: 'toolu_1',
+      childHireId: 99,
+      childRequest: '{}',
+      at: rig.clock,
+    );
+
+    final detail = await query().getHire(rig.wallet, hire.id);
+    final summaries = await query().listMyHires(rig.wallet);
+
+    expect(detail.hire.status, 'funded');
+    expect(detail.hire.runtimeStatus, 'running');
+    expect(detail.hire.failureReason, isNull);
+    expect(detail.result, isNull);
+    expect(summaries.single.needsAction, isFalse);
+  });
+
   test('a failed run shows failed with its safe reason', () async {
     final hire = await rig.hire(status: HireStatus.funded);
     queue(hire.id);

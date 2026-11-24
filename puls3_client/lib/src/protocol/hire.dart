@@ -27,7 +27,11 @@ abstract class Hire
     this.failureReason,
     this.rejectedFrom,
     this.feedbackReference,
-  });
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    this.parentHireId,
+  }) : subcontractReserve = subcontractReserve ?? 0,
+       allowRelatedParty = allowRelatedParty ?? true;
 
   factory Hire({
     required int id,
@@ -41,6 +45,9 @@ abstract class Hire
     String? failureReason,
     String? rejectedFrom,
     String? feedbackReference,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   }) = _HireImpl;
 
   factory Hire.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -56,6 +63,13 @@ abstract class Hire
       failureReason: jsonSerialization['failureReason'] as String?,
       rejectedFrom: jsonSerialization['rejectedFrom'] as String?,
       feedbackReference: jsonSerialization['feedbackReference'] as String?,
+      subcontractReserve: jsonSerialization['subcontractReserve'] as int?,
+      allowRelatedParty: jsonSerialization['allowRelatedParty'] == null
+          ? null
+          : _isc.BoolJsonExtension.fromJson(
+              jsonSerialization['allowRelatedParty'],
+            ),
+      parentHireId: jsonSerialization['parentHireId'] as int?,
     );
   }
 
@@ -97,6 +111,16 @@ abstract class Hire
   /// the give_feedback transaction hash. Replaces the former rated state.
   String? feedbackReference;
 
+  /// USDC stroops of subcontract reserve the consumer funds beside price
+  /// (ADR-0011 D1). 0 for a hire that never subcontracts.
+  int subcontractReserve;
+
+  /// Whether related-party subcontracts are allowed (ADR-0011 D10).
+  bool allowRelatedParty;
+
+  /// Domain HireId of the parent hire of a child hire (ADR-0011 D7).
+  int? parentHireId;
+
   /// Returns a shallow copy of this [Hire]
   /// with some or all fields replaced by the given arguments.
   @_isc.useResult
@@ -112,6 +136,9 @@ abstract class Hire
     String? failureReason,
     String? rejectedFrom,
     String? feedbackReference,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -128,6 +155,9 @@ abstract class Hire
       if (failureReason != null) 'failureReason': failureReason,
       if (rejectedFrom != null) 'rejectedFrom': rejectedFrom,
       if (feedbackReference != null) 'feedbackReference': feedbackReference,
+      'subcontractReserve': subcontractReserve,
+      'allowRelatedParty': allowRelatedParty,
+      if (parentHireId != null) 'parentHireId': parentHireId,
     };
   }
 
@@ -146,6 +176,9 @@ abstract class Hire
       if (failureReason != null) 'failureReason': failureReason,
       if (rejectedFrom != null) 'rejectedFrom': rejectedFrom,
       if (feedbackReference != null) 'feedbackReference': feedbackReference,
+      'subcontractReserve': subcontractReserve,
+      'allowRelatedParty': allowRelatedParty,
+      if (parentHireId != null) 'parentHireId': parentHireId,
     };
   }
 
@@ -170,6 +203,9 @@ class _HireImpl extends Hire {
     String? failureReason,
     String? rejectedFrom,
     String? feedbackReference,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   }) : super._(
          id: id,
          agentId: agentId,
@@ -182,6 +218,9 @@ class _HireImpl extends Hire {
          failureReason: failureReason,
          rejectedFrom: rejectedFrom,
          feedbackReference: feedbackReference,
+         subcontractReserve: subcontractReserve,
+         allowRelatedParty: allowRelatedParty,
+         parentHireId: parentHireId,
        );
 
   /// Returns a shallow copy of this [Hire]
@@ -200,6 +239,9 @@ class _HireImpl extends Hire {
     Object? failureReason = _Undefined,
     Object? rejectedFrom = _Undefined,
     Object? feedbackReference = _Undefined,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    Object? parentHireId = _Undefined,
   }) {
     return Hire(
       id: id ?? this.id,
@@ -221,6 +263,9 @@ class _HireImpl extends Hire {
       feedbackReference: feedbackReference is String?
           ? feedbackReference
           : this.feedbackReference,
+      subcontractReserve: subcontractReserve ?? this.subcontractReserve,
+      allowRelatedParty: allowRelatedParty ?? this.allowRelatedParty,
+      parentHireId: parentHireId is int? ? parentHireId : this.parentHireId,
     );
   }
 }

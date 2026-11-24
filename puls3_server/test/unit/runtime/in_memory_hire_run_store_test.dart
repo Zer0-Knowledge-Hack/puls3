@@ -29,6 +29,7 @@ void main() {
             );
             return hireId;
           },
+      damage: store.damageAwaiting,
     );
   });
 
@@ -41,5 +42,11 @@ void main() {
       reason: 'stays running until the escrow submit lands',
     );
     expect(HireRunState.failed.runtimeStatus.name, 'failed');
+    expect(
+      HireRunState.awaitingChild.runtimeStatus.name,
+      'running',
+      reason: 'waiting for a child is run data; the hire stays funded (D7)',
+    );
+    expect(HireRunState.parse('awaitingChild'), HireRunState.awaitingChild);
   });
 }

@@ -4,6 +4,7 @@
 /// (ADR-0001). See docs/domain/model.md for the glossary and invariants.
 library;
 
+export 'src/agent_search.dart';
 export 'src/entities.dart';
 export 'src/errors.dart';
 export 'src/feedback.dart';

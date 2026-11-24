@@ -83,6 +83,9 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
           expiredAt: hire.expiredAt,
           requestId: hire.requestId,
           input: hire.input,
+          subcontractReserve: hire.subcontractReserve,
+          allowRelatedParty: hire.allowRelatedParty,
+          parentHireId: hire.parentHireId,
         ),
         transaction: transaction,
       );
@@ -184,6 +187,9 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       input: record.input,
       jobId: record.jobId,
       escrow: record.escrow,
+      subcontractReserve: record.subcontractReserve,
+      allowRelatedParty: record.allowRelatedParty,
+      parentHireId: record.parentHireId,
       paymentTransaction: payment?.transactionHash,
       status: payment != null
           ? await _settlement(record.id!, transaction: transaction) ??
@@ -245,6 +251,12 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       consumer: StellarAddress.parse(hireRecord.consumer),
       price: UsdcAmount.stroops(hireRecord.price),
       manifestVersion: hireRecord.manifestVersion,
+      subcontractReserve: UsdcAmount.stroops(hireRecord.subcontractReserve),
+      allowRelatedParty: hireRecord.allowRelatedParty,
+      parentHireId: switch (hireRecord.parentHireId) {
+        final parent? => HireId(parent),
+        null => null,
+      },
     );
 
     if (paymentRecord == null) {
@@ -295,7 +307,10 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
   static Hire _replayRun(Hire funded, HireRunRecord run) =>
       switch (HireRunState.parse(run.state)) {
         HireRunState.queued => funded,
-        HireRunState.running || HireRunState.succeeded => funded.startRun(),
+        // A run waiting for its child is still working (ADR-0011 D7).
+        HireRunState.running ||
+        HireRunState.awaitingChild ||
+        HireRunState.succeeded => funded.startRun(),
         HireRunState.failed =>
           (run.startedAt == null ? funded : funded.startRun()).failRun(
             reason: run.failureReason ?? runFailedWithoutReason,

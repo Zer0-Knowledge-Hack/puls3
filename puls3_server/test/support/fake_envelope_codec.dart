@@ -97,6 +97,25 @@ final class FakeEnvelopeCodec implements EnvelopeCodec {
     };
   }
 
+  /// The source the body starts with, or null when [base64] is not an
+  /// envelope of this format (tests store free-form placeholders too).
+  @override
+  StellarAddress? sourceOf(String base64) {
+    try {
+      final text = latin1.decode(base64Decode(base64));
+      final at = text.lastIndexOf(_marker);
+      if (at < 0) return null;
+      return StellarAddress.parse(text.substring(0, at).split('|').first);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// A signed envelope whose source is [source], as a call that [source]
+  /// signed and that is in flight.
+  static String signedBy(StellarAddress source) =>
+      envelope(latin1.encode('${source.value}|9|0|150|'), 'ok');
+
   /// The base64 envelope of [body] with signature [tag].
   static String envelope(List<int> body, String tag) =>
       base64Encode([...body, ...latin1.encode('$_marker$tag')]);

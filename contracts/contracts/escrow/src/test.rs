@@ -444,7 +444,7 @@ fn job_state_discriminants_are_stable() {
 #[test]
 fn version_matches_crate_version() {
     let ctx = setup();
-    assert_eq!(ctx.escrow().version(), ctx.desc("0.1.0"));
+    assert_eq!(ctx.escrow().version(), ctx.desc("0.2.0"));
 }
 
 #[test]
@@ -2641,6 +2641,8 @@ fn contract_exports_exactly_the_specified_functions() {
         "set_token_allowed",
         "create_job",
         "fund",
+        "fund_with_reserve",
+        "create_child_job",
         "submit",
         "complete",
         "release",
@@ -3229,3 +3231,5 @@ fn extend_ttl_keeps_a_long_funded_job_alive() {
     assert_eq!(job_ttl(&ctx, id), TTL_BUMP);
     assert_eq!(ctx.escrow().get_job(&id).state, JobState::Funded);
 }
+
+mod subcontract;

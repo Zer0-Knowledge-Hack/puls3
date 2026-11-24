@@ -6,14 +6,20 @@ import 'package:serverpod/serverpod.dart';
 
 import '../chain/chain_log.dart';
 import '../feedback/reputation_wiring.dart';
+import '../hire/serverpod_hire_repository.dart';
+import '../ledger/agent_owner_reader.dart';
 import '../ledger/contract_reader.dart';
 import '../ledger/serverpod_terminal_job_store.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'agent_catalog_service.dart';
+import 'agent_owners.dart';
+import 'agent_search_service.dart';
 import 'catalog_reader.dart';
 import 'custodied_wallets.dart';
+import 'hidden_agents.dart';
+import 'hidden_catalog_reader.dart';
 import 'hireable_catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
 import 'reputation_catalog_reader.dart';
@@ -117,7 +123,9 @@ void catalogConsoleLog(ChainLogLevel level, String message) {
 
 /// Builds the catalog reader for one request: the Postgres index, falling back
 /// to the on-chain catalog while the index is empty, with each agent's
-/// reputation added by the #11 function.
+/// reputation added by the #11 function. The agents listed in
+/// `PULS3_HIDDEN_AGENT_IDS` are dropped first, so they get no custody or
+/// reputation read and no caller of this reader ever sees them.
 ///
 /// Every Soroban import lives here, not in the endpoint, so the endpoint
 /// depends only on [CatalogReader]. The fallback is a process-wide singleton;
@@ -127,9 +135,8 @@ CatalogReader buildAgentCatalogReader(
   Map<String, String>? environment,
   http.Client? httpClient,
 }) {
-  final config = StellarConfig.fromEnvironment(
-    environment ?? Platform.environment,
-  );
+  final env = environment ?? Platform.environment;
+  final config = StellarConfig.fromEnvironment(env);
   final fallback = (environment == null && httpClient == null)
       ? chainCatalog(Platform.environment)
       : _buildChainCatalog(
@@ -138,16 +145,55 @@ CatalogReader buildAgentCatalogReader(
         );
   return ReputationCatalogReader(
     inner: HireableCatalogReader(
-      inner: IndexedAgentCatalogService(
-        index: ServerpodAgentIndexRepository(
-          session,
-          network: config.networkPassphrase,
+      inner: HiddenCatalogReader(
+        inner: IndexedAgentCatalogService(
+          index: ServerpodAgentIndexRepository(
+            session,
+            network: config.networkPassphrase,
+          ),
+          fallback: fallback,
         ),
-        fallback: fallback,
+        hidden: HiddenAgents.fromEnvironment(env),
       ),
       custody: custodyOn(session),
       unpublished: publicationOn(session),
     ),
     cache: _reputation(config),
+  );
+}
+
+/// The marketplace search of ADR-0011 D9 over one request's [session]: the
+/// same catalog the endpoint serves, the hire chain from Postgres, and owners
+/// from the database (custody and Studio deploy) and the identity registry's
+/// `owner_of` (D10).
+AgentSearchService buildAgentSearchService(
+  Session session, {
+  Map<String, String>? environment,
+  http.Client? httpClient,
+}) {
+  final config = StellarConfig.fromEnvironment(
+    environment ?? Platform.environment,
+  );
+  final rpc = SorobanRpcClient(
+    httpClient: httpClient ?? (_sharedHttpClient ??= http.Client()),
+    url: config.rpcUrl,
+    timeout: config.rpcTimeout,
+  );
+  return AgentSearchService(
+    catalog: buildAgentCatalogReader(
+      session,
+      environment: environment,
+      httpClient: httpClient,
+    ),
+    hires: ServerpodHireRepository(session),
+    owners: combinedOwnersLookup([
+      databaseOwnersLookup(session),
+      registryOwnersLookup(
+        ContractAgentOwnerReader(
+          ContractReader(rpc, source: config.simulationSource),
+          identityRegistry: config.identityRegistry,
+        ),
+      ),
+    ]),
   );
 }

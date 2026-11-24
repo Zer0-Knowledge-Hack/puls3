@@ -17,6 +17,16 @@ fields:
   ### Null for a hire that predates the column and for a hire without a job:
   ### it then means the escrow configured at that moment (#307).
   escrow: String?
+  ### USDC stroops the consumer funds beside price for child jobs
+  ### (fund_with_reserve, ADR-0011 D1). 0, the default of existing rows, is a
+  ### hire that never subcontracts and is funded with fund.
+  subcontractReserve: int, default=0
+  ### Whether the agent may subcontract an agent of the same owner (ADR-0011
+  ### D10). Allowed by default, with notice.
+  allowRelatedParty: bool, default=true
+  ### The hire whose reserve funded this child hire (ADR-0011 D7). Null for a
+  ### consumer's hire.
+  parentHireId: int?
 indexes:
   hire_consumer_request_idx:
     fields: consumer, requestId
@@ -24,3 +34,5 @@ indexes:
   hire_job_id_idx:
     fields: jobId
     unique: true
+  hire_parent_idx:
+    fields: parentHireId

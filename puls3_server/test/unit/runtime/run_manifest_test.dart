@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/ledger/ledger_errors.dart';
 import 'package:puls3_server/src/runtime/demo_manifests.dart';
 import 'package:puls3_server/src/runtime/run_manifest.dart';
+import 'package:puls3_server/src/runtime/studio_run_manifest_source.dart';
 import 'package:test/test.dart';
 
 import '../hire/hire_test_fakes.dart';
@@ -79,6 +81,84 @@ void main() {
     expect(task.input, 'Where is my refund?');
     expect(task.maxInputChars, 4000);
     expect(task.maxOutputChars, 4000);
+  });
+
+  group('subcontract opt-in (ADR-0011 D8)', () {
+    RunManifest opted(int maxChildren) => RunManifest(
+      provider: 'anthropic',
+      modelId: 'claude-opus-5-5',
+      systemPrompt: 'You triage one customer message.',
+      inputMaxChars: 4000,
+      outputMaxChars: 4000,
+      subcontract: SubcontractOptIn(
+        maxChildren: maxChildren,
+        suggestedReserve: 1000000,
+      ),
+    );
+
+    test('a manifest without it never subcontracts', () {
+      expect(_manifest.subcontract, isNull);
+      expect(_manifest.effectiveMaxChildren, 0);
+    });
+
+    test('the platform cap bounds the manifest child count', () {
+      expect(subcontractMaxChildrenCap, 2);
+      expect(opted(1).effectiveMaxChildren, 1);
+      expect(opted(2).effectiveMaxChildren, 2);
+      expect(opted(5).effectiveMaxChildren, subcontractMaxChildrenCap);
+    });
+
+    test('demo manifests never opt in', () {
+      for (final versions in demoManifests.values) {
+        for (final manifest in versions.values) {
+          expect(manifest.subcontract, isNull);
+        }
+      }
+    });
+
+    Future<RunManifest?> studio(Map<String, Object?> doc) =>
+        StudioRunManifestSource(
+          lookup: (_, _) async =>
+              (manifestJson: jsonEncode(doc), owner: 'G-OWNER'),
+          fallback: source,
+        ).find(42, 1);
+
+    Map<String, Object?> studioDoc() => {
+      'name': 'Copy Forge',
+      'description': 'Rewrites marketing copy.',
+      'skills': [
+        {'id': 'rewrite', 'name': 'Rewrite', 'description': '', 'tags': []},
+      ],
+      'model': {
+        'provider': 'workers-ai',
+        'id': '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      },
+      'system_prompt': 'You rewrite copy in a clear voice.',
+      'input': {'type': 'text', 'max_chars': 4000},
+      'output': {'type': 'markdown', 'max_chars': 8000},
+      'price': {'asset': 'USDC', 'amount': 3000000},
+    };
+
+    test('a Studio version carries its opt-in to the run manifest', () async {
+      final manifest = await studio({
+        ...studioDoc(),
+        'subcontract': {'max_children': 3, 'suggested_reserve': 500},
+      });
+
+      expect(
+        manifest?.subcontract,
+        SubcontractOptIn(maxChildren: 3, suggestedReserve: 500),
+      );
+      expect(manifest?.effectiveMaxChildren, subcontractMaxChildrenCap);
+      expect(manifest, isA<OwnedRunManifest>());
+    });
+
+    test('a Studio version without it has no opt-in', () async {
+      final manifest = await studio(studioDoc());
+
+      expect(manifest, isA<OwnedRunManifest>());
+      expect(manifest?.subcontract, isNull);
+    });
   });
 
   group('demo manifests', () {

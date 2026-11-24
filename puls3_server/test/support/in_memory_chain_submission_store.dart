@@ -123,6 +123,15 @@ final class InMemoryChainSubmissionStore implements ChainSubmissionStore {
       );
 
   @override
+  Future<List<String?>> submittedEnvelopes(
+    Set<SubmissionPurpose> purposes,
+  ) async => [
+    for (final r in _rows.values.toList()..sort((a, b) => a.id.compareTo(b.id)))
+      if (r.state == SubmissionState.submitted && purposes.contains(r.purpose))
+        r.signedEnvelopeXdr,
+  ];
+
+  @override
   Future<bool> markConfirmed(int id) async =>
       _transition(id, SubmissionState.confirmed, null);
 

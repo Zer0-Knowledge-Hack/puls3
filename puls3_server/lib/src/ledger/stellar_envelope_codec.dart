@@ -195,6 +195,22 @@ final class StellarEnvelopeCodec
   }
 
   @override
+  StellarAddress? sourceOf(String base64) {
+    try {
+      final account =
+          (stellar.Envelope.fromXdr(base64Decode(base64))
+                  as stellar.TransactionV1Envelope)
+              .tx
+              .sourceAccount;
+      if (account is! stellar.MuxedAccountEd25519) return null;
+      return StellarAddress.parse(account.address.baseAddress);
+    } on Object {
+      // Not base64, not a version 1 envelope, a fee bump or truncated bytes.
+      return null;
+    }
+  }
+
+  @override
   String? firstDifference(Uint8List preparedBody, Uint8List signedBody) {
     if (_same(preparedBody, signedBody)) return null;
     final prepared = _groups(preparedBody);

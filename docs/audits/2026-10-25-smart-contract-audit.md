@@ -53,7 +53,7 @@ refers back to the report without giving one.
 | E-2 | Not stated | `set_identity_registry` is instant and single-key: a compromised admin can redirect future payments | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | `a6bb6ac` ([#289](https://github.com/Zer0-Knowledge-Hack/puls3/pull/289)) | Fixed in source |
 | E-3 | Low | `set_admin` is single-step (a typo loses control), and `set_treasury` applies to jobs in flight | [#205](https://github.com/Zer0-Knowledge-Hack/puls3/issues/205) | `5c4ed3a` ([#241](https://github.com/Zer0-Knowledge-Hack/puls3/pull/241)) | Fixed in source |
 | E-4 | Not stated | Not described in any follow-up issue | none | none | Unknown: needs the original report |
-| E-5 | Not stated | The persistent TTL (about 60 days) is not tied to `max_expiry` | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | [#333](https://github.com/Zer0-Knowledge-Hack/puls3/pull/333), in review | Open |
+| E-5 | Not stated | The persistent TTL (about 60 days) is not tied to `max_expiry` | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | `3fe4eb1` ([#333](https://github.com/Zer0-Knowledge-Hack/puls3/pull/333)) | Fixed in source |
 | D-1 | Not stated (mainnet blocker) | One key is escrow admin, reputation owner and agent 7's provider wallet, and agent keys are custodied by the server | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | none | Open |
 | I-1 | Not stated | Agent URI squatting: registration has no proof of control | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | Catalog ids: [#381](https://github.com/Zer0-Knowledge-Hack/puls3/pull/381) (a Studio id belongs to its draft's owner; any other id to its first owner) | Partly fixed |
 | I-2 | Not stated | Permissionless registration feeds `catalog.list()`, which every `createHire` read | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | `22a9b3a` ([#288](https://github.com/Zer0-Knowledge-Hack/puls3/pull/288)) | Fixed |
@@ -78,7 +78,10 @@ in [ADR-0008](../adr/0008-reputation-formula-off-chain.md) and tracked in
 
 ## Still open before mainnet
 
-D-1, I-1, E-5 (in review), the rest of P-1, and the redeploy that puts the
+D-1, the rest of I-1, the rest of P-1, and the redeploy that puts the
 "fixed in source" rows on chain. They are tracked in
 [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206). E-4 needs the
 original report.
+
+What each open item needs, who decides it, and the key-separation procedure for
+D-1 are in [mainnet readiness](../security/mainnet-readiness.md).

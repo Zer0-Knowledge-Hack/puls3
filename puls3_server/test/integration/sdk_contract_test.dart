@@ -133,6 +133,118 @@ void main() {
         });
       });
 
+      group('createHire', () {
+        test(
+          'stores the hire the SDK started and returns it unsigned',
+          () async {
+            final result = await signedIn.createHire(
+              agentRegistryId,
+              world.wallet,
+              'summarise this',
+              'contract-create',
+            );
+
+            final row = (await HireRecord.db.findById(
+              world.db,
+              result.hire.id,
+            ))!;
+            expect(row.consumer, world.wallet);
+            expect(row.agentId, agentRegistryId);
+            expect(row.price, agentPrice);
+            expect(result.hire.id, row.id);
+            expect(result.hire.agentId, row.agentId);
+            expect(result.hire.consumer, row.consumer);
+            expect(result.hire.price, row.price);
+            expect(result.hire.status, isNull, reason: 'no job yet');
+            expect(await submissionsOf(row.id!), 0, reason: 'nothing sent');
+          },
+        );
+
+        test('the envelope it returns carries no signatures', () async {
+          final result = await signedIn.createHire(
+            agentRegistryId,
+            world.wallet,
+            'summarise this',
+            'contract-unsigned',
+          );
+
+          final prepared = result.preparedCreateJob!;
+          expect(prepared.purpose, 'createJob');
+          expect(prepared.signer, world.wallet);
+          expect(prepared.unsignedTransactionXdr, isNotEmpty);
+          expect(
+            world.codec.parse(prepared.unsignedTransactionXdr!).signatures,
+            isEmpty,
+          );
+          final stored = await currentPreparation(result.hire.id);
+          expect(prepared.unsignedTransactionXdr, stored.unsignedEnvelopeXdr);
+        });
+
+        test('a repeated requestId returns the same hire', () async {
+          final first = await signedIn.createHire(
+            agentRegistryId,
+            world.wallet,
+            'summarise this',
+            'contract-repeat',
+          );
+          final hiresBefore = await HireRecord.db.count(
+            world.db,
+            where: (t) => t.consumer.equals(world.wallet),
+          );
+          final again = await signedIn.createHire(
+            agentRegistryId,
+            world.wallet,
+            'summarise this',
+            'contract-repeat',
+          );
+
+          expect(again.hire.id, first.hire.id);
+          expect(
+            await HireRecord.db.count(
+              world.db,
+              where: (t) => t.consumer.equals(world.wallet),
+            ),
+            hiresBefore,
+            reason: 'the retry created no second hire',
+          );
+        });
+
+        test('the requestId is sent exactly as given, never trimmed', () async {
+          // The server uses the key raw (#369): padded and plain are two
+          // keys, so two hires.
+          final plain = await signedIn.createHire(
+            agentRegistryId,
+            world.wallet,
+            'summarise this',
+            'contract-raw',
+          );
+          final padded = await signedIn.createHire(
+            agentRegistryId,
+            world.wallet,
+            'summarise this',
+            '  contract-raw  ',
+          );
+
+          expect(padded.hire.id, isNot(plain.hire.id));
+          final server = await world.createHire(
+            requestId: '  contract-raw  ',
+          );
+          expect(server.hire.id, padded.hire.id);
+        });
+
+        test('a wallet that is not the session is WalletMismatch', () async {
+          await expectLater(
+            signedIn.createHire(
+              agentRegistryId,
+              _otherWallet,
+              'summarise this',
+              'contract-mismatch',
+            ),
+            apiError('WalletMismatch'),
+          );
+        });
+      });
+
       group('getHire', () {
         test('returns the hire the server stored', () async {
           final created = await world.createHire(requestId: 'contract-get');
