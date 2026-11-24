@@ -16,7 +16,8 @@ abstract final class ReceiptLineState {
   /// this child: its events did not match the stored child, the job was
   /// bound elsewhere, its events never showed up, or the node lost the
   /// transaction past its retention. The child hire stays unfunded and never
-  /// runs; reconciling it against the chain is a T6.4 item.
+  /// runs until `UnverifiedChildReconciler` finds its job on the chain or
+  /// proves it never landed (T6.4.4).
   static const unverified = 'unverified';
 
   /// The child `HireStatus` names of an opened line that is not settled
@@ -128,6 +129,17 @@ abstract interface class HireReceiptStore {
   /// The set stays small, because each one settles by its deadline at the
   /// latest.
   Future<List<ReceiptLine>> listUnsettled();
+
+  /// Every line whose child job is not opened yet, [ReceiptLineState.pending]
+  /// or [ReceiptLineState.unverified], oldest first (by id), across parents.
+  Future<List<ReceiptLine>> listUnopened();
+
+  /// Sets the line of [childHireId] back to [ReceiptLineState.pending] while
+  /// it is [ReceiptLineState.unverified], so that reconciliation can open it
+  /// or mark it [ReceiptLineState.notOpened] through the usual pending-only
+  /// writes (T6.4.4). One conditional write; returns whether it changed the
+  /// line.
+  Future<bool> reopenUnverified(int childHireId);
 
   /// Sets the line of [childHireId] to [ReceiptLineState.notOpened] while it
   /// is still [ReceiptLineState.pending]. One conditional write; returns

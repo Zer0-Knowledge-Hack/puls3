@@ -71,6 +71,31 @@ final class ServerpodHireReceiptStore implements HireReceiptStore {
   }
 
   @override
+  Future<List<ReceiptLine>> listUnopened() async {
+    final rows = await HireReceiptLineRecord.db.find(
+      _session,
+      where: (t) => t.state.inSet({
+        ReceiptLineState.pending,
+        ReceiptLineState.unverified,
+      }),
+      orderBy: (t) => t.id,
+    );
+    return [for (final row in rows) _line(row)];
+  }
+
+  @override
+  Future<bool> reopenUnverified(int childHireId) async {
+    final updated = await HireReceiptLineRecord.db.updateWhere(
+      _session,
+      columnValues: (t) => [t.state(ReceiptLineState.pending)],
+      where: (t) =>
+          t.childHireId.equals(childHireId) &
+          t.state.equals(ReceiptLineState.unverified),
+    );
+    return updated.isNotEmpty;
+  }
+
+  @override
   Future<bool> markNotOpened(int childHireId) =>
       _settlePending(childHireId, ReceiptLineState.notOpened);
 
