@@ -6,12 +6,16 @@ import 'package:serverpod/serverpod.dart';
 
 import '../chain/chain_log.dart';
 import '../feedback/reputation_wiring.dart';
+import '../hire/serverpod_hire_repository.dart';
+import '../ledger/agent_owner_reader.dart';
 import '../ledger/contract_reader.dart';
 import '../ledger/serverpod_terminal_job_store.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'agent_catalog_service.dart';
+import 'agent_owners.dart';
+import 'agent_search_service.dart';
 import 'catalog_reader.dart';
 import 'custodied_wallets.dart';
 import 'hidden_agents.dart';
@@ -155,5 +159,41 @@ CatalogReader buildAgentCatalogReader(
       unpublished: publicationOn(session),
     ),
     cache: _reputation(config),
+  );
+}
+
+/// The marketplace search of ADR-0011 D9 over one request's [session]: the
+/// same catalog the endpoint serves, the hire chain from Postgres, and owners
+/// from the database (custody and Studio deploy) and the identity registry's
+/// `owner_of` (D10).
+AgentSearchService buildAgentSearchService(
+  Session session, {
+  Map<String, String>? environment,
+  http.Client? httpClient,
+}) {
+  final config = StellarConfig.fromEnvironment(
+    environment ?? Platform.environment,
+  );
+  final rpc = SorobanRpcClient(
+    httpClient: httpClient ?? (_sharedHttpClient ??= http.Client()),
+    url: config.rpcUrl,
+    timeout: config.rpcTimeout,
+  );
+  return AgentSearchService(
+    catalog: buildAgentCatalogReader(
+      session,
+      environment: environment,
+      httpClient: httpClient,
+    ),
+    hires: ServerpodHireRepository(session),
+    owners: combinedOwnersLookup([
+      databaseOwnersLookup(session),
+      registryOwnersLookup(
+        ContractAgentOwnerReader(
+          ContractReader(rpc, source: config.simulationSource),
+          identityRegistry: config.identityRegistry,
+        ),
+      ),
+    ]),
   );
 }

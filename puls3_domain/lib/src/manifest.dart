@@ -119,6 +119,50 @@ final class ModelPolicy {
   bool isPaid(String provider) => provider != freeProvider;
 }
 
+/// The opt-in to hire other agents during a run (ADR-0011 D8): at most
+/// [maxChildren] subcontracts per hire, and a [suggestedReserve] in USDC
+/// stroops the consumer is asked to fund on top of the price.
+///
+/// The platform caps [maxChildren] on the server; the domain only requires at
+/// least one child. A manifest without it never subcontracts.
+final class SubcontractOptIn {
+  const SubcontractOptIn._(this.maxChildren, this.suggestedReserve);
+
+  /// Fails with [ManifestProblem.subcontractInvalid] when [maxChildren] is
+  /// below 1 or [suggestedReserve] is negative.
+  factory SubcontractOptIn({
+    required int maxChildren,
+    required int suggestedReserve,
+  }) {
+    if (maxChildren < 1 || suggestedReserve < 0) {
+      throw InvalidManifest([ManifestProblem.subcontractInvalid]);
+    }
+    return SubcontractOptIn._(maxChildren, suggestedReserve);
+  }
+
+  final int maxChildren;
+  final int suggestedReserve;
+
+  Map<String, Object?> toJson() => {
+    'max_children': maxChildren,
+    'suggested_reserve': suggestedReserve,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is SubcontractOptIn &&
+      other.maxChildren == maxChildren &&
+      other.suggestedReserve == suggestedReserve;
+
+  @override
+  int get hashCode => Object.hash(maxChildren, suggestedReserve);
+
+  @override
+  String toString() =>
+      'SubcontractOptIn(max_children: $maxChildren, '
+      'suggested_reserve: $suggestedReserve)';
+}
+
 /// What an agent accepts as input. Only plain text for now.
 enum InputType { text }
 
@@ -143,6 +187,7 @@ final class AgentManifestDraft {
     this.outputType,
     this.outputMaxChars,
     this.price,
+    this.subcontract,
   );
 
   /// Throws [InvalidManifest] listing every rule the fields break.
@@ -157,6 +202,7 @@ final class AgentManifestDraft {
     OutputType? outputType,
     int? outputMaxChars,
     UsdcAmount? price,
+    SubcontractOptIn? subcontract,
   }) {
     final draft = AgentManifestDraft._(
       name,
@@ -169,6 +215,7 @@ final class AgentManifestDraft {
       outputType,
       outputMaxChars,
       price,
+      subcontract,
     );
     final problems = draft._check(forDeploy: false);
     if (problems.isNotEmpty) throw InvalidManifest(problems);
@@ -184,6 +231,7 @@ final class AgentManifestDraft {
     'input',
     'output',
     'price',
+    'subcontract',
     'version',
   };
 
@@ -211,8 +259,12 @@ final class AgentManifestDraft {
   final int? outputMaxChars;
   final UsdcAmount? price;
 
+  /// The ADR-0011 opt-in to subcontract, or `null` when the agent never does.
+  final SubcontractOptIn? subcontract;
+
   /// The wire document: snake_case and nested, missing fields omitted, no
-  /// `schema` and no version.
+  /// `schema` and no version. `subcontract` is written only when set, so a
+  /// manifest without it keeps its bytes and hash.
   Map<String, Object?> toJson() {
     final skills = this.skills, model = this.model, price = this.price;
     final inType = inputType, inMax = inputMaxChars;
@@ -243,6 +295,7 @@ final class AgentManifestDraft {
           'max_chars': ?outMax,
         },
       if (price != null) 'price': {'asset': _asset, 'amount': price.stroops},
+      'subcontract': ?subcontract?.toJson(),
     };
   }
 
@@ -268,6 +321,7 @@ final class AgentManifestDraft {
       outputType!,
       outputMaxChars!,
       price!,
+      subcontract,
     );
   }
 
@@ -395,6 +449,7 @@ final class AgentManifest {
     this.outputType,
     this.outputMaxChars,
     this.price,
+    this.subcontract,
   );
 
   static const schemaId = 'puls3.agent-manifest/v1';
@@ -410,6 +465,9 @@ final class AgentManifest {
   final OutputType outputType;
   final int outputMaxChars;
   final UsdcAmount price;
+
+  /// The ADR-0011 opt-in to subcontract, or `null` when the agent never does.
+  final SubcontractOptIn? subcontract;
 
   String get schema => schemaId;
 
@@ -449,6 +507,7 @@ final class AgentManifest {
     outputType: outputType,
     outputMaxChars: outputMaxChars,
     price: price,
+    subcontract: subcontract,
   );
 
   @override
@@ -464,7 +523,8 @@ final class AgentManifest {
       other.inputMaxChars == inputMaxChars &&
       other.outputType == outputType &&
       other.outputMaxChars == outputMaxChars &&
-      other.price == price;
+      other.price == price &&
+      other.subcontract == subcontract;
 
   @override
   int get hashCode => Object.hash(
@@ -479,6 +539,7 @@ final class AgentManifest {
     outputType,
     outputMaxChars,
     price,
+    subcontract,
   );
 }
 
@@ -619,6 +680,7 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
         null,
         null,
         null,
+        null,
       ),
     );
   }
@@ -745,6 +807,28 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
     }
   }
 
+  SubcontractOptIn? subcontract;
+  final subcontractMap = object(doc['subcontract'], {
+    'max_children',
+    'suggested_reserve',
+  }, ManifestProblem.subcontractMalformed);
+  if (subcontractMap != null) {
+    final children = _wireInteger(subcontractMap['max_children']);
+    final reserve = _wireInteger(subcontractMap['suggested_reserve']);
+    if (children == null || reserve == null) {
+      found.add(ManifestProblem.subcontractMalformed);
+    } else {
+      try {
+        subcontract = SubcontractOptIn(
+          maxChildren: children,
+          suggestedReserve: reserve,
+        );
+      } on InvalidManifest {
+        found.add(ManifestProblem.subcontractInvalid);
+      }
+    }
+  }
+
   return _Parsed(
     found,
     AgentManifestDraft._(
@@ -758,6 +842,7 @@ _Parsed _parseDocument(Object? json, {required bool manifest}) {
       outputType,
       outputMax,
       price,
+      subcontract,
     ),
     version,
   );
