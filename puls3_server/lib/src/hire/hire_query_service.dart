@@ -9,7 +9,9 @@ import '../ledger/escrow_job.dart';
 import '../ledger/ledger_errors.dart';
 import '../runtime/hire_run_store.dart';
 import 'escrow_preparation_store.dart';
+import 'explorer_links.dart';
 import 'hire_lifecycle_store.dart';
+import 'hire_receipt_store.dart';
 
 /// One of the caller's active Studio agents, which pays hires from its own
 /// custodied [wallet].
@@ -33,6 +35,8 @@ final class HireQueryService {
     EscrowJobReader? jobs,
     DateTime Function()? now,
     CustodyLookup? custody,
+    HireReceiptStore? receipts,
+    TransactionUrl? transactionUrl,
   }) : _hires = hires,
        _runs = runs,
        _submissions = submissions,
@@ -40,7 +44,9 @@ final class HireQueryService {
        _preparations = preparations,
        _jobs = jobs,
        _now = now ?? DateTime.now,
-       _custody = custody;
+       _custody = custody,
+       _receipts = receipts,
+       _transactionUrl = transactionUrl;
 
   final HireLifecycleStore _hires;
   final HireRunStore _runs;
@@ -50,6 +56,13 @@ final class HireQueryService {
   final EscrowJobReader? _jobs;
   final DateTime Function() _now;
   final CustodyLookup? _custody;
+
+  /// The subcontract receipt lines (ADR-0011 D6). Null only in tests that do
+  /// not read them; `HireDetail.receipt` is then left out.
+  final HireReceiptStore? _receipts;
+
+  /// Explorer links of the receipt's transactions; null leaves them unset.
+  final TransactionUrl? _transactionUrl;
 
   /// How many hires [listMyHires] returns at most.
   static const listLimit = 100;
@@ -206,7 +219,39 @@ final class HireQueryService {
       escrowSubmission: escrow?.toProtocol(),
       feedbackSubmission: feedback?.toProtocol(),
       feedbackScore: feedbackScore,
+      receipt: await _receiptOf(hireId),
     );
+  }
+
+  /// The receipt lines of the parent hire [hireId], oldest first. The caller
+  /// has already checked that the session wallet is the hire's consumer.
+  Future<List<HireReceiptLine>?> _receiptOf(int hireId) async {
+    final receipts = _receipts;
+    if (receipts == null) return null;
+    final link = _transactionUrl;
+    String? url(String? hash) => hash == null ? null : link?.call(hash);
+    return [
+      for (final line in await receipts.listByParent(hireId))
+        HireReceiptLine(
+          id: line.id,
+          childHireId: line.childHireId,
+          childJobId: line.childJobId,
+          providerAgentId: line.providerAgentId,
+          providerWallet: line.providerWallet,
+          budget: line.budget,
+          fee: line.fee,
+          payout: line.payout,
+          state: line.state,
+          createTransaction: line.createTransaction,
+          createExplorerUrl: url(line.createTransaction),
+          settleTransaction: line.settleTransaction,
+          settleExplorerUrl: url(line.settleTransaction),
+          deliverableHash: line.deliverableHash,
+          relatedParty: line.relatedParty,
+          justification: line.justification,
+          createdAt: line.createdAt,
+        ),
+    ];
   }
 
   /// Why a funded hire's `submit` cannot land, or null while it can still

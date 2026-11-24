@@ -19,7 +19,12 @@ import '../ledger/soroban_rpc_client.dart';
 import '../ledger/soroban_submission_ledger.dart';
 import '../ledger/stellar_config.dart';
 import '../ledger/stellar_envelope_codec.dart';
+import '../runtime/demo_manifests.dart';
+import '../runtime/run_manifest.dart';
 import '../runtime/serverpod_hire_run_store.dart';
+import '../runtime/studio_run_manifest_source.dart';
+import '../studio/serverpod_studio_agent_version_store.dart';
+import 'explorer_links.dart';
 import 'chain_accounts.dart';
 import 'escrow_relay_service.dart';
 import 'hire_agent_lookup.dart';
@@ -27,6 +32,7 @@ import 'hire_query_service.dart';
 import 'hire_relay_config.dart';
 import 'hire_service.dart';
 import 'serverpod_escrow_preparation_store.dart';
+import 'serverpod_hire_receipt_store.dart';
 import 'serverpod_hire_repository.dart';
 
 /// The services one `HireEndpoint` request works with.
@@ -151,6 +157,15 @@ final class HireWiring {
         config: config,
         hidden: hidden,
         agentOf: agentOf,
+        // The same manifests the runtime runs (agent_runtime_wiring.dart).
+        manifests: StudioRunManifestSource.onVersions(
+          ServerpodStudioAgentVersionStore(session),
+          fallback: SeededRunManifestSource(
+            registry: ledger,
+            manifests: demoManifests,
+          ),
+        ),
+        warn: (message) => session.log(message, level: LogLevel.warning),
       ),
       relay: relay,
       feedback: FeedbackService(
@@ -169,6 +184,10 @@ final class HireWiring {
         agents: agentOf,
         jobs: ledger,
         custody: custodyOn(session),
+        receipts: ServerpodHireReceiptStore(session),
+        transactionUrl: stellarExpertTransactionUrls(
+          stellar.networkPassphrase,
+        ),
       ),
     );
   }

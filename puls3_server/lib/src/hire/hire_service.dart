@@ -9,6 +9,7 @@ import '../agent/hidden_agents.dart';
 import '../agent/registry_reader.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
+import '../runtime/run_manifest.dart';
 import 'escrow_preparation_store.dart';
 import 'escrow_relay_service.dart';
 import 'hire_lifecycle_store.dart';
@@ -30,8 +31,11 @@ class HireService {
     this.unpublished = noStudioAgents,
     this.hidden = HiddenAgents.none,
     AgentSummaryLookup? agentOf,
+    this.manifests,
+    void Function(String message)? warn,
     DateTime Function()? now,
   }) : _agentOf = agentOf,
+       _warn = warn,
        _now = now ?? DateTime.now;
 
   final HireLifecycleStore hires;
@@ -52,6 +56,13 @@ class HireService {
   /// refund.
   final HiddenAgents hidden;
   final HireRelayConfig config;
+
+  /// The manifests hires run, for [hireTerms]. Null reads no manifest, so
+  /// every agent has 0 children.
+  final RunManifestSource? manifests;
+
+  /// Where a setting that cannot be read is reported without failing.
+  final void Function(String message)? _warn;
   final DateTime Function() _now;
 
   /// Finds the hired agent by registry id. The wiring passes the catalog
@@ -229,6 +240,56 @@ class HireService {
         relatedParty,
       );
     }
+  }
+
+  /// What a consumer may fund beside the price before hiring [agentId]
+  /// (`HireEndpoint.getHireTerms`): the platform reserve ceiling and the
+  /// subcontract opt-in of the agent's current manifest, the version a new
+  /// hire would pin (`puls3.manifestVersion`).
+  ///
+  /// It never fails on the terms themselves: an unreadable ceiling is 0 and
+  /// reported, and a missing or unreadable manifest has 0 children. A hidden
+  /// or unknown agent is [AgentUnavailable], like [createHire]; a chain that
+  /// cannot be read is [HireLedgerUnavailable].
+  Future<HireTerms> hireTerms(int agentId) async {
+    if (hidden.contains(agentId)) throw AgentUnavailable(agentId: agentId);
+    final RunManifest? manifest;
+    try {
+      final agent = await _agent(agentId);
+      if (agent == null) throw AgentUnavailable(agentId: agentId);
+      manifest = await _currentManifest(agentId);
+    } on AgentCatalogUnavailable catch (e) {
+      throw HireLedgerUnavailable(message: e.message);
+    } on LedgerException catch (e) {
+      throw HireLedgerUnavailable(message: e.message);
+    }
+    return HireTerms(
+      reserveMaxStroops: config.subcontractReserveMaxOrZero(
+        onInvalid: (key) => _warn?.call(
+          '$key is not a valid reserve ceiling; hire terms show 0',
+        ),
+      ),
+      maxChildren: manifest?.effectiveMaxChildren ?? 0,
+      suggestedReserveStroops: manifest?.subcontract?.suggestedReserve ?? 0,
+    );
+  }
+
+  /// The manifest a new hire of [agentId] would run, or null when its
+  /// version or the manifest itself is unknown.
+  Future<RunManifest?> _currentManifest(int agentId) async {
+    final source = manifests;
+    if (source == null) return null;
+    final raw = await registry.agentMetadata(
+      AgentId(agentId),
+      'puls3.manifestVersion',
+    );
+    final int version;
+    try {
+      version = _manifestVersion(raw, agentId);
+    } on HireRequestInvalid {
+      return null;
+    }
+    return source.find(agentId, version);
   }
 
   /// Refuses a negative reserve, or one above the platform ceiling. The

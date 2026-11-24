@@ -47,6 +47,20 @@ final class HireRelayConfig {
   int get subcontractReserveMaxStroops =>
       _read(subcontractReserveMaxKey, 0, UsdcAmount.maxStroops);
 
+  /// [subcontractReserveMaxStroops] for a read that must not fail, such as
+  /// the pre-hire terms: 0 when unset or blank, and 0 after calling
+  /// [onInvalid] with the key for any other unreadable value.
+  int subcontractReserveMaxOrZero({void Function(String key)? onInvalid}) {
+    final raw = _environment[subcontractReserveMaxKey];
+    if (raw == null || raw.trim().isEmpty) return 0;
+    try {
+      return subcontractReserveMaxStroops;
+    } on HireConfigurationMissing {
+      onInvalid?.call(subcontractReserveMaxKey);
+      return 0;
+    }
+  }
+
   int _positive(String key) => _read(key, 1, null);
 
   int _read(String key, int min, int? max) {
