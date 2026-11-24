@@ -88,3 +88,17 @@ while stack:
     seen.add(n); stack += pk[n].get('dependencies', [])
 print(sorted(x for x in seen if 'flutter' in x) or 'no flutter')"
 ```
+
+## Contract tests against the server
+
+The tests above run against fakes. Fakes cannot tell when the SDK sends something the server reads differently, so the server's integration suite also drives this SDK over HTTP (#375): `puls3_server/test/integration/sdk_contract_test.dart`.
+
+Each test goes through the SDK, a CLI session minted by the real wallet sign-in (a fixed test key, no real wallet), the real endpoints and the test database. Only the chain is faked. It compares what the SDK sends with what the server stores.
+
+Run it with the test database up (`docker compose up -d postgres_test redis_test` in `puls3_server/`):
+
+```bash
+cd puls3_server && dart test test/integration/sdk_contract_test.dart
+```
+
+CI runs it in the `server` job, which also runs when `puls3_sdk/` or `puls3_mcp/` change. If you change what a call sends (trimming, argument order, error mapping), update the matching test there.

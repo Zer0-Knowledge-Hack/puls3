@@ -118,6 +118,8 @@ CliSessionIssuer? _createCliSessions(
 ) => _hireKind == 'server' || _studioKind == 'server'
     ? ServerCliSessionIssuer(
         create: client.cliSession.create,
+        list: client.cliSession.list,
+        revoke: client.cliSession.revoke,
         session: session,
         wallet: wallet,
       )
