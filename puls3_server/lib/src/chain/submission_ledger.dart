@@ -24,6 +24,7 @@ final class TransactionLookup {
     this.jobCreated = const [],
     this.jobFunded = const [],
     this.childJobCreated = const [],
+    this.jobCompleted = const [],
   });
 
   final TransactionStatus status;
@@ -49,6 +50,11 @@ final class TransactionLookup {
   /// The configured escrow's valid `child_job_created` events, in order, on
   /// [TransactionStatus.success]; empty otherwise (ADR-0011 D6).
   final List<ChildJobCreatedEvent> childJobCreated;
+
+  /// The configured escrow's valid `job_completed` events, in order, on
+  /// [TransactionStatus.success]; empty otherwise. A child verdict reads its
+  /// fee and payout from it (ADR-0011 D6).
+  final List<JobCompletedEvent> jobCompleted;
 }
 
 /// The chain as the submission tracker needs it.

@@ -36,6 +36,12 @@ final class FakeEscrowEffects implements EscrowEffects {
   /// Thrown by [onChildJobFailed] when set.
   Object? childFailedError;
 
+  /// The submission ids [onChildSettled] was called with.
+  final childSettled = <int>[];
+
+  /// The `job_completed` events of every [onChildSettled] call.
+  final childSettledEvents = <List<JobCompletedEvent>>[];
+
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
@@ -76,6 +82,16 @@ final class FakeEscrowEffects implements EscrowEffects {
     final failure = childFailedError;
     if (failure != null) throw failure;
     childFailed.add((submission.id, code));
+  }
+
+  @override
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {
+    _answer();
+    childSettled.add(submission.id);
+    childSettledEvents.add(completed);
   }
 
   @override

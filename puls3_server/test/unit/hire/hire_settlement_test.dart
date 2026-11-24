@@ -71,4 +71,20 @@ void main() {
       HireStatus.completed,
     );
   });
+
+  test('an A-signed child verdict settles the child hire (ADR-0011 D3)', () {
+    expect(
+      fundedHireSettlement([
+        SubmissionPurpose.submit,
+        SubmissionPurpose.childComplete,
+      ]),
+      HireStatus.completed,
+    );
+    expect(
+      fundedHireSettlement([SubmissionPurpose.childReject]),
+      HireStatus.rejected,
+    );
+    expect(settlementPurposes, contains(SubmissionPurpose.childComplete));
+    expect(settlementPurposes, contains(SubmissionPurpose.childReject));
+  });
 }

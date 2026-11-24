@@ -110,6 +110,18 @@ abstract interface class EscrowEffects {
   /// exception leaves the submission `submitted` and is retried.
   Future<void> onChildJobFailed(StoredSubmission submission, String code);
 
+  /// After a successful A-signed child verdict
+  /// ([SubmissionPurpose.childComplete] or [SubmissionPurpose.childReject],
+  /// ADR-0011 D3), before the submission is confirmed: records the child's
+  /// settlement on its receipt line. [completed] are the transaction's valid
+  /// `job_completed` events, which carry the fee and the payout of a
+  /// complete. The submission is confirmed whatever the line says; an
+  /// exception leaves it `submitted` and is retried.
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  );
+
   /// After a successful `give_feedback` ([SubmissionPurpose.giveFeedback]).
   ///
   /// No event is needed: the signed envelope is the one the server prepared
@@ -180,6 +192,12 @@ final class NoopEscrowEffects implements EscrowEffects {
   Future<void> onChildJobFailed(
     StoredSubmission submission,
     String code,
+  ) async {}
+
+  @override
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
   ) async {}
 
   @override
