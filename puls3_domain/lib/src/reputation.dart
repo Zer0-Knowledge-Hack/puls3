@@ -30,9 +30,14 @@ double reputationOf(Iterable<Feedback> feedback) {
     final seen = byClient[item.client] ?? (sum: 0, count: 0);
     byClient[item.client] = (sum: seen.sum + item.score, count: seen.count + 1);
   }
+  // Summed in a fixed order (by client address), so the result never depends
+  // on the order the feedback arrived in, not even in the last digit.
+  final clients = byClient.keys.toList()
+    ..sort((a, b) => a.value.compareTo(b.value));
   var sum = 0.0;
-  for (final client in byClient.values) {
-    sum += client.sum / client.count;
+  for (final client in clients) {
+    final scores = byClient[client]!;
+    sum += scores.sum / scores.count;
   }
   final average =
       (reputationPriorWeight * reputationPriorMean + sum) /
