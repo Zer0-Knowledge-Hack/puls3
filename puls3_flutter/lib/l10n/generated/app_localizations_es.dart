@@ -1715,4 +1715,80 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get hireSubcontractRefundNote =>
       'La reserva no usada se te reembolsa cuando termina la contratación.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontrataciones';
+
+  @override
+  String get hireReceiptReserve => 'Reserva fondeada';
+
+  @override
+  String get hireReceiptSpent => 'Gastado';
+
+  @override
+  String get hireReceiptEmpty => 'Aún no hay subcontrataciones.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agente #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Parte relacionada';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Parte relacionada: este agente tiene el mismo creador que el agente que contrataste.';
+
+  @override
+  String get hireReceiptBudget => 'Presupuesto';
+
+  @override
+  String get hireReceiptFee => 'Comisión';
+
+  @override
+  String get hireReceiptPayout => 'Pagado al agente';
+
+  @override
+  String get hireReceiptJustification => 'Por qué este agente';
+
+  @override
+  String get hireReceiptOpened => 'Abierta en la cadena';
+
+  @override
+  String get hireReceiptSettled => 'Liquidada en la cadena';
+
+  @override
+  String get hireReceiptExplorerHint => 'Abre la transacción en StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Abriéndose en la cadena';
+
+  @override
+  String get hireReceiptStateNotOpened => 'No abierta';
+
+  @override
+  String get hireReceiptStateUnverified => 'En verificación';
+
+  @override
+  String get hireReceiptStateOpen => 'Abierta';
+
+  @override
+  String get hireReceiptStateFunded => 'En curso';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Entregada';
+
+  @override
+  String get hireReceiptStateCompleted => 'Completada';
+
+  @override
+  String get hireReceiptStateRejected => 'Rechazada';
+
+  @override
+  String get hireReceiptStateExpired => 'Vencida';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tiene el mismo creador que tu agente.';
 }

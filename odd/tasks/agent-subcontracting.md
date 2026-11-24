@@ -438,7 +438,7 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       code. GREEN: unit+hire+ledger 1473 passed, `dart analyze --fatal-infos` clean. Integration
       not run: Docker needs `puls3_server/.env`, which this agent may not read. Commit: see git log.
       Risk: item 5.
-- [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
+- [x] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer. Branch `feat/334-web-subcontract` from `main`
   `6708683`. Mapped 2026-11-24 by a read-only explorer: `createHire` already takes
   `subcontractReserve` and `allowRelatedParty`; no endpoint exposes the reserve ceiling, the
@@ -470,7 +470,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     (default allowed, with notice), the "a completed subcontract is paid even if you reject the
     result" consent, and price plus reserve in the total and the funds check. The reserve and the
     flag are stored with the pending hire so a resume reuses them. Depends on T7.1.
-  - [ ] **T7.4** Hire detail receipt tree: one row per line with provider, related-party badge,
+  - [x] **T7.4** (done 2026-11-24, `edd0b40` consumer detail and `e30615e` agent-hire detail;
+    delegated writer, surface extended once for `studio/` by the parent. RED: new tests failed to
+    compile. GREEN: `flutter test` 584, analyze clean. One shared `hireReceiptEntries` mapping.)
+    Hire detail receipt tree: one row per line with provider, related-party badge,
     budget, fee, payout, state, justification and explorer links, on the consumer's and the
     agent-hire detail. Depends on T7.1.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
@@ -547,3 +550,11 @@ StellarExpert.
   section only for agents that opted in and only where the ceiling is above 0; the ceiling and the
   opt-in come from a new pre-hire read (`getHireTerms`) instead of new `AgentSummary` fields, so
   the catalog does not read manifests. T7.1 and T7.2 start in parallel.
+- 2026-11-24: T7 done on `feat/334-web-subcontract` (T7.1 `c3c65cb`, T7.2 `f4611e3`, T7.3
+  `fb261d3`, T7.4 `edd0b40` and `e30615e`). Not pushed. Next: PR slicing (stacked-to-main), then T8.
+- 2026-11-24: user: "Si, hagamoslo asi". T7 pushed as four stacked PRs (slice 15 split): #411
+  15a T7.2 Studio opt-in (`feat/334-t7-studio-optin`, base `main`), #412 15b T7.1 server read API
+  (`feat/334-t7-hire-terms`), #413 15c T7.3 hire sheet (`feat/334-t7-hire-sheet`), #414 15d T7.4
+  receipt (`feat/334-t7-receipt`). Order is T7.2 first because T7.2 and T7.3 append to the same ARB
+  files. Each slice is above 400 lines (tests are about half) and asks for `size:exception`. CI
+  runs only on #411 until each base merges. Next: reviews, then T8.

@@ -3035,6 +3035,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The unspent reserve is refunded to you when the hire ends.'**
   String get hireSubcontractRefundNote;
+
+  /// No description provided for @hireReceiptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subcontracts'**
+  String get hireReceiptTitle;
+
+  /// No description provided for @hireReceiptReserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserve funded'**
+  String get hireReceiptReserve;
+
+  /// No description provided for @hireReceiptSpent.
+  ///
+  /// In en, this message translates to:
+  /// **'Spent'**
+  String get hireReceiptSpent;
+
+  /// No description provided for @hireReceiptEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No subcontracts yet.'**
+  String get hireReceiptEmpty;
+
+  /// No description provided for @hireReceiptProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent #{id}'**
+  String hireReceiptProvider(int id);
+
+  /// No description provided for @hireReceiptRelatedParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Related party'**
+  String get hireReceiptRelatedParty;
+
+  /// No description provided for @hireReceiptRelatedPartyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Related party: this agent has the same builder as the agent you hired.'**
+  String get hireReceiptRelatedPartyHint;
+
+  /// No description provided for @hireReceiptBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Budget'**
+  String get hireReceiptBudget;
+
+  /// No description provided for @hireReceiptFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee'**
+  String get hireReceiptFee;
+
+  /// No description provided for @hireReceiptPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid to the agent'**
+  String get hireReceiptPayout;
+
+  /// No description provided for @hireReceiptJustification.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this agent'**
+  String get hireReceiptJustification;
+
+  /// No description provided for @hireReceiptOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened on chain'**
+  String get hireReceiptOpened;
+
+  /// No description provided for @hireReceiptSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled on chain'**
+  String get hireReceiptSettled;
+
+  /// No description provided for @hireReceiptExplorerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the transaction on StellarExpert'**
+  String get hireReceiptExplorerHint;
+
+  /// No description provided for @hireReceiptStatePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening on chain'**
+  String get hireReceiptStatePending;
+
+  /// No description provided for @hireReceiptStateNotOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Not opened'**
+  String get hireReceiptStateNotOpened;
+
+  /// No description provided for @hireReceiptStateUnverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Being verified'**
+  String get hireReceiptStateUnverified;
+
+  /// No description provided for @hireReceiptStateOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get hireReceiptStateOpen;
+
+  /// No description provided for @hireReceiptStateFunded.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get hireReceiptStateFunded;
+
+  /// No description provided for @hireReceiptStateSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get hireReceiptStateSubmitted;
+
+  /// No description provided for @hireReceiptStateCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get hireReceiptStateCompleted;
+
+  /// No description provided for @hireReceiptStateRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get hireReceiptStateRejected;
+
+  /// No description provided for @hireReceiptStateExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get hireReceiptStateExpired;
+
+  /// No description provided for @hireReceiptRelatedPartyHintBuilder.
+  ///
+  /// In en, this message translates to:
+  /// **'Related party: this agent has the same builder as your agent.'**
+  String get hireReceiptRelatedPartyHintBuilder;
 }
 
 class _AppLocalizationsDelegate

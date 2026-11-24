@@ -11,6 +11,7 @@ import '../molecules/key_value_row.dart';
 import '../molecules/progress_step_row.dart';
 import '../molecules/score_picker.dart';
 import '../molecules/screen_header.dart';
+import 'hire_receipt_view.dart';
 
 /// S06 hire detail (flows F6 and F7): the hire's status, the agent run, the
 /// result, the payment link and the rating. Presentational: the container polls the hire and
@@ -36,6 +37,7 @@ class HireDetailView extends StatelessWidget {
     this.claiming = false,
     this.onRate,
     this.onOpenFeedback,
+    this.onOpenReceiptUrl,
     this.ratedScore,
     this.isDemo = false,
     this.banner,
@@ -73,6 +75,9 @@ class HireDetailView extends StatelessWidget {
 
   /// Opens the `give_feedback` transaction on StellarExpert.
   final VoidCallback? onOpenFeedback;
+
+  /// Opens an explorer link of a subcontract receipt line (#334).
+  final ValueChanged<String>? onOpenReceiptUrl;
 
   /// The score sent from this screen before the next poll. The server also
   /// returns the stored score (`hire.feedbackScore`), which wins on a reload.
@@ -211,6 +216,17 @@ class HireDetailView extends StatelessWidget {
             variant: PrimaryButtonVariant.outline,
             expand: true,
             onPressed: onOpenPayment,
+          ),
+        ],
+        if (HireReceiptView.shows(
+          reserveUsdcStroops: hire.subcontractReserveUsdcStroops,
+          lines: hire.receipt,
+        )) ...[
+          const SizedBox(height: Puls3Spacing.lg),
+          HireReceiptView(
+            reserveUsdcStroops: hire.subcontractReserveUsdcStroops,
+            lines: hire.receipt,
+            onOpenUrl: onOpenReceiptUrl,
           ),
         ],
         if (showClaimRefund) ...[

@@ -9,6 +9,7 @@ import '../state/app_scope.dart';
 import '../studio/studio_gateway.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/organisms/agent_hire_panel.dart';
+import '../ui/organisms/hire_receipt_view.dart';
 
 /// Where the testnet USDC faucet lives.
 final Uri circleFaucetUrl = Uri.parse('https://faucet.circle.com');
@@ -186,6 +187,19 @@ class _AgentHireTrackerState extends State<AgentHireTracker> {
           stopped: _stopped(l10n),
           onOpenTransaction: (url) => unawaited(widget.openUrl(Uri.parse(url))),
         ),
+        if (_progress case final progress?
+            when HireReceiptView.shows(
+              reserveUsdcStroops: progress.subcontractReserveUsdcStroops,
+              lines: progress.receipt,
+            )) ...[
+          const SizedBox(height: Puls3Spacing.lg),
+          HireReceiptView(
+            reserveUsdcStroops: progress.subcontractReserveUsdcStroops,
+            lines: progress.receipt,
+            relatedPartyHint: l10n.hireReceiptRelatedPartyHintBuilder,
+            onOpenUrl: (url) => unawaited(widget.openUrl(Uri.parse(url))),
+          ),
+        ],
         if (_error case final message?) ...[
           const SizedBox(height: Puls3Spacing.sm),
           Text(

@@ -5,6 +5,7 @@ import 'package:puls3_client/puls3_client.dart';
 
 import '../data/typed_api_error.dart';
 import 'hire_gateway.dart';
+import 'hire_receipt_mapping.dart';
 import 'wallet_funds.dart';
 import 'wallet_session.dart';
 
@@ -377,6 +378,8 @@ class ServerHireGateway implements HireGateway {
       feedbackExplorerUrl: feedback?.transaction == hire.feedbackReference
           ? feedback?.explorerUrl
           : null,
+      subcontractReserveUsdcStroops: hire.subcontractReserve,
+      receipt: hireReceiptEntries(detail.receipt),
     );
   }
 
