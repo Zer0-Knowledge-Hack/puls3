@@ -3,7 +3,7 @@
 The audit findings that are not code bugs (D-1, I-1, P-1) are tracked in
 [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206). The code
 findings of that issue are merged: I-2 (#288), E-2 (#289), E-5 (#333) and the
-catalog-id part of I-1 is in review (#381). This page is what remains, who decides it, and
+catalog-id part of I-1 (#381). This page is what remains, who decides it, and
 how to do it. The full list of findings is the
 [audit register](../audits/2026-10-25-smart-contract-audit.md).
 
@@ -21,7 +21,7 @@ From [`contracts/deployments/testnet.json`](../../contracts/deployments/testnet.
 | Escrow `admin` | `GAFUY…` | allowed tokens, fee and treasury, limits, the identity-registry change (timelocked since E-2), the next admin |
 | Reputation registry owner | `GAFUY…` | upgrades the contract, so any of its behaviour (timelocked since R-6) |
 | Identity registry owner | `GBY33…` (the deployer) | only transfers or renounces ownership: the registry has no other owner-only function |
-| Payee of the 8 seed agents | `GAFUY…` | receives their hire payments; [#209](https://github.com/Zer0-Knowledge-Hack/puls3/issues/209) moves it to custodied wallets |
+| Payee of the 8 seed agents | `GAFUY…` | receives their hire payments. Rebinding them to custodied wallets was **not run**: [#209](https://github.com/Zer0-Knowledge-Hack/puls3/issues/209) was closed as not planned, because `set_agent_wallet` needs the owner's signature and the owner key of agents 7–14 is not available |
 | Agent wallets of Studio agents | the server, through agent custody | signs `submit` for its agent; see [ADR-0003](../adr/0003-payment-rail-and-custody.md) |
 
 `GAFUY…` is a Stellar CLI identity on a maintainer's machine. One leaked key
@@ -75,7 +75,7 @@ issue.
 
 ## I-1: proof of control at registration (before mainnet: decide)
 
-**In review (#381):** who may hold a catalog id.
+**Merged (#381):** who may hold a catalog id.
 
 - **A Studio id** (`studio-<draftId>`) belongs to the wallet that owns the
   draft, known off chain. A squatter cannot take it, whether it registers
@@ -106,7 +106,7 @@ the maintainers, in an ADR, before external builders can register on mainnet.
 |---|---|---|---|
 | `cargo audit` in CI | Done: weekly, non-gating, `--deny warnings` (#269, #286); each ignore has a reason and a way out (`contracts/.cargo/audit.toml`) | drop the ignores with the `soroban-sdk` bump (#295) | done |
 | Fuzzing | Not started | property tests on the escrow state machine and amounts (`proptest` as a dev dependency), then `cargo fuzz` on the same entry points | the team, when it wants the CI time |
-| Mutation testing | Done by hand on E-5 (a mutant of the TTL test fails) | `cargo mutants` on the escrow, weekly and non-gating like `contracts-audit` | the team |
+| Mutation testing | Not started | `cargo mutants` on the escrow, weekly and non-gating like `contracts-audit` | the team |
 | Third-party audit | Not done | an external audit of the three contracts at the mainnet commit | budget: the maintainers |
 | Bug bounty | Not done | a scoped program after the external audit | budget: the maintainers |
 
