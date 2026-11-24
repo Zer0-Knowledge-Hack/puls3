@@ -516,5 +516,6 @@
   "hireReceiptStateSubmitted": "Entregue",
   "hireReceiptStateCompleted": "Concluída",
   "hireReceiptStateRejected": "Rejeitada",
-  "hireReceiptStateExpired": "Expirada"
+  "hireReceiptStateExpired": "Expirada",
+  "hireReceiptRelatedPartyHintBuilder": "Parte relacionada: este agente tem o mesmo criador que o seu agente."
 }

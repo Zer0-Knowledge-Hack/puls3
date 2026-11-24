@@ -20,7 +20,12 @@ class HireReceiptView extends StatelessWidget {
     required this.reserveUsdcStroops,
     required this.lines,
     this.onOpenUrl,
+    this.relatedPartyHint,
   });
+
+  /// What a screen reader says for the related-party badge; null is the
+  /// consumer's wording.
+  final String? relatedPartyHint;
 
   /// The subcontract reserve funded with the hire, in USDC stroops.
   final int reserveUsdcStroops;
@@ -78,7 +83,12 @@ class HireReceiptView extends StatelessWidget {
           )
         else
           for (final line in lines) ...[
-            _ReceiptLineRow(line: line, onOpenUrl: onOpenUrl),
+            _ReceiptLineRow(
+              line: line,
+              onOpenUrl: onOpenUrl,
+              relatedPartyHint:
+                  relatedPartyHint ?? l10n.hireReceiptRelatedPartyHint,
+            ),
             const SizedBox(height: Puls3Spacing.sm),
           ],
       ],
@@ -114,9 +124,14 @@ String hireReceiptStateLabel(AppLocalizations l10n, String state) =>
     };
 
 class _ReceiptLineRow extends StatelessWidget {
-  const _ReceiptLineRow({required this.line, this.onOpenUrl});
+  const _ReceiptLineRow({
+    required this.line,
+    required this.relatedPartyHint,
+    this.onOpenUrl,
+  });
 
   final HireReceiptEntry line;
+  final String relatedPartyHint;
   final ValueChanged<String>? onOpenUrl;
 
   @override
@@ -152,7 +167,7 @@ class _ReceiptLineRow extends StatelessWidget {
                 _Badge(
                   key: ValueKey('hire-receipt-related-$id'),
                   label: l10n.hireReceiptRelatedParty,
-                  semanticsLabel: l10n.hireReceiptRelatedPartyHint,
+                  semanticsLabel: relatedPartyHint,
                   color: Puls3Colors.accent,
                 ),
               _Badge(

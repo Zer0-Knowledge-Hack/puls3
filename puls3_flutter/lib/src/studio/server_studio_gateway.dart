@@ -4,6 +4,7 @@ import 'package:puls3_client/puls3_client.dart' as api;
 import 'package:puls3_domain/puls3_domain.dart';
 
 import '../data/typed_api_error.dart';
+import '../hire/hire_receipt_mapping.dart';
 import '../hire/wallet_session.dart';
 import '../wallet/wallet_port.dart';
 import 'studio_gateway.dart';
@@ -195,6 +196,8 @@ class ServerStudioGateway implements StudioGateway {
       lastPurpose: escrow?.purpose,
       lastTransaction: escrow?.transaction,
       lastFailed: escrow?.state == 'failed',
+      subcontractReserveUsdcStroops: detail.hire.subcontractReserve,
+      receipt: hireReceiptEntries(detail.receipt),
     );
   }
 

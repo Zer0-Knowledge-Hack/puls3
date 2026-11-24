@@ -1760,4 +1760,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hireReceiptStateExpired => 'Expired';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Related party: this agent has the same builder as your agent.';
 }

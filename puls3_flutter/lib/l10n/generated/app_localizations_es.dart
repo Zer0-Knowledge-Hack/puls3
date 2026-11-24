@@ -1787,4 +1787,8 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get hireReceiptStateExpired => 'Vencida';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tiene el mismo creador que tu agente.';
 }

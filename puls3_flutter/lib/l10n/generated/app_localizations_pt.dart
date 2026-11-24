@@ -1780,6 +1780,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hireReceiptStateExpired => 'Expirada';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tem o mesmo criador que o seu agente.';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -3558,6 +3562,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get hireReceiptStateExpired => 'Expirada';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tem o mesmo criador que o seu agente.';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -5341,4 +5349,8 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get hireReceiptStateExpired => 'Expirada';
+
+  @override
+  String get hireReceiptRelatedPartyHintBuilder =>
+      'Parte relacionada: este agente tem o mesmo criador que o seu agente.';
 }

@@ -3173,6 +3173,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Expired'**
   String get hireReceiptStateExpired;
+
+  /// No description provided for @hireReceiptRelatedPartyHintBuilder.
+  ///
+  /// In en, this message translates to:
+  /// **'Related party: this agent has the same builder as your agent.'**
+  String get hireReceiptRelatedPartyHintBuilder;
 }
 
 class _AppLocalizationsDelegate

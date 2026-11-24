@@ -704,5 +704,6 @@
   "hireReceiptStateSubmitted": "Delivered",
   "hireReceiptStateCompleted": "Completed",
   "hireReceiptStateRejected": "Rejected",
-  "hireReceiptStateExpired": "Expired"
+  "hireReceiptStateExpired": "Expired",
+  "hireReceiptRelatedPartyHintBuilder": "Related party: this agent has the same builder as your agent."
 }
