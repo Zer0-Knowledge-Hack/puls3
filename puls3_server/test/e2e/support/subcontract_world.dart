@@ -226,9 +226,13 @@ final class ScriptedManifests implements RunManifestSource {
   final byAgent = <int, RunManifest>{};
   final unreadable = <int>{};
 
-  /// Everything a suite agent shares. The limits are the platform's own:
-  /// `RuntimeConfig` and the runtime task limits, never a number of the test.
+  /// Everything a suite agent shares. The platform has no default for a
+  /// manifest's character limits (each agent sets its own, at most 16000), so
+  /// the suite uses 4000 for both: the value of the demo manifests of
+  /// `demo_manifests.dart`, far above any text of these journeys.
   static const provider = 'anthropic';
+  static const inputMaxChars = 4000;
+  static const outputMaxChars = 4000;
 
   void opensChildren(
     int registryId,
@@ -239,8 +243,8 @@ final class ScriptedManifests implements RunManifestSource {
       provider: provider,
       modelId: 'e2e',
       systemPrompt: persona,
-      inputMaxChars: 4000,
-      outputMaxChars: 4000,
+      inputMaxChars: inputMaxChars,
+      outputMaxChars: outputMaxChars,
       subcontract: SubcontractOptIn(
         maxChildren: maxChildren,
         suggestedReserve: 0,
@@ -253,8 +257,8 @@ final class ScriptedManifests implements RunManifestSource {
       provider: provider,
       modelId: 'e2e',
       systemPrompt: persona,
-      inputMaxChars: 4000,
-      outputMaxChars: 4000,
+      inputMaxChars: inputMaxChars,
+      outputMaxChars: outputMaxChars,
     );
   }
 

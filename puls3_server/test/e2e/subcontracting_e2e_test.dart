@@ -116,6 +116,23 @@ void main() {
   });
   tearDownAll(() async => world.stop());
 
+  /// The consumer approves the submitted parent hire, signing the `complete`
+  /// the endpoint prepared, and waits for it to confirm.
+  Future<void> consumerApproves(int hireId) async {
+    final complete = await world.endpoint.prepareComplete(
+      world.session,
+      hireId,
+    );
+    await world.endpoint.submitEscrowCall(
+      world.session,
+      hireId,
+      complete.preparationId,
+      world.consumer.sign(world.codec, complete.unsignedTransactionXdr!),
+    );
+    await world.confirmed(complete.preparationId);
+    await world.hireIn(hireId, HireStatus.completed);
+  }
+
   test(
     'happy path: A subcontracts B from the reserve, B delivers, A approves '
     'and the reserve reconciles',
@@ -221,18 +238,7 @@ void main() {
       expect(parentJob.reserve, BigInt.from(reserve - e2ePriceStroops));
 
       // The consumer approves the parent: the unspent reserve goes back.
-      final complete = await world.endpoint.prepareComplete(
-        world.session,
-        hire.hireId,
-      );
-      await world.endpoint.submitEscrowCall(
-        world.session,
-        hire.hireId,
-        complete.preparationId,
-        world.consumer.sign(world.codec, complete.unsignedTransactionXdr!),
-      );
-      await world.confirmed(complete.preparationId);
-      await world.hireIn(hire.hireId, HireStatus.completed);
+      await consumerApproves(hire.hireId);
 
       // Every escrow event of the journey, for these jobs.
       final events = await until('the escrow to report the refund', () async {
@@ -324,8 +330,14 @@ void main() {
 
   test(
     'rejection: B fails, A rejects, the funds return to the reserve and '
-    'never to A',
+    'never to A, and the consumer gets the whole reserve back',
     () async {
+      // B's run fails, so the child is rejected while still funded
+      // (`child_run_failed`). Rejecting an output B did deliver
+      // (`child_output_empty`) is not reachable here: the production
+      // `AgentRunner` fails a blank output as `RuntimeEmptyOutput` before
+      // anything is submitted, so that verdict stays covered by the unit
+      // tests of `judgeChildOutput` and `EscrowChildResultSource`.
       final reserve = reserveFor(1);
       final hire = await world.fundedHire(
         subcontractReserve: reserve,
@@ -406,6 +418,26 @@ void main() {
         ],
         isEmpty,
         reason: 'A is never the client of a refund',
+      );
+
+      // The parent closes: the consumer, not A, gets the reserve, whole
+      // because the rejected child's funds came back to it.
+      await consumerApproves(hire.hireId);
+      final closing = await until('the escrow to report the refund', () async {
+        final all = await runtime.escrowEvents();
+        return all.forJob('reserve_refunded', parentJobId).isNotEmpty
+            ? all
+            : null;
+      });
+      final refunded = closing.forJob('reserve_refunded', parentJobId).single;
+      expect(readAddress(refunded.data['client']), world.consumer.address);
+      expect(readI128(refunded.data['amount']), BigInt.from(reserve));
+      expect(readBool(refunded.data['deferred']), isFalse);
+      final completed = closing.forJob('job_completed', parentJobId).single;
+      expect(
+        readI128(completed.data['payout']),
+        BigInt.from(e2ePriceStroops),
+        reason: 'A is paid its own price and nothing of the reserve',
       );
     },
   );
