@@ -1045,7 +1045,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get studioSubcontractNeedsTools =>
-      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+      'A subcontratação exige um modelo que possa usar ferramentas: Mistral Small 3.1 (gratuito) ou Claude.';
 
   @override
   String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';
@@ -2827,7 +2827,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get studioSubcontractNeedsTools =>
-      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+      'A subcontratação exige um modelo que possa usar ferramentas: Mistral Small 3.1 (gratuito) ou Claude.';
 
   @override
   String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';
@@ -4613,7 +4613,7 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
 
   @override
   String get studioSubcontractNeedsTools =>
-      'A subcontratação exige um modelo Claude: o modelo gratuito não pode usar ferramentas.';
+      'A subcontratação exige um modelo que possa usar ferramentas: Mistral Small 3.1 (gratuito) ou Claude.';
 
   @override
   String get studioSubcontractMaxChildren => 'Máximo de agentes por tarefa';

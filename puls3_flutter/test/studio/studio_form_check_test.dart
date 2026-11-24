@@ -226,10 +226,30 @@ void main() {
       );
     });
 
-    test('a free model cannot subcontract: the opt-in is left out', () {
+    test('a model that cannot call tools cannot subcontract: the opt-in is '
+        'left out', () {
+      expect(_llama.supportsTools, isFalse);
       final check = checkStudioForm(withOptIn(model: _llama));
       expect(check.errors, isEmpty);
       expect(check.draft!.subcontract, isNull);
+    });
+
+    test('Mistral Small 3.1, a free model that calls tools, keeps the '
+        'opt-in (#334 T8.0)', () {
+      final mistral = studioModelOptions.singleWhere(
+        (m) => m.id == '@cf/mistralai/mistral-small-3.1-24b-instruct',
+      );
+      expect(mistral.isFree, isTrue);
+      expect(mistral.supportsTools, isTrue);
+      expect(_claude.supportsTools, isTrue);
+      expect(studioModelPolicy.allows(mistral.modelId), isTrue);
+
+      final check = checkStudioForm(withOptIn(model: mistral));
+      expect(check.errors, isEmpty);
+      expect(
+        check.draft!.subcontract,
+        SubcontractOptIn(maxChildren: 2, suggestedReserve: 5000000),
+      );
     });
 
     test('an edit keeps the opt-in (round trip)', () {

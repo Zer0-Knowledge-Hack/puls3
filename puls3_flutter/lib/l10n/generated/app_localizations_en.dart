@@ -1036,7 +1036,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get studioSubcontractNeedsTools =>
-      'Subcontracting needs a Claude model: the free model cannot call tools.';
+      'Subcontracting needs a model that can call tools: Mistral Small 3.1 (free) or Claude.';
 
   @override
   String get studioSubcontractMaxChildren => 'Most agents per task';

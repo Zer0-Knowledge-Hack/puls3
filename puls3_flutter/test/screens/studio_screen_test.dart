@@ -491,9 +491,8 @@ void main() {
       expect(_field('agent-subcontract-reserve-field'), findsNothing);
     });
 
-    testWidgets('a free model disables the toggle with a note', (
-      tester,
-    ) async {
+    testWidgets('a model that cannot call tools disables the toggle with a '
+        'note', (tester) async {
       await pumpApp(tester, location: '/studio');
       await _openAdvanced(tester);
 
@@ -504,11 +503,32 @@ void main() {
       expect(tile.value, isFalse);
       expect(
         find.text(
-          'Subcontracting needs a Claude model: the free model cannot '
-          'call tools.',
+          'Subcontracting needs a model that can call tools: Mistral Small '
+          '3.1 (free) or Claude.',
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('the free Mistral model enables the toggle (#334 T8.0)', (
+      tester,
+    ) async {
+      await pumpApp(tester, location: '/studio');
+      await _fillValid(tester);
+      await _openAdvanced(tester);
+      await tester.ensureVisible(_field('agent-model-field'));
+      await tester.tap(_field('agent-model-field'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Mistral Small 3.1 24B · free').last);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final tile = tester.widget<SwitchListTile>(
+        _field('agent-subcontract-toggle'),
+      );
+      expect(tile.onChanged, isNotNull);
+      await toggle(tester);
+      expect(_field('agent-subcontract-children-field'), findsOneWidget);
+      expect(_field('agent-subcontract-reserve-field'), findsOneWidget);
     });
 
     testWidgets('too many agents shows the error on the subcontract field', (
