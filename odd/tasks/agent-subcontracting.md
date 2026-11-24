@@ -552,3 +552,9 @@ StellarExpert.
   the catalog does not read manifests. T7.1 and T7.2 start in parallel.
 - 2026-11-24: T7 done on `feat/334-web-subcontract` (T7.1 `c3c65cb`, T7.2 `f4611e3`, T7.3
   `fb261d3`, T7.4 `edd0b40` and `e30615e`). Not pushed. Next: PR slicing (stacked-to-main), then T8.
+- 2026-11-24: user: "Si, hagamoslo asi". T7 pushed as four stacked PRs (slice 15 split): #411
+  15a T7.2 Studio opt-in (`feat/334-t7-studio-optin`, base `main`), #412 15b T7.1 server read API
+  (`feat/334-t7-hire-terms`), #413 15c T7.3 hire sheet (`feat/334-t7-hire-sheet`), #414 15d T7.4
+  receipt (`feat/334-t7-receipt`). Order is T7.2 first because T7.2 and T7.3 append to the same ARB
+  files. Each slice is above 400 lines (tests are about half) and asks for `size:exception`. CI
+  runs only on #411 until each base merges. Next: reviews, then T8.
