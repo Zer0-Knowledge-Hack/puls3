@@ -74,16 +74,19 @@ void main() {
       }
     });
 
-    test('submit, release, claimRefund, createChildJob and the child '
-        'verdicts are server-signed', () {
+    test('submit, release and the child purposes are server-signed; '
+        'claimRefund is permissionless', () {
       expect(SubmissionPurpose.values.where((p) => p.isServerSigned), [
         SubmissionPurpose.submit,
         SubmissionPurpose.release,
-        SubmissionPurpose.claimRefund,
         SubmissionPurpose.createChildJob,
         SubmissionPurpose.childComplete,
         SubmissionPurpose.childReject,
       ]);
+      expect(
+        SubmissionPurpose.values.where((p) => p.isPermissionless),
+        [SubmissionPurpose.claimRefund],
+      );
     });
 
     test('agent wallets sign submit, createChildJob and the child '

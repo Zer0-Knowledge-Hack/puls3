@@ -64,6 +64,7 @@ final class HireRow {
     this.subcontractReserve = 0,
     this.allowRelatedParty = true,
     this.parentHireId,
+    this.payee,
   });
 
   final int id;
@@ -89,6 +90,9 @@ final class HireRow {
 
   /// The `fund` transaction hash, once the hire is funded.
   final String? paymentTransaction;
+
+  /// The agent wallet that received the `fund`, once the hire is funded.
+  final String? payee;
 
   /// The wire status (api.md, "Hire escrow states"): null until the job
   /// exists, then `open`, and `funded` once a payment is recorded.

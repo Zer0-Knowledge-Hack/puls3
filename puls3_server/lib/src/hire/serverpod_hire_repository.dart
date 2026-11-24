@@ -191,6 +191,7 @@ class ServerpodHireRepository implements HireRepository, HireLifecycleStore {
       allowRelatedParty: record.allowRelatedParty,
       parentHireId: record.parentHireId,
       paymentTransaction: payment?.transactionHash,
+      payee: payment?.payee,
       status: payment != null
           ? await _settlement(record.id!, transaction: transaction) ??
                 HireStatus.funded

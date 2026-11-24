@@ -1,6 +1,8 @@
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 
+import '../agent/custodied_wallets.dart';
 import '../chain/chain_submission_store.dart';
+import '../chain/escrow_deadline.dart' show maxEscrowCallAttempts;
 import '../chain/submission_values.dart';
 import '../generated/protocol.dart';
 import '../ledger/escrow_job.dart';
@@ -12,6 +14,11 @@ import 'hire_lifecycle_store.dart';
 /// One of the caller's active Studio agents, which pays hires from its own
 /// custodied [wallet].
 typedef PayingAgent = ({int registryId, String wallet});
+
+/// The `HireDetail.submitErrorCode` value of a hire whose payee the server
+/// does not custody (the same rule as `createHire` and the due-submit
+/// tracker).
+const agentCannotDeliverCode = 'AgentCannotDeliver';
 
 /// Reads one hire for its consumer: `HireEndpoint.getHire` (api.md, F5-5,
 /// F6-2, F6-3). It never writes, so polling it is safe. Reading the escrow
@@ -25,13 +32,15 @@ final class HireQueryService {
     EscrowPreparationStore? preparations,
     EscrowJobReader? jobs,
     DateTime Function()? now,
+    CustodyLookup? custody,
   }) : _hires = hires,
        _runs = runs,
        _submissions = submissions,
        _agents = agents,
        _preparations = preparations,
        _jobs = jobs,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _custody = custody;
 
   final HireLifecycleStore _hires;
   final HireRunStore _runs;
@@ -40,6 +49,7 @@ final class HireQueryService {
   final EscrowPreparationStore? _preparations;
   final EscrowJobReader? _jobs;
   final DateTime Function() _now;
+  final CustodyLookup? _custody;
 
   /// How many hires [listMyHires] returns at most.
   static const listLimit = 100;
@@ -170,6 +180,7 @@ final class HireQueryService {
     // escrow states"); later states come from the escrow.
     final showsRun = hire.status == HireStatus.funded;
     final jobId = hire.jobId;
+    final runFinished = showsRun && run?.state == HireRunState.succeeded;
     return HireDetail(
       hire: hire.toProtocol().copyWith(
         runtimeStatus: showsRun ? run?.state.runtimeStatus.name : null,
@@ -190,10 +201,57 @@ final class HireQueryService {
               isUtc: true,
             ),
       approvalDeadline: await _approvalDeadline(hire.status, jobId),
+      runFinished: runFinished,
+      submitErrorCode: await _submitErrorCode(hire, submissions),
       escrowSubmission: escrow?.toProtocol(),
       feedbackSubmission: feedback?.toProtocol(),
       feedbackScore: feedbackScore,
     );
+  }
+
+  /// Why a funded hire's `submit` cannot land, or null while it can still
+  /// happen. A `submit` in flight wins: the tracker owns it.
+  ///
+  /// A payee the server does not custody can never sign a `submit` (#276),
+  /// so an existing funded hire of one reports [agentCannotDeliverCode]. The
+  /// other reasons are the terminal submit outcomes: the job expired or was
+  /// too late (`SubmitSimulationRejected`), the attempts ran out
+  /// (`EscrowCallFailed`), or the outcome may have landed unseen
+  /// (`OutcomeUnknown`). Transient simulation failures are left for the
+  /// tracker to retry.
+  Future<String?> _submitErrorCode(
+    HireRow hire,
+    List<StoredSubmission> submissions,
+  ) async {
+    if (hire.status != HireStatus.funded) return null;
+    final submits = submissions
+        .where((s) => s.purpose == SubmissionPurpose.submit)
+        .toList();
+    if (submits.any((s) => s.state == SubmissionState.submitted)) return null;
+    // An unknown outcome on any escrow call may have moved funds, so every
+    // preparation is refused for this hire; report it before the submit-only
+    // reasons and before the custody rule.
+    if (submissions.any(
+      (s) => s.errorCode == SubmissionOutcomeCode.outcomeUnknown,
+    )) {
+      return SubmissionOutcomeCode.outcomeUnknown;
+    }
+    final failed = submits.where(_failed).toList();
+    if (failed.any(
+      (s) => s.errorCode == SubmissionOutcomeCode.submitSimulationRejected,
+    )) {
+      return SubmissionOutcomeCode.submitSimulationRejected;
+    }
+    if (failed.length >= maxEscrowCallAttempts) {
+      return SubmissionOutcomeCode.escrowCallFailed;
+    }
+    final custody = _custody;
+    final payee = hire.payee;
+    if (custody != null && payee != null) {
+      final custodied = await custody({payee});
+      if (!custodied.contains(payee)) return agentCannotDeliverCode;
+    }
+    return null;
   }
 
   /// The score a reloaded S06 shows (#242). It is the one stored with the

@@ -6,11 +6,12 @@ class: ChainSubmission
 table: chain_submission
 fields:
   ### The PreparedTransaction this submission came from. Null for
-  ### server-signed purposes (submit, release, claimRefund).
+  ### server-signed purposes (submit, release), and for a relay-signed
+  ### claimRefund. Set when the consumer prepared a claimRefund.
   preparationId: String?
   ### One of registerFull, setAgentWallet, createJob, fund, complete, reject,
-  ### giveFeedback (wallet-signed), or submit, release, claimRefund
-  ### (server-signed).
+  ### giveFeedback, claimRefund (wallet-signed), or submit, release (also
+  ### claimRefund when the relay signs the automatic refund).
   purpose: String
   ### Domain TransactionHash of the one envelope this record ever sends,
   ### persisted before it is submitted. Null when a simulation rejected the
