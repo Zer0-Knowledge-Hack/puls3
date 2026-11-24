@@ -5,6 +5,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
+import 'package:puls3_server/src/ledger/envelope_codec.dart'
+    show PreparedEnvelope;
 import 'package:puls3_server/src/ledger/stellar_envelope_codec.dart';
 import 'package:stellar_dart/stellar_dart.dart' as stellar;
 
@@ -37,7 +39,13 @@ final class LocalSandbox {
       rpcUrl.replaceFirst(RegExp(r'/rpc/?$'), '/friendbot');
 
   /// Connects to the running sandbox, or fails with the commands that start it.
-  static Future<LocalSandbox> connect({String? envFile}) async {
+  ///
+  /// [overrides] replace the file's and the defaults' values, for the
+  /// settings one suite needs (a subcontract reserve ceiling, a job duration).
+  static Future<LocalSandbox> connect({
+    String? envFile,
+    Map<String, String> overrides = const {},
+  }) async {
     final file = File(envFile ?? localSandboxEnvFile);
     if (!file.existsSync()) {
       throw StateError(
@@ -51,15 +59,22 @@ final class LocalSandbox {
       ..._parseEnv(file.readAsStringSync()),
       'PULS3_TRACKER_ENABLED': 'true',
       'PULS3_TRACKER_INTERVAL_SECONDS': '2',
+      ...overrides,
     });
     // The relay settings the sandbox script does not write. The platform fee
     // matches the escrow it deploys (`--fee-bps 0`) and the job outlives its
     // one-day approval window (`submit` fails with SubmitTooLate otherwise).
+    // The duration also leaves a parent room for a child (ADR-0011 D2): a
+    // child must expire a full approval window plus `childExpiryMarginSeconds`
+    // before its parent and leave `childRunHeadroom` to run, or `subcontract`
+    // refuses with `parent_too_short`. With the sandbox's one-day window that
+    // takes more than two days, so the default is three windows (259200 s, the
+    // example duration of the T6 notes in odd/tasks/agent-subcontracting.md).
     for (final entry in {
       'PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS': '300',
       'PULS3_STELLAR_INCLUSION_FEE_STROOPS': '100',
       'PULS3_PLATFORM_FEE_BPS': '0',
-      'PULS3_HIRE_JOB_DURATION_SECONDS': '172800',
+      'PULS3_HIRE_JOB_DURATION_SECONDS': '259200',
     }.entries) {
       sandbox.environment.putIfAbsent(entry.key, () => entry.value);
     }
@@ -109,9 +124,14 @@ final class LocalSandbox {
   /// Stellar CLI identity that signs its own registration. Its secret is read
   /// back with `stellar keys secret` into memory only and the identity is
   /// removed by [cleanup].
+  ///
+  /// [skills] are its listed skills (default `research`); a suite gives the
+  /// agents it searches for a skill of their own, so the marketplace ranking
+  /// of an agent registered by an earlier run never hides them.
   Future<RegisteredAgent> registerAgent({
     required int priceStroops,
     String? name,
+    List<String> skills = const ['research'],
   }) async {
     final tag = _randomHex(4);
     final identity = 'puls3-e2e-$tag';
@@ -130,7 +150,7 @@ final class LocalSandbox {
         'id': 'e2e-$tag',
         'name': name ?? 'E2E Agent $tag',
         'description': 'An agent registered by the E2E suite on the sandbox.',
-        'skills': '["research"]',
+        'skills': jsonEncode(skills),
         'priceUsdcStroops': '$priceStroops',
         'model': 'e2e',
         'puls3.manifestVersion': '1',
@@ -273,6 +293,10 @@ final class E2eAccount {
   /// The secret seed (`S…`). Only for handing an ephemeral sandbox key to a
   /// process that signs for it; it is never logged.
   String get secretSeed => _key.toBase32();
+
+  /// [prepared] signed by this account, as the server signs a relay call.
+  String signPrepared(StellarEnvelopeCodec codec, PreparedEnvelope prepared) =>
+      codec.sign(prepared, _key);
 
   /// [unsigned] carrying this account's signature over its transaction hash.
   /// Only the empty signature list at the end of the envelope is replaced, so
