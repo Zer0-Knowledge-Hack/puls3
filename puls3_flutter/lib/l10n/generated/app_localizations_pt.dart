@@ -1708,6 +1708,78 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get hireSubcontractRefundNote =>
       'A reserva não usada é reembolsada a você quando a contratação termina.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontratações';
+
+  @override
+  String get hireReceiptReserve => 'Reserva financiada';
+
+  @override
+  String get hireReceiptSpent => 'Gasto';
+
+  @override
+  String get hireReceiptEmpty => 'Ainda não há subcontratações.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agente #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Parte relacionada';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Parte relacionada: este agente tem o mesmo criador que o agente que você contratou.';
+
+  @override
+  String get hireReceiptBudget => 'Orçamento';
+
+  @override
+  String get hireReceiptFee => 'Taxa';
+
+  @override
+  String get hireReceiptPayout => 'Pago ao agente';
+
+  @override
+  String get hireReceiptJustification => 'Por que este agente';
+
+  @override
+  String get hireReceiptOpened => 'Aberta na blockchain';
+
+  @override
+  String get hireReceiptSettled => 'Liquidada na blockchain';
+
+  @override
+  String get hireReceiptExplorerHint => 'Abre a transação no StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Abrindo na blockchain';
+
+  @override
+  String get hireReceiptStateNotOpened => 'Não aberta';
+
+  @override
+  String get hireReceiptStateUnverified => 'Em verificação';
+
+  @override
+  String get hireReceiptStateOpen => 'Aberta';
+
+  @override
+  String get hireReceiptStateFunded => 'Em andamento';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Entregue';
+
+  @override
+  String get hireReceiptStateCompleted => 'Concluída';
+
+  @override
+  String get hireReceiptStateRejected => 'Rejeitada';
+
+  @override
+  String get hireReceiptStateExpired => 'Expirada';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).
@@ -3414,6 +3486,78 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get hireSubcontractRefundNote =>
       'A reserva não usada é reembolsada a você quando a contratação termina.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontratações';
+
+  @override
+  String get hireReceiptReserve => 'Reserva financiada';
+
+  @override
+  String get hireReceiptSpent => 'Gasto';
+
+  @override
+  String get hireReceiptEmpty => 'Ainda não há subcontratações.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agente #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Parte relacionada';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Parte relacionada: este agente tem o mesmo criador que o agente que você contratou.';
+
+  @override
+  String get hireReceiptBudget => 'Orçamento';
+
+  @override
+  String get hireReceiptFee => 'Taxa';
+
+  @override
+  String get hireReceiptPayout => 'Pago ao agente';
+
+  @override
+  String get hireReceiptJustification => 'Por que este agente';
+
+  @override
+  String get hireReceiptOpened => 'Aberta na blockchain';
+
+  @override
+  String get hireReceiptSettled => 'Liquidada na blockchain';
+
+  @override
+  String get hireReceiptExplorerHint => 'Abre a transação no StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Abrindo na blockchain';
+
+  @override
+  String get hireReceiptStateNotOpened => 'Não aberta';
+
+  @override
+  String get hireReceiptStateUnverified => 'Em verificação';
+
+  @override
+  String get hireReceiptStateOpen => 'Aberta';
+
+  @override
+  String get hireReceiptStateFunded => 'Em andamento';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Entregue';
+
+  @override
+  String get hireReceiptStateCompleted => 'Concluída';
+
+  @override
+  String get hireReceiptStateRejected => 'Rejeitada';
+
+  @override
+  String get hireReceiptStateExpired => 'Expirada';
 }
 
 /// The translations for Portuguese, as used in Portugal (`pt_PT`).
@@ -5125,4 +5269,76 @@ class AppLocalizationsPtPt extends AppLocalizationsPt {
   @override
   String get hireSubcontractRefundNote =>
       'A reserva não usada é-lhe reembolsada quando a contratação termina.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontratações';
+
+  @override
+  String get hireReceiptReserve => 'Reserva financiada';
+
+  @override
+  String get hireReceiptSpent => 'Gasto';
+
+  @override
+  String get hireReceiptEmpty => 'Ainda não há subcontratações.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agente #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Parte relacionada';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Parte relacionada: este agente tem o mesmo criador que o agente que contratou.';
+
+  @override
+  String get hireReceiptBudget => 'Orçamento';
+
+  @override
+  String get hireReceiptFee => 'Taxa';
+
+  @override
+  String get hireReceiptPayout => 'Pago ao agente';
+
+  @override
+  String get hireReceiptJustification => 'Porquê este agente';
+
+  @override
+  String get hireReceiptOpened => 'Aberta na blockchain';
+
+  @override
+  String get hireReceiptSettled => 'Liquidada na blockchain';
+
+  @override
+  String get hireReceiptExplorerHint => 'Abre a transação no StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'A abrir na blockchain';
+
+  @override
+  String get hireReceiptStateNotOpened => 'Não aberta';
+
+  @override
+  String get hireReceiptStateUnverified => 'Em verificação';
+
+  @override
+  String get hireReceiptStateOpen => 'Aberta';
+
+  @override
+  String get hireReceiptStateFunded => 'Em curso';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Entregue';
+
+  @override
+  String get hireReceiptStateCompleted => 'Concluída';
+
+  @override
+  String get hireReceiptStateRejected => 'Rejeitada';
+
+  @override
+  String get hireReceiptStateExpired => 'Expirada';
 }

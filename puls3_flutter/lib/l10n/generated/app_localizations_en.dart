@@ -1687,4 +1687,77 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hireSubcontractRefundNote =>
       'The unspent reserve is refunded to you when the hire ends.';
+
+  @override
+  String get hireReceiptTitle => 'Subcontracts';
+
+  @override
+  String get hireReceiptReserve => 'Reserve funded';
+
+  @override
+  String get hireReceiptSpent => 'Spent';
+
+  @override
+  String get hireReceiptEmpty => 'No subcontracts yet.';
+
+  @override
+  String hireReceiptProvider(int id) {
+    return 'Agent #$id';
+  }
+
+  @override
+  String get hireReceiptRelatedParty => 'Related party';
+
+  @override
+  String get hireReceiptRelatedPartyHint =>
+      'Related party: this agent has the same builder as the agent you hired.';
+
+  @override
+  String get hireReceiptBudget => 'Budget';
+
+  @override
+  String get hireReceiptFee => 'Fee';
+
+  @override
+  String get hireReceiptPayout => 'Paid to the agent';
+
+  @override
+  String get hireReceiptJustification => 'Why this agent';
+
+  @override
+  String get hireReceiptOpened => 'Opened on chain';
+
+  @override
+  String get hireReceiptSettled => 'Settled on chain';
+
+  @override
+  String get hireReceiptExplorerHint =>
+      'Opens the transaction on StellarExpert';
+
+  @override
+  String get hireReceiptStatePending => 'Opening on chain';
+
+  @override
+  String get hireReceiptStateNotOpened => 'Not opened';
+
+  @override
+  String get hireReceiptStateUnverified => 'Being verified';
+
+  @override
+  String get hireReceiptStateOpen => 'Open';
+
+  @override
+  String get hireReceiptStateFunded => 'In progress';
+
+  @override
+  String get hireReceiptStateSubmitted => 'Delivered';
+
+  @override
+  String get hireReceiptStateCompleted => 'Completed';
+
+  @override
+  String get hireReceiptStateRejected => 'Rejected';
+
+  @override
+  String get hireReceiptStateExpired => 'Expired';
 }

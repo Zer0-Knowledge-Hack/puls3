@@ -198,6 +198,78 @@ enum HireStage {
 }
 
 /// One hire read from the server (api.md `HireDetail`).
+/// One line of a hire's subcontract receipt (#334, ADR-0011 D6): a child
+/// job paid from the hire's reserve, as `HireDetail.receipt` returns it.
+class HireReceiptEntry {
+  const HireReceiptEntry({
+    required this.id,
+    this.childHireId,
+    this.childJobId,
+    required this.providerAgentId,
+    required this.providerWallet,
+    required this.budgetUsdcStroops,
+    this.feeUsdcStroops,
+    this.payoutUsdcStroops,
+    required this.state,
+    this.createTransaction,
+    this.createExplorerUrl,
+    this.settleTransaction,
+    this.settleExplorerUrl,
+    this.deliverableHash,
+    required this.relatedParty,
+    required this.justification,
+    required this.createdAt,
+  });
+
+  final int id;
+
+  /// The child hire, once it is stored.
+  final int? childHireId;
+
+  /// Escrow id of the child job, once its `create_child_job` is confirmed.
+  final int? childJobId;
+
+  /// Registry id of the subcontracted agent.
+  final int providerAgentId;
+
+  /// StrKey of the subcontracted agent's payment wallet.
+  final String providerWallet;
+
+  /// USDC stroops drawn from the reserve as the child budget.
+  final int budgetUsdcStroops;
+
+  /// USDC stroops of platform fee, set when the child settles.
+  final int? feeUsdcStroops;
+
+  /// USDC stroops paid to the provider, set when the child settles.
+  final int? payoutUsdcStroops;
+
+  /// `pending`, `not_opened`, `unverified`, or the child's `HireStatus`
+  /// name: open, funded, submitted, completed, rejected, expired.
+  final String state;
+
+  /// Lowercase hex hash of the `create_child_job` transaction.
+  final String? createTransaction;
+
+  /// StellarExpert link of [createTransaction], when the server built one.
+  final String? createExplorerUrl;
+
+  /// Lowercase hex hash of the transaction that settled the child.
+  final String? settleTransaction;
+
+  /// StellarExpert link of [settleTransaction], when the server built one.
+  final String? settleExplorerUrl;
+  final String? deliverableHash;
+
+  /// The provider has the same builder as the hired agent (disclosed, not
+  /// banned: ADR-0011 D10).
+  final bool relatedParty;
+
+  /// Why the hired agent picked this provider.
+  final String justification;
+  final DateTime createdAt;
+}
+
 class HireProgress {
   const HireProgress({
     required this.hireId,
@@ -222,6 +294,8 @@ class HireProgress {
     this.feedbackErrorCode,
     this.feedbackScore,
     this.feedbackExplorerUrl,
+    this.subcontractReserveUsdcStroops = 0,
+    this.receipt = const [],
   });
 
   final int hireId;
@@ -295,6 +369,14 @@ class HireProgress {
 
   /// StellarExpert link of [feedbackTransaction], when the server built one.
   final String? feedbackExplorerUrl;
+
+  /// USDC stroops of subcontract reserve the consumer funded beside the
+  /// price (ADR-0011 D1); 0 for a hire that never subcontracts.
+  final int subcontractReserveUsdcStroops;
+
+  /// The hire's itemized subcontract receipt (ADR-0011 D6), oldest first;
+  /// empty when the hire opened no child job.
+  final List<HireReceiptEntry> receipt;
 
   HireStage get stage => switch (status) {
     'funded' when runtimeStatus == 'failed' => HireStage.runFailed,

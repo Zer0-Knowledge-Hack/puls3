@@ -938,6 +938,67 @@ void main() {
         throwsA(isA<HireBackendUnavailable>()),
       );
     });
+
+    test('maps the subcontract reserve and every receipt line field '
+        '(#334)', () async {
+      final created = DateTime.utc(2026, 11, 24, 10);
+      final base = funded();
+      final hire = await _gateway(
+        getHire: (_, _) async => base.copyWith(
+          hire: base.hire.copyWith(subcontractReserve: 30000000),
+          receipt: [
+            HireReceiptLine(
+              id: 7,
+              childHireId: 41,
+              childJobId: 52,
+              providerAgentId: 19,
+              providerWallet: 'GPROVIDER',
+              budget: 12000000,
+              fee: 600000,
+              payout: 11400000,
+              state: 'completed',
+              createTransaction: 'c0ffee',
+              createExplorerUrl: 'https://example.test/tx/c0ffee',
+              settleTransaction: '5e771e',
+              settleExplorerUrl: 'https://example.test/tx/5e771e',
+              deliverableHash: 'd311',
+              relatedParty: true,
+              justification: 'Best rated translator',
+              createdAt: created,
+            ),
+          ],
+        ),
+      ).getHire(3, _consumer);
+
+      expect(hire.subcontractReserveUsdcStroops, 30000000);
+      final line = hire.receipt.single;
+      expect(line.id, 7);
+      expect(line.childHireId, 41);
+      expect(line.childJobId, 52);
+      expect(line.providerAgentId, 19);
+      expect(line.providerWallet, 'GPROVIDER');
+      expect(line.budgetUsdcStroops, 12000000);
+      expect(line.feeUsdcStroops, 600000);
+      expect(line.payoutUsdcStroops, 11400000);
+      expect(line.state, 'completed');
+      expect(line.createTransaction, 'c0ffee');
+      expect(line.createExplorerUrl, 'https://example.test/tx/c0ffee');
+      expect(line.settleTransaction, '5e771e');
+      expect(line.settleExplorerUrl, 'https://example.test/tx/5e771e');
+      expect(line.deliverableHash, 'd311');
+      expect(line.relatedParty, isTrue);
+      expect(line.justification, 'Best rated translator');
+      expect(line.createdAt, created);
+    });
+
+    test('a hire without a receipt maps to no lines and no reserve', () async {
+      final hire = await _gateway(
+        getHire: (_, _) async => funded(),
+      ).getHire(3, _consumer);
+
+      expect(hire.receipt, isEmpty);
+      expect(hire.subcontractReserveUsdcStroops, 0);
+    });
   });
 
   group('HireProgress.stage', () {
