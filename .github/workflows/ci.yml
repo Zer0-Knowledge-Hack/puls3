@@ -112,6 +112,18 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - working-directory: puls3_sdk
         run: dart analyze --fatal-infos && dart test
+      # Both packages stay publishable on pub.dev (#300, docs/sdk/releasing.md).
+      - name: puls3_sdk passes the pub.dev checks
+        working-directory: puls3_sdk
+        run: dart pub publish --dry-run
+      - name: puls3_client passes the pub.dev checks (warnings allowed)
+        working-directory: puls3_client
+        # The exact Serverpod pins are warnings that make --dry-run exit 65 on
+        # purpose, so only validation errors fail the step.
+        run: |
+          out="$(dart pub publish --dry-run 2>&1 || true)"
+          echo "$out"
+          if grep -qE 'found the following( [0-9]+)? errors?:' <<<"$out"; then exit 1; fi
       - working-directory: puls3_cli
         run: dart analyze --fatal-infos && dart test
       - working-directory: puls3_mcp

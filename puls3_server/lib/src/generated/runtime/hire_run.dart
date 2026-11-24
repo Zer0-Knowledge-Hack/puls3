@@ -30,6 +30,10 @@ abstract class HireRunRecord
     int? attempts,
     this.notBefore,
     this.lastError,
+    this.loopState,
+    this.pendingToolCallId,
+    this.childHireId,
+    this.childRequest,
   }) : attempts = attempts ?? 0;
 
   factory HireRunRecord({
@@ -44,6 +48,10 @@ abstract class HireRunRecord
     int? attempts,
     DateTime? notBefore,
     String? lastError,
+    String? loopState,
+    String? pendingToolCallId,
+    int? childHireId,
+    String? childRequest,
   }) = _HireRunRecordImpl;
 
   factory HireRunRecord.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -67,6 +75,10 @@ abstract class HireRunRecord
           ? null
           : _is.DateTimeJsonExtension.fromJson(jsonSerialization['notBefore']),
       lastError: jsonSerialization['lastError'] as String?,
+      loopState: jsonSerialization['loopState'] as String?,
+      pendingToolCallId: jsonSerialization['pendingToolCallId'] as String?,
+      childHireId: jsonSerialization['childHireId'] as int?,
+      childRequest: jsonSerialization['childRequest'] as String?,
     );
   }
 
@@ -79,7 +91,7 @@ abstract class HireRunRecord
 
   int hireId;
 
-  /// queued, running, succeeded or failed.
+  /// queued, running, awaitingChild, succeeded or failed.
   String state;
 
   DateTime queuedAt;
@@ -105,6 +117,24 @@ abstract class HireRunRecord
   /// until the run really fails.
   String? lastError;
 
+  /// The tool loop's state as versioned JSON (tool_loop_codec.dart): the
+  /// transcript with each turn's provider content, the turns and children
+  /// used, the remaining reserve and the search snapshots (ADR-0011 D8).
+  /// Set when the loop pauses or is retried mid-conversation; bounded by the
+  /// loop's input cap.
+  String? loopState;
+
+  /// The subcontract call id the paused loop waits on. Set only while the
+  /// run is awaitingChild, like childHireId and childRequest.
+  String? pendingToolCallId;
+
+  /// The child hire the paused loop waits on.
+  int? childHireId;
+
+  /// The child request as versioned JSON: task, justification, the D10
+  /// verdict and the ranking snapshot.
+  String? childRequest;
+
   @override
   _is.Table<int?> get table => t;
 
@@ -123,6 +153,10 @@ abstract class HireRunRecord
     int? attempts,
     DateTime? notBefore,
     String? lastError,
+    String? loopState,
+    String? pendingToolCallId,
+    int? childHireId,
+    String? childRequest,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -139,6 +173,10 @@ abstract class HireRunRecord
       'attempts': attempts,
       if (notBefore != null) 'notBefore': notBefore?.toJson(),
       if (lastError != null) 'lastError': lastError,
+      if (loopState != null) 'loopState': loopState,
+      if (pendingToolCallId != null) 'pendingToolCallId': pendingToolCallId,
+      if (childHireId != null) 'childHireId': childHireId,
+      if (childRequest != null) 'childRequest': childRequest,
     };
   }
 
@@ -190,6 +228,10 @@ class _HireRunRecordImpl extends HireRunRecord {
     int? attempts,
     DateTime? notBefore,
     String? lastError,
+    String? loopState,
+    String? pendingToolCallId,
+    int? childHireId,
+    String? childRequest,
   }) : super._(
          id: id,
          hireId: hireId,
@@ -202,6 +244,10 @@ class _HireRunRecordImpl extends HireRunRecord {
          attempts: attempts,
          notBefore: notBefore,
          lastError: lastError,
+         loopState: loopState,
+         pendingToolCallId: pendingToolCallId,
+         childHireId: childHireId,
+         childRequest: childRequest,
        );
 
   /// Returns a shallow copy of this [HireRunRecord]
@@ -220,6 +266,10 @@ class _HireRunRecordImpl extends HireRunRecord {
     int? attempts,
     Object? notBefore = _Undefined,
     Object? lastError = _Undefined,
+    Object? loopState = _Undefined,
+    Object? pendingToolCallId = _Undefined,
+    Object? childHireId = _Undefined,
+    Object? childRequest = _Undefined,
   }) {
     return HireRunRecord(
       id: id is int? ? id : this.id,
@@ -235,6 +285,12 @@ class _HireRunRecordImpl extends HireRunRecord {
       attempts: attempts ?? this.attempts,
       notBefore: notBefore is DateTime? ? notBefore : this.notBefore,
       lastError: lastError is String? ? lastError : this.lastError,
+      loopState: loopState is String? ? loopState : this.loopState,
+      pendingToolCallId: pendingToolCallId is String?
+          ? pendingToolCallId
+          : this.pendingToolCallId,
+      childHireId: childHireId is int? ? childHireId : this.childHireId,
+      childRequest: childRequest is String? ? childRequest : this.childRequest,
     );
   }
 }
@@ -296,6 +352,28 @@ class HireRunRecordUpdateTable extends _is.UpdateTable<HireRunRecordTable> {
     table.lastError,
     value,
   );
+
+  _is.ColumnValue<String, String> loopState(String? value) => _is.ColumnValue(
+    table.loopState,
+    value,
+  );
+
+  _is.ColumnValue<String, String> pendingToolCallId(String? value) =>
+      _is.ColumnValue(
+        table.pendingToolCallId,
+        value,
+      );
+
+  _is.ColumnValue<int, int> childHireId(int? value) => _is.ColumnValue(
+    table.childHireId,
+    value,
+  );
+
+  _is.ColumnValue<String, String> childRequest(String? value) =>
+      _is.ColumnValue(
+        table.childRequest,
+        value,
+      );
 }
 
 class HireRunRecordTable extends _is.Table<int?> {
@@ -342,13 +420,29 @@ class HireRunRecordTable extends _is.Table<int?> {
       'lastError',
       this,
     );
+    loopState = _is.ColumnString(
+      'loopState',
+      this,
+    );
+    pendingToolCallId = _is.ColumnString(
+      'pendingToolCallId',
+      this,
+    );
+    childHireId = _is.ColumnInt(
+      'childHireId',
+      this,
+    );
+    childRequest = _is.ColumnString(
+      'childRequest',
+      this,
+    );
   }
 
   late final HireRunRecordUpdateTable updateTable;
 
   late final _is.ColumnInt hireId;
 
-  /// queued, running, succeeded or failed.
+  /// queued, running, awaitingChild, succeeded or failed.
   late final _is.ColumnString state;
 
   late final _is.ColumnDateTime queuedAt;
@@ -374,6 +468,24 @@ class HireRunRecordTable extends _is.Table<int?> {
   /// until the run really fails.
   late final _is.ColumnString lastError;
 
+  /// The tool loop's state as versioned JSON (tool_loop_codec.dart): the
+  /// transcript with each turn's provider content, the turns and children
+  /// used, the remaining reserve and the search snapshots (ADR-0011 D8).
+  /// Set when the loop pauses or is retried mid-conversation; bounded by the
+  /// loop's input cap.
+  late final _is.ColumnString loopState;
+
+  /// The subcontract call id the paused loop waits on. Set only while the
+  /// run is awaitingChild, like childHireId and childRequest.
+  late final _is.ColumnString pendingToolCallId;
+
+  /// The child hire the paused loop waits on.
+  late final _is.ColumnInt childHireId;
+
+  /// The child request as versioned JSON: task, justification, the D10
+  /// verdict and the ranking snapshot.
+  late final _is.ColumnString childRequest;
+
   @override
   List<_is.Column> get columns => [
     id,
@@ -387,6 +499,10 @@ class HireRunRecordTable extends _is.Table<int?> {
     attempts,
     notBefore,
     lastError,
+    loopState,
+    pendingToolCallId,
+    childHireId,
+    childRequest,
   ];
 }
 

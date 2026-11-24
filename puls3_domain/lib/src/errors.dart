@@ -103,6 +103,8 @@ enum HireProblem {
   priceNotPositive,
   manifestVersionBelowOne,
   failureReasonEmpty,
+  parentIsSelf,
+  childReserveNotSupported,
 }
 
 final class InvalidHire extends DomainError {
@@ -116,6 +118,9 @@ final class InvalidHire extends DomainError {
     HireProblem.manifestVersionBelowOne =>
       'manifest version must be at least 1',
     HireProblem.failureReasonEmpty => 'a failed run needs a reason',
+    HireProblem.parentIsSelf => 'a hire cannot be its own parent',
+    HireProblem.childReserveNotSupported =>
+      'a child hire cannot have a subcontract reserve of its own',
   };
 }
 
@@ -264,6 +269,8 @@ enum ManifestProblem {
   priceMissing,
   priceAssetUnsupported,
   priceNotPositive,
+  subcontractMalformed,
+  subcontractInvalid,
 }
 
 /// Every rule an agent manifest input broke in one call, in a stable order.
@@ -332,5 +339,9 @@ final class InvalidManifest extends DomainError {
     ManifestProblem.priceMissing => 'price is required',
     ManifestProblem.priceAssetUnsupported => 'the price asset must be USDC',
     ManifestProblem.priceNotPositive => 'price must be greater than zero',
+    ManifestProblem.subcontractMalformed =>
+      'subcontract must be a child count and a reserve in stroops',
+    ManifestProblem.subcontractInvalid =>
+      'subcontract needs at least 1 child and a reserve of at least 0',
   };
 }

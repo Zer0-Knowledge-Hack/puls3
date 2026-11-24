@@ -109,10 +109,13 @@ final class RelayRig {
   /// A stored hire of [consumer] (the session wallet by default) in
   /// [status]: null has no job, any other status has job `id + 2` (3 for
   /// the first hire). The job is bound with [escrow] when given (#273).
+  ///
+  /// [subcontractReserve] is the hire's reserve cap (ADR-0011 D1).
   Future<HireRow> hire({
     HireStatus? status,
     String consumer = alice,
     String? escrow,
+    int subcontractReserve = 0,
   }) async {
     final row = await hires.insertHire(
       NewHire(
@@ -123,6 +126,7 @@ final class RelayRig {
         expiredAt: 1800000000,
         requestId: 'request-${++_requests}',
         input: 'summarise this',
+        subcontractReserve: subcontractReserve,
       ),
     );
     if (status == null) return row;

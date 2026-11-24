@@ -24,6 +24,30 @@ final class FakeEscrowEffects implements EscrowEffects {
   /// The event list of every [onFunded] call, in call order.
   final fundedEvents = <List<JobFundedEvent>>[];
 
+  /// The submission ids [onChildJobCreated] was called with.
+  final childCreated = <int>[];
+
+  /// The `child_job_created` events of every [onChildJobCreated] call.
+  final childCreatedEvents = <List<ChildJobCreatedEvent>>[];
+
+  /// Every [onChildJobFailed] call as `(submission id, code)`, in order.
+  final childFailed = <(int, String)>[];
+
+  /// Thrown by [onChildJobFailed] when set.
+  Object? childFailedError;
+
+  /// The submission ids [onChildSettled] was called with.
+  final childSettled = <int>[];
+
+  /// The `job_completed` events of every [onChildSettled] call.
+  final childSettledEvents = <List<JobCompletedEvent>>[];
+
+  /// The submission ids [onRelaySettled] was called with.
+  final relaySettled = <int>[];
+
+  /// The `job_completed` events of every [onRelaySettled] call.
+  final relaySettledEvents = <List<JobCompletedEvent>>[];
+
   @override
   Future<EffectResult> onJobCreated(
     StoredSubmission submission,
@@ -42,6 +66,48 @@ final class FakeEscrowEffects implements EscrowEffects {
     funded.add(submission.id);
     fundedEvents.add(events);
     return _answer();
+  }
+
+  @override
+  Future<EffectResult> onChildJobCreated(
+    StoredSubmission submission,
+    List<ChildJobCreatedEvent> children, {
+    required List<JobCreatedEvent> created,
+    required List<JobFundedEvent> funded,
+  }) async {
+    childCreated.add(submission.id);
+    childCreatedEvents.add(children);
+    return _answer();
+  }
+
+  @override
+  Future<void> onChildJobFailed(
+    StoredSubmission submission,
+    String code,
+  ) async {
+    final failure = childFailedError;
+    if (failure != null) throw failure;
+    childFailed.add((submission.id, code));
+  }
+
+  @override
+  Future<void> onChildSettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {
+    _answer();
+    childSettled.add(submission.id);
+    childSettledEvents.add(completed);
+  }
+
+  @override
+  Future<void> onRelaySettled(
+    StoredSubmission submission,
+    List<JobCompletedEvent> completed,
+  ) async {
+    _answer();
+    relaySettled.add(submission.id);
+    relaySettledEvents.add(completed);
   }
 
   @override

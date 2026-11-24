@@ -6,7 +6,9 @@ import '../chain/submission_values.dart';
 ///
 /// Terminal purposes win, in this order: `complete` or `release` →
 /// [HireStatus.completed], `reject` → [HireStatus.rejected], `claim_refund`
-/// → [HireStatus.expired]. A confirmed `submit` with none of those is
+/// → [HireStatus.expired]. The parent agent's verdict on a child job
+/// (`childComplete`, `childReject`, ADR-0011 D3) counts as `complete` and
+/// `reject`. A confirmed `submit` with none of those is
 /// [HireStatus.submitted]. Otherwise null: the hire stays `funded`.
 ///
 /// The status is derived on read, so it needs no column. A confirmed record
@@ -16,10 +18,12 @@ import '../chain/submission_values.dart';
 HireStatus? fundedHireSettlement(Iterable<SubmissionPurpose> confirmed) {
   final purposes = confirmed.toSet();
   if (purposes.contains(SubmissionPurpose.complete) ||
+      purposes.contains(SubmissionPurpose.childComplete) ||
       purposes.contains(SubmissionPurpose.release)) {
     return HireStatus.completed;
   }
-  if (purposes.contains(SubmissionPurpose.reject)) {
+  if (purposes.contains(SubmissionPurpose.reject) ||
+      purposes.contains(SubmissionPurpose.childReject)) {
     return HireStatus.rejected;
   }
   if (purposes.contains(SubmissionPurpose.claimRefund)) {
@@ -38,4 +42,6 @@ const settlementPurposes = {
   SubmissionPurpose.reject,
   SubmissionPurpose.release,
   SubmissionPurpose.claimRefund,
+  SubmissionPurpose.childComplete,
+  SubmissionPurpose.childReject,
 };

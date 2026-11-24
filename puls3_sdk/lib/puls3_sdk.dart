@@ -7,6 +7,7 @@ export 'package:puls3_client/puls3_client.dart'
         AgentHireStarted,
         AgentSummary,
         ClientAuthKeyProvider,
+        CreateHireResult,
         HireDetail,
         PreparedTransaction,
         Puls3ApiException,

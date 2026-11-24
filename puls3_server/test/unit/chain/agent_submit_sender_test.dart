@@ -21,6 +21,9 @@ import '../../support/in_memory_chain_submission_store.dart';
 final _provider = StellarAddress.parse(
   'GABKNX5HWXUYTWF6ORIKYO2NHTAPJ67OIF46TPP2IEMVGWXGBQXIHF5H',
 );
+final _otherAgent = StellarAddress.parse(
+  'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+);
 final _escrow = StellarAddress.parse(
   'CBRD7A7MXINM7LREKCL3RMKRQ5UMLGKNHAEYY4JT7MVBBB7R5QV4TPE2',
 );
@@ -72,28 +75,30 @@ void main() {
   late Object? sendFailure;
   late Object? signFailure;
 
-  AgentSubmitSender sender() => AgentSubmitSender(
-    submissions: store,
-    accounts: accounts,
-    codec: codec,
-    sign: (prepared, provider) {
-      final failure = signFailure;
-      if (failure != null) throw failure;
-      expect(provider, _provider);
-      return Future.value(FakeEnvelopeCodec.sign(prepared.envelopeXdr));
-    },
-    send: (envelope, hash) {
-      sent.add(envelope);
-      final failure = sendFailure;
-      if (failure != null) throw failure;
-      return Future.value(answer);
-    },
-    escrow: _escrow,
-    inclusionFee: 100,
-    validitySeconds: 300,
-    now: () => _now,
-    log: ignoreChainLog,
-  );
+  AgentSubmitSender sender({Future<bool> Function(int hireId)? childrenOpen}) =>
+      AgentSubmitSender(
+        submissions: store,
+        accounts: accounts,
+        codec: codec,
+        sign: (prepared, provider) {
+          final failure = signFailure;
+          if (failure != null) throw failure;
+          expect(provider, _provider);
+          return Future.value(FakeEnvelopeCodec.sign(prepared.envelopeXdr));
+        },
+        send: (envelope, hash) {
+          sent.add(envelope);
+          final failure = sendFailure;
+          if (failure != null) throw failure;
+          return Future.value(answer);
+        },
+        escrow: _escrow,
+        inclusionFee: 100,
+        validitySeconds: 300,
+        now: () => _now,
+        log: ignoreChainLog,
+        childrenOpen: childrenOpen,
+      );
 
   setUp(() {
     store = InMemoryChainSubmissionStore();
@@ -160,6 +165,36 @@ void main() {
 
     expect(codec.built, hasLength(2));
     expect(store.all.last.hireId, 5);
+  });
+
+  test("another wallet's agent-signed call does not hold a submit", () async {
+    await store.insertSubmitted(
+      purpose: SubmissionPurpose.childComplete,
+      transactionHash: 'cd' * 32,
+      signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_otherAgent),
+      validUntil: _now.add(const Duration(minutes: 5)),
+      hireId: 9,
+    );
+
+    await sender().send(_due());
+
+    expect(codec.built, hasLength(1));
+    expect(sent, hasLength(1));
+  });
+
+  test("the provider's own agent-signed call holds its submit", () async {
+    await store.insertSubmitted(
+      purpose: SubmissionPurpose.createChildJob,
+      transactionHash: 'cd' * 32,
+      signedEnvelopeXdr: FakeEnvelopeCodec.signedBy(_provider),
+      validUntil: _now.add(const Duration(minutes: 5)),
+      hireId: 9,
+    );
+
+    await sender().send(_due());
+
+    expect(codec.built, isEmpty);
+    expect(sent, isEmpty);
   });
 
   test('a hire with a non-final escrow record is not submitted', () async {
@@ -286,4 +321,72 @@ void main() {
     await sender().send(_due());
     expect(store.all, hasLength(maxEscrowCallAttempts));
   });
+  group('a parent with open children (ADR-0011 D4)', () {
+    test('is not submitted while a child is open', () async {
+      final asked = <int>[];
+
+      await sender(
+        childrenOpen: (hireId) async {
+          asked.add(hireId);
+          return true;
+        },
+      ).send(_due());
+
+      expect(asked, [4]);
+      expect(codec.built, isEmpty);
+      expect(store.all, isEmpty);
+    });
+
+    test('a childrenOpen that throws holds the submit and does not escape '
+        'send', () async {
+      await sender(
+        childrenOpen: (_) async => throw StateError('database down'),
+      ).send(_due());
+
+      expect(codec.built, isEmpty);
+      expect(store.all, isEmpty);
+      expect(sent, isEmpty);
+    });
+
+    test('is submitted once every child settled', () async {
+      await sender(childrenOpen: (_) async => false).send(_due());
+
+      expect(store.all.single.purpose, SubmissionPurpose.submit);
+      expect(sent, hasLength(1));
+    });
+
+    test('a ChildrenOpen simulation refusal stores nothing and is '
+        'retried', () async {
+      accounts.simulationFailure = LedgerContractError(
+        EscrowSubcontractError.childrenOpen.code,
+        'Error(Contract, #125)',
+      );
+
+      for (var i = 0; i < maxEscrowCallAttempts + 1; i++) {
+        await sender().send(_due());
+      }
+
+      expect(store.all, isEmpty);
+      accounts.simulationFailure = null;
+      await sender().send(_due());
+      expect(store.all.single.state, SubmissionState.submitted);
+    });
+  });
+
+  test(
+    'an unreadable agent-signed envelope in flight holds every submit',
+    () async {
+      await store.insertSubmitted(
+        purpose: SubmissionPurpose.childComplete,
+        transactionHash: 'cd' * 32,
+        signedEnvelopeXdr: 'AAAA',
+        validUntil: _now.add(const Duration(minutes: 5)),
+        hireId: 9,
+      );
+
+      await sender().send(_due());
+
+      expect(codec.built, isEmpty);
+    },
+  );
 }
