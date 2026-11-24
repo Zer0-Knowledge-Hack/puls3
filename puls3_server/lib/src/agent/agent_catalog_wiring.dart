@@ -18,6 +18,7 @@ import 'hireable_catalog_reader.dart';
 import 'indexed_agent_catalog_service.dart';
 import 'reputation_catalog_reader.dart';
 import 'serverpod_agent_index_repository.dart';
+import 'studio_draft_owners.dart';
 
 /// The HTTP client shared by every catalog read. Created once and reused for
 /// the life of the process, so requests do not open a socket each time.
@@ -98,6 +99,9 @@ AgentCatalogService _buildChainCatalog(
     config,
   ),
   log: catalogConsoleLog,
+  // The process-wide catalog outlives a request, so each draft lookup opens
+  // its own session (#381).
+  owners: studioDraftOwnersOf(() async => Serverpod.instance.createSession()),
 );
 
 /// Writes a catalog message to the process output: info to stdout, the rest to

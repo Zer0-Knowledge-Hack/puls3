@@ -55,7 +55,7 @@ refers back to the report without giving one.
 | E-4 | Not stated | Not described in any follow-up issue | none | none | Unknown: needs the original report |
 | E-5 | Not stated | The persistent TTL (about 60 days) is not tied to `max_expiry` | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | [#333](https://github.com/Zer0-Knowledge-Hack/puls3/pull/333), in review | Open |
 | D-1 | Not stated (mainnet blocker) | One key is escrow admin, reputation owner and agent 7's provider wallet, and agent keys are custodied by the server | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | none | Open |
-| I-1 | Not stated | Agent URI squatting: registration has no proof of control | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | none | Open |
+| I-1 | Not stated | Agent URI squatting: registration has no proof of control | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | Catalog ids: [#381](https://github.com/Zer0-Knowledge-Hack/puls3/pull/381) (a Studio id belongs to its draft's owner; any other id to its first owner) | Partly fixed |
 | I-2 | Not stated | Permissionless registration feeds `catalog.list()`, which every `createHire` read | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | `22a9b3a` ([#288](https://github.com/Zer0-Knowledge-Hack/puls3/pull/288)) | Fixed |
 | P-1 | Not stated | Process gaps: no third-party audit, no fuzzing or mutation testing, no `cargo audit` in CI, no bug bounty | [#206](https://github.com/Zer0-Knowledge-Hack/puls3/issues/206) | `cargo audit`: `0d146ac` ([#269](https://github.com/Zer0-Knowledge-Hack/puls3/pull/269)), `21b9252` ([#286](https://github.com/Zer0-Knowledge-Hack/puls3/pull/286)) | Partly done |
 
