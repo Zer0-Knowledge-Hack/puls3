@@ -250,6 +250,16 @@ Keep commits small and focused. Keep tests and docs in the same commit as the co
 3. Add the same labels and milestone as the issue.
 4. CI must be green.
 
+#### Closes vs Refs (enforced by `Issue gate / gate`)
+
+The `Issue gate` workflow reads the **Acceptance criteria** checkboxes of every issue the PR references:
+
+- `Closes|Fixes|Resolves #N`: the check fails unless **every** acceptance criterion in issue #N is checked, and it lists the unchecked ones. Either tick them in the issue (with evidence), or change the keyword to `Refs #N` for partial work.
+- `Refs #N`: the check passes and keeps one comment on the PR listing the criteria and deliverables still unchecked in #N, so the remaining work stays visible.
+- No reference at all: the check fails if the PR changes anything other than docs. Maintainers can add the `no-issue` label to opt out; Dependabot PRs are skipped.
+
+An issue with no **Acceptance criteria** checklist cannot be verified and does not block `Closes`. The logic and its tests live in `.github/scripts/issue-gate.js`; run them with `node --test .github/scripts/issue-gate.test.js`.
+
 **Review rule:** a PR is approved only when **every acceptance criterion is checked** and the issue's **How to verify** steps pass for the reviewer. It needs at least **1 approval from someone other than the author**. If something is missing, the reviewer requests changes and names the exact criterion that failed.
 
 ### 3.5 Where each area lives
@@ -327,7 +337,7 @@ An administrator must configure a ruleset for `main` with:
 
 - pull requests required before merging;
 - at least one approval from someone other than the author;
-- required status checks: `CI / gate` and `Secrets / scan`;
+- required status checks: `CI / gate`, `Secrets / scan` and `Issue gate / gate`;
 - branches required to be up to date before merging;
 - direct pushes and force pushes blocked; and
 - administrators included, unless an emergency bypass policy is documented.
