@@ -381,7 +381,13 @@ final class HireRunner {
     // continues a transcript whose last tool call has its result, so the
     // paid child's output is never lost or asked for again.
     final child = result;
-    final resumed = ToolLoop.resumedState(awaiting, child);
+    // The runner's loop keeps the default headroom (`_drive`).
+    final resumed = ToolLoop.resumedState(
+      awaiting,
+      child,
+      maxConversationChars:
+          manifest.inputMaxChars + defaultConversationHeadroomChars,
+    );
     if (!await runs.markResumed(
       paused.hireId,
       _now(),
