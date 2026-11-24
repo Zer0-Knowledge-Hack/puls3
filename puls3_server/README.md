@@ -45,6 +45,25 @@ With no indexed rows and a chain that cannot be read, the on-chain fallback
 throws the serializable `AgentCatalogUnavailable` exception; an outage is never
 an empty list, and an unknown id is never reported as an outage.
 
+### Marketplace search for subcontracting (ADR-0011 D9)
+
+`AgentSearchService` (built by `buildAgentSearchService`) ranks the agents a
+hired agent may subcontract. It has no endpoint; the runtime's `search_agents`
+tool calls it. Candidates are hireable, priced within the remaining reserve,
+and are neither the hiring agent nor any agent up its hire chain (by registry
+id or provider wallet). The pure rules live in `puls3_domain`
+(`rankAgentCandidates`, `justifyRelatedPartyPick`):
+
+- Score: `0.50 * skillMatch + 0.25 * (rating - 1) / 4 + 0.15 * hires / (hires + 10) + 0.10 * (1 - price / reserve)`,
+  ties to the lowest registry id. `skillMatch` is the matched fraction of the
+  requested skills and of the query words (0.6 / 0.4 when both are given).
+- Related party (D10): an agent sharing a custody, Studio deploy or registry
+  owner with the hiring agent. Unknown owners (no row, or a failed registry
+  read) count as related, so an opt-out anywhere in the hire chain drops them.
+- A related pick is justified when it is rank 1, costs no more than the
+  best-ranked independent candidate whose skill match is at least the pick's
+  minus 0.1, or no such independent exists.
+
 ## Hidden agents
 
 The Identity Registry has no delete and anyone can register an agent on chain,
@@ -142,9 +161,18 @@ the same transaction. Each pass:
 4. stores the result, or a safe failure code such as `timeout`,
    `provider_error:<type>` or `manifest_unavailable`.
 
+For the subcontracting tool loop (#334, ADR-0011 D8) the model layer also
+holds conversations with tools: `ConversationRuntime.converse` returns one
+`ModelTurn`, the final text or the tool calls, and
+`AgentRunner.converseOnce` applies the same timeout, abort and limits to each
+turn (the input limit counts the whole conversation). Anthropic supports
+tools; Workers AI holds plain conversations only and fails a call with tools
+as `tools_unsupported`, so subcontracting is Anthropic-only.
+
 Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,
-`running`, `failed`), with the `result` and `failureReason`.
+`running`, `failed`; a run in `awaitingChild` shows `running`), with the
+`result` and `failureReason`.
 
 A successful run stores the result and, when agent-wallet custody is
 configured, the runtime signs escrow `submit` with the custodied provider
@@ -178,14 +206,87 @@ It is off by default so tests, CI and existing deployments never call a paid
 model. It writes `[agent-runtime]` lines to stdout (info) and stderr
 (warnings).
 
+### Run phases (#334, T5.3)
+
+With a `SubcontractSetup` (search, `SubcontractPort`, `ChildResultSource`
+and a `RunnerLease`), `HireRunner` runs an opted-in Anthropic manifest
+through `ToolLoop`. A run that opens a child moves `running` →
+`awaitingChild`: the loop state is stored in `hire_run` (`loopState`, versioned
+JSON from `tool_loop_codec.dart`: the transcript with each turn's opaque
+`providerContent`, turns and children used, the remaining reserve and the
+search snapshots; plus `pendingToolCallId`, `childHireId` and `childRequest`
+with the justification, D10 verdict and ranking), the model call has ended,
+and nothing holds the timeout. Each pass first asks `ChildResultSource` about
+every paused run; once the child delivered or failed, the run goes back to
+`running` and the loop continues with that result. An awaiting run is never
+swept as `interrupted`, shows `runtimeStatus` `running`, and its hire stays
+`funded` (ADR-0011 D7). A retryable provider failure mid-loop stores the
+conversation and the next attempt continues it, so no finished turn is
+repeated and no child is opened twice. Studio (`OwnedRunManifest`) runs hold
+the conversation on the builder's credential (`runnerLease`). The stored
+state is bounded by the loop's input cap (`input.max_chars` plus 32,000
+characters of headroom) plus provider content: tens of kilobytes.
+
+### Child verdicts (#334, T6.3)
+
+`EscrowChildResultSource` is the real `ChildResultSource`. Once the child's
+facts are final, the parent agent A judges its child B with one server rule
+(ADR-0011 D3) and A's custodied wallet signs the verdict as the child's
+evaluator: a `childComplete` or `childReject` submission (server-signed; it
+calls the escrow's `complete` or `reject`). The 32-byte `reason` is the
+SHA-256 of the UTF-8 reason code:
+
+| Code | When | Call |
+|---|---|---|
+| `child_complete` | B's `submit` confirmed and its output is non-blank | `complete` from `Submitted` |
+| `child_output_empty` | B's submitted output is empty or blank | `reject` from `Submitted` |
+| `child_run_failed` | B's run failed | `reject` from `Funded` |
+| `child_not_submitted` | B's run succeeded but its `submit` can never land | `reject` from `Funded` |
+
+Length is never a reason to reject. B's run already fails an output over its
+own manifest's `output.max_chars`, which no manifest may set above 16,000
+(domain invariant I30), so a stored output is work B delivered within its own
+terms. "Malformed" and "off the subtask" (D3) are not checked either, on
+purpose: they would need a model call that B's output could steer, so anything
+non-blank is paid.
+
+The parent's loop gets B's stored output (`ChildDelivered`) after a confirmed
+`complete` or a deadline-relay `release`, and `ChildFailed` with the reason
+code after a confirmed `reject`, `child_expired` after `claim_refund`, and
+`child_not_opened` for a child whose `create_child_job` never landed. When
+the parent's run fails, its open children are still judged by the same rule on
+every runtime pass. The reserve backs B's work until B finishes, whoever hired
+the parent. A
+delivered output that would push the parent's conversation past its limit
+(`input.max_chars` plus the loop's headroom) is cut to the longest prefix that
+fits and labelled with `truncated` and `output_runes`, so the paid result never
+fails the parent's next segment with `input_too_long`. A
+`pending` or `unverified` receipt line keeps the parent waiting. One verdict
+is in flight per child; a failed one is built again up to three attempts,
+after which the deadline relay settles the child. On confirmation the tracker
+fills the receipt line's `state`, `fee`, `payout` (from `JobCompleted`; 0 for
+a reject) and `settleTransaction`; the complete verdict stores B's
+`deliverableHash` when it is sent.
+
+`AgentSubmitSender` takes an optional `childrenOpen` check (`OpenChildren`)
+and does not submit a parent hire while a child is open; a simulation refused
+with `ChildrenOpen` stores nothing and is retried, so it never burns an
+attempt. Agent-signed calls (`submit`, `createChildJob` and the verdicts) are
+kept one in flight at a time.
+
+**Not wired in production yet.** `startAgentRuntime` passes no
+`SubcontractSetup` until T6.4, so no run is offered the tools, an opted-in
+manifest runs as one plain segment, and no run pauses. Tests inject fakes.
+
 ### Hire configuration
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `172800`. |
+| `PULS3_HIRE_JOB_DURATION_SECONDS` | none (required) | How long a new hire's escrow job stays valid: `HireService.createHire` sets the job's `expired_at` to now plus this many seconds, and `fund` is only accepted for a job with that same `expired_at`. A positive whole number; without it `createHire` fails with `HireConfigurationMissing`. The value is deferred (ADR-0005 D3), so no default is set. It must be longer than the escrow's `approval_window` plus the run time: `submit` fails with `SubmitTooLate` unless `now + approval_window < expired_at`, and the testnet escrow's window is 86400 s, so `86400` makes every `submit` fail. The examples use `259200`: a hire that subcontracts needs two approval windows plus the escrow's 600 s `CHILD_EXPIRY_MARGIN`, because a child job must expire one window plus 600 s before the parent's and still leave the child a full window to submit, so `172800` leaves no room for a child. |
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
+| `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS` | none (optional) | The platform ceiling of a hire's subcontract reserve, in USDC stroops (ADR-0011 D1). Read only when `createHire` asks for a reserve above 0: such a hire is funded with `fund_with_reserve` instead of `fund`. A reserve above the ceiling fails with `InvalidHire`; without the setting a reserve fails with `HireConfigurationMissing`, so a deployment without it hires exactly as before. `0` turns subcontracting off. |
 
 The three relay keys have no default, fallback or placeholder. They are read
 when an operation needs them, so a missing, empty, non-integer or out-of-range
@@ -233,7 +334,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
+PULS3_HIRE_JOB_DURATION_SECONDS=259200 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
@@ -270,7 +371,7 @@ PULS3_E2E_CONSUMER_ADDRESS="$(stellar keys address alice)" \
 PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
 PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
 PULS3_PLATFORM_FEE_BPS=0 \
-PULS3_HIRE_JOB_DURATION_SECONDS=172800 \
+PULS3_HIRE_JOB_DURATION_SECONDS=259200 \
 PULS3_E2E_SERVERPOD_MODE=development \
 dart run tool/e2e_submit_testnet.dart
 ```
@@ -664,7 +765,7 @@ per project.
    scloud variable set PULS3_INDEXER_ENABLED true
    scloud variable set PULS3_RUNTIME_ENABLED true
    scloud variable set PULS3_WORKERS_AI_ACCOUNT_ID <cloudflare-account-id>
-   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 172800
+   scloud variable set PULS3_HIRE_JOB_DURATION_SECONDS 259200
    scloud variable set PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS 600
    scloud variable set PULS3_STELLAR_INCLUSION_FEE_STROOPS 100000
    scloud variable set PULS3_PLATFORM_FEE_BPS 0

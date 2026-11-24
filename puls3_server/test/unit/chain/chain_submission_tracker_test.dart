@@ -38,14 +38,29 @@ final _jobFunded = JobFundedEvent(
   feeBps: 0,
 );
 
+final _childJobCreated = ChildJobCreatedEvent(
+  parentJobId: 3,
+  childJobId: 4,
+  provider: _address,
+  agentId: AgentId(9),
+  budget: BigInt.from(500000),
+  reserve: BigInt.zero,
+  depth: 1,
+  parentReserveLeft: BigInt.from(1500000),
+);
+
 TransactionLookup _success({
   List<JobCreatedEvent> jobCreated = const [],
   List<JobFundedEvent> jobFunded = const [],
+  List<ChildJobCreatedEvent> childJobCreated = const [],
+  List<JobCompletedEvent> jobCompleted = const [],
 }) => TransactionLookup(
   status: TransactionStatus.success,
   latestLedgerCloseTime: _start,
   jobCreated: jobCreated,
   jobFunded: jobFunded,
+  childJobCreated: childJobCreated,
+  jobCompleted: jobCompleted,
 );
 
 /// Delegates to an in-memory store but throws from the transitions while
@@ -112,6 +127,10 @@ final class _FlakyStore implements ChainSubmissionStore {
   @override
   Future<bool> hasSubmitted(Set<SubmissionPurpose> purposes) =>
       _inner.hasSubmitted(purposes);
+
+  @override
+  Future<List<String?>> submittedEnvelopes(Set<SubmissionPurpose> purposes) =>
+      _inner.submittedEnvelopes(purposes);
 
   @override
   Future<bool> markConfirmed(int id) =>
@@ -1130,6 +1149,224 @@ void main() {
 
     expect(first.errors, 1);
     await expectState(s, SubmissionState.confirmed);
+  });
+
+  group('createChildJob', () {
+    test('applies the ChildJobCreated effect and confirms', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = _success(
+        childJobCreated: [_childJobCreated],
+        jobCreated: [_jobCreated],
+        jobFunded: [_jobFunded],
+      );
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.confirmed, 1);
+      expect(effects.childCreated, [s.id]);
+      expect(effects.childCreatedEvents.single.single.childJobId, 4);
+      expect(effects.childFailed, isEmpty);
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('without a ChildJobCreated event waits, then fails '
+        'JobEvidenceUnavailable and tells the effect', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = _success(jobCreated: [_jobCreated]);
+
+      for (var i = 0; i < evidencePasses; i++) {
+        await tracker.pass(store);
+      }
+
+      expect(effects.childCreated, isEmpty);
+      expect(effects.childFailed, [
+        (s.id, SubmissionOutcomeCode.jobEvidenceUnavailable),
+      ]);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobEvidenceUnavailable,
+      );
+    });
+
+    test('a FAILED transaction tells the effect before failing', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.childFailed, [
+        (s.id, SubmissionOutcomeCode.transactionFailed),
+      ]);
+      // One envelope per child: no EscrowCallFailed budget applies.
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
+
+    test('an expired envelope fails PreparationExpired through the '
+        'effect', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = TransactionLookup(
+        status: TransactionStatus.notFound,
+        latestLedgerCloseTime: _validUntil.add(const Duration(seconds: 1)),
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.childFailed, [
+        (s.id, SubmissionOutcomeCode.preparationExpired),
+      ]);
+    });
+
+    test('a mismatching effect fails JobMismatch through the effect', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = _success(
+        childJobCreated: [_childJobCreated],
+      );
+      effects.result = EffectResult.failed(
+        SubmissionOutcomeCode.jobMismatch,
+        field: 'provider',
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.childFailed, [(s.id, SubmissionOutcomeCode.jobMismatch)]);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.jobMismatch,
+      );
+    });
+
+    test('a failure effect that throws leaves the record submitted', () async {
+      final s = await submit(SubmissionPurpose.createChildJob);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+      effects.childFailedError = StateError('db down');
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+    });
+  });
+
+  group('relay settlements (T6.4.3)', () {
+    final released = JobCompletedEvent(
+      jobId: 4,
+      evaluator: _address,
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: true,
+    );
+
+    for (final purpose in [
+      SubmissionPurpose.release,
+      SubmissionPurpose.claimRefund,
+    ]) {
+      test('a successful ${purpose.wireName} records the settlement, then '
+          'confirms', () async {
+        final s = await submit(purpose);
+        ledger.lookups[s.transactionHash] = _success(jobCompleted: [released]);
+
+        final summary = await tracker.pass(store);
+
+        expect(summary.confirmed, 1);
+        expect(effects.relaySettled, [s.id]);
+        expect(
+          effects.relaySettledEvents.single.single.payout,
+          released.payout,
+        );
+        await expectState(s, SubmissionState.confirmed);
+      });
+    }
+
+    test('an effect that throws leaves the relay call submitted', () async {
+      final s = await submit(SubmissionPurpose.release);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.error = StateError('receipt table locked');
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+    });
+
+    test('a failed relay call is stored failed without the effect', () async {
+      final s = await submit(SubmissionPurpose.claimRefund);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.relaySettled, isEmpty);
+    });
+  });
+
+  group('child verdicts (ADR-0011 D3)', () {
+    final completed = JobCompletedEvent(
+      jobId: 4,
+      evaluator: _address,
+      payout: BigInt.from(490000),
+      fee: BigInt.from(10000),
+      autoReleased: false,
+    );
+
+    test('a successful childComplete settles the line and confirms', () async {
+      final s = await submit(SubmissionPurpose.childComplete);
+      ledger.lookups[s.transactionHash] = _success(jobCompleted: [completed]);
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.confirmed, 1);
+      expect(effects.childSettled, [s.id]);
+      expect(effects.childSettledEvents.single.single.fee, BigInt.from(10000));
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('a successful childReject settles the line and confirms', () async {
+      final s = await submit(SubmissionPurpose.childReject);
+      ledger.lookups[s.transactionHash] = _success();
+
+      await tracker.pass(store);
+
+      expect(effects.childSettled, [s.id]);
+      await expectState(s, SubmissionState.confirmed);
+    });
+
+    test('an effect that throws leaves the verdict submitted', () async {
+      final s = await submit(SubmissionPurpose.childComplete);
+      ledger.lookups[s.transactionHash] = _success();
+      effects.error = StateError('receipt table locked');
+
+      final summary = await tracker.pass(store);
+
+      expect(summary.errors, 1);
+      await expectState(s, SubmissionState.submitted);
+    });
+
+    test('a failed verdict is stored failed without the effect', () async {
+      final s = await submit(SubmissionPurpose.childReject);
+      ledger.lookups[s.transactionHash] = const TransactionLookup(
+        status: TransactionStatus.failed,
+      );
+
+      await tracker.pass(store);
+
+      expect(effects.childSettled, isEmpty);
+      await expectState(
+        s,
+        SubmissionState.failed,
+        SubmissionOutcomeCode.transactionFailed,
+      );
+    });
   });
 
   group('recordCheck', () {

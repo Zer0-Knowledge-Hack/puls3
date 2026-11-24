@@ -319,12 +319,18 @@ class EndpointHire extends _isc.EndpointRef {
 
   /// Creates the hire of [requestId] for [consumer] and prepares its
   /// `create_job`; repeating the request returns the same hire.
+  ///
+  /// [subcontractReserve] (USDC stroops) and [allowRelatedParty] are the
+  /// consumer's subcontract cap and related-party choice (ADR-0011 D1, D10).
+  /// Left out, the hire never subcontracts, so older clients keep working.
   _ida.Future<_iyigzt6l.CreateHireResult> createHire(
     int agentId,
     String consumer,
     String input,
-    String requestId,
-  ) => caller.callServerEndpoint<_iyigzt6l.CreateHireResult>(
+    String requestId, {
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+  }) => caller.callServerEndpoint<_iyigzt6l.CreateHireResult>(
     'hire',
     'createHire',
     {
@@ -332,6 +338,8 @@ class EndpointHire extends _isc.EndpointRef {
       'consumer': consumer,
       'input': input,
       'requestId': requestId,
+      'subcontractReserve': subcontractReserve,
+      'allowRelatedParty': allowRelatedParty,
     },
   );
 

@@ -162,6 +162,31 @@ void main() {
       expect(event.deferred, isFalse);
     });
 
+    test('reads job_completed (the settlement of a child verdict)', () {
+      final tx = _tx([
+        _event('job_completed', 4, {
+          'evaluator': {'address': _client},
+          'reason': {'bytes': '00' * 32},
+          'payout': {'i128': '490000'},
+          'fee': {'i128': '10000'},
+          'auto_released': {'bool': false},
+        }),
+        _event('job_completed', 5, {
+          'evaluator': {'address': _client},
+          'payout': {'i128': '1'},
+        }),
+      ]);
+
+      final event = allJobCompleted(tx, escrow: _escrow).single;
+
+      expect(event.jobId, 4);
+      expect(event.evaluator.value, _client);
+      expect(event.payout, BigInt.from(490000));
+      expect(event.fee, BigInt.from(10000));
+      expect(event.autoReleased, isFalse);
+      expect(allJobCompleted(_tx([]), escrow: _escrow), isEmpty);
+    });
+
     test('skips other names, other contracts, failed and malformed', () {
       final good = _event('reserve_refunded', 3, {
         'client': {'address': _client},

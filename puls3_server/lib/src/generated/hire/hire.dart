@@ -25,7 +25,11 @@ abstract class HireRecord
     this.input,
     this.jobId,
     this.escrow,
-  });
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    this.parentHireId,
+  }) : subcontractReserve = subcontractReserve ?? 0,
+       allowRelatedParty = allowRelatedParty ?? true;
 
   factory HireRecord({
     int? id,
@@ -38,6 +42,9 @@ abstract class HireRecord
     String? input,
     int? jobId,
     String? escrow,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   }) = _HireRecordImpl;
 
   factory HireRecord.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -52,6 +59,13 @@ abstract class HireRecord
       input: jsonSerialization['input'] as String?,
       jobId: jsonSerialization['jobId'] as int?,
       escrow: jsonSerialization['escrow'] as String?,
+      subcontractReserve: jsonSerialization['subcontractReserve'] as int?,
+      allowRelatedParty: jsonSerialization['allowRelatedParty'] == null
+          ? null
+          : _is.BoolJsonExtension.fromJson(
+              jsonSerialization['allowRelatedParty'],
+            ),
+      parentHireId: jsonSerialization['parentHireId'] as int?,
     );
   }
 
@@ -86,6 +100,19 @@ abstract class HireRecord
   /// it then means the escrow configured at that moment (#307).
   String? escrow;
 
+  /// USDC stroops the consumer funds beside price for child jobs
+  /// (fund_with_reserve, ADR-0011 D1). 0, the default of existing rows, is a
+  /// hire that never subcontracts and is funded with fund.
+  int subcontractReserve;
+
+  /// Whether the agent may subcontract an agent of the same owner (ADR-0011
+  /// D10). Allowed by default, with notice.
+  bool allowRelatedParty;
+
+  /// The hire whose reserve funded this child hire (ADR-0011 D7). Null for a
+  /// consumer's hire.
+  int? parentHireId;
+
   @override
   _is.Table<int?> get table => t;
 
@@ -103,6 +130,9 @@ abstract class HireRecord
     String? input,
     int? jobId,
     String? escrow,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -118,6 +148,9 @@ abstract class HireRecord
       if (input != null) 'input': input,
       if (jobId != null) 'jobId': jobId,
       if (escrow != null) 'escrow': escrow,
+      'subcontractReserve': subcontractReserve,
+      'allowRelatedParty': allowRelatedParty,
+      if (parentHireId != null) 'parentHireId': parentHireId,
     };
   }
 
@@ -168,6 +201,9 @@ class _HireRecordImpl extends HireRecord {
     String? input,
     int? jobId,
     String? escrow,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    int? parentHireId,
   }) : super._(
          id: id,
          consumer: consumer,
@@ -179,6 +215,9 @@ class _HireRecordImpl extends HireRecord {
          input: input,
          jobId: jobId,
          escrow: escrow,
+         subcontractReserve: subcontractReserve,
+         allowRelatedParty: allowRelatedParty,
+         parentHireId: parentHireId,
        );
 
   /// Returns a shallow copy of this [HireRecord]
@@ -196,6 +235,9 @@ class _HireRecordImpl extends HireRecord {
     Object? input = _Undefined,
     Object? jobId = _Undefined,
     Object? escrow = _Undefined,
+    int? subcontractReserve,
+    bool? allowRelatedParty,
+    Object? parentHireId = _Undefined,
   }) {
     return HireRecord(
       id: id is int? ? id : this.id,
@@ -208,6 +250,9 @@ class _HireRecordImpl extends HireRecord {
       input: input is String? ? input : this.input,
       jobId: jobId is int? ? jobId : this.jobId,
       escrow: escrow is String? ? escrow : this.escrow,
+      subcontractReserve: subcontractReserve ?? this.subcontractReserve,
+      allowRelatedParty: allowRelatedParty ?? this.allowRelatedParty,
+      parentHireId: parentHireId is int? ? parentHireId : this.parentHireId,
     );
   }
 }
@@ -259,6 +304,21 @@ class HireRecordUpdateTable extends _is.UpdateTable<HireRecordTable> {
     table.escrow,
     value,
   );
+
+  _is.ColumnValue<int, int> subcontractReserve(int value) => _is.ColumnValue(
+    table.subcontractReserve,
+    value,
+  );
+
+  _is.ColumnValue<bool, bool> allowRelatedParty(bool value) => _is.ColumnValue(
+    table.allowRelatedParty,
+    value,
+  );
+
+  _is.ColumnValue<int, int> parentHireId(int? value) => _is.ColumnValue(
+    table.parentHireId,
+    value,
+  );
 }
 
 class HireRecordTable extends _is.Table<int?> {
@@ -300,6 +360,20 @@ class HireRecordTable extends _is.Table<int?> {
       'escrow',
       this,
     );
+    subcontractReserve = _is.ColumnInt(
+      'subcontractReserve',
+      this,
+      hasDefault: true,
+    );
+    allowRelatedParty = _is.ColumnBool(
+      'allowRelatedParty',
+      this,
+      hasDefault: true,
+    );
+    parentHireId = _is.ColumnInt(
+      'parentHireId',
+      this,
+    );
   }
 
   late final HireRecordUpdateTable updateTable;
@@ -328,6 +402,19 @@ class HireRecordTable extends _is.Table<int?> {
   /// it then means the escrow configured at that moment (#307).
   late final _is.ColumnString escrow;
 
+  /// USDC stroops the consumer funds beside price for child jobs
+  /// (fund_with_reserve, ADR-0011 D1). 0, the default of existing rows, is a
+  /// hire that never subcontracts and is funded with fund.
+  late final _is.ColumnInt subcontractReserve;
+
+  /// Whether the agent may subcontract an agent of the same owner (ADR-0011
+  /// D10). Allowed by default, with notice.
+  late final _is.ColumnBool allowRelatedParty;
+
+  /// The hire whose reserve funded this child hire (ADR-0011 D7). Null for a
+  /// consumer's hire.
+  late final _is.ColumnInt parentHireId;
+
   @override
   List<_is.Column> get columns => [
     id,
@@ -340,6 +427,9 @@ class HireRecordTable extends _is.Table<int?> {
     input,
     jobId,
     escrow,
+    subcontractReserve,
+    allowRelatedParty,
+    parentHireId,
   ];
 }
 

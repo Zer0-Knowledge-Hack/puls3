@@ -10,9 +10,11 @@ import 'package:test/test.dart';
 
 import '../support/relay_rig.dart';
 
-/// The escrow binding of ADR-0011 D2: `create_child_job`.
+/// The escrow bindings of ADR-0011: `fund_with_reserve` and
+/// `create_child_job`.
 
 final _escrow = StellarConfig.testnet.escrow;
+final _wallet = StellarAddress.parse(alice);
 final _agentA = StellarAddress.parse(agentWallet);
 final _agentB = StellarAddress.parse(stranger);
 
@@ -35,6 +37,49 @@ void main() {
   late RelayRig rig;
 
   setUp(() => rig = RelayRig());
+
+  group('prepareFund with a subcontract reserve (D1)', () {
+    test('a hire with a reserve calls fund_with_reserve once', () async {
+      final hire = await rig.hire(
+        status: HireStatus.open,
+        subcontractReserve: 2000000,
+      );
+
+      final prepared = await rig.service.prepareFund(_wallet, hire.id);
+
+      expect(prepared.purpose, 'fund', reason: 'funding stays one purpose');
+      expect(
+        _builtCall(rig),
+        _call('fund_with_reserve', [
+          ScArg.address(_wallet),
+          const ScArg.u64(3),
+          const ScArg.i128(price),
+          const ScArg.i128(2000000),
+          const ScArg.u32(platformFeeBps),
+        ]),
+      );
+      expect(
+        rig.preparations.all.single.purpose,
+        SubmissionPurpose.fund,
+      );
+    });
+
+    test('a hire without a reserve still calls fund unchanged', () async {
+      final hire = await rig.hire(status: HireStatus.open);
+
+      await rig.service.prepareFund(_wallet, hire.id);
+
+      expect(
+        _builtCall(rig),
+        _call('fund', [
+          ScArg.address(_wallet),
+          const ScArg.u64(3),
+          const ScArg.i128(price),
+          const ScArg.u32(platformFeeBps),
+        ]),
+      );
+    });
+  });
 
   group('draftCreateChildJob (D2)', () {
     Future<PreparationDraft> draft({int reserve = 0}) =>

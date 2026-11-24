@@ -28,3 +28,10 @@ fields:
   ### Reference to the confirmed ERC-8004 feedback for this hire, for example
   ### the give_feedback transaction hash. Replaces the former rated state.
   feedbackReference: String?
+  ### USDC stroops of subcontract reserve the consumer funds beside price
+  ### (ADR-0011 D1). 0 for a hire that never subcontracts.
+  subcontractReserve: int, default=0
+  ### Whether related-party subcontracts are allowed (ADR-0011 D10).
+  allowRelatedParty: bool, default=true
+  ### Domain HireId of the parent hire of a child hire (ADR-0011 D7).
+  parentHireId: int?

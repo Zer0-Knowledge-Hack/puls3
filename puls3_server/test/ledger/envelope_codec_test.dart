@@ -706,6 +706,44 @@ void main() {
     });
   });
 
+  group('sourceOf', () {
+    test('reads the source account of a signed or unsigned envelope', () {
+      for (final vector in [_create, _fund]) {
+        expect(_codec.sourceOf(vector.signedXdr), _signer);
+        expect(_codec.sourceOf(base64Encode(vector.unsigned)), _signer);
+      }
+    });
+
+    test('is null for an envelope it cannot read', () {
+      expect(_codec.sourceOf(''), isNull);
+      expect(_codec.sourceOf('not base64!'), isNull);
+      expect(_codec.sourceOf(base64Encode([1, 2, 3])), isNull);
+      expect(_codec.sourceOf(base64Encode(_feeBumpAround(_create))), isNull);
+    });
+
+    test('is null for a muxed M source account', () {
+      // KEY_TYPE_MUXED_ED25519 (0x100), then the uint64 id, then the key.
+      final unsigned = _create.unsigned;
+      final muxed = [
+        ...unsigned.sublist(0, 4),
+        0,
+        0,
+        1,
+        0,
+        ...List.filled(8, 0)..[7] = 5,
+        ...unsigned.sublist(8),
+      ];
+      final decoded = stellar.Envelope.fromXdr(muxed);
+      expect(
+        (decoded as stellar.TransactionV1Envelope).tx.sourceAccount,
+        isA<stellar.MuxedAccountMed25519>(),
+        reason: 'the probe is a well-formed muxed envelope',
+      );
+
+      expect(_codec.sourceOf(base64Encode(muxed)), isNull);
+    });
+  });
+
   test('sign attaches one signature that verifies and keeps the hash', () {
     final key = stellar.StellarPrivateKey.fromBytes(Uint8List(32)..[0] = 7);
     final source = StellarAddress.parse(key.toPublicKey().toAddress().address);

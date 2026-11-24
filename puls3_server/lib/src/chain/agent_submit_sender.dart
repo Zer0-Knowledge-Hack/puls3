@@ -14,11 +14,16 @@ import '../ledger/xdr_invoke_encoder.dart' show ScArg;
 import 'chain_log.dart';
 import 'chain_submission_store.dart';
 import 'escrow_deadline.dart';
+import 'agent_call_gate.dart';
 import 'submission_values.dart';
 
 /// SHA-256 of the UTF-8 run output, the 32-byte escrow `deliverable`.
 Uint8List deliverableHash(String output) =>
     Uint8List.fromList(sha256.convert(utf8.encode(output)).bytes);
+
+/// [deliverableHash] as lowercase hex, as the receipt line stores it.
+String deliverableHashHex(String output) =>
+    sha256.convert(utf8.encode(output)).toString();
 
 /// Escrow codes a `submit` can never recover from: `JobExpired` (9) and
 /// `SubmitTooLate` (106). Every other contract code may be transient (a
@@ -54,11 +59,18 @@ final class DueSubmit {
 /// Builds, signs with the agent's custodied key, persists and sends one
 /// escrow `submit`.
 ///
-/// One `submit` is in flight at a time, across hires: agent wallets can
-/// have more than one funded job, and two envelopes built against the same
-/// sequence would be `txBadSeq`. A hire with any non-final submission is
-/// skipped too. After [maxEscrowCallAttempts] failed `submit`s the pass
-/// stops building another.
+/// One agent-signed call ([agentSignedPurposes]) is in flight per signing
+/// wallet, across hires ([agentCallInFlight]): agent wallets can have more
+/// than one funded job, and two envelopes built against the same sequence
+/// would be `txBadSeq`. Another agent's call does not hold it. A hire
+/// with any non-final submission is skipped too. After
+/// [maxEscrowCallAttempts] failed `submit`s the pass stops building another.
+///
+/// A parent hire is not submitted while `childrenOpen` says it has an open
+/// child job (ADR-0011 D4), and a simulation refused with `ChildrenOpen`
+/// stores nothing: the hire is submitted on a later pass, once its children
+/// settled, instead of burning an attempt. Without `childrenOpen` every
+/// hire is a plain hire.
 ///
 /// The envelope is stored before it is sent. A node that cannot be reached
 /// leaves the record `submitted` so the tracker can send the same envelope
@@ -83,7 +95,9 @@ final class AgentSubmitSender {
     required this.validitySeconds,
     required DateTime Function() now,
     required ChainLog log,
-  }) : _submissions = submissions,
+    Future<bool> Function(int hireId)? childrenOpen,
+  }) : _childrenOpen = childrenOpen,
+       _submissions = submissions,
        _accounts = accounts,
        _codec = codec,
        _sign = sign,
@@ -106,17 +120,46 @@ final class AgentSubmitSender {
   _send;
   final DateTime Function() _now;
   final ChainLog _log;
+  final Future<bool> Function(int hireId)? _childrenOpen;
 
   final StellarAddress escrow;
   final int inclusionFee;
   final int validitySeconds;
 
-  /// Sends [due] unless a `submit` is already in flight, the hire has a
-  /// non-final submission, a `submit` already confirmed, or attempts are
-  /// exhausted.
+  /// Whether [hireId] has an open child job. A check that fails counts as
+  /// open (fail closed): the escrow refuses a parent `submit` while a child
+  /// is open, so sending blind would only burn an attempt. The error is
+  /// logged and caught so one failing read does not abort the rest of the
+  /// pass's hires (T6.4.4).
+  Future<bool> _anyChildOpen(
+    Future<bool> Function(int hireId) childrenOpen,
+    int hireId,
+  ) async {
+    try {
+      return await childrenOpen(hireId);
+    } on Object catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Could not read the open children of hire $hireId; its submit waits: '
+        '$e',
+      );
+      return true;
+    }
+  }
+
+  /// Sends [due] unless an agent-signed call of its provider is already in
+  /// flight, the hire
+  /// has a non-final submission, a `submit` already confirmed, attempts are
+  /// exhausted, or the hire has an open child job.
   Future<void> send(DueSubmit due) async {
     const purpose = SubmissionPurpose.submit;
-    if (await _submissions.hasSubmitted({purpose})) return;
+    if (await agentCallInFlight(
+      submissions: _submissions,
+      codec: _codec,
+      signer: due.provider,
+    )) {
+      return;
+    }
     final existing = await _submissions.listByHire(due.hireId);
     if (existing.any((row) => !row.state.isFinal)) return;
     if (existing.any(
@@ -136,6 +179,10 @@ final class AgentSubmitSender {
       return;
     }
     if (failed.length >= maxEscrowCallAttempts) return;
+    final childrenOpen = _childrenOpen;
+    if (childrenOpen != null && await _anyChildOpen(childrenOpen, due.hireId)) {
+      return;
+    }
 
     final until = _now().toUtc().add(Duration(seconds: validitySeconds));
     final PreparedEnvelope prepared;
@@ -156,6 +203,14 @@ final class AgentSubmitSender {
       );
       prepared = _codec.build(spec, await _accounts.simulateRaw(spec));
     } on LedgerContractError catch (e) {
+      if (e.code == EscrowSubcontractError.childrenOpen.code) {
+        // The parent still has an open child: not a failed submit.
+        _log(
+          ChainLogLevel.info,
+          'Submit for hire ${due.hireId} waits for its open child jobs',
+        );
+        return;
+      }
       // Only an expired / too-late job is permanent. The rest may be a
       // lagging node or an admin change, so count one bounded attempt.
       final terminal = _terminalSubmitCodes.contains(e.code);

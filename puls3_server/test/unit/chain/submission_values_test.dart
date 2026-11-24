@@ -16,6 +16,8 @@ void main() {
         'release',
         'claimRefund',
         'createChildJob',
+        'childComplete',
+        'childReject',
       ]);
     });
 
@@ -37,6 +39,8 @@ void main() {
           'release': 'release',
           'claimRefund': 'claim_refund',
           'createChildJob': 'create_child_job',
+          'childComplete': 'complete',
+          'childReject': 'reject',
         },
       );
     });
@@ -70,20 +74,27 @@ void main() {
       }
     });
 
-    test(
-      'submit, release, claimRefund and createChildJob are server-signed',
-      () {
-        expect(
-          SubmissionPurpose.values.where((p) => p.isServerSigned),
-          [
-            SubmissionPurpose.submit,
-            SubmissionPurpose.release,
-            SubmissionPurpose.claimRefund,
-            SubmissionPurpose.createChildJob,
-          ],
-        );
-      },
-    );
+    test('submit, release, claimRefund, createChildJob and the child '
+        'verdicts are server-signed', () {
+      expect(SubmissionPurpose.values.where((p) => p.isServerSigned), [
+        SubmissionPurpose.submit,
+        SubmissionPurpose.release,
+        SubmissionPurpose.claimRefund,
+        SubmissionPurpose.createChildJob,
+        SubmissionPurpose.childComplete,
+        SubmissionPurpose.childReject,
+      ]);
+    });
+
+    test('agent wallets sign submit, createChildJob and the child '
+        'verdicts', () {
+      expect(agentSignedPurposes, {
+        SubmissionPurpose.submit,
+        SubmissionPurpose.createChildJob,
+        SubmissionPurpose.childComplete,
+        SubmissionPurpose.childReject,
+      });
+    });
   });
 
   group('SubmissionState', () {
