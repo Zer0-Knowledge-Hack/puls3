@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:puls3_domain/puls3_domain.dart';
 import 'package:puls3_server/src/agent/agent_index_repository.dart';
+import 'package:puls3_server/src/agent/catalog_id_owner.dart';
 import 'package:puls3_server/src/agent/catalog_indexer.dart';
 import 'package:puls3_server/src/agent/registry_event_reader.dart';
 import 'package:puls3_server/src/agent/registry_events.dart';
@@ -51,6 +52,16 @@ final class _FakeRegistry implements RegistryReader {
   Future<StellarAddress?> agentWallet(AgentId id) async {
     final wallet = wallets[id.value];
     return wallet == null ? null : StellarAddress.parse(wallet);
+  }
+
+  /// Owners by registry id; any other agent below [total] is owned by
+  /// [_wallet], so a repeated catalog id is a redeploy by the same owner.
+  final Map<int, String> owners = {};
+
+  @override
+  Future<StellarAddress?> ownerOf(AgentId agent) async {
+    if (agent.value >= total) return null;
+    return StellarAddress.parse(owners[agent.value] ?? _wallet);
   }
 }
 
@@ -133,6 +144,10 @@ final class _InMemoryIndex implements AgentIndexRepository {
   }
 
   @override
+  Future<void> removeAll(Set<int> registryIds) async =>
+      rows.removeWhere((id, _) => registryIds.contains(id));
+
+  @override
   Future<int?> lastProcessedLedger() async => checkpoint;
 
   @override
@@ -169,6 +184,154 @@ void main() {
     repository: index,
     log: log,
   );
+
+  group('a Studio id belongs to its draft owner (#381)', () {
+    const builder = 'GDKAJMNZ6WOMQ3EWLJI2UOWA3FWNHZM2BR7KJQUGQ2TQV5LZ7FUWJ7EO';
+    const squatter = 'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+    CatalogIndexer withDrafts(
+      _FakeRegistry registry,
+      _FakeEvents events,
+      _InMemoryIndex index,
+    ) => CatalogIndexer(
+      registry: registry,
+      events: events,
+      repository: index,
+      log: log,
+      owners: StudioCatalogIdOwners(
+        (draftId) async => draftId == 31 ? builder : null,
+      ),
+    );
+
+    Map<String, String> studio(String name) => _metadata(1)
+      ..['id'] = 'studio-31'
+      ..['name'] = name;
+
+    test('a squatter that registered first is not indexed', () async {
+      final registry = _FakeRegistry({
+        0: studio('Squatter'),
+        1: studio('The real agent'),
+      })
+        ..owners[0] = squatter
+        ..owners[1] = builder;
+      final index = _InMemoryIndex();
+
+      final summary = await withDrafts(
+        registry,
+        _FakeEvents(latest: 500),
+        index,
+      ).pass();
+
+      expect(index.rows.keys.toList(), [1]);
+      expect(summary.foreign, 1);
+      expect((await index.findByAgentId('studio-31'))!.name, 'The real agent');
+      expect(await index.findByRegistryId(1), isNotNull);
+    });
+
+    test('a row indexed before the rule is removed on rehydration', () async {
+      // Production today: a registration of a Studio id by another owner was
+      // indexed under the old newest-wins rule and shadows the real agent.
+      final registry = _FakeRegistry({
+        0: studio('The real agent'),
+        1: studio('Foreign'),
+      })
+        ..owners[0] = builder
+        ..owners[1] = squatter;
+      final index = _InMemoryIndex()
+        ..rows[0] = _stale(0, 'The real agent').copyWith(id: 'studio-31')
+        ..rows[1] = _stale(1, 'Foreign').copyWith(id: 'studio-31')
+        ..checkpoint = 500;
+
+      final summary = await withDrafts(
+        registry,
+        _FakeEvents(latest: 600),
+        index,
+      ).pass(rehydrateAll: true);
+
+      expect(summary.removed, 1);
+      expect(index.rows.keys.toList(), [0]);
+      expect((await index.findByAgentId('studio-31'))!.registryId, 0);
+    });
+
+    test('a Studio id without a draft is not indexed', () async {
+      final registry = _FakeRegistry({0: _metadata(1)..['id'] = 'studio-99'})
+        ..owners[0] = builder;
+      final index = _InMemoryIndex();
+
+      final summary = await withDrafts(
+        registry,
+        _FakeEvents(latest: 500),
+        index,
+      ).pass();
+
+      expect(index.rows, isEmpty);
+      expect(summary.foreign, 1);
+    });
+  });
+
+  group('a repeated catalog id (audit I-1, #206)', () {
+    const squatter = 'GBY33NK3HMKQUKHL7YSCJ2W5JMJ62MEVKEJTRUWNQXBQIFLUVZY6TJ4R';
+
+    test('the first pass does not index a copy by another owner', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'A copy',
+      })..owners[1] = squatter;
+      final index = _InMemoryIndex();
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 500),
+        index,
+      ).pass();
+
+      expect(index.rows.keys.toList(), [0]);
+      expect(summary.foreign, 1);
+      expect(summary.hydrated, 1);
+      expect((await index.findByRegistryId(0))!.name, 'Agent 1');
+    });
+
+    test('a later copy is not indexed and the agent stays hireable', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'A copy',
+      })..owners[1] = squatter;
+      final index = _InMemoryIndex()
+        ..rows[0] = _stale(0, 'Agent 1').copyWith(id: 'agt-001')
+        ..checkpoint = 500;
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 600, events: [_registered(1)]),
+        index,
+      ).pass();
+
+      expect(index.rows.keys.toList(), [0]);
+      expect(summary.foreign, 1);
+      expect(await index.findByRegistryId(0), isNotNull);
+      expect((await index.findByAgentId('agt-001'))!.registryId, 0);
+    });
+
+    test('a redeploy by the same owner still supersedes', () async {
+      final registry = _FakeRegistry({
+        0: _metadata(1),
+        1: _metadata(1)..['name'] = 'Version 2',
+      });
+      final index = _InMemoryIndex()
+        ..rows[0] = _stale(0, 'Agent 1').copyWith(id: 'agt-001')
+        ..checkpoint = 500;
+
+      final summary = await indexer(
+        registry,
+        _FakeEvents(latest: 600, events: [_registered(1)]),
+        index,
+      ).pass();
+
+      expect(summary.foreign, 0);
+      expect((await index.findByAgentId('agt-001'))!.name, 'Version 2');
+      expect(await index.findByRegistryId(0), isNull);
+    });
+  });
 
   test('the first pass bootstraps every agent from state', () async {
     final registry = _FakeRegistry({
@@ -248,7 +411,7 @@ void main() {
 
     expect(summary.hydrated, 1);
     expect(summary.skipped, 1);
-    expect(index.rows.keys, [0]);
+    expect(index.rows.keys.toList(), [0]);
   });
 
   test('a chain outage aborts the pass and leaves the index untouched',

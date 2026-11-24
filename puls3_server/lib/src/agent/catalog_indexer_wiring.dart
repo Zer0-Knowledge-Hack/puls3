@@ -11,6 +11,7 @@ import '../ledger/soroban_rpc_client.dart';
 import '../ledger/stellar_config.dart';
 import 'catalog_indexer.dart';
 import 'serverpod_agent_index_repository.dart';
+import 'studio_draft_owners.dart';
 
 /// Longest a pass may run before the loop gives up on it, so a hung pass
 /// cannot wedge the indexer.
@@ -98,6 +99,9 @@ TrackerLoop? startCatalogIndexer(Serverpod pod, Map<String, String> env) {
             network: stellar.networkPassphrase,
           ),
           log: log,
+          // A Studio id belongs to its draft's owner, not to whoever
+          // registers it first (#381).
+          owners: studioDraftOwnersOn(session),
         );
         final summary = await indexer.pass(rehydrateAll: !rehydrated);
         rehydrated = true;

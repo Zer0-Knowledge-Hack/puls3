@@ -67,6 +67,23 @@ void main() {
         expect(stored.name, 'Second');
       });
 
+      test('removeAll deletes only the given rows (#381)', () async {
+        final session = sessionBuilder.build();
+        final repo = ServerpodAgentIndexRepository(session, network: 'it-6');
+
+        await repo.upsertAll([
+          _agent(registryId: 9501, id: 'studio-9501', name: 'Real'),
+          _agent(registryId: 9502, id: 'studio-9501', name: 'Foreign'),
+          _agent(registryId: 9503, id: 'it-keep'),
+        ]);
+        await repo.removeAll({9502, 9599});
+        await repo.removeAll({});
+
+        expect(await repo.findByRegistryId(9502), isNull);
+        expect((await repo.findByAgentId('studio-9501'))!.name, 'Real');
+        expect((await repo.findByRegistryId(9503))!.id, 'it-keep');
+      });
+
       test('findByRegistryId reads one row, the newest only (#206)', () async {
         final session = sessionBuilder.build();
         final repo = ServerpodAgentIndexRepository(session, network: 'it-5');
