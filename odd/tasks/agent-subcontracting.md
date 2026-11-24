@@ -444,7 +444,11 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   `subcontractReserve` and `allowRelatedParty`; no endpoint exposes the reserve ceiling, the
   manifest opt-in, or the receipt lines (`HireReceiptLineRecord` is `serverOnly`); the Studio form
   drops `subcontract` on edit (`studio_form_check.dart:157-180`).
-  - [ ] **T7.1** Server read API. A new `HireEndpoint.getHireTerms(agentId)` (reserve ceiling from
+  - [x] **T7.1** (done 2026-11-24, `c3c65cb`; delegated writer, parallel with T7.2. RED: 28
+    compile errors in the new tests. GREEN: server unit+hire+ledger 1523, `test/studio` 56,
+    analyze clean on server and client, a second `serverpod generate` changed nothing;
+    integration not run. New `HireRelayConfig.subcontractReserveMaxOrZero`, `explorer_links.dart`
+    (the server had no explorer helper), `StudioRunManifestSource.onVersions`.) Server read API. A new `HireEndpoint.getHireTerms(agentId)` (reserve ceiling from
     `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, 0 when unset, plus the agent's `max_children` and
     `suggested_reserve` from its manifest, 0 without the opt-in), and `HireDetail.receipt`: the
     parent's receipt lines (`listByParent`) as a public `HireReceiptLine`, readable only by the
@@ -452,7 +456,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     Route: delegated writer, parallel with T7.2 (trigger: two independent units, disjoint
     surfaces, each several files and 200+ lines). Risk: none expected (adds an endpoint and
     optional fields).
-  - [ ] **T7.2** Studio form opt-in: `max_children` and `suggested_reserve` in Advanced, mapped
+  - [x] **T7.2** (done 2026-11-24, `f4611e3`; delegated writer. RED: unit tests failed to load,
+    4 widget tests failed. GREEN: `flutter test` 545, analyze clean. The cap 2 is mirrored as
+    `studioSubcontractMaxChildren`; the Studio refuses more than 2, the server would clamp. The
+    switch is disabled for the free model, which cannot call tools.) Studio form opt-in: `max_children` and `suggested_reserve` in Advanced, mapped
     both ways so an edit keeps the opt-in, and `subcontractMalformed`/`subcontractInvalid` shown
     on the new field. Route: delegated writer, parallel with T7.1. Risk: none expected.
   - [ ] **T7.3** Hire form: a subcontract section only when the agent opted in and the ceiling is
