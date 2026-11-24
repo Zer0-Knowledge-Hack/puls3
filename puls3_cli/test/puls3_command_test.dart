@@ -64,6 +64,28 @@ final class _FakeHire implements HireApi {
   final calls = <String>[];
 
   @override
+  Future<CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) async {
+    calls.add('create $agentId $consumer $input $requestId');
+    if (error != null) throw error!;
+    return CreateHireResult(
+      hire: Hire(
+        id: 21,
+        agentId: agentId,
+        consumer: consumer,
+        price: 5000000,
+        manifestVersion: 1,
+        status: 'open',
+      ),
+      preparedCreateJob: _prepared('createJob'),
+    );
+  }
+
+  @override
   Future<HireDetail> get(int hireId, String consumer) async {
     calls.add('get $hireId $consumer');
     if (error != null) throw error!;
@@ -82,6 +104,20 @@ final class _FakeHire implements HireApi {
       jobId: 34,
       approvalDeadline: DateTime.utc(2026, 11, 12),
     );
+  }
+
+  @override
+  Future<PreparedTransaction> prepareCreateJob(int hireId) async {
+    calls.add('createJob $hireId');
+    if (error != null) throw error!;
+    return _prepared('createJob');
+  }
+
+  @override
+  Future<PreparedTransaction> prepareFund(int hireId) async {
+    calls.add('fund $hireId');
+    if (error != null) throw error!;
+    return _prepared('fund');
   }
 
   @override

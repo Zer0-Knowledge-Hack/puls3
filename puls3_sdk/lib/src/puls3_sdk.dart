@@ -69,6 +69,45 @@ final class Puls3Sdk {
     return _catalog.get(id);
   }
 
+  /// Starts a hire of [agentId] for [consumer] with [input]
+  /// (`HireEndpoint.createHire`). Returns the persisted hire and, when it is
+  /// available, its unsigned `create_job`.
+  ///
+  /// [requestId] is the idempotency key: repeating it for the same [consumer]
+  /// returns the same hire, so a retry is safe. The key is opaque: the SDK
+  /// sends it exactly as given, as the server and every other client do, so
+  /// `" req-1 "` and `"req-1"` are two different keys. [consumer] must be the
+  /// session wallet's address. The SDK does not sign or submit anything.
+  ///
+  /// Throws [ArgumentError] for a negative [agentId] or a blank [consumer],
+  /// [input] or [requestId], and [SessionRequired] without a session, without
+  /// calling the server.
+  Future<CreateHireResult> createHire(
+    int agentId,
+    String consumer,
+    String input,
+    String requestId,
+  ) {
+    if (agentId < 0) {
+      throw ArgumentError.value(agentId, 'agentId', 'must be 0 or more');
+    }
+    if (consumer.trim().isEmpty) {
+      throw ArgumentError.value(consumer, 'consumer', 'must not be blank');
+    }
+    if (input.trim().isEmpty) {
+      throw ArgumentError.value(input, 'input', 'must not be blank');
+    }
+    if (requestId.trim().isEmpty) {
+      throw ArgumentError.value(requestId, 'requestId', 'must not be blank');
+    }
+    return _hireApi('createHire').createHire(
+      agentId,
+      consumer.trim(),
+      input,
+      requestId,
+    );
+  }
+
   /// Hire [hireId] of [consumer], the session wallet's address
   /// (`HireEndpoint.getHire`).
   ///
@@ -80,6 +119,27 @@ final class Puls3Sdk {
       throw ArgumentError.value(consumer, 'consumer', 'must not be blank');
     }
     return _hireApi('getHire').get(hireId, consumer.trim());
+  }
+
+  /// A fresh unsigned `create_job` for [hireId], for the session wallet to
+  /// sign (`HireEndpoint.prepareCreateJob`). The SDK does not sign or submit
+  /// it.
+  ///
+  /// Throws [ArgumentError] for an id below 1, and [SessionRequired] without
+  /// a session, without calling the server.
+  Future<PreparedTransaction> prepareCreateJob(int hireId) {
+    _requireHireId(hireId);
+    return _hireApi('prepareCreateJob').prepareCreateJob(hireId);
+  }
+
+  /// The unsigned `fund` of hire [hireId], for the session wallet to sign
+  /// (`HireEndpoint.prepareFund`). The SDK does not sign or submit it.
+  ///
+  /// Throws [ArgumentError] for an id below 1, and [SessionRequired] without
+  /// a session, without calling the server.
+  Future<PreparedTransaction> prepareFund(int hireId) {
+    _requireHireId(hireId);
+    return _hireApi('prepareFund').prepareFund(hireId);
   }
 
   /// The unsigned `complete` of hire [hireId], for the session wallet to

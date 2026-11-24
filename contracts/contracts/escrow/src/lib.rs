@@ -29,6 +29,21 @@ pub const MAX_DESCRIPTION_LEN: u32 = 256;
 pub const BPS_DENOMINATOR: u32 = 10_000;
 /// Hard fee ceiling: at most 10% (1,000 bps) to protect providers.
 pub const MAX_FEE_BPS: u32 = 1_000;
+/// Seconds a Stellar ledger is assumed to take when a TTL in ledgers is turned
+/// into time. Ledgers close in about 5 s; a faster network only makes the
+/// margin below smaller, never negative (see [`MAX_EXPIRY_CEILING`]).
+pub const LEDGER_SECONDS: u64 = 5;
+/// The longest `max_expiry` the escrow accepts: 30 days (audit E-5, #206).
+///
+/// A job lives from `create_job` until it settles, at the latest a little after
+/// `expired_at`, which is at most `max_expiry` after creation (`submit` must
+/// leave the approval window before `expired_at`). Every transition extends the
+/// job's TTL to [`TTL_BUMP`] ledgers, about 60 days, and the job is never left
+/// below [`TTL_THRESHOLD`] ledgers, about 30 days, after a write. Capping
+/// `max_expiry` at [`TTL_THRESHOLD`] ledgers ties the two: an open, funded or
+/// submitted job cannot archive before its own deadline, with the TTL bump
+/// leaving twice that much room. The admin cannot raise `max_expiry` past it.
+pub const MAX_EXPIRY_CEILING: u64 = TTL_THRESHOLD as u64 * LEDGER_SECONDS;
 /// Ledgers a proposed identity registry waits before it can take effect (about
 /// 3 days at 5 s a ledger), so a compromised admin cannot redirect new jobs at
 /// once and the change is public before it applies (audit E-2, #206).
@@ -977,7 +992,11 @@ fn registry_change_expired(proposal: &RegistryProposal, now: u32) -> bool {
 }
 
 fn validate_limits(max_expiry: u64, approval_window: u64) -> Result<(), EscrowError> {
-    if max_expiry == 0 || approval_window == 0 || approval_window >= max_expiry {
+    if max_expiry == 0
+        || approval_window == 0
+        || approval_window >= max_expiry
+        || max_expiry > MAX_EXPIRY_CEILING
+    {
         return Err(EscrowError::InvalidDuration);
     }
     Ok(())

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show IOException, stderr;
+import 'dart:io' show FileSystemException, IOException, stderr;
 
 import 'package:dart_mcp/server.dart';
 import 'package:puls3_sdk/puls3_sdk.dart';
@@ -16,12 +16,22 @@ const toolNames = [
   'studio_test_run',
 ];
 
-/// Why the hire and Studio tools answer with an error for now.
-const sessionPending =
-    'This tool needs a wallet session, which the SDK does not have yet '
-    '(docs/adr/0007-developer-sdk.md, Open decision 1; '
-    'https://github.com/Zer0-Knowledge-Hack/puls3/issues/259). '
-    'Use the app at https://puls3.org/ meanwhile.';
+/// The environment variable with the public address of the session wallet,
+/// which `hire_get` uses when the call names no wallet. It is not a secret.
+const walletVariable = 'PULS3_WALLET';
+
+/// What the hire and Studio tools answer when the server has no session.
+const sessionMissing =
+    'This tool needs a wallet session. In the app at https://puls3.org/, '
+    'open the wallet sheet and use "Copy session for CLI". Then set '
+    '$refreshTokenVariable for this server once and restart it '
+    '(docs/mcp/setup.md).';
+
+/// What they answer when the server refuses the session.
+const sessionRefused =
+    'The server refused the wallet session: it ended (72 hours after the '
+    'app created it) or it was revoked. Copy a new session for the CLI from '
+    'the app, set $refreshTokenVariable and restart this server.';
 
 /// A stdio MCP server over [Puls3Sdk].
 ///
@@ -29,20 +39,28 @@ const sessionPending =
 /// rates or submits a transaction: a prepared envelope is returned unsigned
 /// for a wallet to sign, never sent.
 base class Puls3McpServer extends MCPServer with ToolsSupport {
-  Puls3McpServer(super.channel, {required this.sdk, required String apiUrl})
-    : apiUrl = redactedUrl(apiUrl),
-      super.fromStreamChannel(
-        implementation: Implementation(name: 'puls3', version: '0.1.0'),
-        instructions:
-            'Reads the puls3 agent catalog on Stellar testnet. The tools '
-            'never sign or submit a transaction.',
-      ) {
+  Puls3McpServer(
+    super.channel, {
+    required this.sdk,
+    required String apiUrl,
+    String? wallet,
+  }) : apiUrl = redactedUrl(apiUrl),
+       wallet = (wallet ?? '').trim().isEmpty ? null : wallet!.trim(),
+       super.fromStreamChannel(
+         implementation: Implementation(name: 'puls3', version: '0.1.0'),
+         instructions:
+             'Reads the puls3 agent catalog on Stellar testnet and, with a '
+             'wallet session, reads a hire, prepares its approve or reject '
+             'and runs a Studio draft. The tools never sign or submit a '
+             'transaction: a prepared envelope is for the wallet to sign in '
+             'the app.',
+       ) {
     registerTool(_catalogList, _onCatalogList);
     registerTool(_catalogGet, _onCatalogGet);
-    registerTool(_hireGet, _needsSession);
-    registerTool(_hirePrepareComplete, _needsSession);
-    registerTool(_hirePrepareReject, _needsSession);
-    registerTool(_studioTestRun, _needsSession);
+    registerTool(_hireGet, _onHireGet);
+    registerTool(_hirePrepareComplete, _onHirePrepareComplete);
+    registerTool(_hirePrepareReject, _onHirePrepareReject);
+    registerTool(_studioTestRun, _onStudioTestRun);
   }
 
   /// The SDK the tools call. The caller owns it and closes it.
@@ -50,6 +68,10 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
 
   /// The server URL, as the errors name it, without any user info.
   final String apiUrl;
+
+  /// The session wallet's public address ([walletVariable]), which `hire_get`
+  /// uses when the call names none.
+  final String? wallet;
 
   final _catalogList = Tool(
     name: 'catalog_list',
@@ -78,10 +100,17 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
   final _hireGet = Tool(
     name: 'hire_get',
     description:
-        'One hire of the signed-in wallet. Not available until the SDK has '
-        'a wallet session (#259).',
+        'One hire of the session wallet: status, agent, price, input, '
+        'result and deadlines. Needs a wallet session.',
     inputSchema: Schema.object(
-      properties: {'hireId': Schema.int(description: 'The hire id.')},
+      properties: {
+        'hireId': Schema.int(description: 'The hire id.'),
+        'wallet': Schema.string(
+          description:
+              'The session wallet (G...). Optional when the server was '
+              'started with PULS3_WALLET.',
+        ),
+      },
       required: ['hireId'],
     ),
     annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: true),
@@ -91,8 +120,8 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
     name: 'hire_prepare_complete',
     description:
         'Prepares the unsigned escrow `complete` (approve) of a hire, for a '
-        'wallet to sign. It does not sign or send it. Not available until '
-        'the SDK has a wallet session (#259).',
+        'wallet to sign. It does not sign or send it: approve in the app. '
+        'Needs a wallet session.',
     inputSchema: Schema.object(
       properties: {'hireId': Schema.int(description: 'The hire id.')},
       required: ['hireId'],
@@ -109,8 +138,8 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
     name: 'hire_prepare_reject',
     description:
         'Prepares the unsigned escrow `reject` of a hire, for a wallet to '
-        'sign. It does not sign or send it. Not available until the SDK has '
-        'a wallet session (#259).',
+        'sign. It does not sign or send it: reject in the app. Needs a '
+        'wallet session.',
     inputSchema: Schema.object(
       properties: {
         'hireId': Schema.int(description: 'The hire id.'),
@@ -130,8 +159,8 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
     name: 'studio_test_run',
     description:
         'Runs one of your Studio drafts on an input, without a hire. The '
-        'draft id is required; there is no default draft. Not available '
-        'until the SDK has a wallet session (#259).',
+        'draft id is required; there is no default draft. It uses one of '
+        'the daily test runs of the builder. Needs a wallet session.',
     inputSchema: Schema.object(
       properties: {
         'draftId': Schema.int(description: 'The Studio draft id.'),
@@ -157,29 +186,102 @@ base class Puls3McpServer extends MCPServer with ToolsSupport {
         return _json(agentJson(agent));
       });
 
-  /// The hire and Studio tools: their arguments are checked by their schema
-  /// first (a missing draft id or input is refused there), then they fail
-  /// closed until the SDK has a session.
-  CallToolResult _needsSession(CallToolRequest request) =>
-      _error('SessionUnavailable', sessionPending);
+  Future<CallToolResult> _onHireGet(CallToolRequest request) =>
+      _guard(() async {
+        final hireId = _int(request, 'hireId');
+        if (hireId == null) return _error('Usage', 'hire_get needs a hireId.');
+        final named = (request.arguments?['wallet'] as String? ?? '').trim();
+        final consumer = named.isEmpty ? wallet : named;
+        // Without a session the missing session is the thing to fix first.
+        if (!sdk.hasSession) throw const SessionRequired('getHire');
+        if (consumer == null) {
+          return _error(
+            'Usage',
+            'hire_get needs the session wallet: pass wallet, or start the '
+                'server with $walletVariable.',
+          );
+        }
+        return _json(hireJson(await sdk.getHire(hireId, consumer)));
+      });
+
+  Future<CallToolResult> _onHirePrepareComplete(CallToolRequest request) =>
+      _guard(() async {
+        final hireId = _int(request, 'hireId');
+        if (hireId == null) {
+          return _error('Usage', 'hire_prepare_complete needs a hireId.');
+        }
+        return _json(preparedJson(await sdk.prepareComplete(hireId)));
+      });
+
+  Future<CallToolResult> _onHirePrepareReject(CallToolRequest request) =>
+      _guard(() async {
+        final hireId = _int(request, 'hireId');
+        final reason = (request.arguments?['reason'] as String? ?? '').trim();
+        if (hireId == null || reason.isEmpty) {
+          return _error(
+            'Usage',
+            'hire_prepare_reject needs a hireId and a reason.',
+          );
+        }
+        return _json(preparedJson(await sdk.prepareReject(hireId, reason)));
+      });
+
+  Future<CallToolResult> _onStudioTestRun(CallToolRequest request) =>
+      _guard(() async {
+        final draftId = _int(request, 'draftId');
+        final input = request.arguments?['input'] as String? ?? '';
+        if (draftId == null || input.trim().isEmpty) {
+          return _error(
+            'Usage',
+            'studio_test_run needs a draftId and an input.',
+          );
+        }
+        final run = await sdk.testRun(draftId, input);
+        return _json({
+          'output': run.output,
+          'remainingDailyRuns': run.remainingDailyRuns,
+        });
+      });
+
+  /// The whole-number argument [name], or null when it is missing or is not
+  /// a whole number.
+  static int? _int(CallToolRequest request, String name) {
+    final value = request.arguments?[name];
+    if (value is int) return value;
+    if (value is num && value == value.truncate()) return value.toInt();
+    return null;
+  }
 
   /// Maps the SDK's errors to a tool error, never a stack trace.
   Future<CallToolResult> _guard(Future<CallToolResult> Function() call) async {
     try {
       return await call();
+    } on SessionRequired {
+      return _error('SessionUnavailable', sessionMissing);
+    } on ArgumentError catch (e) {
+      // The SDK refused an argument before calling the server.
+      return _error('Usage', '${e.name ?? 'argument'} ${e.message}');
     } on Puls3ApiException catch (e) {
       return _error(e.code, e.message ?? '');
     } on AgentCatalogUnavailable catch (e) {
       return _error('AgentCatalogUnavailable', e.message);
+    } on ServerpodClientUnauthorized {
+      return _error('SessionExpired', sessionRefused);
     } on ServerpodClientException catch (e) {
       return _error('Unreachable', '$apiUrl: ${e.message}');
+    } on FileSystemException catch (e) {
+      // The session file could not be read or written. Its path is not a
+      // secret; its content never reaches an error.
+      return _error('SessionFile', '${e.message}: ${e.path ?? '-'}');
     } on IOException catch (e) {
       return _error('Unreachable', '$apiUrl: $e');
     } catch (e, stack) {
       // Anything else (a StateError, a response the client cannot read):
       // dart_mcp would return '$e\n$stack' to the client. The detail goes
       // to stderr for whoever runs the server, never to the client.
-      stderr.writeln('puls3_mcp: unexpected ${e.runtimeType}: $e\n$stack');
+      stderr.writeln(
+        redactedTokens('puls3_mcp: unexpected ${e.runtimeType}: $e\n$stack'),
+      );
       return _error(
         'Internal',
         'unexpected ${e.runtimeType}; see the server log',
@@ -204,6 +306,41 @@ Map<String, Object?> agentJson(AgentSummary agent) => {
   'paidHireCount': agent.paidHireCount,
 };
 
+/// The fields `hire_get` returns, the same as `puls3 hire get --json`.
+Map<String, Object?> hireJson(HireDetail detail) => {
+  'id': detail.hire.id,
+  'status': detail.hire.status ?? 'open',
+  'agentId': detail.agent.id,
+  'agentName': detail.agent.name,
+  'consumer': detail.hire.consumer,
+  'priceUsdcStroops': detail.hire.price,
+  'priceUsdc': formatUsdc(detail.hire.price),
+  'jobId': detail.jobId,
+  'expiresAt': _iso(detail.expiresAt),
+  'approvalDeadline': _iso(detail.approvalDeadline),
+  'input': detail.input,
+  'result': detail.result,
+  'rejectReason': detail.rejectReason,
+  'paymentExplorerUrl': detail.paymentExplorerUrl,
+};
+
+/// The fields the prepare tools return: an envelope for the wallet named in
+/// `signer`. `submitted` is always false, because this server sends nothing.
+Map<String, Object?> preparedJson(PreparedTransaction prepared) => {
+  'preparationId': prepared.preparationId,
+  'purpose': prepared.purpose,
+  'signer': prepared.signer,
+  'networkPassphrase': prepared.networkPassphrase,
+  'unsignedTransactionXdr': prepared.unsignedTransactionXdr,
+  'expiresAt': _iso(prepared.expiresAt),
+  'submitted': false,
+  'next':
+      'Not signed and not sent. Approve or reject in the app at '
+      'https://puls3.org/, where the wallet signs.',
+};
+
+String? _iso(DateTime? time) => time?.toUtc().toIso8601String();
+
 /// [url] without its user info, so a `https://user:token@host/` never
 /// reaches the client in an error. Text that is not a URL stays as it is.
 String redactedUrl(String url) {
@@ -212,10 +349,21 @@ String redactedUrl(String url) {
   return uri.replace(userInfo: '').toString();
 }
 
+/// [text] with every refresh token (`sajrt:…`) and bearer token replaced,
+/// so a token quoted by an unexpected error never reaches the log.
+String redactedTokens(String text) => text
+    .replaceAll(RegExp(r'sajrt:[A-Za-z0-9+/=:_-]+'), 'sajrt:[redacted]')
+    .replaceAll(
+      RegExp(r'Bearer\s+[A-Za-z0-9._~+/=-]+', caseSensitive: false),
+      'Bearer [redacted]',
+    );
+
 CallToolResult _json(Object value) =>
     CallToolResult(content: [TextContent(text: jsonEncode(value))]);
 
+/// A one-line tool error. Every message goes through [redactedTokens], so a
+/// token quoted by the server or the network layer never reaches the client.
 CallToolResult _error(String code, String message) => CallToolResult(
   isError: true,
-  content: [TextContent(text: 'error: $code: $message')],
+  content: [TextContent(text: redactedTokens('error: $code: $message'))],
 );

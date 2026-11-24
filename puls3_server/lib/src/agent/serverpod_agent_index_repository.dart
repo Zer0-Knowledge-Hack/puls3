@@ -71,6 +71,15 @@ class ServerpodAgentIndexRepository implements AgentIndexRepository {
   }
 
   @override
+  Future<void> removeAll(Set<int> registryIds) async {
+    if (registryIds.isEmpty) return;
+    await AgentRecord.db.deleteWhere(
+      session,
+      where: (t) => t.registryId.inSet(registryIds),
+    );
+  }
+
+  @override
   Future<void> upsertAll(List<AgentSummary> agents) async {
     for (final agent in agents) {
       final existing = await AgentRecord.db.findFirstRow(

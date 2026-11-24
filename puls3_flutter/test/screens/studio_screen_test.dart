@@ -37,28 +37,23 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
-/// Fills a manifest the domain accepts.
+/// Fills the four fields a first-time builder sees; Advanced keeps its
+/// defaults.
 Future<void> _fillValid(WidgetTester tester) async {
   await _type(tester, 'agent-name-field', 'Brief Bot');
   await _type(
     tester,
-    'agent-description-field',
+    'agent-brief-field',
     'Summarizes long text into a short brief.',
   );
-  await tester.ensureVisible(_field('agent-model-field'));
-  await tester.tap(_field('agent-model-field'));
-  await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(find.text('Llama 3.3 70B · free').last);
-  await tester.pump(const Duration(milliseconds: 300));
-  await _type(
-    tester,
-    'agent-prompt-field',
-    'You are Brief Bot. Reply with at most five bullet points.',
-  );
   await _tapText(tester, '+ Summaries');
-  await _type(tester, 'agent-input-max-field', '6000');
-  await _type(tester, 'agent-output-max-field', '2000');
   await _type(tester, 'agent-price-field', '0.10');
+}
+
+Future<void> _openAdvanced(WidgetTester tester) async {
+  await tester.ensureVisible(_field('agent-advanced-toggle'));
+  await tester.tap(_field('agent-advanced-toggle'));
+  await tester.pump();
 }
 
 void main() {
@@ -70,7 +65,7 @@ void main() {
     expect(find.text('MARKETPLACE PREVIEW'), findsOneWidget);
     expect(_deployButton(tester).onPressed, isNull);
     expect(find.text('Give your agent a name.'), findsNothing);
-    expect(find.text('8 fields to complete'), findsOneWidget);
+    expect(find.text('4 fields to complete'), findsOneWidget);
   });
 
   testWidgets('invalid fields show the domain errors', (tester) async {
@@ -79,11 +74,15 @@ void main() {
     await _type(tester, 'agent-name-field', 'AB');
     expect(find.text('The name is too short.'), findsOneWidget);
 
-    await _type(tester, 'agent-prompt-field', 'Too short');
-    expect(find.text('The instructions are too short.'), findsOneWidget);
+    await _type(tester, 'agent-brief-field', 'Too short');
+    expect(find.text('The description is too short.'), findsOneWidget);
 
     await _type(tester, 'agent-price-field', '0');
     expect(find.text('The price must be more than 0.'), findsOneWidget);
+
+    await _openAdvanced(tester);
+    await _type(tester, 'agent-prompt-field', 'Too short');
+    expect(find.text('The instructions are too short.'), findsOneWidget);
 
     await _type(tester, 'agent-input-max-field', '99999');
     expect(
@@ -100,8 +99,8 @@ void main() {
     await _tapText(tester, 'What is missing?');
 
     expect(find.text('Give your agent a name.'), findsOneWidget);
-    expect(find.text('Choose a model.'), findsOneWidget);
-    expect(find.text('Add at least one skill.'), findsOneWidget);
+    expect(find.text('Say what the agent does.'), findsOneWidget);
+    expect(find.text('Add at least one category.'), findsOneWidget);
     expect(find.text('Set a price.'), findsOneWidget);
   });
 
@@ -119,6 +118,70 @@ void main() {
     expect(card.priceUsdcStroops, 1000000);
     // A new agent has no reviews: no invented rating.
     expect(card.rating, 0.0);
+  });
+
+  testWidgets('the four fields alone enable Deploy; Advanced stays closed', (
+    tester,
+  ) async {
+    await pumpApp(tester, location: '/studio');
+    await _fillValid(tester);
+
+    expect(_field('agent-description-field'), findsNothing);
+    expect(find.text('Ready to deploy'), findsOneWidget);
+    expect(_deployButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('Advanced generates the description and prompt from the brief '
+      'and keeps the documented defaults', (tester) async {
+    await pumpApp(tester, location: '/studio');
+    await _type(tester, 'agent-name-field', 'Brief Bot');
+    await _type(
+      tester,
+      'agent-brief-field',
+      'Summarizes long text into a short brief.',
+    );
+    await _openAdvanced(tester);
+
+    String text(String key) =>
+        tester.widget<TextField>(_field(key)).controller!.text;
+
+    expect(
+      text('agent-description-field'),
+      'Summarizes long text into a short brief.',
+    );
+    expect(text('agent-prompt-field'), contains('You are Brief Bot'));
+    expect(
+      text('agent-prompt-field'),
+      contains('Summarizes long text into a short brief.'),
+    );
+    expect(text('agent-input-max-field'), '8000');
+    expect(text('agent-output-max-field'), '2000');
+    expect(find.text('Markdown'), findsOneWidget);
+    expect(find.text('Llama 3.3 70B · free'), findsOneWidget);
+
+    // The prompt follows the name until the builder edits it.
+    await _type(tester, 'agent-name-field', 'Brief Bot Pro');
+    expect(text('agent-prompt-field'), contains('Brief Bot Pro'));
+  });
+
+  testWidgets('editing the generated description stops following the brief', (
+    tester,
+  ) async {
+    await pumpApp(tester, location: '/studio');
+    await _type(tester, 'agent-brief-field', 'First brief for the agent.');
+    await _openAdvanced(tester);
+    await _type(
+      tester,
+      'agent-description-field',
+      'A custom public description.',
+    );
+    await _type(tester, 'agent-brief-field', 'Second brief for the agent.');
+
+    String text(String key) =>
+        tester.widget<TextField>(_field(key)).controller!.text;
+
+    expect(text('agent-description-field'), 'A custom public description.');
+    expect(text('agent-prompt-field'), contains('Second brief for the agent.'));
   });
 
   testWidgets('Studio lays out on a phone without overflow', (tester) async {
