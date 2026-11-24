@@ -1,0 +1,21 @@
+name: Start the local Soroban sandbox
+description: >-
+  Generate throwaway local secrets, start the sandbox, Postgres and Redis, and
+  deploy the contracts on the sandbox. Teardown stays in the caller because it
+  needs its own failure() and always() conditions.
+
+runs:
+  using: composite
+  steps:
+    - name: Generate throwaway local secrets
+      shell: bash
+      run: bash scripts/setup-local-secrets.sh
+    - name: Start the sandbox, Postgres and Redis
+      shell: bash
+      # The quickstart image is pinned by digest in docker-compose.yaml.
+      run: |
+        docker compose -f puls3_server/docker-compose.yaml up -d --wait --wait-timeout 300 \
+          soroban_standalone postgres_test redis_test
+    - name: Deploy the contracts on the sandbox
+      shell: bash
+      run: bash scripts/setup-local-soroban.sh

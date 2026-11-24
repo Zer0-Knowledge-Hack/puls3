@@ -8,7 +8,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 BUILD_SH="$REPO_ROOT/scripts/cloudflare-pages-build.sh"
-CI_YML="$REPO_ROOT/.github/workflows/ci.yml"
+CI_YML="$REPO_ROOT/.github/actions/setup-flutter/action.yml"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
