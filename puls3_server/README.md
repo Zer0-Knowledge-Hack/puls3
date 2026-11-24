@@ -303,7 +303,7 @@ to expire.
 | `PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS` | none (required) | How long an unsigned escrow envelope stays valid: its `maxTime` is now plus this many seconds, and `submitEscrowCall` answers `PreparationExpired` after it. A positive whole number. |
 | `PULS3_STELLAR_INCLUSION_FEE_STROOPS` | none (required) | The inclusion fee, in stroops, of every prepared envelope; the simulated resource fee is added on top. A positive whole number. |
 | `PULS3_PLATFORM_FEE_BPS` | none (required) | The `max_fee_bps` argument of `fund`, in basis points from 0 to 1000 (the contract's `MAX_FEE_BPS`). It must equal `NetworkConfig.platformFeeBps`. `0` is a valid value. |
-| `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS` | none (optional) | The platform ceiling of a hire's subcontract reserve, in USDC stroops (ADR-0011 D1). Read only when `createHire` asks for a reserve above 0: such a hire is funded with `fund_with_reserve` instead of `fund`. A reserve above the ceiling fails with `InvalidHire`; without the setting a reserve fails with `HireConfigurationMissing`, so a deployment without it hires exactly as before. `0` turns subcontracting off. |
+| `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS` | none (optional) | The platform ceiling of a hire's subcontract reserve, in USDC stroops (ADR-0011 D1). Read only when `createHire` asks for a reserve above 0: such a hire is funded with `fund_with_reserve` instead of `fund`. A reserve above the ceiling fails with `InvalidHire`; without the setting a reserve fails with `HireConfigurationMissing`, so a deployment without it hires exactly as before. `0` turns subcontracting off. `getHireTerms` reports it as `reserveMaxStroops`, 0 when unset; an unreadable value is logged and also reported as 0. |
 
 The three relay keys have no default, fallback or placeholder. They are read
 when an operation needs them, so a missing, empty, non-integer or out-of-range
@@ -313,8 +313,9 @@ value makes that call fail with `HireConfigurationMissing` naming the key
 
 ### Hire endpoint sessions
 
-Every `HireEndpoint` method (`createHire`, `prepareCreateJob`, `prepareFund`,
-`prepareComplete`, `prepareReject`, `submitEscrowCall`, `getHire`) requires a
+Every `HireEndpoint` method (`createHire`, `getHireTerms`, `prepareCreateJob`,
+`prepareFund`, `prepareComplete`, `prepareReject`, `submitEscrowCall`,
+`getHire`) requires a
 signed-in caller: a request without a session is HTTP 401 before the method
 runs. The method then resolves the caller's wallet through the
 `SessionWallet` seam before doing any work. The production binding,

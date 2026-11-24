@@ -1,6 +1,7 @@
 import 'package:puls3_domain/puls3_domain.dart';
 
 import '../domain/agent_draft.dart';
+import '../hire/hire_gateway.dart' show HireReceiptEntry;
 
 /// Backend side of the Studio drafts, test runs and "My agents" (#35), shaped
 /// after `StudioEndpoint` in docs/architecture/api.md and flows F8, F9 and
@@ -106,6 +107,8 @@ class AgentHireProgress {
     this.lastPurpose,
     this.lastTransaction,
     this.lastFailed = false,
+    this.subcontractReserveUsdcStroops = 0,
+    this.receipt = const [],
   });
 
   final int hireId;
@@ -128,6 +131,13 @@ class AgentHireProgress {
   final String? lastPurpose;
   final String? lastTransaction;
   final bool lastFailed;
+
+  /// USDC stroops of subcontract reserve funded with the hire (#334); 0 for
+  /// a hire that never subcontracts.
+  final int subcontractReserveUsdcStroops;
+
+  /// The hire's itemized subcontract receipt (ADR-0011 D6), oldest first.
+  final List<HireReceiptEntry> receipt;
 
   /// No later read can change it.
   bool get isFinal =>

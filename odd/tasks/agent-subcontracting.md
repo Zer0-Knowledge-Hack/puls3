@@ -438,8 +438,44 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       code. GREEN: unit+hire+ledger 1473 passed, `dart analyze --fatal-infos` clean. Integration
       not run: Docker needs `puls3_server/.env`, which this agent may not read. Commit: see git log.
       Risk: item 5.
-- [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
-  tree on hire detail. Route: delegated writer.
+- [x] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
+  tree on hire detail. Route: delegated writer. Branch `feat/334-web-subcontract` from `main`
+  `6708683`. Mapped 2026-11-24 by a read-only explorer: `createHire` already takes
+  `subcontractReserve` and `allowRelatedParty`; no endpoint exposes the reserve ceiling, the
+  manifest opt-in, or the receipt lines (`HireReceiptLineRecord` is `serverOnly`); the Studio form
+  drops `subcontract` on edit (`studio_form_check.dart:157-180`).
+  - [x] **T7.1** (done 2026-11-24, `c3c65cb`; delegated writer, parallel with T7.2. RED: 28
+    compile errors in the new tests. GREEN: server unit+hire+ledger 1523, `test/studio` 56,
+    analyze clean on server and client, a second `serverpod generate` changed nothing;
+    integration not run. New `HireRelayConfig.subcontractReserveMaxOrZero`, `explorer_links.dart`
+    (the server had no explorer helper), `StudioRunManifestSource.onVersions`.) Server read API. A new `HireEndpoint.getHireTerms(agentId)` (reserve ceiling from
+    `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, 0 when unset, plus the agent's `max_children` and
+    `suggested_reserve` from its manifest, 0 without the opt-in), and `HireDetail.receipt`: the
+    parent's receipt lines (`listByParent`) as a public `HireReceiptLine`, readable only by the
+    parent hire's consumer, also on `StudioEndpoint.getAgentHire`. Regenerated client, `api.md`.
+    Route: delegated writer, parallel with T7.2 (trigger: two independent units, disjoint
+    surfaces, each several files and 200+ lines). Risk: none expected (adds an endpoint and
+    optional fields).
+  - [x] **T7.2** (done 2026-11-24, `f4611e3`; delegated writer. RED: unit tests failed to load,
+    4 widget tests failed. GREEN: `flutter test` 545, analyze clean. The cap 2 is mirrored as
+    `studioSubcontractMaxChildren`; the Studio refuses more than 2, the server would clamp. The
+    switch is disabled for the free model, which cannot call tools.) Studio form opt-in: `max_children` and `suggested_reserve` in Advanced, mapped
+    both ways so an edit keeps the opt-in, and `subcontractMalformed`/`subcontractInvalid` shown
+    on the new field. Route: delegated writer, parallel with T7.1. Risk: none expected.
+  - [x] **T7.3** (done 2026-11-24, `fb261d3`; delegated writer. RED: four test files failed to
+    load. GREEN: `flutter test` 566, analyze clean. Choices: with reserve 0 the flag is sent as
+    true; a resumed hire does not ask the consent again; terms that fail to load hide the section.)
+    Hire form: a subcontract section only when the agent opted in and the ceiling is
+    above 0, prefilled with `suggested_reserve`, capped by the ceiling, a related-party switch
+    (default allowed, with notice), the "a completed subcontract is paid even if you reject the
+    result" consent, and price plus reserve in the total and the funds check. The reserve and the
+    flag are stored with the pending hire so a resume reuses them. Depends on T7.1.
+  - [x] **T7.4** (done 2026-11-24, `edd0b40` consumer detail and `e30615e` agent-hire detail;
+    delegated writer, surface extended once for `studio/` by the parent. RED: new tests failed to
+    compile. GREEN: `flutter test` 584, analyze clean. One shared `hireReceiptEntries` mapping.)
+    Hire detail receipt tree: one row per line with provider, related-party badge,
+    budget, fee, payout, state, justification and explorer links, on the consumer's and the
+    agent-hire detail. Depends on T7.1.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
   `docs/verification/334-agent-subcontracting.md`.
@@ -509,3 +545,16 @@ StellarExpert.
   startup count of runs left `awaitingChild`, search on the injected `env`). A parallel local fix
   of the same review was dropped in favour of it (kept as `backup/407-our-fix`). README updated to
   the new timings. Next: T7.
+- 2026-11-24: user: "Si, ahora si, podemos arrancar" (T7). T7 split into T7.1-T7.4 after a
+  read-only map. Choices made without a product question: the hire form shows the subcontract
+  section only for agents that opted in and only where the ceiling is above 0; the ceiling and the
+  opt-in come from a new pre-hire read (`getHireTerms`) instead of new `AgentSummary` fields, so
+  the catalog does not read manifests. T7.1 and T7.2 start in parallel.
+- 2026-11-24: T7 done on `feat/334-web-subcontract` (T7.1 `c3c65cb`, T7.2 `f4611e3`, T7.3
+  `fb261d3`, T7.4 `edd0b40` and `e30615e`). Not pushed. Next: PR slicing (stacked-to-main), then T8.
+- 2026-11-24: user: "Si, hagamoslo asi". T7 pushed as four stacked PRs (slice 15 split): #411
+  15a T7.2 Studio opt-in (`feat/334-t7-studio-optin`, base `main`), #412 15b T7.1 server read API
+  (`feat/334-t7-hire-terms`), #413 15c T7.3 hire sheet (`feat/334-t7-hire-sheet`), #414 15d T7.4
+  receipt (`feat/334-t7-receipt`). Order is T7.2 first because T7.2 and T7.3 append to the same ARB
+  files. Each slice is above 400 lines (tests are about half) and asks for `size:exception`. CI
+  runs only on #411 until each base merges. Next: reviews, then T8.

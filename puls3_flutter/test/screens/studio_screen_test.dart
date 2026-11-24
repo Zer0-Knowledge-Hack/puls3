@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:puls3_domain/puls3_domain.dart' show ManifestProblem;
+import 'package:puls3_domain/puls3_domain.dart'
+    show AgentManifestDraft, ManifestProblem, ModelId, SubcontractOptIn;
 import 'package:puls3_flutter/src/studio/fake_studio_gateway.dart';
 import 'package:puls3_flutter/src/studio/studio_gateway.dart';
 import 'package:puls3_flutter/src/ui/atoms/primary_button.dart';
@@ -453,6 +454,153 @@ void main() {
       expect(find.text('Live · version 1'), findsOneWidget);
       // A demo deploy is not in the catalog: nothing to view.
       expect(find.text('View'), findsNothing);
+    });
+  });
+
+  group('the subcontract opt-in (#334 T7.2)', () {
+    Future<void> pickClaude(WidgetTester tester) async {
+      await tester.ensureVisible(_field('agent-model-field'));
+      await tester.tap(_field('agent-model-field'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Claude Sonnet 5.5').last);
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    Future<void> toggle(WidgetTester tester) async {
+      await tester.ensureVisible(_field('agent-subcontract-toggle'));
+      await tester.tap(_field('agent-subcontract-toggle'));
+      await tester.pump();
+    }
+
+    testWidgets('the toggle shows and hides the subcontract inputs', (
+      tester,
+    ) async {
+      await pumpApp(tester, location: '/studio');
+      await _fillValid(tester);
+      await _openAdvanced(tester);
+      await pickClaude(tester);
+      expect(_field('agent-subcontract-children-field'), findsNothing);
+      expect(_field('agent-subcontract-reserve-field'), findsNothing);
+
+      await toggle(tester);
+      expect(_field('agent-subcontract-children-field'), findsOneWidget);
+      expect(_field('agent-subcontract-reserve-field'), findsOneWidget);
+
+      await toggle(tester);
+      expect(_field('agent-subcontract-children-field'), findsNothing);
+      expect(_field('agent-subcontract-reserve-field'), findsNothing);
+    });
+
+    testWidgets('a free model disables the toggle with a note', (
+      tester,
+    ) async {
+      await pumpApp(tester, location: '/studio');
+      await _openAdvanced(tester);
+
+      final tile = tester.widget<SwitchListTile>(
+        _field('agent-subcontract-toggle'),
+      );
+      expect(tile.onChanged, isNull);
+      expect(tile.value, isFalse);
+      expect(
+        find.text(
+          'Subcontracting needs a Claude model: the free model cannot '
+          'call tools.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('too many agents shows the error on the subcontract field', (
+      tester,
+    ) async {
+      await pumpApp(tester, location: '/studio');
+      await _fillValid(tester);
+      await _openAdvanced(tester);
+      await pickClaude(tester);
+      await toggle(tester);
+
+      await _type(tester, 'agent-subcontract-children-field', '3');
+      final children = tester.widget<TextField>(
+        _field('agent-subcontract-children-field'),
+      );
+      expect(children.decoration!.errorText, 'Choose from 1 to 2 agents.');
+      final name = tester.widget<TextField>(_field('agent-name-field'));
+      expect(name.decoration!.errorText, isNull);
+      expect(_deployButton(tester).onPressed, isNull);
+    });
+
+    testWidgets('editing a saved agent keeps its opt-in', (tester) async {
+      final wallet = _connected();
+      final base = validManifest();
+      final manifest = AgentManifestDraft(
+        name: base.name,
+        description: base.description,
+        skills: base.skills,
+        model: ModelId(provider: 'anthropic', id: 'claude-sonnet-5-5'),
+        systemPrompt: base.systemPrompt,
+        inputType: base.inputType,
+        inputMaxChars: base.inputMaxChars,
+        outputType: base.outputType,
+        outputMaxChars: base.outputMaxChars,
+        price: base.price,
+        subcontract: SubcontractOptIn(
+          maxChildren: 2,
+          suggestedReserve: 5000000,
+        ),
+      );
+      final studio = _studio(
+        seed: [
+          (
+            wallet.address!,
+            StudioDraft(
+              draftId: 1,
+              manifest: manifest,
+              revision: 1,
+              deployState: DraftDeployState.draft,
+            ),
+          ),
+        ],
+      );
+      await pumpApp(
+        tester,
+        location: '/studio?draft=1',
+        wallet: wallet,
+        studioGateway: studio,
+      );
+      await advance(tester, const Duration(milliseconds: 400));
+      await _openAdvanced(tester);
+
+      expect(
+        tester.widget<SwitchListTile>(_field('agent-subcontract-toggle')).value,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<TextField>(_field('agent-subcontract-children-field'))
+            .controller!
+            .text,
+        '2',
+      );
+      expect(
+        tester
+            .widget<TextField>(_field('agent-subcontract-reserve-field'))
+            .controller!
+            .text,
+        '0.50',
+      );
+
+      await _type(tester, 'agent-name-field', 'Brief Bot Two');
+      await _tapText(tester, 'Save draft');
+      await advance(tester, const Duration(milliseconds: 400));
+      expect(find.text('Saved · revision 2 (demo)'), findsOneWidget);
+      final saved = await tester.runAsync(
+        () => studio.getDraft(1, owner: wallet.address!),
+      );
+      expect(
+        saved!.manifest.subcontract,
+        SubcontractOptIn(maxChildren: 2, suggestedReserve: 5000000),
+      );
     });
   });
 }

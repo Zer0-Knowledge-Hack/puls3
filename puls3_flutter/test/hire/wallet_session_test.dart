@@ -189,7 +189,8 @@ void main() {
   group('ServerHireGateway sign-in', () {
     ServerHireGateway gateway(WalletSession? walletSession) =>
         ServerHireGateway(
-          createHire: (_, _, _, _) => throw UnimplementedError(),
+          createHire: (_, _, _, _, {subcontractReserve, allowRelatedParty}) =>
+              throw UnimplementedError(),
           prepareCreateJob: (_) => throw UnimplementedError(),
           prepareFund: (_) => throw UnimplementedError(),
           prepareComplete: (_) => throw UnimplementedError(),
@@ -272,7 +273,8 @@ void main() {
     test('a 401 after a failed refresh makes the next sign-in challenge '
         'again', () async {
       final detailGateway = ServerHireGateway(
-        createHire: (_, _, _, _) => throw UnimplementedError(),
+        createHire: (_, _, _, _, {subcontractReserve, allowRelatedParty}) =>
+            throw UnimplementedError(),
         prepareCreateJob: (_) => throw UnimplementedError(),
         prepareFund: (_) => throw UnimplementedError(),
         prepareComplete: (_) => throw UnimplementedError(),
