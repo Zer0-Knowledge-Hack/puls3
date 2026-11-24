@@ -23,6 +23,11 @@ dependencies:
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
   serverpod_test: 4.0.4
+  # The SDK contract tests drive puls3_sdk against this server (#375).
+  puls3_client:
+    path: ../puls3_client
+  puls3_sdk:
+    path: ../puls3_sdk
   test: ^1.25.5
 
 serverpod:
