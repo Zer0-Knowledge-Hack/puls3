@@ -3,4 +3,14 @@
 library;
 
 export 'src/puls3_mcp_server.dart'
-    show Puls3McpServer, agentJson, redactedUrl, sessionPending, toolNames;
+    show
+        Puls3McpServer,
+        agentJson,
+        hireJson,
+        preparedJson,
+        redactedTokens,
+        redactedUrl,
+        sessionMissing,
+        sessionRefused,
+        toolNames,
+        walletVariable;

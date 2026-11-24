@@ -1,6 +1,9 @@
 name: puls3_sdk
 description: Dart SDK for the puls3 API (catalog, hire, studio). It never signs or submits a transaction. See docs/adr/0007-developer-sdk.md.
-publish_to: none
+version: 0.1.0
+repository: https://github.com/Zer0-Knowledge-Hack/puls3/tree/main/puls3_sdk
+issue_tracker: https://github.com/Zer0-Knowledge-Hack/puls3/issues
+topics: [stellar, soroban, ai-agents, serverpod]
 
 environment:
   sdk: '^3.12.2'
@@ -8,8 +11,9 @@ environment:
 resolution: workspace
 
 dependencies:
-  puls3_client:
-    path: ../puls3_client
+  # Hosted, so pub.dev accepts it; inside this workspace it still resolves to
+  # ../puls3_client (docs/sdk/releasing.md).
+  puls3_client: ^0.1.0
 
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
