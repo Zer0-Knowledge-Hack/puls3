@@ -1,0 +1,133 @@
+name: Issue gate
+
+# Prevents partial delivery against issues: a PR that says `Closes #N` must have
+# every acceptance criterion of #N checked; partial work uses `Refs #N` and gets
+# a sticky comment listing what remains. Rules: CONTRIBUTING.md, "Closes vs Refs".
+# Logic and tests: .github/scripts/issue-gate.js. Make `Issue gate / issue-gate` a
+# required status check (repository admin). The job id and name are `issue-gate`,
+# distinct from the `gate` job of ci.yml, so the two required checks never collide.
+#
+# Which issues the PR closes comes from GitHub's own `closingIssuesReferences`
+# (GraphQL), not from parsing the body: it covers keyword and URL forms and issues
+# linked by hand in the Development sidebar. `Refs` is still read from the body.
+#
+# SECURITY: this uses `pull_request_target`, so the workflow file AND the
+# checked-out code both come from the base branch. A PR (same-repo or fork)
+# cannot edit the gate that judges it. Never check out or execute PR-controlled
+# code here (no `ref: pull_request.head.*`); the PR body, title and labels are
+# read as data inside github-script and never interpolated into a shell.
+# Consequence: a PR that changes the gate is judged and unit-tested by the
+# current base version; its new tests run once it is merged. .github/CODEOWNERS
+# lists the gate files, but that only takes effect once code-owner reviews are
+# required on `main` and a second code owner exists; until then it is advisory.
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  issue-gate:
+    name: issue-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      # Default ref under pull_request_target is the base branch tip.
+      - name: Check out base gate scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      # The runner image ships Node 20+, so no setup action is needed.
+      - name: Unit tests
+        run: node --test .github/scripts/issue-gate.test.js
+      - name: Check issue deliverables
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { evaluate, parseReferences, MARKER } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-gate.js`);
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const slug = `${owner}/${repo}`;
+
+            // The issues GitHub will actually close on merge (keywords, URLs, sidebar links).
+            const q = await github.graphql(
+              `query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    closingIssuesReferences(first: 100) {
+                      pageInfo { hasNextPage }
+                      nodes { number repository { nameWithOwner } }
+                    }
+                  }
+                }
+              }`,
+              { owner, repo, number: pr.number },
+            );
+            const refsPage = q.repository.pullRequest.closingIssuesReferences;
+            if (refsPage.pageInfo.hasNextPage) {
+              core.setFailed('This pull request closes more than 100 issues; the gate cannot verify them all.');
+              return;
+            }
+            const closing = refsPage.nodes.map((n) => ({ number: n.number, repo: n.repository.nameWithOwner }));
+
+            const { refs } = parseReferences(pr.body, slug);
+            const localClosing = closing.filter((c) => c.repo.toLowerCase() === slug.toLowerCase()).map((c) => c.number);
+            const issues = {};
+            for (const n of [...localClosing, ...refs]) {
+              try {
+                const { data } = await github.rest.issues.get({ owner, repo, issue_number: n });
+                issues[n] = data.pull_request ? null : (data.body || '');
+              } catch (e) {
+                // 404 not found, 410 deleted issue: nothing to verify.
+                if (e.status !== 404 && e.status !== 410) throw e;
+                issues[n] = null;
+              }
+            }
+            const files = (await github.paginate(github.rest.pulls.listFiles,
+              { owner, repo, pull_number: pr.number, per_page: 100 })).map((f) => f.filename);
+
+            const result = evaluate({
+              body: pr.body,
+              labels: pr.labels.map((l) => l.name),
+              author: pr.user.login,
+              files,
+              repo: slug,
+              closing,
+              issues,
+            });
+            for (const n of result.notices) core.notice(n);
+
+            // One sticky comment, found by marker and bot author. Under pull_request_target
+            // fork PRs get the base repo's token (nothing from the PR runs, so this is safe), but a
+            // failed write is still only a warning, never a gate failure.
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments,
+                { owner, repo, issue_number: pr.number, per_page: 100 });
+              const existing = comments.find((c) =>
+                c.user && c.user.login === 'github-actions[bot]' && c.body && c.body.includes(MARKER));
+              if (result.comment && existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: result.comment });
+              } else if (result.comment) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: result.comment });
+              } else if (existing) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+              }
+            } catch (e) {
+              core.warning(`Could not update the sticky comment: ${e.message}`);
+            }
+
+            if (result.status === 'fail') {
+              core.setFailed(result.failures.join('\n\n'));
+            }

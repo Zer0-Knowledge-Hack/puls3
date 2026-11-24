@@ -1,6 +1,6 @@
 Closes #
 
-<!-- Use "Closes #N" only if every acceptance criterion is met. Otherwise use "Refs #N" and list what is missing. -->
+<!-- Use "Closes #N" only if every acceptance criterion is checked in the issue (the Issue gate check fails otherwise and lists the unchecked items). For partial work use "Refs #N" and list what is missing; the check then comments the remaining items on this PR. A PR that changes code must reference an issue. -->
 
 ## Summary
 
