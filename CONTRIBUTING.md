@@ -254,7 +254,7 @@ Keep commits small and focused. Keep tests and docs in the same commit as the co
 
 The `Issue gate` workflow reads the **Acceptance criteria** checkboxes of every issue the PR references:
 
-- `Closes|Fixes|Resolves #N`: the check fails unless **every** acceptance criterion in issue #N is checked, and it lists the unchecked ones. Either tick them in the issue (with evidence), or change the keyword to `Refs #N` for partial work.
+- `Closes|Fixes|Resolves #N`: the check fails unless **every** acceptance criterion in issue #N is checked, and it lists the unchecked ones. Either tick them in the issue (with evidence), or change the keyword to `Refs #N` for partial work. Editing an issue does not trigger the check, so after ticking criteria **re-run the `Issue gate / gate` job** (Actions tab, "Re-run jobs") or edit the PR description; until then it stays red.
 - `Refs #N`: the check passes and keeps one comment on the PR listing the criteria and deliverables still unchecked in #N, so the remaining work stays visible.
 - No reference at all: the check fails if the PR changes anything other than docs. Maintainers can add the `no-issue` label to opt out; Dependabot PRs are skipped.
 

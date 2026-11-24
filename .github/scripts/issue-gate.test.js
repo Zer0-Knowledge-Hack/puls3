@@ -107,3 +107,9 @@ test('parseChecklist stops at the next heading and handles CRLF', () => {
   ]);
   assert.equal(parseChecklist(body, 'Deliverables'), null);
 });
+
+test('Closes failure tells the author to re-run the job after ticking criteria', () => {
+  const r = evaluate({ body: 'Closes #3', files: CODE, issues: { 3: issue(['- [ ] A']) } });
+  assert.equal(r.status, 'fail');
+  assert.match(r.failures[0], /re-run the `Issue gate \/ gate` job/);
+});

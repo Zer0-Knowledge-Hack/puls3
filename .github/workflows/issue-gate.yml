@@ -29,14 +29,32 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # A PR must not be able to edit the gate that judges it: run the script
+      # from the base ref when it exists there. Only a PR that introduces the
+      # gate (bootstrap) falls back to its own copy.
+      - name: Check out base gate scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-gate
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Select gate scripts
+        run: |
+          if [ -f base-gate/.github/scripts/issue-gate.js ]; then
+            echo "GATE_DIR=$GITHUB_WORKSPACE/base-gate/.github/scripts" >> "$GITHUB_ENV"
+          else
+            echo "::notice::Base ref has no issue gate yet; using the PR's own copy (bootstrap)."
+            echo "GATE_DIR=$GITHUB_WORKSPACE/.github/scripts" >> "$GITHUB_ENV"
+          fi
       # The runner image ships Node 20+, so no setup action is needed.
       - name: Unit tests
-        run: node --test .github/scripts/issue-gate.test.js
+        run: node --test "$GATE_DIR/issue-gate.test.js"
       - name: Check issue deliverables
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { evaluate, parseReferences, MARKER } = require('./.github/scripts/issue-gate.js');
+            const { evaluate, parseReferences, MARKER } = require(`${process.env.GATE_DIR}/issue-gate.js`);
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
 

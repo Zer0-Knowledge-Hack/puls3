@@ -5,6 +5,10 @@
 // so everything here is unit-testable offline. Node 20+, no dependencies.
 
 const MARKER = '<!-- issue-deliverables-gate -->';
+const RERUN_HINT =
+  'Editing an issue does not trigger this check: after ticking criteria, re-run the ' +
+  '`Issue gate / gate` job (Actions tab, "Re-run jobs") or edit the PR description.';
+
 const OPT_OUT_LABEL = 'no-issue';
 const CLOSING = '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)';
 const CLOSES_RE = new RegExp(`(?<![\\w-])${CLOSING}:?\\s+#(\\d+)\\b`, 'gi');
@@ -122,7 +126,7 @@ function evaluate({ body, labels = [], author = '', files = [], issues = {} }) {
         `This pull request closes #${n}, but ${open.length} acceptance criteri` +
           `${open.length === 1 ? 'on is' : 'a are'} not checked in the issue:\n${bullets(open)}\n` +
           `Tick them in the issue with evidence, or change \`Closes #${n}\` to ` +
-          `\`Refs #${n}\` for partial work.`,
+          `\`Refs #${n}\` for partial work. ${RERUN_HINT}`,
       );
     }
   }
