@@ -29,7 +29,8 @@ them: `PULS3_STELLAR_RPC_URL`, `PULS3_STELLAR_NETWORK_PASSPHRASE`,
 `PULS3_STELLAR_ESCROW`, `PULS3_STELLAR_PREVIOUS_ESCROWS` (comma-separated: the
 escrows `PULS3_STELLAR_ESCROW` replaced, whose jobs still make a rating count)
 and `PULS3_STELLAR_SIMULATION_SOURCE`. Each RPC call
-times out after 8 seconds.
+times out after 8 seconds. To move to a new escrow, follow
+[Rotating the escrow](../docs/operations/escrow-rotation.md).
 
 `PULS3_STELLAR_REPUTATION_REGISTRY` is the Reputation Registry contract id
 (#14). Its testnet default is the deployed registry
@@ -62,6 +63,25 @@ id or provider wallet). The pure rules live in `puls3_domain`
 - A related pick is justified when it is rank 1, costs no more than the
   best-ranked independent candidate whose skill match is at least the pick's
   minus 0.1, or no such independent exists.
+
+## Hidden agents
+
+The Identity Registry has no delete and anyone can register an agent on chain,
+so the catalog would otherwise show every registered agent. Maintainers hide one
+by listing its registry id:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PULS3_HIDDEN_AGENT_IDS` | unset | Comma-separated registry ids, e.g. `15,16`. Unset or blank hides nothing; a malformed id fails the request instead of being ignored |
+
+A hidden agent is left out of `agent.list`, `agent.get` returns `null` for it,
+`createHire` refuses it with the same `AgentNotFound` as an unknown id (the
+server raises `AgentUnavailable`), and its `/registry/<hash>` file is a 404.
+Jobs already funded are not touched: they settle or refund as usual, because the
+hire relay and `getHire` keep reading the unfiltered catalog.
+
+On Serverpod Cloud, set it with
+`scloud variable set PULS3_HIDDEN_AGENT_IDS "15,16"` and redeploy.
 
 ## Agent catalog indexer
 
