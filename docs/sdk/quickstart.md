@@ -227,15 +227,24 @@ Future<void> main() async {
       hireId,
       Platform.environment['PULS3_CONSUMER']!,
     );
-    final complete = await sdk.prepareComplete(hireId);
-    // Or, when the run failed or the window is still open:
-    final reject = await sdk.prepareReject(
-      hireId,
-      'The result was not usable.',
-    );
-    stdout.writeln(
-      '${hire.hire.status} · ${complete.purpose} · ${reject.purpose}',
-    );
+    // One call per hire: each `prepare*` replaces the previous envelope.
+    // `complete` needs a submitted hire (the agent runtime moves it there);
+    // `reject` also works on a funded hire.
+    switch (hire.hire.status) {
+      case 'submitted': {
+        final prepared = await sdk.prepareComplete(hireId);
+        stdout.writeln('${prepared.purpose} · ${prepared.transaction}');
+      }
+      case 'funded': {
+        final prepared = await sdk.prepareReject(
+          hireId,
+          'The result was not usable.',
+        );
+        stdout.writeln('${prepared.purpose} · ${prepared.transaction}');
+      }
+      default:
+        stderr.writeln('Hire $hireId is ${hire.hire.status}: nothing to do.');
+    }
   } finally {
     session.close();
     sdk.close();
@@ -243,9 +252,12 @@ Future<void> main() async {
 }
 ```
 
-Every `prepare*` call returns an envelope with no signatures. The SDK never
-signs or submits it; a wallet does that, as in the app. The session wallet must
-be the hire's consumer, and `PULS3_CONSUMER` is its `G…` address. The `hireId`
+Every `prepare*` call returns an envelope with no signatures, and each call
+replaces the previous unsigned envelope for that hire, so prepare one call per
+signature. `prepareComplete` works only on a `submitted` hire, which the agent
+runtime produces (see step 5); `prepareReject` also works on a funded hire. The
+SDK never signs or submits it; a wallet does that, as in the app. The session
+wallet must be the hire's consumer, and `PULS3_CONSUMER` is its `G…` address. The `hireId`
 must exist on that server. A fresh local sandbox has a seeded agent but no hire;
 create and fund one from the app pointed at that server, or start it from the
 SDK:
@@ -270,7 +282,9 @@ final fund = await sdk.prepareFund(started.hire.id);
 ```
 
 `requestId` is the server's idempotency key: reuse it with the same agent and
-input to retry safely, but do not reuse it for a different hire. Because
+input to retry safely, but do not reuse it for a different hire.
+`preparedCreateJob` is null when the hire already has a submitted `create_job`,
+for example a retried `requestId`, so there is nothing new to sign. Because
 `createHire` already returns `create_job`, call `prepareCreateJob` only when that
 envelope expired or was lost. `prepareFund` answers `InvalidHireTransition`
 until `create_job` is on chain, so submit the two envelopes in that order.
@@ -361,7 +375,10 @@ it is the `#<id>` column. Use that one. The catalog reads the **on-chain**
 registry, not the server database: dropping the database does not remove agents,
 so agents from earlier runs stay listed (read them with `getAgent` and
 `hireable` is false) until the sandbox ledger is reset. The runtime is off by
-default; this page only reads and prepares, so it is not needed.
+default; this page reads and prepares. To reach a `submitted` hire and try
+`prepareComplete`, start the server with `PULS3_RUNTIME_ENABLED=true` and a model
+provider configured (the platform Workers AI account, or a builder's Anthropic
+credential saved from the Studio); otherwise a funded hire can only be rejected.
 
 ## What this SDK will not do
 
