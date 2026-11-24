@@ -126,6 +126,27 @@ final class AgentSubmitSender {
   final int inclusionFee;
   final int validitySeconds;
 
+  /// Whether [hireId] has an open child job. A check that fails counts as
+  /// open (fail closed): the escrow refuses a parent `submit` while a child
+  /// is open, so sending blind would only burn an attempt. The error is
+  /// logged and caught so one failing read does not abort the rest of the
+  /// pass's hires (T6.4.4).
+  Future<bool> _anyChildOpen(
+    Future<bool> Function(int hireId) childrenOpen,
+    int hireId,
+  ) async {
+    try {
+      return await childrenOpen(hireId);
+    } on Object catch (e) {
+      _log(
+        ChainLogLevel.warning,
+        'Could not read the open children of hire $hireId; its submit waits: '
+        '$e',
+      );
+      return true;
+    }
+  }
+
   /// Sends [due] unless an agent-signed call of its provider is already in
   /// flight, the hire
   /// has a non-final submission, a `submit` already confirmed, attempts are
@@ -159,7 +180,9 @@ final class AgentSubmitSender {
     }
     if (failed.length >= maxEscrowCallAttempts) return;
     final childrenOpen = _childrenOpen;
-    if (childrenOpen != null && await childrenOpen(due.hireId)) return;
+    if (childrenOpen != null && await _anyChildOpen(childrenOpen, due.hireId)) {
+      return;
+    }
 
     final until = _now().toUtc().add(Duration(seconds: validitySeconds));
     final PreparedEnvelope prepared;

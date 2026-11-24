@@ -166,6 +166,40 @@ final class EscrowChildResultSource implements ChildResultSource {
     return null;
   }
 
+  /// Sends the verdict of each opened, unsettled child whose parent run
+  /// failed (T6.4.4). A failed parent run leaves `awaitingChild`, so its
+  /// resume never calls [resultOf] again.
+  ///
+  /// User decision 2026-11-23: such a child is judged by the normal rule,
+  /// not rejected early and not left to the deadline relay alone:
+  /// - B was hired to do the work. The reserve backs that work until B
+  ///   finishes, whoever hired the parent, a human or another agent.
+  /// - A child that delivered keeps its pay (Policy 1), and a blank output is
+  ///   still rejected. The relay's `release` would pay it unjudged.
+  /// - Rejecting B mid-work would race its `submit` and cut work it was
+  ///   paid to do.
+  ///
+  /// A child still working is skipped until a later pass. One line that
+  /// cannot be read is logged and does not hold the others.
+  @override
+  Future<void> judgeOrphans() async {
+    for (final line in await _receipts.listUnsettled()) {
+      final childHireId = line.childHireId;
+      if (childHireId == null) continue;
+      try {
+        final parent = await _runs.find(line.parentHireId);
+        if (parent?.state != HireRunState.failed) continue;
+        await resultOf(childHireId);
+      } on Object catch (e) {
+        _log(
+          e is LedgerException ? ChainLogLevel.warning : ChainLogLevel.error,
+          'Verdict of child hire $childHireId of failed parent '
+          '${line.parentHireId} deferred: ${e.runtimeType}',
+        );
+      }
+    }
+  }
+
   /// The verdict the final facts call for, or `null` while B still works.
   /// Every input it reads is final once it answers, so a confirmed reject
   /// recomputes the same code.
@@ -248,6 +282,13 @@ final class EscrowChildResultSource implements ChildResultSource {
       await _recordSimulationFailure(childHireId, purpose, priorFailures);
       return;
     } on LedgerException catch (e) {
+      // A node that cannot be reached is transient, so it stores nothing
+      // and uses no attempt, as `AgentSubmitSender` does for a `submit`.
+      // Counting it would let a short RPC outage use up
+      // [maxEscrowCallAttempts] and leave the child without a verdict for
+      // good. While the node is down no other path frees the budget faster,
+      // and the deadline relay still settles the child (T6.4.4, user
+      // decision 2026-11-23). The cost is one warning per pass.
       _log(
         ChainLogLevel.warning,
         'Could not prepare the verdict of child hire $childHireId: $e',

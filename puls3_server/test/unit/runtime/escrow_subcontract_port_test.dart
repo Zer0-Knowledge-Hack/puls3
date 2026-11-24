@@ -285,6 +285,32 @@ void main() {
       expect(sent, hasLength(1));
     });
 
+    test('a request id another hire of the same wallet holds, with no line '
+        'under this parent, refuses with request_conflict and sends '
+        'nothing', () async {
+      final hire = await parent();
+      // Not a child of this parent: no parent link and no receipt line.
+      await rig.hires.insertHire(
+        NewHire(
+          consumer: agentWallet,
+          agentId: 7,
+          price: price,
+          manifestVersion: 1,
+          expiredAt: 1800000000,
+          requestId: 'child:${hire.id}:call-1',
+          input: 'unrelated',
+        ),
+      );
+
+      await expectRefused(
+        port().requestChild(_request(hire.id)),
+        'request_conflict',
+      );
+      expect(receipts.all, isEmpty, reason: 'the line rolled back');
+      expect(await rig.submissions.listSubmitted(), isEmpty);
+      expect(sent, isEmpty, reason: 'the envelope was signed, never sent');
+    });
+
     test('another call id opens another child', () async {
       final hire = await parent();
       final first = await port().requestChild(_request(hire.id));

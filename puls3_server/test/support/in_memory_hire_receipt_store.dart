@@ -65,6 +65,12 @@ final class InMemoryHireReceiptStore implements HireReceiptStore {
   ];
 
   @override
+  Future<List<ReceiptLine>> listUnsettled() async => [
+    for (final line in _lines)
+      if (ReceiptLineState.unsettled.contains(line.state)) line,
+  ];
+
+  @override
   Future<bool> markNotOpened(int childHireId) async =>
       _settlePending(childHireId, state: ReceiptLineState.notOpened);
 

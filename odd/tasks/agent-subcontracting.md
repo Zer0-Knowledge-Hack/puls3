@@ -323,7 +323,8 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       Verifier notes, not fixed here:
       - (A, already true) Custodied-key `create_job`, `fund` and `complete` (`agent_hire_service`)
         are not in `agentSignedPurposes`, so they can share a sequence with that wallet's
-        `submit`. Candidate for T6.4.4 or a follow-up.
+        `submit`. User decision 2026-11-23: a separate follow-up, not part of T6.4.4. It touches
+        the #312 A2A flow (Risk item 3) and gets its own test and commit.
       - (B, already true) The gate is check-then-act, not a lock.
       - (C) The `chain_busy` message gives the model no hint to wait and retry.
     - [x] **T6.4.3** Record relay `release` / `claim_refund` on the child's receipt line.
@@ -344,7 +345,55 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
       tracker tests.
     - [ ] **T6.4.4** Reconciliation: `unverified` and half-opened lines, children of failed
       parent runs, orphan `HireRequestConflict`, a throwing `childrenOpen`, and bounded
-      `LedgerException` retries.
+      `LedgerException` retries. Mapped by a read-only explorer, then split into five
+      independent fronts, each with a small inline route:
+      - [x] **C** Orphan `HireRequestConflict`: when `_storedChild` finds no child of this
+        parent, `requestChild` now refuses with `request_conflict` instead of rethrowing.
+        Before, the error escaped `SubcontractTools`, and `_drive` failed the whole parent run
+        with `runInternalError`. Everything had rolled back, so nothing is held. RED: the new
+        port test failed with the raw `HireRequestConflict`.
+      - [x] **D** A throwing `childrenOpen`: `AgentSubmitSender` now fails closed. The error is
+        logged and the hire counts as having an open child. Before, it escaped `send` and
+        aborted the rest of the pass. Production does not pass `childrenOpen` until T6.4.5.
+        RED: the new sender test failed with `Bad state: database down`.
+        C and D checks: analyze clean, unit+hire+ledger 1400 passed, integration 211 passed.
+        Risk: none.
+      - [x] **E** `LedgerException` retries in verdict preparation
+        (`escrow_child_result_source.dart:250`): a plain `LedgerException` stores nothing,
+        so it never reaches `maxEscrowCallAttempts`. User decision 2026-11-23 ("Vamos con la
+        1"): keep it unbounded on purpose, as `AgentSubmitSender` does.
+        - A node that cannot be reached is transient. Counting it would let a short RPC
+          outage use up the attempts and leave the child without a verdict for good.
+        - No other path frees the budget faster while the node is down, and the deadline
+          relay still settles the child.
+        - The cost is one warning per pass.
+
+        The reason is written in the code, and a characterization test pins it: no attempt
+        is used, and the verdict is sent once the node is back. There is no RED because the
+        behavior did not change. Focused 21 passed, analyze clean. Risk: none.
+      - [x] **B** Children of failed parent runs: `markFailed` dropped the run from
+        `listAwaitingChild`, so A never judged its open children. The deadline relay then
+        settled them, and its `release` paid a blank output without judging it.
+        User decision 2026-11-23 (option 1): "Pues la 1, ya que es lo corecto, las reservas
+        deben de quedarse trabadas hasta que el agent termine su trabajo, independientemente
+        de quien lo haya contratado, si un humano u otro agente".
+
+        The fix adds `HireReceiptStore.listUnsettled` (contract-tested on both stores) and
+        `ChildResultSource.judgeOrphans`. `judgeOrphans` calls the same `resultOf` for each
+        opened, unsettled line whose parent run is `failed`, and `HireRunner.pass` runs it on
+        every pass. The sweep is isolated: one failing line, or a failing sweep, does not hold
+        the rest. There is no migration and no schema change.
+
+        RED:
+        - the contract and the `judgeOrphans` tests failed to compile;
+        - the runner tests failed with `Expected: <1> Actual: <0>`.
+
+        GREEN: analyze clean, unit+hire+ledger 1408 passed, integration 212 passed. The
+        server README is updated. Risk: none. It reuses `resultOf` and the per-wallet gate
+        unchanged, and only children of failed parents are affected.
+      - [ ] **A** `unverified` and half-opened lines: stuck until the parent deadline, and the
+        relay never reaches them because no `jobId` is bound. Needs decisions on how to find the
+        child job on chain and which state results.
     - [ ] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
       Risk: item 5 (environment).
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
@@ -391,3 +440,7 @@ StellarExpert.
   (signer read from the stored envelope, no migration). Native review of `c30c7d7` (lenses resilience
   and reliability, lineage `review-453dd25ab4c54ba9`) granted, approved and acknowledged; the
   reviewed boundary is now `c30c7d7`. T6.4.3 done. Next: T6.4.4.
+- 2026-11-23: user on verifier note A: "Follow up". It stays out of T6.4.4 as a separate
+  follow-up. Next: T6.4.4.
+- 2026-11-23: T6.4.4 C and D done (`7318113`). E decided by the user ("Vamos con la 1"): unbounded transient retries, documented and pinned. Next: B.
+- 2026-11-23: T6.4.4 E done (`7376160`). B decided by the user (option 1: judge orphans by the normal rule) and done. Next: A.

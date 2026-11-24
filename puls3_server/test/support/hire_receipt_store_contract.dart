@@ -69,6 +69,34 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
     expect([for (final l in lines) l.id], [first.id, second.id]);
   });
 
+  test('listUnsettled lists a line only while it is opened and not '
+      'settled', () async {
+    // Other fixtures may share the store: only this parent's lines count.
+    Future<List<int>> unsettled() async => [
+      for (final line in await f.store.listUnsettled())
+        if (line.parentHireId == f.parentHireId) line.childHireId!,
+    ];
+    await f.store.insert(_line(f));
+    expect(await unsettled(), isEmpty, reason: 'a pending line is not opened');
+
+    await f.store.markOpened(
+      f.childHireId,
+      childJobId: 44,
+      createTransaction: 'cd' * 32,
+      state: 'funded',
+    );
+    expect(await unsettled(), [f.childHireId]);
+
+    await f.store.markSettled(
+      f.childHireId,
+      state: 'completed',
+      fee: 1,
+      payout: 2,
+      settleTransaction: 'ef' * 32,
+    );
+    expect(await unsettled(), isEmpty, reason: 'a settled line is final');
+  });
+
   test('markNotOpened moves a pending line once', () async {
     await f.store.insert(_line(f));
 

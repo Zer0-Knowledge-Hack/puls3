@@ -123,6 +123,12 @@ abstract interface class HireReceiptStore {
   /// Every line of [parentHireId], oldest first (by id).
   Future<List<ReceiptLine>> listByParent(int parentHireId);
 
+  /// Every opened line that is not settled yet ([ReceiptLineState.unsettled]),
+  /// oldest first (by id), across parents. These are the live child jobs.
+  /// The set stays small, because each one settles by its deadline at the
+  /// latest.
+  Future<List<ReceiptLine>> listUnsettled();
+
   /// Sets the line of [childHireId] to [ReceiptLineState.notOpened] while it
   /// is still [ReceiptLineState.pending]. One conditional write; returns
   /// whether it changed the line.

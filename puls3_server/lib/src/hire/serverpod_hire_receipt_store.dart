@@ -61,6 +61,16 @@ final class ServerpodHireReceiptStore implements HireReceiptStore {
   }
 
   @override
+  Future<List<ReceiptLine>> listUnsettled() async {
+    final rows = await HireReceiptLineRecord.db.find(
+      _session,
+      where: (t) => t.state.inSet(ReceiptLineState.unsettled),
+      orderBy: (t) => t.id,
+    );
+    return [for (final row in rows) _line(row)];
+  }
+
+  @override
   Future<bool> markNotOpened(int childHireId) =>
       _settlePending(childHireId, ReceiptLineState.notOpened);
 
