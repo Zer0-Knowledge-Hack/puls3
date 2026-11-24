@@ -3,7 +3,7 @@ import 'package:serverpod/serverpod.dart' show Transaction;
 
 /// In-memory [HireReceiptStore]. [inTransaction] snapshots the lines and
 /// restores them when the body throws, and passes a `null` transaction.
-final class InMemoryHireReceiptStore implements HireReceiptStore {
+class InMemoryHireReceiptStore implements HireReceiptStore {
   InMemoryHireReceiptStore({DateTime Function()? now})
     : _now = now ?? DateTime.now;
 

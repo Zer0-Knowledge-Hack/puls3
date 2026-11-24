@@ -1,13 +1,17 @@
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart' show HireConfigurationMissing;
 import '../hire/chain_accounts.dart';
+import '../hire/child_job_effects.dart';
 import '../hire/hire_escrow_effects.dart';
 import '../hire/hire_relay_config.dart';
+import '../hire/serverpod_child_job_store.dart';
 import '../hire/serverpod_escrow_preparation_store.dart';
+import '../hire/serverpod_hire_receipt_store.dart';
 import '../hire/serverpod_hire_repository.dart';
 import '../ledger/soroban_ledger.dart';
 import '../ledger/soroban_rpc_client.dart';
@@ -50,30 +54,11 @@ TrackerLoop? startChainTracker(Serverpod pod, Map<String, String> env) {
   var deadlineAfterId = 0;
   final tracker = ChainSubmissionTracker(
     ledger: SorobanSubmissionLedger(rpc, escrow: stellar.escrow),
-    effects: HireEscrowEffects(
-      repositories: <T>(action) async {
-        final session = await pod.createSession();
-        try {
-          return await action(ServerpodHireRepository(session));
-        } finally {
-          await session.close();
-        }
-      },
-      lifecycle: <T>(action) async {
-        final session = await pod.createSession();
-        try {
-          return await action(
-            ServerpodHireRepository(session),
-            ServerpodEscrowPreparationStore(session),
-          );
-        } finally {
-          await session.close();
-        }
-      },
-      ledger: reader,
-      jobs: reader,
-      usdc: stellar.usdcSac,
-      escrow: stellar.escrow,
+    effects: hireEscrowEffects(
+      openSession: pod.createSession,
+      reader: reader,
+      stellar: stellar,
+      log: log,
     ),
     log: log,
   );
@@ -153,3 +138,58 @@ void _consoleLog(ChainLogLevel level, String message) {
     stderr.writeln(line);
   }
 }
+
+/// The effects the tracker applies to a landed submission. The
+/// `ChildJobEffects` scope is always present, so a child job submission is
+/// applied instead of failing for lack of them (ADR-0011); a deployment that
+/// never subcontracts simply has none of those submissions.
+@visibleForTesting
+HireEscrowEffects hireEscrowEffects({
+  required Future<Session> Function() openSession,
+  required SorobanLedger reader,
+  required StellarConfig stellar,
+  ChainLog log = ignoreChainLog,
+}) => HireEscrowEffects(
+  repositories: <T>(action) async {
+    final session = await openSession();
+    try {
+      return await action(ServerpodHireRepository(session));
+    } finally {
+      await session.close();
+    }
+  },
+  lifecycle: <T>(action) async {
+    final session = await openSession();
+    try {
+      return await action(
+        ServerpodHireRepository(session),
+        ServerpodEscrowPreparationStore(session),
+      );
+    } finally {
+      await session.close();
+    }
+  },
+  ledger: reader,
+  jobs: reader,
+  usdc: stellar.usdcSac,
+  escrow: stellar.escrow,
+  // A-signed `create_child_job` and child verdicts of the subcontract
+  // executor (ADR-0011). Without it those submissions would stay
+  // `submitted` for good. A deployment that never subcontracts has none.
+  children: ChildJobEffects(
+    scope: <T>(action) async {
+      final session = await openSession();
+      try {
+        return await action(
+          ServerpodHireRepository(session),
+          ServerpodHireReceiptStore(session),
+          ServerpodChildJobStore(session),
+        );
+      } finally {
+        await session.close();
+      }
+    },
+    escrow: stellar.escrow,
+    log: log,
+  ),
+);

@@ -423,8 +423,21 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
         RED: 4 probes failed on the old code. The fifth, two reconcilers at once, already
         passed and now pins the behavior. GREEN: unit+hire+ledger 1425 passed, integration 214
         passed, analyze clean.
-    - [ ] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
-      Risk: item 5 (environment).
+    - [x] **T6.4.5** Production wiring, plus `staleAfter` / `passTimeout` for multi-segment runs.
+      Risk: item 5 (environment). Route: inline (resumed after an interrupted agent).
+      `startAgentRuntime` builds `SubcontractServices` per pass (`buildSubcontractServices`:
+      `EscrowSubcontractPort`, `EscrowChildResultSource`, `UnverifiedChildReconciler`,
+      `OpenChildren.anyOpen`), with `childAgentLookup` (the `createHire` checks) and
+      `contractApprovalWindow`; the reconciler runs once per pass and `childrenOpen` goes to
+      `AgentSubmitSender`. `startChainTracker` passes `ChildJobEffects`. Fail closed: it is on only
+      where `submit` is on and `PULS3_HIRE_JOB_DURATION_SECONDS` is set; no new switch (reserve
+      needs `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS`, tools need a manifest opt-in).
+      `runtimeTimings`: `staleAfter = timeout * 8 + 1 min`, `passTimeout = 2 * batch * 8 * timeout
+      + 1 min` (derived from D8's 8 turns and the batch; not given as numbers by the ADR).
+      RED: `child_agent_lookup_test` and `subcontract_wiring_test` failed to compile before the
+      code. GREEN: unit+hire+ledger 1473 passed, `dart analyze --fatal-infos` clean. Integration
+      not run: Docker needs `puls3_server/.env`, which this agent may not read. Commit: see git log.
+      Risk: item 5.
 - [ ] **T7** Web: hire with a subcontract cap and a related-party toggle, and a receipt/subcontract
   tree on hire detail. Route: delegated writer.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
@@ -489,3 +502,10 @@ StellarExpert.
 
   Next: T6.4.5 production wiring. It should also wire `UnverifiedChildReconciler.reconcile` into
   the runtime pass.
+- 2026-11-24: T6.4.5 shipped as #407 (moises-cisneros, `59a1ba2`). TOMOKI977's review asked for
+  one-call timings with subcontracting off (a hung pass could hold the queue for over 5 h) and
+  tests for the fail-closed gate and the tracker's child effects. moises fixed both in `c125bba`
+  (`subcontractEnabled`/`subcontractOffReason`, `agentRuntimeTimings`, `hireEscrowEffects`, a
+  startup count of runs left `awaitingChild`, search on the injected `env`). A parallel local fix
+  of the same review was dropped in favour of it (kept as `backup/407-our-fix`). README updated to
+  the new timings. Next: T7.
