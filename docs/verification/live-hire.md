@@ -23,7 +23,7 @@ proves is the server and on-chain side of the loop.
 | Agent | Soroban Pre-Audit (`studio-4`, registry id 30) |
 | Agent payment wallet | [`GDQHKMYJLDOMS5YDOS3MQ2XRTCSKK3VBUYHJAIHR4H7FSPETQCOTNFBB`](https://stellar.expert/explorer/testnet/account/GDQHKMYJLDOMS5YDOS3MQ2XRTCSKK3VBUYHJAIHR4H7FSPETQCOTNFBB) |
 | Hire | 21 |
-| Escrow job | 34 |
+| Escrow job | 35 |
 | Budget | 0.50 USDC (`5000000` stroops) |
 | Asset | Circle testnet USDC, SAC `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
 
@@ -123,7 +123,7 @@ The escrow job:
 
 ```bash
 stellar contract invoke --id $ESCROW --network testnet --source-account $SRC \
-  --send=no -- get_job --job-id 34
+  --send=no -- get_job --job-id 35
 ```
 
 Expected: `agent_id` 30, `client` and `evaluator` the consumer, `provider` the
@@ -144,11 +144,14 @@ The rating, tied to this paid job:
 ```bash
 stellar contract invoke --id $REPUTATION --network testnet --source-account $SRC \
   --send=no -- read_feedback --agent-id 30 \
-  --client-address $CONSUMER --feedback-index 1
+  --client-address $CONSUMER --feedback-index 2
 ```
 
+The same consumer rated agent 30 twice: index 1 is the earlier hire 20 (job 34,
+`give_feedback` `61648311…`), and index 2 is this hire (job 35, `39dcc190…`).
+
 Expected: `is_revoked` false, `value` `"5"`, `value_decimals` 0, and `tag2`
-`puls3:job:v1:<escrow>:34`. The tag is the rule from
+`puls3:job:v1:<escrow>:35`. The tag is the rule from
 [#201](https://github.com/Zer0-Knowledge-Hack/puls3/issues/201) that only
 feedback tied to a paid job counts.
 
