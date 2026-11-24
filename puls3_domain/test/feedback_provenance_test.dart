@@ -28,7 +28,10 @@ void main() {
     });
 
     test('the largest job id it accepts round-trips exactly', () {
-      final reference = PaidJobReference(escrow: _escrow, jobId: 999999999999999);
+      final reference = PaidJobReference(
+        escrow: _escrow,
+        jobId: 999999999999999,
+      );
 
       expect(PaidJobReference.tryParse(reference.text), reference);
     });
