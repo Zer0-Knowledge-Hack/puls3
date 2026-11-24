@@ -222,8 +222,22 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
     `review-bfbfb6031598701e`, approved and acknowledged); its warning that a child hire without
     a receipt line rethrows a raw `HireRequestConflict` is a T6.4 item (map it to
     `SubcontractRefused`). Server unit+hire 1221 passed, integration 201.
-  - [ ] **T6.2** Track `createChildJob`: bind the child job, record the payment (payer A, payee B)
+  - [x] **T6.2** Track `createChildJob`: bind the child job, record the payment (payer A, payee B)
     so B's run is enqueued, update the receipt line.
+    Evidence: RED (new tests failed to load) then GREEN; server unit+hire 1254 passed,
+    integration 208, analyze clean. Source `2b9b32e`. The tracker's new `createChildJob` case
+    reads `ChildJobCreated` (plus `JobCreated` / `JobFunded`) and calls `onChildJobCreated`,
+    which validates every field against the stored child and, in one transaction, binds the
+    job, records the payment (which enqueues B's run) and moves the line to `funded`. A proven
+    failure moves the line to `not_opened`; a mismatch or missing evidence moves it to
+    `unverified` and funds nothing. Reprocessing is idempotent (`alreadyOpened`).
+    `createChildJob` stays out of `_relayPurposes` (one envelope per child). Review (consent
+    medium, granted, reliability lens, approved and acknowledged, lineage
+    `review-bd9662d5cc0abd5d`); its warning that a job id taken by another hire could fund a
+    child does not hold, because `hire.jobId` and `hire_payment.transactionHash` / `jobId` are
+    unique (`hire.spy.yaml:35-36`, `hire_payment.spy.yaml:16-20`); only its Postgres test is
+    missing. T6.4 must pass `children: ChildJobEffects` in `chain_tracker_wiring.dart` and
+    reconcile `unverified` lines; T6.3 maps `not_opened` to `ChildFailed('child_not_opened')`.
   - [ ] **T6.3** `ChildResultSource` and verdict: A-signed child `complete` / `reject`, receipt
     settlement fields, and no parent `submit` while children are open.
   - [ ] **T6.4** Production wiring of `SubcontractSetup`, `staleAfter` and `passTimeout` for

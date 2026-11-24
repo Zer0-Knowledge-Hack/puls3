@@ -33,6 +33,7 @@ final class SorobanSubmissionLedger implements SubmissionLedger {
       oldestLedgerCloseTime: _unixSeconds(tx['oldestLedgerCloseTime']),
       jobCreated: allJobCreated(tx, escrow: _escrow),
       jobFunded: allJobFunded(tx, escrow: _escrow),
+      childJobCreated: allChildJobCreated(tx, escrow: _escrow),
     );
   }
 

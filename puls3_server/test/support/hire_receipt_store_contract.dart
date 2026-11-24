@@ -80,6 +80,49 @@ void hireReceiptStoreContract(Future<HireReceiptStoreFixture> Function() make) {
     );
   });
 
+  test('markUnverified moves a pending line once', () async {
+    await f.store.insert(_line(f));
+
+    expect(await f.store.markUnverified(f.childHireId), isTrue);
+    expect(await f.store.markUnverified(f.childHireId), isFalse);
+    expect(await f.store.markNotOpened(f.childHireId), isFalse);
+    expect(
+      (await f.store.findByChildHire(f.childHireId))?.state,
+      ReceiptLineState.unverified,
+    );
+  });
+
+  test('markOpened records the child job on a pending line once', () async {
+    await f.store.insert(_line(f));
+
+    final opened = await f.store.inTransaction(
+      (transaction) => f.store.markOpened(
+        f.childHireId,
+        childJobId: 44,
+        createTransaction: 'cd' * 32,
+        state: 'funded',
+        transaction: transaction,
+      ),
+    );
+
+    expect(opened, isTrue);
+    final line = await f.store.findByChildHire(f.childHireId);
+    expect(line?.childJobId, 44);
+    expect(line?.createTransaction, 'cd' * 32);
+    expect(line?.state, 'funded');
+    expect(
+      await f.store.markOpened(
+        f.childHireId,
+        childJobId: 45,
+        createTransaction: 'ef' * 32,
+        state: 'funded',
+      ),
+      isFalse,
+    );
+    expect(await f.store.markNotOpened(f.childHireId), isFalse);
+    expect((await f.store.findByChildHire(f.childHireId))?.childJobId, 44);
+  });
+
   test('inTransaction rolls the insert back when the body throws', () async {
     await expectLater(
       f.store.inTransaction((transaction) async {
