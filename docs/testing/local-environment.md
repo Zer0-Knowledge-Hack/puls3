@@ -190,6 +190,57 @@ and needs Docker to detect the volume. A warning (for example "volume
 separate `-p` project") covers the failure at no cost. Implementing it is a
 follow-up to the script; this change is documentation only.
 
+## Run the E2E suites
+
+```bash
+melos run test:e2e        # or, per package, without melos:
+cd puls3_server && dart test -t e2e --run-skipped -j 1 test/e2e
+```
+
+The suites share the test database, so they run one at a time (`-j 1`).
+
+| Suite | What it proves |
+|---|---|
+| `hire_relay_e2e_test.dart` | create and fund a hire with the XDR signed unchanged (#255) |
+| `feedback_e2e_test.dart` | approve, rate and count a delivered hire (#255, #287) |
+| `subcontracting_e2e_test.dart` | the subcontracting journey of #334: happy path with reserve accounting, rejection, restart (#374) |
+| `subcontract_limits_e2e_test.dart` | reserve (#124), cycle (#127), depth (#126), the children cap and a spent reserve (#374) |
+| `subcontract_expiry_e2e_test.dart` | a child that is never delivered is refunded and the parent stays consistent (#374) |
+
+The subcontracting suites run the production wiring of the subcontract executor
+with a deterministic stand-in for the model (`support/subcontract_world.dart`).
+`startAgentRuntime` itself is not exercised, because it has no seam for a
+stand-in model; the suites compose the same pieces (`buildSubcontractServices`,
+`HireRunner`, the real stores) and drive the passes by hand.
+
+Things the suites rely on:
+
+- **Redeploy, then clear the test database.** A redeployed escrow numbers its
+  jobs from 1 again, and hires left in the test database by a run on the old
+  ledger hold those ids, so a new `create_job` fails with `JobMismatch`. After
+  `scripts/setup-local-soroban.sh` truncate the hire tables of the test
+  database (`hire`, `hire_payment`, `hire_run`, `chain_submission`,
+  `escrow_preparation`, `agent_wallet`, `terminal_job_fact`) or run
+  `docker compose down -v` first.
+- **Job duration.** The sandbox helper sets `PULS3_HIRE_JOB_DURATION_SECONDS`
+  to 259200 (three one-day approval windows). A child must expire a full
+  approval window plus `childExpiryMarginSeconds` before its parent and leave
+  `childRunHeadroom` to run, so with the one-day window a shorter duration
+  makes `subcontract` refuse with `parent_too_short`.
+- **Reserve ceiling.** `PULS3_SUBCONTRACT_RESERVE_MAX_STROOPS` is set by the
+  suites to `subcontractMaxChildrenCap` children at the sandbox price. ADR-0011
+  D1 names a configured ceiling per network but no value.
+- **Expiry.** The expiry suite shortens the escrow's approval window with the
+  admin identity for its own run and restores it afterwards, because a child
+  outlives that window and the ledger clock cannot be moved. It needs the
+  `STELLAR_ACCOUNT` identity of `.env.local-soroban` to be the escrow admin.
+  It fails fast when the window is not the sandbox default (86400 s), which
+  means an earlier run was killed before it could restore it: reset the
+  window to 86400 s (or redeploy the escrow) and run it again.
+- **Relay key.** The `test:` passwords hold no `escrowRelaySigningKey`, so the
+  tracker's deadline relay is off in the tests; the subcontracting suites run
+  the same `EscrowDeadlineRunner` with an ephemeral, friendbot-funded account.
+
 ## Check the migrations
 
 CI runs `scripts/check-migrations.sh` (#373) whenever a migration or a `.spy.yaml`
