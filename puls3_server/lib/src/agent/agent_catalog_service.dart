@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'package:puls3_domain/puls3_domain.dart';
+
 import '../chain/chain_log.dart';
 import '../generated/protocol.dart';
 import '../ledger/ledger_errors.dart';
 import 'agent_summary_reader.dart';
+import 'catalog_id_owner.dart';
 import 'catalog_reader.dart';
 import 'registry_reader.dart';
 
@@ -17,7 +20,9 @@ const _readConcurrency = 4;
 ///
 /// The registry has no list function, so the catalog enumerates the ids
 /// `0` to `total_agents - 1`. An agent whose metadata is missing or invalid
-/// (for example a superseded registration) is skipped. A chain that cannot be
+/// (for example a superseded registration) is skipped, and so is one that
+/// reuses a catalog id another owner registered first (audit I-1, see
+/// [mayTakeOverCatalogId]). A chain that cannot be
 /// read is different: the refresh is abandoned, the last list built is served
 /// when there is one, and [AgentCatalogUnavailable] is thrown otherwise. An
 /// outage is never reported as an empty catalog.
@@ -28,12 +33,15 @@ final class AgentCatalogService implements CatalogReader {
     Duration ttl = _catalogTtl,
     int concurrency = _readConcurrency,
     ChainLog log = ignoreChainLog,
-  }) : _now = now ?? DateTime.now,
+    CatalogIdOwners owners = const FirstRegistrantOnly(),
+  }) : _owners = owners,
+       _now = now ?? DateTime.now,
        _ttl = ttl,
        _concurrency = concurrency,
        _log = log;
 
   final RegistryReader _registry;
+  final CatalogIdOwners _owners;
   final DateTime Function() _now;
   final Duration _ttl;
   final int _concurrency;
@@ -108,23 +116,64 @@ final class AgentCatalogService implements CatalogReader {
       aborted = true;
       rethrow;
     }
-    return List.unmodifiable(_newestPerId(found));
+    return List.unmodifiable(await _newestPerId(found));
   }
 
   /// One agent, or `null` when its metadata is missing or invalid.
   Future<AgentSummary?> _read(int registryId) =>
       readAgentSummary(_registry, registryId);
 
-  /// Orphans may repeat a metadata id: keep the newest registration.
-  List<AgentSummary> _newestPerId(List<AgentSummary> agents) {
-    final newest = <String, AgentSummary>{};
-    for (final agent in agents) {
-      final current = newest[agent.id];
-      if (current == null || agent.registryId > current.registryId) {
-        newest[agent.id] = agent;
+  /// Orphans may repeat a metadata id: keep one registration per id, by the
+  /// claim [_owners] gives it. A Studio id goes to the newest registration of
+  /// its draft's owner, and to nobody without a draft. Any other id goes to
+  /// the newest registration by the owner who registered it first. For those,
+  /// owners are read only when the id repeats.
+  Future<List<AgentSummary>> _newestPerId(List<AgentSummary> agents) async {
+    final byId = <String, List<AgentSummary>>{};
+    for (final agent in [
+      ...agents,
+    ]..sort((a, b) => a.registryId.compareTo(b.registryId))) {
+      (byId[agent.id] ??= []).add(agent);
+    }
+    final newest = <AgentSummary>[];
+    for (final MapEntry(key: id, value: registrations) in byId.entries) {
+      final kept = switch (await _owners.claimOf(id)) {
+        NobodyClaim() => null,
+        OwnerClaim(:final owner) => await _newestOwnedBy(registrations, owner),
+        FirstRegistrantClaim() => await _newestOfFirstOwner(registrations),
+      };
+      if (kept != null) newest.add(kept);
+    }
+    return newest..sort((a, b) => a.registryId.compareTo(b.registryId));
+  }
+
+  /// The newest of [registrations] (oldest first) owned by [owner], or null.
+  Future<AgentSummary?> _newestOwnedBy(
+    List<AgentSummary> registrations,
+    StellarAddress owner,
+  ) async {
+    for (final agent in registrations.reversed) {
+      if (await isOwnedBy(_registry, agent.registryId, owner)) return agent;
+    }
+    return null;
+  }
+
+  /// The newest of [registrations] (oldest first) whose owner is the owner of
+  /// the first one.
+  Future<AgentSummary> _newestOfFirstOwner(
+    List<AgentSummary> registrations,
+  ) async {
+    final first = registrations.first;
+    var kept = first;
+    for (final agent in registrations.skip(1)) {
+      if (await mayTakeOverCatalogId(
+        _registry,
+        earlier: first.registryId,
+        later: agent.registryId,
+      )) {
+        kept = agent;
       }
     }
-    return newest.values.toList()
-      ..sort((a, b) => a.registryId.compareTo(b.registryId));
+    return kept;
   }
 }

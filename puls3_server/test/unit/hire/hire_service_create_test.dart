@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:puls3_domain/puls3_domain.dart' hide Hire, Payment;
 import 'package:puls3_server/src/agent/agent_catalog_service.dart';
 import 'package:puls3_server/src/agent/custodied_wallets.dart';
+import 'package:puls3_server/src/agent/hidden_agents.dart';
 import 'package:puls3_server/src/chain/submission_values.dart';
 import 'package:puls3_server/src/generated/protocol.dart';
 import 'package:puls3_server/src/hire/hire_lifecycle_store.dart';
@@ -533,6 +534,40 @@ void main() {
         throwsA(isA<HireLedgerUnavailable>()),
       );
       expect(rig.hires.all, isEmpty);
+    });
+
+    group('hidden agents (#308)', () {
+      HireService withHidden(String ids) => HireService(
+        hires: rig.hires,
+        preparations: rig.preparations,
+        relay: rig.service,
+        registry: rig.ledger,
+        catalog: AgentCatalogService(rig.ledger),
+        custody: rig.custodyOf,
+        config: HireRelayConfig(env),
+        hidden: HiddenAgents.fromEnvironment({hiddenAgentIdsKey: ids}),
+        now: () => rig.clock,
+      );
+
+      test('a new hire of a hidden agent is refused and stores nothing',
+          () async {
+        await expectLater(
+          create(withHidden('7')),
+          throwsA(isA<AgentUnavailable>()),
+        );
+
+        expect(rig.hires.all, isEmpty);
+        expect(rig.preparations.all, isEmpty);
+      });
+
+      test('a repeated request returns the hire created before hiding',
+          () async {
+        final first = await create(service);
+
+        final again = await create(withHidden('7'));
+
+        expect(again.hire.id, first.hire.id);
+      });
     });
   });
 }

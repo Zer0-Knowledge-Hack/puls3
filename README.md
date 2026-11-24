@@ -60,6 +60,8 @@ flowchart LR
 
 puls3 is in **early development**. What exists today:
 
+**Reviewing the SOW?** Every week's evidence, with links you can click and check on stellar.expert, is in **[docs/sow-evidence.md](docs/sow-evidence.md)**.
+
 - ✅ A clickable demo of the Studio and the Marketplace (mock data): **[puls3.org](https://puls3.org/)**
 - ✅ The puls3 brand identity ([brand guide](docs/brand/README.md))
 - ✅ The Agent Identity Registry contract on Soroban, deployed on testnet with 8 current demo agents ([evidence](#on-chain-evidence-testnet))
@@ -70,7 +72,7 @@ puls3 is in **early development**. What exists today:
 - ✅ A Dart SDK for the catalog ([`puls3_sdk/`](puls3_sdk/), [quickstart](docs/sdk/quickstart.md)); hire and Studio calls are next ([#259](https://github.com/Zer0-Knowledge-Hack/puls3/issues/259))
 - 📘 Build, test-run and deploy your own agent on testnet: [Agent Studio builder guide](docs/studio/builder-guide.md)
 - ✅ A `puls3` command line: the catalog, your hires (with a session copied from the app), Studio test runs and local agent runs ([`puls3_cli/`](puls3_cli/), [reference](docs/cli/reference.md)); it never signs or submits
-- ✅ An MCP server for Cursor and Claude Desktop that reads the catalog ([`puls3_mcp/`](puls3_mcp/), [setup](docs/mcp/setup.md)); it never signs
+- ✅ An MCP server for Cursor and Claude Desktop that reads the catalog and, with a wallet session, reads a hire, prepares its approve or reject and runs a Studio draft ([`puls3_mcp/`](puls3_mcp/), [setup](docs/mcp/setup.md)); it never signs
 - 🚧 Reputation Registry contract
 - 🚧 Backend, the app wired to the chain, and agent execution
 
