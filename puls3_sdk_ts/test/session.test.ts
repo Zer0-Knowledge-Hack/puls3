@@ -103,6 +103,34 @@ describe('the cross-process session lock (#424)', () => {
     assert.deepEqual(events, ['a in', 'a out', 'b in']);
   });
 
+  it('a live holder keeps the lock directory fresh too, for 0.1.0 programs that age it by the directory', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    let before = 0;
+    let after = 0;
+    await acrossProcesses(
+      file,
+      async () => {
+        await fs.utimes(lockDir(), old, old);
+        before = (await fs.stat(lockDir())).mtimeMs;
+        await new Promise((r) => setTimeout(r, 200));
+        after = (await fs.stat(lockDir())).mtimeMs;
+      },
+      { staleMs: 1_000, heartbeatMs: 40, waitMs: 5_000 },
+    );
+    assert.ok(after > before + 60_000, `the heartbeat touched the directory (${before} -> ${after})`);
+  });
+
+  it('a stale takeover lock left by a program that died is cleared, and the stale lock taken', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await staleLock();
+    await fs.mkdir(`${lockDir()}.takeover`);
+    await fs.utimes(`${lockDir()}.takeover`, old, old);
+    let ran = false;
+    await acrossProcesses(file, async () => void (ran = true), { staleMs: 1_000, heartbeatMs: 100, waitMs: 5_000 });
+    assert.ok(ran);
+    await assert.rejects(fs.stat(`${lockDir()}.takeover`), { code: 'ENOENT' });
+  });
+
   it('a holder whose lock was taken over leaves the new owner’s lock in place', async () => {
     await fs.mkdir(dirname(file), { recursive: true });
     await acrossProcesses(file, async () => {

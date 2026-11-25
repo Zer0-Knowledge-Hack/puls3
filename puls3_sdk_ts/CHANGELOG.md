@@ -33,7 +33,8 @@ The remaining checks and errors of #424.
   (after reading again that it is the same one), and a holder removes the
   lock only while it is still its own. Before, two programs could both take
   over a stale lock and present the same refresh token, which revokes the
-  session.
+  session. A 0.1.0 program sharing the same file still sees a live holder
+  as alive.
 
 ## 0.1.0
 
