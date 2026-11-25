@@ -494,6 +494,14 @@ describe('Puls3Sdk.approve, reject, rate', () => {
     ['empty options', {}],
     ['a result and trustServer together', { result: 'Two findings.', trustServer: true }],
     ['trustServer other than true', { trustServer: false }],
+    // From the #424 verifier's probes.
+    ['null options', null],
+    ['a bare string', 'Two findings.'],
+    ['an array', ['Two findings.']],
+    ['a result that is not a string', { result: 5 }],
+    ['trustServer as a string', { trustServer: 'true' }],
+    ['trustServer as 1', { trustServer: 1 }],
+    ['a result with trustServer false', { result: 'Two findings.', trustServer: false }],
   ] as const) {
     it(`approve and reject refuse ${label} with InvalidArgument, sending nothing (#424)`, async () => {
       for (const decide of ['approve', 'reject'] as const) {
@@ -512,6 +520,27 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       }
     });
   }
+
+  it('approve ignores a trustServer inherited from Object.prototype (#424)', async () => {
+    const { sdk, calls, chain } = hireServer();
+    chain.status = 'submitted';
+    const loose = sdk as unknown as Loose;
+    (Object.prototype as Record<string, unknown>)['trustServer'] = true;
+    try {
+      await assert.rejects(loose.approve(21, {}), InvalidArgument);
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)['trustServer'];
+    }
+    assert.equal(calls.length, 0);
+  });
+
+  it('approve refuses { result: null }: there is nothing to approve (#424)', async () => {
+    const { sdk, calls, chain } = hireServer();
+    chain.status = 'submitted';
+    const loose = sdk as unknown as Loose;
+    await assert.rejects(loose.approve(21, { result: null }), InvalidArgument);
+    assert.equal(calls.length, 0);
+  });
 
   it('reject with result null signs for a funded hire with no delivery (#424)', async () => {
     const { sdk, submitted, chain } = hireServer();

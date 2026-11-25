@@ -22,6 +22,7 @@ import {
   fundCall,
   fundWithReserveCall,
   giveFeedbackCall,
+  i128,
   invocation,
   manifestHash,
   otherContract,
@@ -515,6 +516,39 @@ describe('ADR-0010 D3 rule 4: the score and the fee are the caller’s (#424)', 
     const call = registerFullCall({ uri });
     refused('call', () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }));
   });
+
+  it('fund is refused when max_fee_bps is not a u32 the cap allows', () => {
+    for (const fee of [i128(1n), i128(-1n)]) {
+      const call = fundCall();
+      call.args[3] = fee;
+      refused('money', () => check(funded(call, 5_000_000n), fund));
+    }
+  });
+
+  it('fund_with_reserve is refused above 1000 bps even at the highest cap', () => {
+    const call = fundWithReserveCall(5_000_000n, 2_000_000n, 1_001);
+    const expectation: Expectation = { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 2_000_000n, jobId: 35n };
+    refused('money', () => check(funded(call, 7_000_000n), expectation, withNetwork({ maxFeeBps: 1_000 })));
+  });
+
+  // From the #424 verifier's probes: only `<origin>/registry/<lowercase hex>` is the server's URI.
+  for (const uri of [
+    `${TESTNET.registrationOrigin}/registry/${manifestHash}?x=1`,
+    `${TESTNET.registrationOrigin}/registry/${manifestHash}#f`,
+    `${TESTNET.registrationOrigin}.evil.example/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}:8443/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}/x/registry/${manifestHash}`,
+    `http://puls3-hub-on-stellar.serverpod.space/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}//registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}@evil.example/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}/registry/${manifestHash.toUpperCase()}`,
+  ]) {
+    it(`register_full refuses the URI ${uri}`, () => {
+      refused('call', () =>
+        check(preparedTx('registerFull', registerFullCall({ uri })), { purpose: 'registerFull', registration }),
+      );
+    });
+  }
 
   it('register_full accepts any origin when the network pins none', () => {
     const call = registerFullCall({ uri: `https://puls3.example/registry/${manifestHash}` });
