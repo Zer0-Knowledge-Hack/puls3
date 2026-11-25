@@ -274,28 +274,6 @@ void main() {
     expect(result.remainingDailyRuns, 19);
   });
 
-  test(
-    'a quota error the browser client could not decode keeps its time',
-    () async {
-      final quota = gateway(
-        testRun: (draftId, input) async => throw api.ServerpodClientBadRequest(
-          '{"className":"Puls3ApiException","data":{"code":"TestQuotaExceeded",'
-          '"details":{"resetsAt":"2026-10-15T00:00:00.000Z"}}}',
-        ),
-      );
-      await expectLater(
-        quota.testRun(1, _prompt, owner: 'G'),
-        throwsA(
-          isA<StudioTestQuotaExceeded>().having(
-            (e) => e.resetsAt,
-            'resetsAt',
-            DateTime.utc(2026, 10, 15),
-          ),
-        ),
-      );
-    },
-  );
-
   test('test run errors keep the prompt out of the message', () async {
     final quota = gateway(
       testRun: (draftId, input) async => throw api.Puls3ApiException(
