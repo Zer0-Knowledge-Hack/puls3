@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { inspect } from 'node:util';
@@ -48,7 +49,10 @@ const chainJob = {
   agentId: 30,
   token: TESTNET.usdc,
   budget: 5_000_000n,
+  deliverable: null as string | null,
 };
+/** What the agent's submit records: the SHA-256 of the result the hire shows. */
+const delivered = createHash('sha256').update('Two findings.', 'utf8').digest('hex');
 const fakeChain: ChainReader = {
   agentWallet: async (agentId) => (agentId === 30 ? provider : null),
   job: async (jobId) => {
@@ -195,7 +199,14 @@ function hireServer(options: {
   const sdk = new Puls3Sdk(transport, {
     hasSession: true,
     signer,
-    chain: options.chainReader ?? fakeChain,
+    chain: options.chainReader ?? {
+      ...fakeChain,
+      // The job carries the delivery once the agent submitted, as on chain.
+      job: async (jobId) => ({
+        ...(await fakeChain.job(jobId)),
+        deliverable: chain.status === 'submitted' ? delivered : null,
+      }),
+    },
     pollIntervalMs: 1_000,
     stepTimeoutMs: 10_000,
     now: () => new Date(clock),
@@ -320,10 +331,15 @@ describe('Puls3Sdk.approve, reject, rate', () => {
   // from the escrow. A server that answers approve(hire A) with the complete
   // of another of the signer's jobs is refused, and nothing is signed.
   for (const [label, job] of [
-    ['another agent', { ...chainJob, agentId: 31 }],
-    ['another price', { ...chainJob, budget: 9_000_000n }],
-    ['another wallet', { ...chainJob, provider: Keypair.random().publicKey() }],
-    ["another client's job", { ...chainJob, client: Keypair.random().publicKey() }],
+    ['another agent', { ...chainJob, deliverable: delivered, agentId: 31 }],
+    ['another price', { ...chainJob, deliverable: delivered, budget: 9_000_000n }],
+    ["another client's job", { ...chainJob, deliverable: delivered, client: Keypair.random().publicKey() }],
+    // The server is consistent about the agent and the price: only the
+    // delivery recorded on chain tells the two jobs apart.
+    ['the same agent and price but another delivery', {
+      ...chainJob,
+      deliverable: createHash('sha256').update('Other work.', 'utf8').digest('hex'),
+    }],
   ] as const) {
     it(`approve and reject sign nothing when the server points at a job for ${label}`, async () => {
       for (const decide of ['approve', 'reject'] as const) {
@@ -337,6 +353,29 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       }
     });
   }
+
+  it('approve accepts a job whose agent has since bound another wallet', async () => {
+    // The escrow pays the provider it stored, so a later rebind is no reason to refuse.
+    const { sdk, submitted, chain } = hireServer({
+      chainReader: {
+        ...fakeChain,
+        agentWallet: async () => Keypair.random().publicKey(),
+        job: async () => ({ ...chainJob, deliverable: delivered }),
+      },
+    });
+    chain.status = 'submitted';
+    assert.equal((await sdk.approve(21)).hire.status, 'completed');
+    assert.equal(submitted.length, 1);
+  });
+
+  it('reject of a funded hire refuses a job that already has a delivery', async () => {
+    const { sdk, submitted, chain } = hireServer({
+      chainReader: { ...fakeChain, job: async () => ({ ...chainJob, deliverable: delivered }) },
+    });
+    chain.status = 'funded';
+    await assert.rejects(sdk.reject(21, 'Not usable.'), SigningRefused);
+    assert.equal(submitted.length, 0);
+  });
 
   it('rate signs give_feedback and waits for it on chain', async () => {
     const { sdk, submitted, chain } = hireServer();

@@ -63,6 +63,7 @@ describe('SorobanRpcReader', () => {
       entry('agent_id', nativeToScVal(39, { type: 'u32' })),
       entry('budget', nativeToScVal(1_000_000n, { type: 'i128' })),
       entry('client', new Address(client).toScVal()),
+      entry('deliverable', xdr.ScVal.scvBytes(Buffer.alloc(32, 0xab))),
       entry('evaluator', new Address(client).toScVal()),
       entry('provider', new Address(provider).toScVal()),
       entry('reserve', nativeToScVal(0n, { type: 'i128' })),
@@ -78,6 +79,7 @@ describe('SorobanRpcReader', () => {
       agentId: 39,
       token: TESTNET.usdc,
       budget: 1_000_000n,
+      deliverable: 'ab'.repeat(32),
     });
     const tx = TransactionBuilder.fromXDR(String(requests[0]!.params.transaction), TESTNET.passphrase);
     const call = (tx as unknown as { operations: { func: xdr.HostFunction }[] }).operations[0]!.func.invokeContract();

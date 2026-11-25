@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
   ChainSubmissionFailed,
@@ -14,7 +14,7 @@ import {
   checkPreparedTransaction,
   type Expectation,
 } from './guard.js';
-import { SorobanRpcReader, type ChainReader } from './chain_reader.js';
+import { SorobanRpcReader, type ChainReader, type EscrowJob } from './chain_reader.js';
 import { KeySession } from './key_session.js';
 import { TESTNET, type Puls3Network } from './network.js';
 import type { Puls3Signer } from './signer.js';
@@ -615,7 +615,13 @@ export class Puls3Sdk {
     if (detail.hire.status === 'open') {
       const fund = await this.prepareFund(hireId);
       const jobId = requireJobId(detail);
-      await this.#checkJob(jobId, agentId, price);
+      // agentId is the caller's own argument here, so the job read from the
+      // escrow must be for the agent the caller asked for, and pay its wallet.
+      const job = await this.#checkJob(jobId, agentId, price);
+      const provider = await this.#requireChain().agentWallet(agentId);
+      if (provider === null || job.provider !== provider) {
+        throw new SigningRefused('money', `job ${jobId} pays another wallet than agent ${agentId}'s`);
+      }
       await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, price, maxReserve, jobId });
       detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
     }
@@ -650,7 +656,7 @@ export class Puls3Sdk {
    */
   async approve(hireId: number): Promise<HireDetail> {
     const wallet = this.#requireSigner('approve').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet);
+    const jobId = await this.#checkHireJob(hireId, wallet, 'complete');
     const prepared = await this.prepareComplete(hireId);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
@@ -662,7 +668,7 @@ export class Puls3Sdk {
    */
   async reject(hireId: number, reason: string): Promise<HireDetail> {
     const wallet = this.#requireSigner('reject').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet);
+    const jobId = await this.#checkHireJob(hireId, wallet, 'reject');
     const prepared = await this.prepareReject(hireId, reason);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
@@ -703,24 +709,33 @@ export class Puls3Sdk {
   // --- Internals ----------------------------------------------------------
 
   /**
-   * Hire [hireId]'s escrow job, after checking on chain that it is the
-   * signer's job for that hire's agent and price. The job id comes from the
-   * server, so the job itself is read from the escrow: a server cannot point
-   * an approval or a rejection at another of the signer's jobs unless that
-   * job is for the same agent and price.
+   * Hire [hireId]'s escrow job, after checking it on chain. The job id, the
+   * agent and the price all come from the server, so the binding that holds
+   * is the delivery itself: the agent's `submit` recorded the SHA-256 of its
+   * result on the job, and it must be the result this hire shows. A server
+   * that points approve(A) at another job B fails here, unless it also shows
+   * B's result as A's, and then the signer approves the work it was shown.
+   * [purpose] `complete` needs a delivery; `reject` accepts none (a funded
+   * hire), but then the job must have none either.
    */
-  async #checkHireJob(hireId: number, wallet: string): Promise<bigint> {
+  async #checkHireJob(hireId: number, wallet: string, purpose: 'complete' | 'reject'): Promise<bigint> {
     const detail = await this.getHire(hireId, wallet);
     const jobId = requireJobId(detail);
-    await this.#checkJob(jobId, detail.hire.agentId, BigInt(detail.hire.price));
+    const job = await this.#checkJob(jobId, detail.hire.agentId, BigInt(detail.hire.price));
+    const shown = detail.result === null ? null : createHash('sha256').update(detail.result, 'utf8').digest('hex');
+    if (purpose === 'complete' && (job.deliverable === null || shown === null)) {
+      throw new SigningRefused('call', `job ${jobId} has no delivery to approve`);
+    }
+    if (job.deliverable !== shown) {
+      throw new SigningRefused('call', `job ${jobId}'s delivery is not the result hire ${hireId} shows`);
+    }
     return jobId;
   }
 
-  /** Checks escrow job [jobId], read from the chain, against what this hire is for. */
-  async #checkJob(jobId: bigint, agentId: number, price: bigint): Promise<void> {
-    const chain = this.#requireChain();
+  /** Checks escrow job [jobId], read from the chain, against an agent and a price. */
+  async #checkJob(jobId: bigint, agentId: number, price: bigint): Promise<EscrowJob> {
     const signer = this.#requireSigner('reading the job').publicKey();
-    const job = await chain.job(jobId);
+    const job = await this.#requireChain().job(jobId);
     if (job.client !== signer || job.evaluator !== signer) {
       throw new SigningRefused('signer', `job ${jobId} is not the signer's`);
     }
@@ -730,10 +745,7 @@ export class Puls3Sdk {
     if (job.token !== this.#network.usdc || job.budget !== price) {
       throw new SigningRefused('money', `job ${jobId} is not ${price} USDC stroops`);
     }
-    const provider = await chain.agentWallet(agentId);
-    if (provider === null || job.provider !== provider) {
-      throw new SigningRefused('money', `job ${jobId} pays another wallet than agent ${agentId}'s`);
-    }
+    return job;
   }
 
   #requireChain(): ChainReader {

@@ -32,6 +32,8 @@ export interface EscrowJob {
   agentId: number;
   token: string;
   budget: bigint;
+  /** The SHA-256 the agent's `submit` recorded (hex), or null before it. */
+  deliverable: string | null;
 }
 
 /**
@@ -75,7 +77,13 @@ export class SorobanRpcReader implements ChainReader {
     if (scVal.switch().name !== 'scvMap') {
       throw new Puls3ProtocolError(`The escrow returned no job ${jobId}`);
     }
-    const fields = new Map(scVal.map()!.map((e) => [e.key().sym().toString(), e.val()]));
+    const fields = new Map<string, xdr.ScVal>();
+    for (const e of scVal.map()!) {
+      if (e.key().switch().name !== 'scvSymbol') {
+        throw new Puls3ProtocolError(`The escrow returned job ${jobId} with a non-symbol field`);
+      }
+      fields.set(e.key().sym().toString(), e.val());
+    }
     const address = (name: string) => {
       const value = fields.get(name);
       if (value === undefined || value.switch().name !== 'scvAddress') {
@@ -95,6 +103,7 @@ export class SorobanRpcReader implements ChainReader {
       agentId: Number(integer('agent_id')),
       token: address('token'),
       budget: integer('budget'),
+      deliverable: deliverable(fields.get('deliverable'), jobId),
     };
   }
 
@@ -149,4 +158,13 @@ export class SorobanRpcReader implements ChainReader {
     }
     return body.result;
   }
+}
+
+/** `Option<BytesN<32>>`: void before the agent submits, 32 bytes after. */
+function deliverable(value: xdr.ScVal | undefined, jobId: bigint): string | null {
+  if (value === undefined || value.switch().name === 'scvVoid') return null;
+  if (value.switch().name !== 'scvBytes' || value.bytes().length !== 32) {
+    throw new Puls3ProtocolError(`Job ${jobId} has a deliverable that is not 32 bytes`);
+  }
+  return Buffer.from(value.bytes()).toString('hex');
 }
