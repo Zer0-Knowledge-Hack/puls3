@@ -1360,6 +1360,16 @@ void main() {
       expect(find.byKey(section), findsNothing);
     });
 
+    testWidgets('a sign-in the server refuses after the wallet signed asks '
+        'once more at most, not once per step', (tester) async {
+      final opened = await open(tester, terms: SubcontractTerms.none);
+      opened.signIn.verifyFailure = StateError('verifyChallenge failed');
+
+      await confirm(tester);
+
+      expect(opened.wallet.challenges, hasLength(2));
+    });
+
     testWidgets('declining the sign-in starts nothing', (tester) async {
       final opened = await open(tester);
       opened.wallet.failNextChallenge = const WalletSignatureRejected();
@@ -1383,6 +1393,10 @@ class _TestSignIn implements WalletSignIn {
   /// When set, a sign-in waits for it, like an open wallet prompt.
   Completer<void>? gate;
 
+  /// When set, the server refuses every signed challenge with it, as when
+  /// `verifyChallenge` fails after the wallet signed.
+  Object? verifyFailure;
+
   /// Wallets that were asked to sign in, in order.
   final prompts = <String>[];
 
@@ -1402,6 +1416,8 @@ class _TestSignIn implements WalletSignIn {
         networkPassphrase: stellarTestnetPassphrase,
       ),
     );
+    final failure = verifyFailure;
+    if (failure != null) throw failure;
     prompts.add(wallet);
     signedInAs = wallet;
   }

@@ -335,8 +335,9 @@ class _HireSheetState extends State<HireSheet> {
     if (wallet != null && flow.canEditTask && !await wallet.hasSession()) {
       final offeredBefore = flow.terms.offered;
       try {
+        // Connecting signs in: one prompt. A server failure leaves no
+        // session, and the hire's own sign-in reports it.
         await wallet.connect();
-        await wallet.ensureSession();
       } on WalletException {
         // Declined or failed: the wallet state shows why; nothing started.
         return;
