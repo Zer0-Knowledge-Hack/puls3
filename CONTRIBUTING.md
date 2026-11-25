@@ -225,7 +225,14 @@ Each issue lists its **Deliverables**, **Acceptance criteria**, **How to verify*
 
 Examples: `feat/13-identity-registry`, `docs/2-vision`, `chore/29-ci`.
 
-Always branch from an up-to-date `main`.
+`<type>` is one of `feat`, `fix`, `docs`, `chore`, `ci`, `test`, `spike`. The rules are in [ADR-0015](docs/adr/0015-branching-and-artifact-versioning.md):
+
+- **No issue:** only for work the Issue gate accepts without one (docs-only, or a PR labelled `no-issue`): `<type>/<short-slug>`.
+- **Hotfix of a published SDK:** `hotfix/<package>-<issue-number>-<short-slug>`, branched from the release tag (`puls3_sdk-v0.1.0`) and cherry-picked back to `main`.
+- **Spike sandbox an open issue asks for:** `sandbox/<short-slug>` (for example `sandbox/nirium` for #296). It is deleted when the issue closes.
+- **Bot branches** (`dependabot/*`) keep the bot's naming.
+
+Always branch from an up-to-date `main`. Review other people's PRs in a detached worktree (`git worktree add --detach <path> <sha>`); do not push `review-pr-*`, `pr-*` or `local/*` branches. GitHub deletes the branch of a merged PR; delete your branch yourself when you close a PR without merging. Tags are for releases only ([docs/sdk/releasing.md](docs/sdk/releasing.md), [docs/sdk/releasing-npm.md](docs/sdk/releasing-npm.md)).
 
 ### 3.3 Commits
 
@@ -240,6 +247,8 @@ chore: pin Flutter version in CI
 
 Keep commits small and focused. Keep tests and docs in the same commit as the code they cover.
 
+The types are the branch types above, plus `build`, `refactor`, `perf` and `revert` when they apply.
+
 ### 3.4 Pull requests
 
 1. Open the PR against `main`. The description is pre-filled from `.github/pull_request_template.md`.
@@ -249,6 +258,15 @@ Keep commits small and focused. Keep tests and docs in the same commit as the co
    - Add evidence: command output, screenshots, GIFs, tx hashes, as the issue asks.
 3. Add the same labels and milestone as the issue.
 4. CI must be green.
+5. The PR title is a Conventional Commit with the issue number: `feat(server): store the escrow on old hires (#307)`. Squash merge uses the title as the commit on `main`, and GitHub appends the PR number.
+
+#### Stacked pull requests
+
+Prefer independent PRs against `main`. When one PR has to build on another (`B -> A -> main`):
+
+1. Keep at most **4 open PRs** in a stack.
+2. Every PR except the last one uses `Refs #N`.
+3. Merge in this order: merge `A` (when GitHub deletes `A`'s branch it retargets `B` to `main`; never delete `A`'s branch by hand while `A` is unmerged, because that closes `B`), sync `B` with `main`, then ask for the final review on `B` after that push (the last push needs its own approval).
 
 #### Closes vs Refs (enforced by `Issue gate / issue-gate`)
 

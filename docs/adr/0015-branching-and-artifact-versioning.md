@@ -16,8 +16,8 @@
 
 The repository already defines parts of a release and Git workflow: GitHub Flow on `main`, Conventional Commits, `CI / gate`, `Secrets / scan`, `Issue gate / issue-gate`, and SemVer + `<package>-v<version>` tags in [docs/sdk/releasing.md](../sdk/releasing.md), and a tag-triggered npm release in [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md). However, an audit of the current repository shows several gaps where conventions are incomplete or applied inconsistently:
 
-1. **Branch naming and hygiene:** `CONTRIBUTING.md` documents only `feat/`, `docs/`, and `chore/`, while the repository has accumulated `fix/`, `ci/`, `test/`, `spike/`, un-issued branches, local review branches (`review-pr-*`, `pr-*`), and over 100 unpruned remote branches.
-2. **Stacked PR friction:** `main` enforces squash-merge, `require_last_push_approval`, and `enforce_admins`. When large features ship as chained PRs, squash-merging a parent PR leaves child PRs conflicted, dismisses approvals, and can auto-close child PRs if the parent branch is deleted before retargeting.
+1. **Branch naming and hygiene:** `CONTRIBUTING.md` documents the pattern `<type>/<issue-number>-<short-slug>` with examples for `feat/`, `docs/` and `chore/` only. Across all pull requests the team has used `feat` (116), `docs` (52), `fix` (46), `chore` (18), `ci` (12), `test` (10) and `spike` (4), plus a long-lived `sandbox/nirium` branch for the #296 spike and `dependabot/*` branches opened by the bot. Some branches carry no issue number (`ci/consolidate-workflows`, `fix/web-cache-headers`), which matches the Issue gate's exceptions for docs-only and `no-issue` pull requests. Local review branches (`review-pr-*`, `pr-*`) were pushed at times, and closed or orphaned branches piled up on `origin` (36 remote branches, pruned to 7 on 2026-11-25).
+2. **Stacked PR friction:** `main` requires one approval from someone other than the author, `require_last_push_approval`, `enforce_admins`, and the `gate` and `scan` checks. Squash merge is the usual method, but linear history is not required and merge commits are also used (for example #411). When large features ship as chained PRs (the #334 stacks reached four open PRs), squash-merging a parent PR leaves child PRs conflicted, dismisses approvals, and can auto-close child PRs if the parent branch is deleted before retargeting.
 3. **Uneven artifact versioning:**
    - `puls3_client` and `puls3_sdk` are published as `0.1.0` on pub.dev under the verified publisher `puls3.org`, with `CHANGELOG.md` and the tags `puls3_client-v0.1.0` and `puls3_sdk-v0.1.0` (on `2fe943e`). They are released manually with `dart pub publish` per [docs/sdk/releasing.md](../sdk/releasing.md).
    - `@puls3_org/sdk` is published as `0.1.0` on npm with the tag `sdk-ts-v0.1.0` (on `edf81ae`). Later versions are published by `.github/workflows/publish-sdk-ts.yml` on `sdk-ts-vX.Y.Z` tags, per [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md).
@@ -38,21 +38,26 @@ Instead, we standardize on **strict GitHub Flow (trunk-based on `main`)**:
 2. **Closed branch taxonomy:**
    - Standard work: `<type>/<issue-number>-<short-slug>` where `<type>` is strictly one of:
      `feat` · `fix` · `docs` · `chore` · `ci` · `test` · `spike`
+   - Work the Issue gate accepts without an issue (docs-only changes, or a PR labelled `no-issue`): `<type>/<short-slug>`.
    - Patching an already-published SDK release when `main` has unreleased breaking changes: `hotfix/<package>-<issue-number>-<short-slug>` branched from `<package>-v<X.Y.Z>` and cherry-picked back to `main`.
+   - Long-lived spike sandboxes that an open issue asks for: `sandbox/<short-slug>` (today `sandbox/nirium` for #296). The issue names the branch, and the branch is deleted when the issue closes.
+   - Bot branches (`dependabot/*`) keep the bot's own naming.
 3. **No review or scratch branches on `origin`:**
    - Local PR reviews and agent checks run in detached worktrees (`git worktree add --detach`) rather than pushing `review-pr-*` or `local/*` branches.
-   - Enable GitHub's *Automatically delete head branches* setting for standard PRs.
+   - GitHub's *Automatically delete head branches* setting is enabled and deletes the branch of a merged PR. The author deletes the branch of a PR closed without merging.
 4. **Conventional Commits in PR titles:**
-   - Because `main` uses squash-merge, every PR title must follow `<type>(<scope>): <summary> (#<issue>)` (or `<type>: <summary> (#<issue>)`), so `main` history remains machine-readable for changelogs and version bumps.
+   - Because squash merge is the usual method, every PR title must follow `<type>(<scope>): <summary> (#<issue>)` (or `<type>: <summary> (#<issue>)`), so `main` history remains machine-readable for changelogs and version bumps. GitHub appends the PR number on squash, so the commit on `main` reads `<type>(<scope>): <summary> (#<issue>) (#<pr>)`, as it already does today.
+   - Commit types are the branch types above plus `build`, `refactor`, `perf` and `revert` when they apply.
+5. **Tags are for releases only.** Every tag follows the formats in section 3. Ad-hoc tags such as `backup/feat-19-pre-rework` do not belong on `origin`.
 
 ### 2. Stacked PR protocol
 
 Prefer independent PRs against `main` (using feature flags or config toggles when incomplete). When a dependency stack (`A -> main`, `B -> A`) is unavoidable:
 
-1. Limit stacks to at most **2–3 open PRs**.
+1. Limit stacks to at most **4 open PRs**. Work that needs more is grouped into fewer, larger slices.
 2. Intermediate PRs use `Refs #<issue>` (never `Closes #<issue>`), per `Issue gate`.
 3. **Required merge sequence:**
-   - Retarget `B`'s base branch to `main` **before** deleting `A`'s branch (or merge `A` without deleting its branch first, then retarget `B` to `main`, then delete `A`'s branch).
+   - Merge `A`. When GitHub deletes `A`'s branch after the merge, it retargets `B` to `main` on its own. Never delete `A`'s branch by hand while `A` is unmerged: that closes `B`.
    - Sync `B` with `main` (merge or rebase).
    - Request final review on `B` **after** the sync push so `require_last_push_approval` is not invalidated.
 
@@ -62,9 +67,9 @@ A single global repository version does not fit contracts, SDKs, and continuousl
 
 | Artifact family | Versioning scheme | Git tag / identifier | Metadata & provenance |
 | --- | --- | --- | --- |
-| **Publishable SDKs** (`puls3_client`, `puls3_sdk`, `@puls3_org/sdk`) | **SemVer 2.0.0** (`0.x` until 1.0 stability) + [Keep a Changelog](https://keepachangelog.com) | `<package>-v<X.Y.Z>` (e.g. `puls3_sdk-v0.1.0`) + GitHub Release. Exception: `@puls3_org/sdk` uses the tag prefix `sdk-ts` (`sdk-ts-v<X.Y.Z>`), because a scoped name with `/` cannot be a clean tag. | Released per [docs/sdk/releasing.md](../sdk/releasing.md) (Dart: manual `dart pub publish`, no publishing from CI) and [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md) (npm: version bump in a PR, then a tag the workflow publishes with provenance). Any contract redeploy changing pinned `contract_id`s requires a new SDK release (ADR-0010). |
+| **Publishable SDKs** (`puls3_client`, `puls3_sdk`, `@puls3_org/sdk`) | **SemVer 2.0.0** (`0.x` until 1.0 stability) + `CHANGELOG.md` with one section per release | `<package>-v<X.Y.Z>` (e.g. `puls3_sdk-v0.1.0`) on the commit it was published from. A GitHub Release is optional (none exists yet). Exception: `@puls3_org/sdk` uses the tag prefix `sdk-ts` (`sdk-ts-v<X.Y.Z>`), because a scoped name with `/` cannot be a clean tag. | Released per [docs/sdk/releasing.md](../sdk/releasing.md) (Dart: manual `dart pub publish`, no publishing from CI) and [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md) (npm: version bump in a PR, then a tag the workflow publishes with provenance). Any contract redeploy changing pinned `contract_id`s requires a new SDK release (ADR-0010). |
 | **Continuously deployed apps** (`puls3_server`, `puls3_flutter`) | **CalVer** `YYYY.MM.DD+<short_sha>` *(or SemVer `X.Y.Z+<short_sha>` — confirm in team review)* | No tag per commit (optional milestone tags) | `puls3_server` reports via `/health/check` (`PULS3_GIT_SHA`); `puls3_server/Dockerfile` sets `LABEL org.opencontainers.image.*`; `scripts/cloudflare-pages-build.sh` passes `--build-name` and `--build-number`. |
-| **Soroban contracts** (`escrow`, `identity-registry`, `reputation-registry`) | **SemVer** in `Cargo.toml` + `pub fn version()` | `contracts/<name>-v<X.Y.Z>-<network>` on deploy | Release builds pass `--meta source_repo=github:Zer0-Knowledge-Hack/puls3` and `--meta revision=<sha>` (**SEP-55**). `contracts/deployments/<network>.json` records `crate_version`, `git_commit`, `wasm_hash_sha256`, and `contract_id`. |
+| **Soroban contracts** (`escrow`, `identity-registry`, `reputation-registry`) | **SemVer** in `Cargo.toml` + `pub fn version()` | `contracts/<name>-v<X.Y.Z>-<network>` on deploy (new; no contract tag exists yet). A version without an upgrade function is a new contract id ([docs/operations/escrow-rotation.md](../operations/escrow-rotation.md)), so each deploy gets its own tag. | Release builds pass `--meta source_repo=github:Zer0-Knowledge-Hack/puls3` and `--meta revision=<sha>` (**SEP-55**). `contracts/deployments/<network>.json` keeps its snake_case keys (`contract_id`, `wasm_hash_sha256`, `deploy_tx`, `deployed_at_utc`) and adds `crate_version` and `git_commit`. |
 | **Internal / CLI packages** (`puls3_domain`, `puls3_cli`, `puls3_mcp`) | `publish_to: none` internally; **SemVer** if distributed as binaries | `<bin>-v<X.Y.Z>` (only if published) | If `puls3_cli` or `puls3_mcp` ship standalone binaries on GitHub Releases, use `<bin>-v<X.Y.Z>-<os>-<arch>` + `SHA256SUMS`. |
 | **Domain & DB artifacts** (`puls3.agent-manifest/v1`, `skill_packs`, migrations) | Schema `puls3.<type>/v<N>` + monotonic integer + SHA-256 / Serverpod timestamp | Persisted on-chain / in DB | Unchanged; follows ADR-0004, ADR-0014, and `puls3_server/migrations/migration_registry.txt`. |
 
@@ -80,10 +85,13 @@ Before moving this ADR to `Accepted`, the team should confirm two points on #425
 1. **App versioning (`puls3_server` and `puls3_flutter`):** adopt **CalVer** (`YYYY.MM.DD+<short_sha>`) for continuous deploys, or keep **SemVer** (`1.x.y+<short_sha>`) bumped per milestone/release?
 2. **CLI / MCP binary distribution:** keep `puls3_cli` and `puls3_mcp` source-only inside the workspace, or publish prebuilt release archives?
 
-## Consequences
+## Consequences and rollout
 
-- **Docs:** [CONTRIBUTING.md](../../CONTRIBUTING.md) updates section `3.2 Branches`, `3.3 Commits`, and `3.4 Pull requests` with the closed prefix list, detached-worktree review rule, and stacked PR merge protocol. [docs/sdk/releasing.md](../sdk/releasing.md) links to this policy and clarifies contract/SDK release coupling.
-- **Repository settings:** enable *Automatically delete head branches* on GitHub and prune merged remote branches.
+The pull request that proposes this ADR also carries the #425 documentation, so accepting it leaves nothing to write afterwards:
+
+- **Docs (in this PR):** [CONTRIBUTING.md](../../CONTRIBUTING.md) sections `3.2 Branches`, `3.3 Commits` and `3.4 Pull requests` list the branch types, the detached-worktree review rule, the PR title rule and the stacked PR merge order. [docs/sdk/releasing.md](../sdk/releasing.md) and [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md) link to this policy.
+- **Repository settings (done 2026-11-25):** *Automatically delete head branches* is enabled, and `origin` was pruned to `main`, the branches of open PRs and `sandbox/nirium`.
+- **On acceptance:** record the two open decisions in section 3 and in *Open decisions*, set the status to `Accepted`, and switch the PR to `Closes #425`.
 - **Tooling (follow-up issues, to be filed):**
   - **Follow-up A, app/server version stamping:** OCI labels (`org.opencontainers.image.*`) in `puls3_server/Dockerfile`, a real `puls3_server/CHANGELOG.md` in place of the Stagehand template, and Flutter web `--build-name` / `--build-number` in `scripts/cloudflare-pages-build.sh`. Melos `command.version` is optional (see *SDK tags and release process*).
   - **Follow-up B, Soroban provenance:** SEP-55 `--meta source_repo=github:Zer0-Knowledge-Hack/puls3 --meta revision=<sha>` on release builds, `crate_version` / `git_commit` / `wasm_hash_sha256` in `contracts/deployments/*.json`, and the release steps in `contracts/README.md`.

@@ -14,7 +14,9 @@ Semantic versioning, with one `CHANGELOG.md` section per release. While the
 version is `0.x`, a change that removes or renames anything is a **minor**
 bump, and an addition is a **patch** bump. Every published version has the
 tag `sdk-ts-vX.Y.Z`, and the workflow refuses a tag that does not match
-`package.json`.
+`package.json`. `sdk-ts` is this package's tag prefix under
+[ADR-0015](../adr/0015-branching-and-artifact-versioning.md), because the
+scoped name `@puls3_org/sdk` cannot be a clean tag.
 
 ## One-time setup
 

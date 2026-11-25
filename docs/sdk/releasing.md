@@ -32,7 +32,11 @@ Both packages use [semantic versioning](https://semver.org), and each has a
   (`0.2.0`), update its constraint (`puls3_client: ^0.2.0`). In `0.x`, a caret
   allows only patch releases.
 - **Every published version gets a git tag** on the commit it was published
-  from: `puls3_client-v0.1.0`, `puls3_sdk-v0.1.0`.
+  from: `puls3_client-v0.1.0`, `puls3_sdk-v0.1.0`. The format
+  `<package>-v<X.Y.Z>` is the one
+  [ADR-0015](../adr/0015-branching-and-artifact-versioning.md) sets for every
+  published SDK; the npm package uses the prefix `sdk-ts`
+  ([releasing-npm.md](releasing-npm.md)).
 
 A published client must match the server that is deployed. Publish a new
 `puls3_client` after the server change is deployed, not before.
