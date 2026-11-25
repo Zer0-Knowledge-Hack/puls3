@@ -11,6 +11,10 @@ enum WalletStatus {
   /// The wallet is showing a signing prompt.
   signing,
 
+  /// The wallet is showing the sign-in prompt: a challenge that proves the
+  /// account is yours, is never sent to the network and costs nothing.
+  signingIn,
+
   /// Connected, and the last transaction was signed.
   signed,
 
@@ -25,17 +29,38 @@ enum WalletStatus {
   error,
 }
 
+/// The server session of a wallet (#136): `WalletSession` in the app.
+abstract interface class WalletSignIn {
+  /// Whether the stored session belongs to [wallet].
+  Future<bool> isSignedInAs(String wallet);
+
+  /// Signs in [wallet] with [sign] unless it already has a session.
+  Future<void> ensureSignedIn(
+    String wallet,
+    Future<String> Function(SignInChallenge challenge) sign,
+  );
+}
+
 /// Observable wrapper around a [WalletPort]: the container that owns the
 /// connection state (#25). Presentational widgets get its values through
 /// their constructors. It knows nothing about deploys, hires or escrow.
+///
+/// With a [signIn], connecting also signs in (#334 T8.2): the user connects
+/// once and every screen then works on that session, so no screen opens a
+/// wallet prompt on its own.
 class WalletController extends ChangeNotifier {
   WalletController(
     this._wallet, {
     this.connectTimeout = const Duration(minutes: 2),
     this.onDisconnect,
+    this.signIn,
   });
 
   final WalletPort _wallet;
+
+  /// The wallet's server session. Null in the demo and in tests, where no
+  /// screen needs one.
+  final WalletSignIn? signIn;
 
   /// Upper bound for the connect prompt, so a popup that is ignored,
   /// blocked or stuck never leaves a flow waiting forever. Null disables it.
@@ -88,16 +113,21 @@ class WalletController extends ChangeNotifier {
   /// use [tryConnect] instead.
   Future<String> connect() async {
     final existing = _wallet.address;
-    if (existing != null) return existing;
+    if (existing != null) {
+      // Connected without a session (declined or expired): sign in again.
+      await ensureSession();
+      return existing;
+    }
     final session = _session;
     _busy = WalletStatus.connecting;
     _lastError = null;
     _signed = false;
     notifyListeners();
+    final String address;
     try {
       final timeout = connectTimeout;
       final attempt = _wallet.connect();
-      final address = await (timeout == null
+      address = await (timeout == null
           ? attempt
           : attempt.timeout(
               timeout,
@@ -108,13 +138,42 @@ class WalletController extends ChangeNotifier {
         await _wallet.disconnect();
         throw const WalletSignatureRejected();
       }
-      return address;
     } on WalletException catch (e) {
       if (session == _session) _lastError = e;
       rethrow;
     } finally {
       if (session == _session) _busy = null;
       notifyListeners();
+    }
+    await ensureSession();
+    return address;
+  }
+
+  /// Whether screens can call the server now without a wallet prompt: the
+  /// connected wallet has a session, or the app needs none ([signIn] null).
+  Future<bool> hasSession() async {
+    final signIn = this.signIn;
+    if (signIn == null) return true;
+    final address = _wallet.address;
+    return address != null && await signIn.isSignedInAs(address);
+  }
+
+  /// Signs the connected wallet in unless it has a session. A declined
+  /// prompt throws the [WalletException] (and shows it as [lastError]); a
+  /// server failure is left to the next server call, which reports it.
+  Future<void> ensureSession() async {
+    final signIn = this.signIn;
+    final address = _wallet.address;
+    if (signIn == null || address == null) return;
+    try {
+      final had = await signIn.isSignedInAs(address);
+      await signIn.ensureSignedIn(address, signChallenge);
+      // Screens waiting for a session (the hire sheet) read it now.
+      if (!had) notifyListeners();
+    } on WalletException {
+      rethrow;
+    } on Object catch (e) {
+      debugPrint('Wallet sign-in failed: ${e.runtimeType}');
     }
   }
 
@@ -168,19 +227,26 @@ class WalletController extends ChangeNotifier {
       _sign(() => _wallet.signAuthEntry(entryXdr));
 
   /// Signs a SEP-10 sign-in challenge (#136); returns the signed XDR.
-  Future<String> signChallenge(SignInChallenge challenge) =>
-      _sign(() => _wallet.signChallenge(challenge));
+  Future<String> signChallenge(SignInChallenge challenge) => _sign(
+    () => _wallet.signChallenge(challenge),
+    prompt: WalletStatus.signingIn,
+  );
 
-  Future<String> _sign(Future<String> Function() sign) async {
+  Future<String> _sign(
+    Future<String> Function() sign, {
+    WalletStatus prompt = WalletStatus.signing,
+  }) async {
     _lastError = null;
     _signed = false;
     try {
       if (!isConnected) throw const WalletUnavailable();
       if (!isOnTestnet) throw const WalletWrongNetwork();
-      _busy = WalletStatus.signing;
+      _busy = prompt;
       notifyListeners();
       final signed = await sign();
-      _signed = true;
+      // A sign-in is not a transaction: the wallet shows connected, not
+      // "signed".
+      _signed = prompt == WalletStatus.signing;
       return signed;
     } on WalletException catch (e) {
       _lastError = e;

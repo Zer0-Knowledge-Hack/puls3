@@ -2,6 +2,7 @@ import 'package:puls3_client/puls3_client.dart';
 import 'package:serverpod_auth_idp_flutter/serverpod_auth_idp_flutter.dart'
     show AuthSuccess;
 
+import '../state/wallet_controller.dart' show WalletSignIn;
 import '../wallet/wallet_port.dart';
 
 /// `client.walletAuth.createChallenge`.
@@ -26,8 +27,9 @@ abstract interface class SessionWalletStore {
   Future<void> write(String? wallet);
 }
 
-/// [SessionWalletStore] in memory. A reload forgets it, so the first hire
-/// after a reload signs in again.
+/// [SessionWalletStore] in memory. A reload forgets it, so the first call
+/// after a reload signs in again. The web app keeps it in `localStorage`
+/// instead (`createSessionWalletStore`).
 final class InMemorySessionWalletStore implements SessionWalletStore {
   String? _wallet;
 
@@ -45,7 +47,7 @@ final class InMemorySessionWalletStore implements SessionWalletStore {
 ///
 /// The Serverpod calls are injected, so the class is tested without a
 /// server; `main.dart` passes `client.walletAuth` and `client.auth`.
-class WalletSession {
+class WalletSession implements WalletSignIn {
   WalletSession({
     required this._createChallenge,
     required this._verifyChallenge,
@@ -70,6 +72,7 @@ class WalletSession {
 
   /// Whether the stored session belongs to [wallet]: authenticated, and the
   /// wallet the session was created for is still [wallet].
+  @override
   Future<bool> isSignedInAs(String wallet) async =>
       _isAuthenticated() && await _walletStore.read() == wallet;
 
@@ -79,6 +82,7 @@ class WalletSession {
   /// Throws a `WalletException` from the wallet (for example when the user
   /// declines) or a `Puls3ApiException` from the server, unchanged, so the
   /// caller maps them like every other call.
+  @override
   Future<void> ensureSignedIn(String wallet, ChallengeSigner sign) async {
     if (_isAuthenticated() && await _walletStore.read() == wallet) return;
     await forget();

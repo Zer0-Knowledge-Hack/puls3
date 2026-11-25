@@ -175,8 +175,9 @@ class HireFlowController extends ChangeNotifier {
           'This agent is not registered on chain, so it cannot be hired.',
         );
       }
-      // A new payment is checked before any signature, the sign-in
-      // included (F5-2). A resumed hire may have paid already, so its
+      // A new payment is checked before any payment signature (F5-2). The
+      // sign-in comes first now: connecting signs in (#334 T8.2), and it
+      // moves no funds. A resumed hire may have paid already, so its
       // balance says nothing: the server decides.
       restore(consumer);
       // The reserve is funded with the price, so both must be there.

@@ -501,6 +501,37 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
 - [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
   `docs/verification/334-agent-subcontracting.md`.
+- [ ] **T8.1** The server Studio carries the subcontract opt-in: the transport
+  `AgentManifestDraft` gets the `subcontract` block (max children, suggested reserve),
+  `draftDocument` and `transportDraft` map it both ways, and `server_studio_gateway.dart` sends and
+  reads it, so an agent deployed from the web with the opt-in on can subcontract. Found during the
+  T8 local run (Log, 2026-11-24).
+- [ ] **T8.2 + T8.3** One sign-in, never a surprise prompt (approved 2026-11-25: "Si, me cierra,
+  sigamos con eso"). Route: inline (one understood change, no writer reason). Implemented,
+  uncommitted, pending the independent verifier (Risk: item 2, auth/session):
+  1. Connecting the wallet signs in, in the same gesture (`WalletController.connect` →
+     `ensureSession`); the wallet panel shows `signingIn` with copy that the prompt is not a
+     payment, is never sent and its fee is never charged.
+  2. The session's wallet is kept in `localStorage` (`BrowserSessionWalletStore`), so a reload
+     keeps the session; disconnect still forgets both.
+  3. With a session nothing asks to sign in again; the hire sheet reads terms and paying agents
+     silently.
+  4. Opening the hire sheet never prompts and never calls the server without a session;
+     confirming without one signs in, reads the terms and stops when a reserve the user has not
+     seen is offered.
+  Evidence: RED, the old `hire_sheet.dart` fails 3 of the 5 new sheet tests; GREEN, Flutter 596
+  passed (586 + 10 new), `flutter analyze --fatal-infos` clean. The test-first order was not
+  followed (code before tests); RED was observed afterwards by restoring the old sheet.
+  Independent verifier: no blockers, behaviors 1-4 PASS. Its non-blocking notes applied: a second
+  tap while signing in opens no second prompt, a finished sign-in notifies so the sheet reads the
+  terms, the two readers share one read, the F5-2 comment says the sign-in now comes first; tests
+  added for the double tap and for a session of another wallet. Flutter 598 passed, analyze clean.
+  Left as notes: no unit test for `BrowserSessionWalletStore` (web-only), and a server failure
+  after the user signed can ask again once in the same confirm.
+- [ ] **T8.4** Reject reason contract: the app labels the field "Motivo (opcional)"
+  (`hireRejectReasonHint`) but `EscrowRelayService._prepare` refuses an empty reason with
+  `InvalidRejectReason`, and the click shows nothing (Log, 2026-11-24). Pre-existing since `f799ca5`
+  (#96).
 
 ## Acceptance
 
@@ -603,3 +634,58 @@ StellarExpert.
   Next: T8 local run: Docker sandbox for Postgres, a v0.2.0 escrow on testnet, the server and web on
   this machine against it, agent A on Mistral (opt-in) and B on llama or Mistral, then the user's
   own hire with Varial (Freighter). Production stays on its escrow until the user approves.
+- 2026-11-24: T8 local escrow. User: "Dale, empieza a levantar el entorno local para empezar con
+  las pruebas". Escrow v0.2.0 deployed to testnet by the new identity `puls3-t8-admin`
+  (`GBLPJKFGTHDQUECAO3T6DGGGOCTXI5R7EF7DL4ZSY3PJKMGQCHX5ENUS`), recorded in a scratch copy of the
+  record so `contracts/deployments/testnet.json` keeps the production escrow: contract
+  `CD4CKHGKEHVDFETFUF662REOSCDEAEYQR736MGMGYU4ZO4VLTMV3GLJM`, wasm sha256
+  `bc1082ea86c7c2ba4c1216692f29087c07678815aadf6cec25dd09dc2f931059`, deploy tx
+  `a191cd55b8b16e45cf265db319d6a8ddedddf6c2e6093d06518b1f5923f9c456`, USDC allow-list tx
+  `2e4cc2c8603bd684cadc26290de3332851687b9245ec47487e44eb7391ec61f1`; `version` answers `0.2.0`.
+  Built with Rust 1.98.1 (the default 1.91.0 is refused by the Stellar CLI).
+- 2026-11-24: T8 local stack up: Postgres/Redis in Docker, database `puls3_t8`, server on :8080
+  (`PULS3_STELLAR_ESCROW` the v0.2.0 escrow, reserve ceiling 50000000 stroops, tracker on, "Agent
+  runtime started ... providers workers-ai ... subcontracting on"), web on :8190 with `HIRE=server`
+  and `STUDIO=server`. On Windows, `SERVERPOD_PASSWORD_<name>` variables arrive upper-cased and
+  are not found, so `workersAiApiToken`, `walletAuthSigningKey` (`puls3-auth`) and
+  `escrowRelaySigningKey` (`puls3-t8-admin`) were added to the `development` section of the
+  ignored `config/passwords.yaml`. Next: the user's own test from the web.
+- 2026-11-24: Finding: the server Studio drops the subcontract opt-in. The transport
+  `AgentManifestDraft` (`puls3_server/lib/src/studio/agent_manifest_draft.spy.yaml`) has no
+  `subcontract` field, `draftDocument` does not write one, and `server_studio_gateway.dart` does not
+  send it, so an agent deployed from the web never subcontracts. User: "Si, hagamoslo asi" (seed A
+  and B with a tool now, fix the Studio as T8.1 after the test). Untracked
+  `puls3_server/tool/t8_seed_agents.dart` saved A's draft through `StudioDraftService` with the
+  block and deployed both through the Studio endpoints, each from its own Friendbot builder:
+  B = registry agent 39 "T8 English Translator" (llama), wallet
+  `GCUBN6GFPLMO5TOZCEVUL6OINEHYSA7NHFUGKC4VT67B2TXTRKA6UGXO`, register_full
+  `1a1814e5583919010b6497dd95757e89fbe814e6c273ef550cfcaaeed9d5684f`, set_agent_wallet
+  `62ff058051a670059fe3a23fa08399a0df2fc516cf6f8a2e96ccdbd567600c68`; A = registry agent 40
+  "T8 Post Writer" (Mistral, `subcontract {max_children: 1, suggested_reserve: 2000000}` read back
+  from `studio_agent_version`), wallet `GCSEKUIH7NEQX44VYL2Q2F5Q7YPN6A3AHOQYBVY66ER6CU5FTNAUWNXN`,
+  register_full `6655f397efd8c0de64d47a41510f5ab9d53070a640fabb5a09a79a326f7d6e20`,
+  set_agent_wallet `3a10136fe9c14003f67782aac212076b98318e6578cc37b74589c25833817a4b`. Both
+  wallets hold a USDC trustline; both are in the catalog index.
+- 2026-11-24: First hire attempt. User: "No se de que seccion de subcontratar hablas, cuando le das
+  a contratar, aparece este forms [...] e instantaneameten, sin haber escrito su tarea, me aparece
+  una ventana flotante para darle dinero, sin haber escrito nada, eso es una mala configuracion de
+  UX/UI, que usuario estaria dispuesto a dejar dinero, sin antes haber hecho nada?". Findings:
+  (1) the server log shows `hire.getHireTerms` with no `user=` (unauthenticated, 163 µs), because
+  `hire_sheet.dart` calls `flow.loadTerms()` on open and the session is only ensured in `start`; the
+  failure is swallowed as `SubcontractTerms.none`, so no reserve section (T8.2). Server side is
+  right: agent 40 has `puls3.manifestVersion` 1 and its version row carries the opt-in. (2) The
+  sheet showed escrow `CBRD…TPE2` because the local web build lacked `PULS3_ESCROW_CONTRACT`
+  (display only; envelopes come from the server); rebuilt with it. (3) UX feedback (T8.3).
+  User: "La ventana flotante de la que te hablo era una de freigter, pidiendo confirmar algo, no
+  alcnace a leerlo porque involuntariamente le di a confirmar". Server log at 23:52:53-58:
+  `getHireTerms` (no session), then `walletAuth.createChallenge`, `walletAuth.verifyChallenge`,
+  then `studio.listDrafts` with the user: the Freighter prompt was the SEP-10 sign-in challenge,
+  opened by `_loadPayingAgents` (Studio `listDrafts`) when the sheet opens. No `createHire`,
+  `prepare*` or `submitEscrowCall` call: nothing was paid. The terms request raced ahead of that
+  sign-in, which is the T8.2 cause.
+- 2026-11-25: Hire 1 (job 1, agent 40) was a plain hire: `subcontractReserve` 0, since the terms
+  were read again without a session at 00:11:43. The run succeeded with "No hay agentes
+  disponibles para contratar." (no tools without a reserve). The three Freighter prompts were the
+  sign-in, `create_job` and the 0.10 USDC fund. User: "Le doy a rechazar y no sucede nada. Revisa
+  que sucede en el log": eight `hire.prepareReject` calls, each `InvalidRejectReason`, with an
+  empty reason (T8.4).
