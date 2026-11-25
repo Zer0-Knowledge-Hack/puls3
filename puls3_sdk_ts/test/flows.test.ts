@@ -1,0 +1,466 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { inspect } from 'node:util';
+
+import { Keypair, TransactionBuilder, xdr } from '@stellar/stellar-base';
+
+import {
+  ChainSubmissionFailed,
+  Puls3ApiError,
+  Puls3Timeout,
+  SignerRequired,
+  SigningRefused,
+} from '../src/errors.js';
+import { KeySession } from '../src/key_session.js';
+import { TESTNET, withNetwork } from '../src/network.js';
+import { Puls3Sdk } from '../src/sdk.js';
+import { keypairSigner, keypairSignerFromEnvironment } from '../src/signer.js';
+import {
+  agentWallet,
+  builder,
+  challenge,
+  createJobCall,
+  envelope,
+  escrowCall,
+  fundCall,
+  giveFeedbackCall,
+  invocation,
+  addressAuth,
+  registerFullCall,
+  server,
+  setAgentWalletCall,
+  sourceAuth,
+  transferCall,
+} from './chain.js';
+import { agentJson, fakeTransport, hireJson, type Call } from './support.js';
+
+const me = builder.publicKey();
+const signer = keypairSigner(builder.secret());
+
+/** Whether [signed] carries a valid signature of [key] over the testnet hash. */
+function signedBy(signed: string, key: Keypair): boolean {
+  const tx = TransactionBuilder.fromXDR(signed, TESTNET.passphrase);
+  return tx.signatures.some((s) => key.verify(tx.hash(), s.signature()));
+}
+
+const preparedJson = (purpose: string, fields: Record<string, unknown>) => ({
+  preparationId: `prep-${purpose}`,
+  purpose,
+  signer: me,
+  networkPassphrase: TESTNET.passphrase,
+  unsignedTransactionXdr: null,
+  authorizationEntryXdr: null,
+  transaction: null,
+  signatureExpirationLedger: null,
+  expiresAt: new Date(Date.now() + 600_000).toISOString(),
+  ...fields,
+});
+
+const fundEnvelope = (budget = 5_000_000n) => {
+  const call = fundCall(budget);
+  return envelope(call, { auth: [sourceAuth(call, [invocation(transferCall(budget))])] });
+};
+
+interface Chain {
+  status: string | null;
+  last: { preparationId: string; purpose: string; state: string; errorCode: string | null } | null;
+  feedback: { preparationId: string; state: string } | null;
+}
+
+/**
+ * A server whose chain confirms each signed submission at once, unless
+ * [options.outcome] says otherwise for a purpose.
+ */
+function hireServer(options: {
+  createJobBudget?: bigint;
+  price?: number;
+  outcome?: Record<string, 'failed' | 'pending'>;
+  /** createHire answers as for a retried requestId: create_job already sent. */
+  createJobAlreadySent?: boolean;
+} = {}) {
+  const chain: Chain = { status: null, last: null, feedback: null };
+  let reads = 0;
+  const submitted: { purpose: string; signed: string }[] = [];
+  const next: Record<string, string> = {
+    createJob: 'open',
+    fund: 'funded',
+    complete: 'completed',
+    reject: 'rejected',
+  };
+  const detail = () => ({
+    hire: { ...hireJson, consumer: me, price: options.price ?? 5_000_000, status: chain.status },
+    agent: agentJson,
+    input: 'Review this contract.',
+    result: chain.status === 'submitted' ? 'Two findings.' : null,
+    payment: null,
+    jobId: chain.status === null ? null : 35,
+    expiresAt: null,
+    approvalDeadline: null,
+    runFinished: false,
+    submitErrorCode: null,
+    rejectReason: null,
+    escrowSubmission:
+      chain.last && {
+        ...chain.last,
+        transaction: null,
+        explorerUrl: null,
+        updatedAt: new Date().toISOString(),
+      },
+    feedbackSubmission:
+      chain.feedback && {
+        ...chain.feedback,
+        purpose: 'giveFeedback',
+        transaction: null,
+        errorCode: null,
+        explorerUrl: null,
+        updatedAt: new Date().toISOString(),
+      },
+    feedbackScore: null,
+    paymentExplorerUrl: null,
+  });
+  const submit = (purpose: string, call: Call) => {
+    const signed = call.args['signedTransactionXdr'] as string;
+    submitted.push({ purpose, signed });
+    const outcome = options.outcome?.[purpose];
+    const state = outcome ?? 'confirmed';
+    chain.last = {
+      preparationId: call.args['preparationId'] as string,
+      purpose,
+      state,
+      errorCode: outcome === 'failed' ? 'TransactionFailed' : null,
+    };
+    if (state === 'confirmed' && next[purpose]) chain.status = next[purpose]!;
+  };
+  const { transport, calls } = fakeTransport((call) => {
+    switch (`${call.endpoint}.${call.method}`) {
+      case 'hire.createHire':
+        return {
+          hire: { ...hireJson, consumer: me, price: options.price ?? 5_000_000 },
+          preparedCreateJob: options.createJobAlreadySent ? null : preparedJson('createJob', {
+            unsignedTransactionXdr: envelope(createJobCall({ budget: options.createJobBudget ?? 5_000_000n })),
+          }),
+        };
+      case 'hire.prepareFund':
+        return preparedJson('fund', { unsignedTransactionXdr: fundEnvelope() });
+      case 'hire.prepareComplete':
+        return preparedJson('complete', { unsignedTransactionXdr: envelope(escrowCall('complete')) });
+      case 'hire.prepareReject':
+        return preparedJson('reject', { unsignedTransactionXdr: envelope(escrowCall('reject')) });
+      case 'hire.submitEscrowCall': {
+        const purpose = String(call.args['preparationId']).replace('prep-', '');
+        submit(purpose, call);
+        return detail();
+      }
+      case 'feedback.prepareFeedback':
+        return preparedJson('giveFeedback', { unsignedTransactionXdr: envelope(giveFeedbackCall()) });
+      case 'feedback.submitFeedback':
+        submitted.push({ purpose: 'giveFeedback', signed: call.args['signedTransactionXdr'] as string });
+        chain.feedback = { preparationId: call.args['preparationId'] as string, state: 'confirmed' };
+        return detail();
+      case 'hire.getHire':
+        // The create_job sent before the retry lands on the second read.
+        if (options.createJobAlreadySent && chain.status === null && ++reads === 2) chain.status = 'open';
+        return detail();
+      default:
+        throw new Error(`unexpected call ${call.endpoint}.${call.method}`);
+    }
+  });
+  let clock = Date.now();
+  const sdk = new Puls3Sdk(transport, {
+    hasSession: true,
+    signer,
+    pollIntervalMs: 1_000,
+    stepTimeoutMs: 10_000,
+    now: () => new Date(clock),
+    sleep: async (ms) => {
+      clock += ms;
+    },
+  });
+  return { sdk, calls, submitted, chain };
+}
+
+describe('Puls3Sdk.hire', () => {
+  it('signs create_job and then fund, and returns the funded hire', async () => {
+    const { sdk, calls, submitted } = hireServer();
+    const detail = await sdk.hire(30, 'Review this contract.', { maxPrice: 5_000_000, requestId: 'req-1' });
+    assert.equal(detail.hire.status, 'funded');
+    assert.deepEqual(
+      submitted.map((s) => s.purpose),
+      ['createJob', 'fund'],
+    );
+    for (const s of submitted) assert.ok(signedBy(s.signed, builder), `${s.purpose} is signed by the signer`);
+    const create = calls.find((c) => c.method === 'createHire')!;
+    assert.equal(create.args['consumer'], me);
+    assert.equal(create.args['requestId'], 'req-1');
+  });
+
+  it('makes a request id when none is given', async () => {
+    const { sdk, calls } = hireServer();
+    await sdk.hire(30, 'x', { maxPrice: 5_000_000 });
+    assert.match(String(calls.find((c) => c.method === 'createHire')!.args['requestId']), /^sdk-[0-9a-f-]{36}$/);
+  });
+
+  it('on a retry, waits for the create_job already sent instead of signing another', async () => {
+    const { sdk, submitted } = hireServer({ createJobAlreadySent: true });
+    const detail = await sdk.hire(30, 'x', { maxPrice: 5_000_000, requestId: 'req-1' });
+    assert.equal(detail.hire.status, 'funded');
+    assert.deepEqual(
+      submitted.map((s) => s.purpose),
+      ['fund'],
+    );
+  });
+
+  it('refuses before preparing anything when the agent costs more than maxPrice', async () => {
+    const { sdk, submitted } = hireServer({ price: 9_000_000 });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), SigningRefused);
+    assert.equal(submitted.length, 0);
+  });
+
+  it('signs nothing when the server prepares a bigger budget than it reported', async () => {
+    const { sdk, submitted } = hireServer({ createJobBudget: 50_000_000n });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), (e: unknown) => {
+      assert.ok(e instanceof SigningRefused);
+      assert.equal(e.rule, 'money');
+      return true;
+    });
+    assert.equal(submitted.length, 0);
+  });
+
+  it('reports a fund that failed on chain', async () => {
+    const { sdk } = hireServer({ outcome: { fund: 'failed' } });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), (e: unknown) => {
+      assert.ok(e instanceof ChainSubmissionFailed);
+      assert.equal(e.purpose, 'fund');
+      assert.equal(e.errorCode, 'TransactionFailed');
+      return true;
+    });
+  });
+
+  it('times out when create_job never lands', async () => {
+    const { sdk } = hireServer({ outcome: { createJob: 'pending' } });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), Puls3Timeout);
+  });
+
+  it('needs a signer, and sends nothing without one', async () => {
+    const { transport, calls } = fakeTransport(() => null);
+    const sdk = new Puls3Sdk(transport, { hasSession: true });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 1 }), SignerRequired);
+    await assert.rejects(sdk.deploy(1), SignerRequired);
+    await assert.rejects(sdk.approve(21), SignerRequired);
+    assert.equal(calls.length, 0);
+  });
+});
+
+describe('Puls3Sdk.approve, reject, rate', () => {
+  it('approve signs complete and waits until the hire is completed', async () => {
+    const { sdk, submitted, chain } = hireServer();
+    chain.status = 'submitted';
+    const detail = await sdk.approve(21);
+    assert.equal(detail.hire.status, 'completed');
+    assert.equal(submitted[0]!.purpose, 'complete');
+    assert.ok(signedBy(submitted[0]!.signed, builder));
+  });
+
+  it('reject signs reject and waits until the hire is rejected', async () => {
+    const { sdk, chain } = hireServer();
+    chain.status = 'funded';
+    assert.equal((await sdk.reject(21, 'Not usable.')).hire.status, 'rejected');
+  });
+
+  it('rate signs give_feedback and waits for it on chain', async () => {
+    const { sdk, submitted, chain } = hireServer();
+    chain.status = 'completed';
+    const detail = await sdk.rate(21, 5, 'Clear findings.');
+    assert.equal(detail.feedbackSubmission?.state, 'confirmed');
+    assert.ok(signedBy(submitted[0]!.signed, builder));
+  });
+
+  it('waitForResult returns once the agent delivered', async () => {
+    const { sdk, chain } = hireServer();
+    chain.status = 'funded';
+    let reads = 0;
+    const original = sdk.getHire.bind(sdk);
+    sdk.getHire = async (id, consumer) => {
+      if (++reads === 3) chain.status = 'submitted';
+      return original(id, consumer);
+    };
+    assert.equal((await sdk.waitForResult(21)).hire.status, 'submitted');
+  });
+});
+
+describe('Puls3Sdk.deploy', () => {
+  function deployServer(options: { agentWallet?: string } = {}) {
+    let state = 'awaitingRegistrationSignature';
+    let reads = 0;
+    const signedEntries: string[] = [];
+    const session = () => ({
+      state,
+      preparation:
+        state === 'awaitingRegistrationSignature'
+          ? preparedJson('registerFull', { unsignedTransactionXdr: envelope(registerFullCall()) })
+          : null,
+      agentId: state === 'awaitingRegistrationSignature' || state === 'registrationSubmitted' ? null : 31,
+      agentWallet,
+      failureCode: null,
+      retryFromStep: null,
+    });
+    const { transport, calls } = fakeTransport((call) => {
+      switch (call.method) {
+        case 'prepareDeploy':
+          assert.equal(call.args['builder'], me);
+          return session();
+        case 'submitRegistration':
+          assert.ok(signedBy(call.args['signedTransactionXdr'] as string, builder));
+          state = 'registrationSubmitted';
+          return session();
+        case 'getDeploySession':
+          reads++;
+          if (state === 'registrationSubmitted') state = 'awaitingWalletAuthorization';
+          else if (state === 'walletAuthorizationSubmitted') state = 'publishing';
+          else if (state === 'publishing') state = 'active';
+          return session();
+        case 'prepareWalletAuthorization':
+          return {
+            ...session(),
+            preparation: preparedJson('setAgentWallet', {
+              authorizationEntryXdr: addressAuth(
+                me,
+                setAgentWalletCall(31, options.agentWallet ?? agentWallet),
+              ).toXDR('base64'),
+              signatureExpirationLedger: 5_000,
+            }),
+          };
+        case 'submitWalletAuthorization':
+          signedEntries.push(call.args['signedAuthorizationEntryXdr'] as string);
+          state = 'walletAuthorizationSubmitted';
+          return session();
+        default:
+          throw new Error(`unexpected ${call.method}`);
+      }
+    });
+    let clock = Date.now();
+    const sdk = new Puls3Sdk(transport, {
+      hasSession: true,
+      signer,
+      pollIntervalMs: 1_000,
+      stepTimeoutMs: 10_000,
+      now: () => new Date(clock),
+      sleep: async (ms) => {
+        clock += ms;
+      },
+    });
+    return { sdk, calls, signedEntries, reads: () => reads };
+  }
+
+  it('signs register_full and the wallet authorization, and returns the active agent', async () => {
+    const { sdk, signedEntries } = deployServer();
+    const states: string[] = [];
+    const result = await sdk.deploy(7, { onState: (s) => states.push(s.state) });
+    assert.equal(result.state, 'active');
+    assert.equal(result.agentId, 31);
+    assert.equal(result.agentWallet, agentWallet);
+    assert.deepEqual(states, [
+      'awaitingRegistrationSignature',
+      'registrationSubmitted',
+      'awaitingWalletAuthorization',
+      'walletAuthorizationSubmitted',
+      'publishing',
+      'active',
+    ]);
+    const entry = xdr.SorobanAuthorizationEntry.fromXDR(signedEntries[0]!, 'base64');
+    const credentials = entry.credentials().address();
+    assert.equal(credentials.signatureExpirationLedger(), 5_000);
+    assert.notEqual(credentials.signature().switch().name, 'scvVoid', 'the entry carries a signature');
+  });
+
+  it('refuses a wallet authorization that binds another wallet', async () => {
+    const { sdk, signedEntries } = deployServer({ agentWallet: Keypair.random().publicKey() });
+    await assert.rejects(sdk.deploy(7), SigningRefused);
+    assert.equal(signedEntries.length, 0);
+  });
+});
+
+describe('KeySession', () => {
+  function authServer(options: { challenge?: ReturnType<typeof challenge>; refreshFails?: boolean } = {}) {
+    let logins = 0;
+    const { transport, calls } = fakeTransport((call) => {
+      switch (`${call.endpoint}.${call.method}`) {
+        case 'walletAuth.createChallenge':
+          return { ...(options.challenge ?? challenge()), expiresAt: new Date(Date.now() + 900_000).toISOString() };
+        case 'walletAuth.verifyChallenge':
+          assert.ok(signedBy(call.args['signedChallengeXdr'] as string, builder));
+          logins++;
+          return { token: `access-${logins}`, tokenExpiresAt: new Date(Date.now() + 600_000).toISOString(), refreshToken: `refresh-${logins}` };
+        case 'jwtRefresh.refreshAccessToken':
+          if (options.refreshFails) throw new Puls3ApiError('RefreshTokenExpired', null, null);
+          return { token: 'access-r', tokenExpiresAt: new Date(Date.now() + 600_000).toISOString(), refreshToken: 'refresh-r' };
+        default:
+          throw new Error('unexpected');
+      }
+    });
+    return { transport, calls, logins: () => logins };
+  }
+
+  const network = withNetwork({ serverSigningKey: server.publicKey() });
+
+  it('signs in with the signer and gives a bearer header', async () => {
+    const { transport, calls } = authServer();
+    const session = new KeySession(transport, signer, network);
+    assert.equal(await session.authorization(), 'Bearer access-1');
+    assert.ok(calls.every((c) => !c.authenticated), 'the auth calls are anonymous');
+  });
+
+  it('refreshes with the rotated token, and signs in again when it is refused', async () => {
+    const ok = authServer();
+    const session = new KeySession(ok.transport, signer, network);
+    await session.login();
+    assert.equal(await session.refresh(true), 'success');
+    assert.equal(await session.authorization(), 'Bearer access-r');
+
+    const refused = authServer({ refreshFails: true });
+    const again = new KeySession(refused.transport, signer, network);
+    await again.login();
+    assert.equal(await again.refresh(true), 'success');
+    assert.equal(refused.logins(), 2);
+  });
+
+  it('refuses a challenge that is not one, and never sends a signature', async () => {
+    const { transport, calls } = authServer({ challenge: challenge({ sequence: '9' }) });
+    await assert.rejects(new KeySession(transport, signer, network).login(), SigningRefused);
+    assert.ok(!calls.some((c) => c.method === 'verifyChallenge'));
+  });
+
+  it('never shows a token', async () => {
+    const { transport } = authServer();
+    const session = new KeySession(transport, signer, network);
+    await session.login();
+    for (const text of [String(session), JSON.stringify(session), inspect(session)]) {
+      assert.ok(!text.includes('access-1') && !text.includes('refresh-1'), text);
+    }
+  });
+});
+
+describe('keypairSigner', () => {
+  it('never shows the secret', () => {
+    const secret = builder.secret();
+    for (const text of [String(signer), JSON.stringify(signer), inspect(signer), inspect(signer, { showHidden: true })]) {
+      assert.ok(!text.includes(secret), text);
+      assert.ok(text.includes(me));
+    }
+  });
+
+  it('does not echo a malformed secret', () => {
+    const bad = `S${'B'.repeat(55)}`;
+    assert.throws(() => keypairSigner(bad), (e: unknown) => e instanceof TypeError && !e.message.includes(bad));
+  });
+
+  it('reads PULS3_SECRET_KEY, and is null without it', () => {
+    assert.equal(keypairSignerFromEnvironment({ PULS3_SECRET_KEY: builder.secret() })?.publicKey(), me);
+    assert.equal(keypairSignerFromEnvironment({}), null);
+  });
+
+  it('signs a transaction with the network it is given', async () => {
+    const signed = await signer.signTransaction(envelope(escrowCall('complete')), TESTNET.passphrase);
+    assert.ok(signedBy(signed, builder));
+  });
+});

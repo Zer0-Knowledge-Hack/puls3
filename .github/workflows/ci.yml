@@ -143,6 +143,10 @@ jobs:
           cache: npm
           cache-dependency-path: puls3_sdk_ts/package-lock.json
       - run: npm ci
+      # The SDK signs with a developer key (ADR-0010): its one runtime
+      # dependency is the Stellar SDK, and a known advisory fails the job.
+      - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run check
       - run: npm test
       - run: npm run build
       # What `npm publish` would ship: dist with its .d.ts, README, CHANGELOG.

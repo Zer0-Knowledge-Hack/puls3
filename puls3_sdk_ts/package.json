@@ -35,5 +35,8 @@
   "devDependencies": {
     "@types/node": "20.19.43",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@stellar/stellar-base": "15.0.0"
   }
 }

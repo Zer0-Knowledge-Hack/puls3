@@ -96,7 +96,8 @@ export interface HireSummary {
 
 /**
  * An unsigned transaction (or authorization entry) the server prepared for
- * [signer]. This SDK version never signs it.
+ * [signer]. The SDK signs it only through its flows, after the checks of
+ * ADR-0010 D3.
  */
 export interface PreparedTransaction {
   preparationId: string;
@@ -490,4 +491,95 @@ export function decodeAuthTokens(value: unknown): AuthTokens {
     tokenExpiresAt: r.dateOrNull('tokenExpiresAt'),
     refreshToken: r.strOrNull('refreshToken'),
   };
+}
+
+/** A SEP-10 login challenge (`walletAuth.createChallenge`). */
+export interface WalletChallenge {
+  /** Opaque id sent back to `verifyChallenge`. */
+  challengeId: string;
+  /** The `G…` address it was issued for. */
+  wallet: string;
+  /** The base64 challenge transaction. */
+  payload: string;
+  networkPassphrase: string;
+  expiresAt: Date;
+}
+
+export function decodeWalletChallenge(value: unknown): WalletChallenge {
+  const r = reader(value, 'WalletChallenge');
+  return {
+    challengeId: r.str('challengeId'),
+    wallet: r.str('wallet'),
+    payload: r.str('payload'),
+    networkPassphrase: r.str('networkPassphrase'),
+    expiresAt: r.date('expiresAt'),
+  };
+}
+
+/**
+ * One deploy of a Studio draft, as `studio.getDeploySession` reports it
+ * (`docs/architecture/api.md`, F4). [state] is one of
+ * `awaitingRegistrationSignature`, `registrationSubmitted`,
+ * `awaitingWalletAuthorization`, `walletAuthorizationSubmitted`,
+ * `publishing`, `active` or `failed`.
+ */
+export interface DeploySession {
+  state: string;
+  /** What the builder signs next, in the two `awaiting…` states. */
+  preparation: PreparedTransaction | null;
+  /** The Identity Registry id, once `register_full` is confirmed. */
+  agentId: number | null;
+  /** The custodied agent wallet (`G…`). */
+  agentWallet: string | null;
+  /** The chain error code, or `PublicationFailed`, when [state] is `failed`. */
+  failureCode: string | null;
+  retryFromStep: number | null;
+}
+
+export function decodeDeploySession(value: unknown): DeploySession {
+  const r = reader(value, 'DeploySession');
+  return {
+    state: r.str('state'),
+    preparation: r.nestedOrNull('preparation', decodePreparedTransaction),
+    agentId: r.intOrNull('agentId'),
+    agentWallet: r.strOrNull('agentWallet'),
+    failureCode: r.strOrNull('failureCode'),
+    retryFromStep: r.intOrNull('retryFromStep'),
+  };
+}
+
+/**
+ * [draft] in the wire format of the generated client: every model carries
+ * its `__className__`, and a null field is left out.
+ */
+export function encodeAgentManifestDraft(draft: Partial<AgentManifestDraft>): Record<string, unknown> {
+  const out: Record<string, unknown> = { __className__: 'AgentManifestDraft' };
+  const put = (key: string, value: unknown) => {
+    if (value !== null && value !== undefined) out[key] = value;
+  };
+  put('name', draft.name);
+  put('description', draft.description);
+  put(
+    'skills',
+    draft.skills?.map((s) => {
+      const skill: Record<string, unknown> = { __className__: 'ManifestSkill', id: s.id, name: s.name };
+      if (s.description !== null && s.description !== undefined) skill['description'] = s.description;
+      if (s.tags !== null && s.tags !== undefined) skill['tags'] = s.tags;
+      return skill;
+    }),
+  );
+  put(
+    'model',
+    draft.model && { __className__: 'ManifestModel', provider: draft.model.provider, id: draft.model.id },
+  );
+  put('systemPrompt', draft.systemPrompt);
+  put('inputType', draft.inputType);
+  put('inputMaxChars', draft.inputMaxChars);
+  put('outputType', draft.outputType);
+  put('outputMaxChars', draft.outputMaxChars);
+  put(
+    'price',
+    draft.price && { __className__: 'ManifestPrice', asset: draft.price.asset, amount: draft.price.amount },
+  );
+  return out;
 }

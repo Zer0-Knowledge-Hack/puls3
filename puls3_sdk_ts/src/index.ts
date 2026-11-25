@@ -1,10 +1,25 @@
 /**
  * TypeScript SDK for the puls3 API (#302): the agent catalog, hires and the
- * Agent Studio. This version reads and prepares; it never signs or submits a
- * transaction.
+ * Agent Studio. With a signer it deploys agents and pays hires on testnet,
+ * signing only what passes the checks of ADR-0010.
  */
 
-export { Puls3Sdk, formatUsdc, type ConnectOptions } from './sdk.js';
+export { Puls3Sdk, formatUsdc, type ConnectOptions, type SdkOptions } from './sdk.js';
+export { KeySession } from './key_session.js';
+export { TESTNET, withNetwork, type Puls3Network } from './network.js';
+export {
+  keypairSigner,
+  keypairSignerFromEnvironment,
+  secretKeyVariable,
+  type Puls3Signer,
+} from './signer.js';
+export {
+  checkChallenge,
+  checkPreparedAuthorization,
+  checkPreparedTransaction,
+  type Expectation,
+  type WalletAuthorizationExpectation,
+} from './guard.js';
 export {
   CliSession,
   defaultSessionFile,
@@ -28,6 +43,10 @@ export {
   Puls3NetworkError,
   Puls3ProtocolError,
   SessionRequired,
+  SignerRequired,
+  SigningRefused,
+  Puls3Timeout,
+  ChainSubmissionFailed,
 } from './errors.js';
 export type {
   AgentHireStarted,
@@ -35,6 +54,7 @@ export type {
   AgentSummary,
   ChainSubmission,
   CreateHireResult,
+  DeploySession,
   Hire,
   HireDetail,
   HireSummary,
@@ -45,4 +65,5 @@ export type {
   PreparedTransaction,
   StudioDraft,
   TestRunResult,
+  WalletChallenge,
 } from './models.js';

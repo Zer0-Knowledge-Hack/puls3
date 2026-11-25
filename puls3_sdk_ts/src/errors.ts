@@ -78,3 +78,62 @@ export class InvalidArgument extends Error {
     super(`${argument} ${reason}`);
   }
 }
+
+/**
+ * The call signs a transaction and the SDK has no signer (ADR-0010 D5).
+ * Nothing was sent.
+ */
+export class SignerRequired extends Error {
+  override readonly name = 'SignerRequired';
+  readonly code = 'SignerRequired';
+
+  constructor(readonly operation: string) {
+    super(`${operation} signs a transaction and needs a signer`);
+  }
+}
+
+/**
+ * The SDK refused to sign what the server prepared, because it broke one of
+ * the rules of ADR-0010 D3. [rule] names it (`network`, `signer`, `call`,
+ * `money`, `bounds`, `login`). Nothing was signed and nothing was submitted.
+ */
+export class SigningRefused extends Error {
+  override readonly name = 'SigningRefused';
+  readonly code = 'SigningRefused';
+
+  constructor(
+    readonly rule: 'network' | 'signer' | 'call' | 'money' | 'bounds' | 'login',
+    message: string,
+  ) {
+    super(`Refused to sign (${rule}): ${message}`);
+  }
+}
+
+/**
+ * A step that waits on the chain did not finish in time. [step] names it.
+ * The transaction may still land: read the hire or the deploy again.
+ */
+export class Puls3Timeout extends Error {
+  override readonly name = 'Puls3Timeout';
+  readonly code = 'Timeout';
+
+  constructor(readonly step: string) {
+    super(`Timed out waiting for ${step}`);
+  }
+}
+
+/**
+ * The chain refused a transaction the SDK signed and submitted. [errorCode]
+ * is the server's code for it (`ChainSubmission` `errorCode`).
+ */
+export class ChainSubmissionFailed extends Error {
+  override readonly name = 'ChainSubmissionFailed';
+  readonly code = 'ChainSubmissionFailed';
+
+  constructor(
+    readonly purpose: string,
+    readonly errorCode: string | null,
+  ) {
+    super(`The ${purpose} transaction failed on chain${errorCode === null ? '' : `: ${errorCode}`}`);
+  }
+}

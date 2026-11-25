@@ -5,8 +5,22 @@ minor version may change the API.
 
 ## 0.1.0 (unreleased)
 
-First version (#302). It reads and prepares; it never signs or submits a
-transaction.
+First version (#302).
+
+- **Signing with a developer key** (ADR-0010): `Puls3Signer`, `keypairSigner`
+  and `keypairSignerFromEnvironment` (`PULS3_SECRET_KEY`). Every envelope is
+  checked before it is signed (`checkPreparedTransaction`,
+  `checkPreparedAuthorization`, `checkChallenge`), against the testnet
+  contracts pinned in `TESTNET`; a failed check throws `SigningRefused`.
+- `KeySession`: signs in with the signer (SEP-10), no app needed.
+- Flows that sign and wait on chain: `deploy`, `hire`, `waitForResult`,
+  `approve`, `reject`, `rate`.
+- The Studio: `saveDraft` and the deploy calls (`prepareDeploy`,
+  `submitRegistration`, `getDeploySession`, `prepareWalletAuthorization`,
+  `submitWalletAuthorization`); `submitEscrowCall`, `prepareFeedback`,
+  `submitFeedback`.
+- Errors: `SignerRequired`, `SigningRefused`, `ChainSubmissionFailed`,
+  `Puls3Timeout`.
 
 - The catalog without a session: `listAgents`, `getAgent`.
 - Hires with a session: `createHire`, `getHire`, `listMyHires`,

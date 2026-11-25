@@ -1,5 +1,27 @@
-import { InvalidArgument, SessionRequired } from './errors.js';
+import { randomUUID } from 'node:crypto';
+
 import {
+  ChainSubmissionFailed,
+  InvalidArgument,
+  Puls3ProtocolError,
+  Puls3Timeout,
+  SessionRequired,
+  SignerRequired,
+  SigningRefused,
+} from './errors.js';
+import {
+  checkPreparedAuthorization,
+  checkPreparedTransaction,
+  type Expectation,
+} from './guard.js';
+import { KeySession } from './key_session.js';
+import { TESTNET, type Puls3Network } from './network.js';
+import type { Puls3Signer } from './signer.js';
+import {
+  decodeDeploySession,
+  encodeAgentManifestDraft,
+  type AgentManifestDraft,
+  type DeploySession,
   decodeAgentHireStarted,
   decodeAgentSummaries,
   decodeAgentSummary,
@@ -27,53 +49,114 @@ export interface ConnectOptions {
    * example a [CliSession]. Without it only the catalog works.
    */
   session?: AuthProvider;
+  /**
+   * Signs the wallet's transactions after checking each one (ADR-0010). With
+   * a signer and no [session], the SDK signs in by itself (SEP-10).
+   */
+  signer?: Puls3Signer;
+  /** The chain and contracts the SDK signs for. Defaults to [TESTNET]. */
+  network?: Puls3Network;
   /** For tests and other runtimes. Defaults to the global `fetch`. */
   fetch?: typeof fetch;
   /** Per request. Defaults to 20 seconds. */
   timeoutMs?: number;
+  /** How often a flow reads the chain state again. Defaults to 3 seconds. */
+  pollIntervalMs?: number;
+  /** How long a flow waits for one transaction. Defaults to 3 minutes. */
+  stepTimeoutMs?: number;
+}
+
+/** What [Puls3Sdk]'s constructor takes besides its transport. */
+export interface SdkOptions {
+  /** Whether the transport authenticates as a wallet. */
+  hasSession: boolean;
+  /** Signs after the checks of ADR-0010 D3. Without it the flows throw [SignerRequired]. */
+  signer?: Puls3Signer;
+  network?: Puls3Network;
+  pollIntervalMs?: number;
+  stepTimeoutMs?: number;
+  /** For tests: the clock the checks and the waits use. */
+  now?: () => Date;
+  /** For tests: how a flow waits between two reads. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
  * The puls3 API for TypeScript and JavaScript programs (#302), with the
  * calls, names and error codes of the Dart SDK `puls3_sdk`.
  *
- * It reads and prepares; this version never signs or submits a transaction
- * (signing is ADR-0010, a later release). Server errors reach the caller as
- * [Puls3ApiError] with the server's code (`HireNotFound`,
- * `InvalidHireTransition`, `AgentCatalogUnavailable`, ...).
+ * Server errors reach the caller as [Puls3ApiError] with the server's code
+ * (`HireNotFound`, `InvalidHireTransition`, `AgentCatalogUnavailable`, ...).
  *
  * The catalog needs no session. Hire and Studio calls act for a wallet, so
  * they need its session: without one they throw [SessionRequired] and send
  * nothing. Arguments the server would refuse throw [InvalidArgument], also
  * without sending anything.
+ *
+ * With a [Puls3Signer] the SDK also signs, as ADR-0010 decides: the flows
+ * [deploy], [hire], [approve], [reject] and [rate] sign what the server
+ * prepares, after checking each envelope, and submit it. Agent custody does
+ * not change: the agent's own transactions and [hireAgentAs] are signed by
+ * the server.
  */
 export class Puls3Sdk {
   readonly #transport: Transport;
   readonly #hasSession: boolean;
+  readonly #signer: Puls3Signer | null;
+  readonly #network: Puls3Network;
+  readonly #pollMs: number;
+  readonly #stepMs: number;
+  readonly #now: () => Date;
+  readonly #sleep: (ms: number) => Promise<void>;
 
-  /**
-   * An SDK over any [Transport], for tests and other runtimes.
-   * [hasSession] says whether the transport authenticates as a wallet.
-   */
-  constructor(transport: Transport, options: { hasSession: boolean }) {
+  /** An SDK over any [Transport], for tests and other runtimes. */
+  constructor(transport: Transport, options: SdkOptions) {
     this.#transport = transport;
     this.#hasSession = options.hasSession;
+    this.#signer = options.signer ?? null;
+    this.#network = options.network ?? TESTNET;
+    this.#pollMs = options.pollIntervalMs ?? 3_000;
+    this.#stepMs = options.stepTimeoutMs ?? 180_000;
+    this.#now = options.now ?? (() => new Date());
+    this.#sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   /**
    * Connects to the puls3 server at [apiUrl], for example
    * `https://puls3-hub-on-stellar.api.serverpod.space/`.
    *
+   * With a [ConnectOptions.signer] and no [ConnectOptions.session], the SDK
+   * signs in as the signer's wallet on the first call that needs it.
+   *
    * Throws a `TypeError` unless [apiUrl] is an absolute `http` or `https`
    * URL with no query or fragment.
    */
   static connect(apiUrl: string, options: ConnectOptions = {}): Puls3Sdk {
-    const transport = new HttpTransport(apiUrl, {
-      ...(options.session === undefined ? {} : { auth: options.session }),
+    const network = options.network ?? TESTNET;
+    const base = {
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    };
+    let auth = options.session;
+    if (auth === undefined && options.signer !== undefined) {
+      auth = new KeySession(new HttpTransport(apiUrl, base), options.signer, network);
+    }
+    const transport = new HttpTransport(apiUrl, {
+      ...base,
+      ...(auth === undefined ? {} : { auth }),
     });
-    return new Puls3Sdk(transport, { hasSession: options.session !== undefined });
+    return new Puls3Sdk(transport, {
+      hasSession: auth !== undefined,
+      network,
+      ...(options.signer === undefined ? {} : { signer: options.signer }),
+      ...(options.pollIntervalMs === undefined ? {} : { pollIntervalMs: options.pollIntervalMs }),
+      ...(options.stepTimeoutMs === undefined ? {} : { stepTimeoutMs: options.stepTimeoutMs }),
+    });
+  }
+
+  /** The signer's wallet, or null without a signer. */
+  get wallet(): string | null {
+    return this.#signer?.publicKey() ?? null;
   }
 
   /** Whether the hire and Studio calls have a session to use. */
@@ -239,7 +322,412 @@ export class Puls3Sdk {
     );
   }
 
+  // --- Studio drafts and deploy (session) ---------------------------------
+
+  /**
+   * Creates a draft, or saves a new revision of [options.draftId]
+   * (`studio.saveDraft`). [options.revision] must be the revision last read,
+   * unless [options.overwrite] is true. The server validates the manifest
+   * and answers `InvalidManifest` with the problems in `details`.
+   */
+  async saveDraft(
+    draft: Partial<AgentManifestDraft>,
+    options: { draftId?: number; revision?: number; overwrite?: boolean } = {},
+  ): Promise<StudioDraft> {
+    if (options.draftId !== undefined) requireInt('draftId', options.draftId, 1);
+    if (options.revision !== undefined) requireInt('revision', options.revision, 0);
+    return decodeStudioDraft(
+      await this.#call('saveDraft', 'studio', 'saveDraft', {
+        draft: encodeAgentManifestDraft(draft),
+        draftId: options.draftId ?? null,
+        revision: options.revision ?? null,
+        overwrite: options.overwrite ?? null,
+      }),
+    );
+  }
+
+  /**
+   * Starts or resumes the deploy of [draftId] for [builder], the session
+   * wallet (`studio.prepareDeploy`, F4-4 to F4-6). It creates the agent's
+   * custodied wallet and prepares `register_full`.
+   */
+  async prepareDeploy(draftId: number, builder: string): Promise<DeploySession> {
+    requireInt('draftId', draftId, 1);
+    requireText('builder', builder);
+    return decodeDeploySession(
+      await this.#call('prepareDeploy', 'studio', 'prepareDeploy', { draftId, builder: builder.trim() }),
+    );
+  }
+
+  /** Submits the builder-signed `register_full` (`studio.submitRegistration`). */
+  async submitRegistration(
+    draftId: number,
+    preparationId: string,
+    signedTransactionXdr: string,
+  ): Promise<DeploySession> {
+    requireInt('draftId', draftId, 1);
+    requireText('preparationId', preparationId);
+    requireText('signedTransactionXdr', signedTransactionXdr);
+    return decodeDeploySession(
+      await this.#call('submitRegistration', 'studio', 'submitRegistration', {
+        draftId,
+        preparationId,
+        signedTransactionXdr,
+      }),
+    );
+  }
+
+  /** The current deploy of [draftId] (`studio.getDeploySession`). */
+  async getDeploySession(draftId: number): Promise<DeploySession> {
+    requireInt('draftId', draftId, 1);
+    return decodeDeploySession(
+      await this.#call('getDeploySession', 'studio', 'getDeploySession', { draftId }),
+    );
+  }
+
+  /** Prepares the builder's `set_agent_wallet` entry (`studio.prepareWalletAuthorization`, F4-7). */
+  async prepareWalletAuthorization(draftId: number): Promise<DeploySession> {
+    requireInt('draftId', draftId, 1);
+    return decodeDeploySession(
+      await this.#call('prepareWalletAuthorization', 'studio', 'prepareWalletAuthorization', {
+        draftId,
+      }),
+    );
+  }
+
+  /** Submits the signed `set_agent_wallet` entry (`studio.submitWalletAuthorization`). */
+  async submitWalletAuthorization(
+    draftId: number,
+    preparationId: string,
+    signedAuthorizationEntryXdr: string,
+  ): Promise<DeploySession> {
+    requireInt('draftId', draftId, 1);
+    requireText('preparationId', preparationId);
+    requireText('signedAuthorizationEntryXdr', signedAuthorizationEntryXdr);
+    return decodeDeploySession(
+      await this.#call('submitWalletAuthorization', 'studio', 'submitWalletAuthorization', {
+        draftId,
+        preparationId,
+        signedAuthorizationEntryXdr,
+      }),
+    );
+  }
+
+  // --- Signed submissions (session) ---------------------------------------
+
+  /** Submits a wallet-signed escrow call of [hireId] (`hire.submitEscrowCall`). */
+  async submitEscrowCall(
+    hireId: number,
+    preparationId: string,
+    signedTransactionXdr: string,
+  ): Promise<HireDetail> {
+    requireInt('hireId', hireId, 1);
+    requireText('preparationId', preparationId);
+    requireText('signedTransactionXdr', signedTransactionXdr);
+    return decodeHireDetail(
+      await this.#call('submitEscrowCall', 'hire', 'submitEscrowCall', {
+        hireId,
+        preparationId,
+        signedTransactionXdr,
+      }),
+    );
+  }
+
+  /** Prepares the client's `give_feedback` of [hireId], [score] 1 to 5 (`feedback.prepareFeedback`). */
+  async prepareFeedback(hireId: number, score: number, comment: string): Promise<PreparedTransaction> {
+    requireInt('hireId', hireId, 1);
+    if (!Number.isSafeInteger(score) || score < 1 || score > 5) {
+      throw new InvalidArgument('score', 'must be an integer from 1 to 5');
+    }
+    return decodePreparedTransaction(
+      await this.#call('prepareFeedback', 'feedback', 'prepareFeedback', { hireId, score, comment }),
+    );
+  }
+
+  /** Submits the signed `give_feedback` (`feedback.submitFeedback`). */
+  async submitFeedback(
+    hireId: number,
+    preparationId: string,
+    signedTransactionXdr: string,
+  ): Promise<HireDetail> {
+    requireInt('hireId', hireId, 1);
+    requireText('preparationId', preparationId);
+    requireText('signedTransactionXdr', signedTransactionXdr);
+    return decodeHireDetail(
+      await this.#call('submitFeedback', 'feedback', 'submitFeedback', {
+        hireId,
+        preparationId,
+        signedTransactionXdr,
+      }),
+    );
+  }
+
+  // --- Flows that sign (signer, ADR-0010) ----------------------------------
+
+  /**
+   * Deploys the session wallet's draft [draftId] as an agent with its own
+   * on-chain identity and wallet (F4-4 to F4-8): the server creates the
+   * custodied agent wallet, the signer signs `register_full` and the
+   * `set_agent_wallet` entry, and the server publishes the agent.
+   *
+   * Resumes a deploy that stopped halfway. Returns the `active` session,
+   * with [DeploySession.agentId] and [DeploySession.agentWallet]. Throws
+   * [ChainSubmissionFailed] when the deploy ends `failed`.
+   */
+  async deploy(
+    draftId: number,
+    options: { onState?: (session: DeploySession) => void } = {},
+  ): Promise<DeploySession> {
+    const signer = this.#requireSigner('deploy');
+    const wallet = signer.publicKey();
+    let session = await this.prepareDeploy(draftId, wallet);
+    let deadline = this.#deadline();
+    for (;;) {
+      options.onState?.(session);
+      switch (session.state) {
+        case 'active':
+          return session;
+        case 'failed':
+          throw new ChainSubmissionFailed('deploy', session.failureCode);
+        case 'awaitingRegistrationSignature': {
+          const prepared = session.preparation;
+          if (prepared === null || prepared.expiresAt.getTime() <= this.#now().getTime()) {
+            await this.#wait(deadline, 'a fresh register_full');
+            session = await this.prepareDeploy(draftId, wallet);
+            continue;
+          }
+          const envelope = checkPreparedTransaction(
+            prepared,
+            { purpose: 'registerFull' },
+            wallet,
+            this.#network,
+            this.#now(),
+          );
+          const signed = await signer.signTransaction(envelope, this.#network.passphrase);
+          session = await this.submitRegistration(draftId, prepared.preparationId, signed);
+          deadline = this.#deadline();
+          continue;
+        }
+        case 'awaitingWalletAuthorization': {
+          const authorizing = await this.prepareWalletAuthorization(draftId);
+          const prepared = authorizing.preparation;
+          const agentId = authorizing.agentId ?? session.agentId;
+          const agentWallet = authorizing.agentWallet ?? session.agentWallet;
+          if (prepared === null || agentId === null || agentWallet === null) {
+            throw new Puls3ProtocolError(
+              'The server prepared no wallet authorization, or no agent id and wallet',
+            );
+          }
+          const { entryXdr, validUntilLedger } = checkPreparedAuthorization(
+            prepared,
+            { agentId, agentWallet },
+            wallet,
+            this.#network,
+            this.#now(),
+          );
+          const signed = await signer.signAuthEntry(entryXdr, validUntilLedger, this.#network.passphrase);
+          session = await this.submitWalletAuthorization(draftId, prepared.preparationId, signed);
+          deadline = this.#deadline();
+          continue;
+        }
+        default:
+          // registrationSubmitted, walletAuthorizationSubmitted, publishing.
+          await this.#wait(deadline, `the deploy (${session.state})`);
+          session = await this.getDeploySession(draftId);
+      }
+    }
+  }
+
+  /**
+   * Hires [agentId] (its `registryId`) on [input] and pays it: the signer
+   * signs `create_job` and then `fund`, each after checking it moves at most
+   * [options.maxPrice] USDC stroops into the escrow, and the SDK waits for
+   * each on chain. Returns the hire once it is `funded`; the agent then
+   * works on it ([waitForResult]).
+   *
+   * [options.requestId] is the idempotency key, so a retry with the same one
+   * resumes the same hire. A new one is made when it is left out.
+   */
+  async hire(
+    agentId: number,
+    input: string,
+    options: { maxPrice: number | bigint; requestId?: string; maxReserve?: number | bigint },
+  ): Promise<HireDetail> {
+    const signer = this.#requireSigner('hire');
+    const wallet = signer.publicKey();
+    const maxBudget = BigInt(options.maxPrice);
+    if (maxBudget <= 0n) throw new InvalidArgument('maxPrice', 'must be above 0');
+    const maxReserve = BigInt(options.maxReserve ?? 0);
+    if (maxReserve < 0n) throw new InvalidArgument('maxReserve', 'must not be negative');
+    const started = await this.createHire(
+      agentId,
+      wallet,
+      input,
+      options.requestId ?? `sdk-${randomUUID()}`,
+    );
+    const hireId = started.hire.id;
+    if (BigInt(started.hire.price) > maxBudget) {
+      throw new SigningRefused(
+        'money',
+        `the agent's price ${started.hire.price} is above the allowed ${maxBudget}`,
+      );
+    }
+
+    let detail = await this.getHire(hireId, wallet);
+    if (detail.hire.status === null) {
+      // createHire returns no create_job when one was already submitted (a
+      // retried requestId): wait for that one instead of preparing another.
+      const createJob = started.preparedCreateJob;
+      if (createJob !== null) {
+        await this.#signEscrowCall(hireId, createJob, { purpose: 'createJob', maxBudget });
+      }
+      detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job');
+    }
+    if (detail.hire.status === 'open') {
+      const fund = await this.prepareFund(hireId);
+      await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, maxReserve });
+      detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
+    }
+    return detail;
+  }
+
+  /**
+   * Waits until the agent delivered on hire [hireId] (`submitted`) or the
+   * hire ended (`completed`, `rejected`, `expired`), and returns it. Agents
+   * can take minutes, so the wait is [options.timeoutMs], 10 minutes by
+   * default. [consumer] defaults to the signer's wallet.
+   */
+  async waitForResult(
+    hireId: number,
+    options: { consumer?: string; timeoutMs?: number } = {},
+  ): Promise<HireDetail> {
+    const consumer = options.consumer ?? this.#requireSigner('waitForResult').publicKey();
+    const deadline = this.#now().getTime() + (options.timeoutMs ?? 600_000);
+    for (;;) {
+      const detail = await this.getHire(hireId, consumer);
+      const status = detail.hire.status;
+      if (status !== null && ['submitted', 'completed', 'rejected', 'expired'].includes(status)) {
+        return detail;
+      }
+      await this.#wait(deadline, `the result of hire ${hireId}`);
+    }
+  }
+
+  /**
+   * Approves the delivered hire [hireId]: signs `complete`, which releases
+   * the escrow to the agent, and waits until the hire is `completed`.
+   */
+  async approve(hireId: number): Promise<HireDetail> {
+    const wallet = this.#requireSigner('approve').publicKey();
+    const prepared = await this.prepareComplete(hireId);
+    await this.#signEscrowCall(hireId, prepared, { purpose: 'complete' });
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
+  }
+
+  /**
+   * Rejects hire [hireId] for [reason]: signs `reject`, which refunds the
+   * escrow to the signer, and waits until the hire is `rejected`.
+   */
+  async reject(hireId: number, reason: string): Promise<HireDetail> {
+    const wallet = this.#requireSigner('reject').publicKey();
+    const prepared = await this.prepareReject(hireId, reason);
+    await this.#signEscrowCall(hireId, prepared, { purpose: 'reject' });
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
+  }
+
+  /**
+   * Rates the completed hire [hireId] with [score] (1 to 5) and [comment]:
+   * signs `give_feedback` on the Reputation Registry and waits for it.
+   */
+  async rate(hireId: number, score: number, comment: string): Promise<HireDetail> {
+    const signer = this.#requireSigner('rate');
+    const wallet = signer.publicKey();
+    const prepared = await this.prepareFeedback(hireId, score, comment);
+    const envelope = checkPreparedTransaction(
+      prepared,
+      { purpose: 'giveFeedback' },
+      wallet,
+      this.#network,
+      this.#now(),
+    );
+    const signed = await signer.signTransaction(envelope, this.#network.passphrase);
+    await this.submitFeedback(hireId, prepared.preparationId, signed);
+    const deadline = this.#deadline();
+    for (;;) {
+      const detail = await this.getHire(hireId, wallet);
+      const submission = detail.feedbackSubmission;
+      if (submission?.preparationId === prepared.preparationId) {
+        if (submission.state === 'failed') {
+          throw new ChainSubmissionFailed('giveFeedback', submission.errorCode);
+        }
+        if (submission.state === 'confirmed') return detail;
+      }
+      await this.#wait(deadline, 'give_feedback');
+    }
+  }
+
   // --- Internals ----------------------------------------------------------
+
+  #requireSigner(operation: string): Puls3Signer {
+    if (this.#signer === null) throw new SignerRequired(operation);
+    if (!this.#hasSession) throw new SessionRequired(operation);
+    return this.#signer;
+  }
+
+  /** Checks [prepared] (ADR-0010 D3), signs it and submits it. */
+  async #signEscrowCall(
+    hireId: number,
+    prepared: PreparedTransaction,
+    expectation: Expectation,
+  ): Promise<HireDetail> {
+    const signer = this.#requireSigner(expectation.purpose);
+    const envelope = checkPreparedTransaction(
+      prepared,
+      expectation,
+      signer.publicKey(),
+      this.#network,
+      this.#now(),
+    );
+    const signed = await signer.signTransaction(envelope, this.#network.passphrase);
+    return this.submitEscrowCall(hireId, prepared.preparationId, signed);
+  }
+
+  /**
+   * Reads hire [hireId] until [done], or until the submission of [prepared]
+   * failed on chain ([ChainSubmissionFailed]) or the step timed out.
+   */
+  async #waitHire(
+    hireId: number,
+    consumer: string,
+    prepared: PreparedTransaction | null,
+    done: (detail: HireDetail) => boolean,
+    step: string,
+  ): Promise<HireDetail> {
+    const deadline = this.#deadline();
+    for (;;) {
+      const detail = await this.getHire(hireId, consumer);
+      const submission = detail.escrowSubmission;
+      if (
+        prepared !== null &&
+        submission?.preparationId === prepared.preparationId &&
+        submission.state === 'failed'
+      ) {
+        throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
+      }
+      if (done(detail)) return detail;
+      await this.#wait(deadline, step);
+    }
+  }
+
+  #deadline(): number {
+    return this.#now().getTime() + this.#stepMs;
+  }
+
+  async #wait(deadline: number, step: string): Promise<void> {
+    if (this.#now().getTime() >= deadline) throw new Puls3Timeout(step);
+    await this.#sleep(this.#pollMs);
+  }
+
 
   async #prepare(method: string, hireId: number): Promise<PreparedTransaction> {
     requireInt('hireId', hireId, 1);
