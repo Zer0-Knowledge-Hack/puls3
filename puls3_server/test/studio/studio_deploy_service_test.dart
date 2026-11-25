@@ -226,6 +226,55 @@ void main() {
     );
   });
 
+  test(
+    'prepareDeploy names an agent already registered with the same registration file (#424)',
+    () async {
+      final draftId = await rig.saveDraft();
+      // identity-registry `UriAlreadyRegistered = 100`.
+      rig.accounts.failure = const LedgerContractError(
+        100,
+        'HostError: Error(Contract, #100)',
+      );
+
+      await expectLater(
+        rig.service.prepareDeploy(owner: rig.owner, draftId: draftId),
+        throwsA(
+          isA<Puls3ApiException>()
+              .having((e) => e.code, 'code', 'AgentAlreadyRegistered')
+              .having(
+                (e) => e.details?['agentUri'],
+                'agentUri',
+                startsWith('https://puls3.test/registry/'),
+              ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'prepareDeploy keeps another register_full rejection a chain error',
+    () async {
+      final draftId = await rig.saveDraft();
+      rig.accounts.failure = const LedgerContractError(
+        3,
+        'HostError: Error(Contract, #3)',
+      );
+
+      await expectLater(
+        rig.service.prepareDeploy(owner: rig.owner, draftId: draftId),
+        throwsA(
+          isA<Puls3ApiException>()
+              .having((e) => e.code, 'code', 'ChainUnavailable')
+              .having(
+                (e) => e.details?['reason'],
+                'reason',
+                'simulationFailed',
+              ),
+        ),
+      );
+    },
+  );
+
   test('a simulation without the latest ledger is a chain error', () async {
     final draftId = await rig.registered();
     rig.accounts.simulation = SimulationData(
@@ -636,6 +685,9 @@ final class _Accounts implements ChainAccounts {
   final simulated = <EnvelopeSpec>[];
   int sequenceReads = 0;
 
+  /// The rejection the next simulations raise, as the RPC client raises it.
+  LedgerException? failure;
+
   @override
   Future<int> sequenceOf(StellarAddress account) async {
     sequenceReads++;
@@ -645,6 +697,8 @@ final class _Accounts implements ChainAccounts {
   @override
   Future<SimulationData> simulate(EnvelopeSpec spec) async {
     simulated.add(spec);
+    final failure = this.failure;
+    if (failure != null) throw failure;
     return simulation;
   }
 

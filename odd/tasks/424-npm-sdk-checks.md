@@ -28,8 +28,8 @@ Quoted from #424 and its comments.
 | T3 | S9 + version 0.2.0 | inline | item 3 (public API) | done | `443933b` (RED 4 fail, GREEN 216/216; T2+T3 review approved) |
 | T4 | S4 | inline | item 4 (cross-process lock) | done | `1f5c7ff` (RED race 3/5 runs, GREEN 221/221, race test 10/10) |
 | T5 | S5 (transport, KeySession), S6 | inline | item 2 (sign-in error path) | done | `f0918cb` (RED 4 fail, GREEN 227/227) |
-| T6 | S7 | inline | item 5 (CI) | done | (pending hash; RED Node 20 "Could not find .../*.test.js", GREEN 227/227 on Node 20 and 24) |
-| T7 | S8 | inline | none expected | pending | |
+| T6 | S7 | inline | item 5 (CI) | done | `e8dca83` (RED Node 20 "Could not find .../*.test.js", GREEN 227/227 on Node 20 and 24) |
+| T7 | S8 | inline | none (additive error code) | done | (pending hash; RED 1 fail, GREEN 12/12; server suite 1690/1690 per directory) |
 
 ## Log
 
