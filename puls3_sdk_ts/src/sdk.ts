@@ -210,24 +210,38 @@ export class Puls3Sdk {
    * [consumer] returns the same hire, so a retry is safe. It is opaque and
    * sent exactly as given, so `" req-1 "` and `"req-1"` are two keys.
    * [consumer] must be the session wallet's address; it is trimmed.
+   *
+   * [options.subcontractReserve] (USDC stroops) is what the agent may spend
+   * subcontracting other agents, funded with the hire and refunded when
+   * unspent (#334). The server refuses one above its ceiling; a retry must
+   * repeat the same one.
    */
   async createHire(
     agentId: number,
     consumer: string,
     input: string,
     requestId: string,
+    options: { subcontractReserve?: number | bigint } = {},
   ): Promise<CreateHireResult> {
     requireInt('agentId', agentId, 0);
     requireText('consumer', consumer);
     requireText('input', input);
     requireText('requestId', requestId);
+    let subcontractReserve: number | null = null;
+    if (options.subcontractReserve !== undefined) {
+      const reserve = stroops('subcontractReserve', options.subcontractReserve);
+      if (reserve < 0n || reserve > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new InvalidArgument('subcontractReserve', 'must be a non-negative integer amount of stroops');
+      }
+      subcontractReserve = Number(reserve);
+    }
     return decodeCreateHireResult(
       await this.#call('createHire', 'hire', 'createHire', {
         agentId,
         consumer: consumer.trim(),
         input,
         requestId,
-        subcontractReserve: null,
+        subcontractReserve,
         allowRelatedParty: null,
       }),
     );
@@ -576,15 +590,18 @@ export class Puls3Sdk {
   ): Promise<HireDetail> {
     const signer = this.#requireSigner('hire');
     const wallet = signer.publicKey();
-    const maxBudget = BigInt(options.maxPrice);
+    const maxBudget = stroops('maxPrice', options.maxPrice);
     if (maxBudget <= 0n) throw new InvalidArgument('maxPrice', 'must be above 0');
-    const maxReserve = BigInt(options.maxReserve ?? 0);
+    const maxReserve = stroops('maxReserve', options.maxReserve ?? 0);
     if (maxReserve < 0n) throw new InvalidArgument('maxReserve', 'must not be negative');
     const started = await this.createHire(
       agentId,
       wallet,
       input,
       options.requestId ?? `sdk-${randomUUID()}`,
+      // The server reserves it on `fund_with_reserve`; the fund check below
+      // still refuses a reserve above it.
+      options.maxReserve === undefined ? {} : { subcontractReserve: maxReserve },
     );
     const hireId = started.hire.id;
     const price = BigInt(started.hire.price);
@@ -615,7 +632,7 @@ export class Puls3Sdk {
           provider,
         });
       }
-      detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job');
+      detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job', 'createJob');
     }
     if (detail.hire.status === 'open') {
       const fund = await this.prepareFund(hireId);
@@ -628,7 +645,12 @@ export class Puls3Sdk {
         throw new SigningRefused('money', `job ${jobId} pays another wallet than agent ${agentId}'s`);
       }
       await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, price, maxReserve, jobId });
-      detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
+      detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund', 'fund');
+    }
+    // Funded, or already past it when the agent was quick (or on a retry).
+    const status = detail.hire.status;
+    if (status !== 'funded' && status !== 'submitted' && status !== 'completed') {
+      throw new Puls3ProtocolError(`Hire ${hireId} is ${status ?? 'not started'} after fund, not funded`);
     }
     return detail;
   }
@@ -670,7 +692,7 @@ export class Puls3Sdk {
     const jobId = await this.#checkHireJob(hireId, wallet, 'complete', options.result);
     const prepared = await this.prepareComplete(hireId);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
-    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete', 'complete');
   }
 
   /**
@@ -685,7 +707,7 @@ export class Puls3Sdk {
     const jobId = await this.#checkHireJob(hireId, wallet, 'reject', options.result);
     const prepared = await this.prepareReject(hireId, reason);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId, reason: reason.trim() });
-    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject', 'reject');
   }
 
   /**
@@ -820,17 +842,23 @@ export class Puls3Sdk {
     prepared: PreparedTransaction | null,
     done: (detail: HireDetail) => boolean,
     step: string,
+    purpose: string,
   ): Promise<HireDetail> {
     const deadline = this.#deadline();
     for (;;) {
       const detail = await this.getHire(hireId, consumer);
       const submission = detail.escrowSubmission;
-      if (
-        prepared !== null &&
-        submission?.preparationId === prepared.preparationId &&
-        submission.state === 'failed'
-      ) {
-        throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
+      if (prepared !== null) {
+        if (submission?.preparationId === prepared.preparationId && submission.state === 'failed') {
+          throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
+        }
+      } else {
+        // Nothing was prepared here (a retry waits for the call sent before):
+        // the step is done, or that call is the latest of its purpose and failed.
+        if (done(detail)) return detail;
+        if (submission?.purpose === purpose && submission.state === 'failed') {
+          throw new ChainSubmissionFailed(purpose, submission.errorCode);
+        }
       }
       if (done(detail)) return detail;
       await this.#wait(deadline, step);
@@ -873,6 +901,15 @@ function requireInt(argument: string, value: number, min: number): void {
   if (!Number.isSafeInteger(value) || value < min) {
     throw new InvalidArgument(argument, `must be an integer of ${min} or more`);
   }
+}
+
+/** [value], an amount in stroops, as a bigint; `InvalidArgument` unless it is an integer. */
+function stroops(argument: string, value: number | bigint): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+    throw new InvalidArgument(argument, 'must be an integer amount of stroops');
+  }
+  return BigInt(value);
 }
 
 /**
