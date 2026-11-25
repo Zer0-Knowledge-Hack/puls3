@@ -504,7 +504,12 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   local stack against escrow v0.2.0 `CD4C…GLJM`; eight transactions `SUCCESS` on the RPC; the
   `complete` effects credit A 0.1 and refund the consumer 0.1. Limit: A was deployed by the local
   tool because of T8.1.)
-- [ ] **T8.1** The server Studio carries the subcontract opt-in: the transport
+- [x] **T8.1** (done 2026-11-25. User: "Dale, arranquemos con esas ahora". Route: inline. RED: the
+  server endpoint test read the opt-in back as `null`, the gateway test sent `null`. GREEN: server
+  1685 passed (5 skipped) plus integration 243 with the test database up, Flutter 600 passed,
+  `dart analyze` clean in server, client, sdk, cli and mcp, `flutter analyze --fatal-infos` clean.
+  Risk: none (an optional field added to the draft transport). The Studio form already read the
+  opt-in from a saved draft (`studio_form_check.dart:202`).) The server Studio carries the subcontract opt-in: the transport
   `AgentManifestDraft` gets the `subcontract` block (max children, suggested reserve),
   `draftDocument` and `transportDraft` map it both ways, and `server_studio_gateway.dart` sends and
   reads it, so an agent deployed from the web with the opt-in on can subcontract. Found during the
