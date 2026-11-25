@@ -63,6 +63,9 @@ jobs:
                 sdk_ts=true ;;
               puls3_flutter/*)
                 app=true ;;
+              # The TypeScript SDK pins these contract ids (#421 rotates the escrow).
+              contracts/deployments/testnet.json)
+                contracts=true; e2e=true; sdk_ts=true ;;
               contracts/*)
                 contracts=true; e2e=true ;;
               scripts/setup-local-soroban.sh|scripts/setup-local-secrets.sh|.github/workflows/e2e.yml)
