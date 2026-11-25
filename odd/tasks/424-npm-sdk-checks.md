@@ -26,7 +26,7 @@ Quoted from #424 and its comments.
 | T1 | S1 | inline | item 2 (signing guard) | done | `94c5db9` (RED 6 fail, GREEN 205/205; review approved) |
 | T2 | S2, S3, S10, S5 (maxPrice) | inline | none | done | `5a209fc` (RED 4 fail, GREEN 210/210) |
 | T3 | S9 + version 0.2.0 | inline | item 3 (public API) | done | `443933b` (RED 4 fail, GREEN 216/216; T2+T3 review approved) |
-| T4 | S4 | inline | item 4 (cross-process lock) | pending | |
+| T4 | S4 | inline | item 4 (cross-process lock) | done | (pending hash; RED race 3/5 runs, GREEN 221/221, race test 10/10) |
 | T5 | S5 (transport, KeySession), S6 | inline | none expected | pending | |
 | T6 | S7 | inline | item 5 (CI) | pending | |
 | T7 | S8 | inline | none expected | pending | |

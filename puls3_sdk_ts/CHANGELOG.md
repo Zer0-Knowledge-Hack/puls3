@@ -27,6 +27,13 @@ The remaining checks and errors of #424.
   `Puls3ProtocolError` instead of being returned. A
   `maxPrice` or `maxReserve` that is not an integer throws
   `InvalidArgument`, not `RangeError`.
+- **`CliSession` lock:** programs that share a session file no longer race
+  on a stale lock. The holder writes an owner token and keeps it fresh
+  while it works, only one program may take over a lock whose owner died
+  (after reading again that it is the same one), and a holder removes the
+  lock only while it is still its own. Before, two programs could both take
+  over a stale lock and present the same refresh token, which revokes the
+  session.
 
 ## 0.1.0
 
