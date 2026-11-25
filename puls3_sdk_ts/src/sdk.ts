@@ -230,8 +230,9 @@ export class Puls3Sdk {
     let subcontractReserve: number | null = null;
     if (options.subcontractReserve !== undefined) {
       const reserve = stroops('subcontractReserve', options.subcontractReserve);
-      if (reserve < 0n || reserve > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new InvalidArgument('subcontractReserve', 'must be a non-negative integer amount of stroops');
+      if (reserve < 0n) throw new InvalidArgument('subcontractReserve', 'must not be negative');
+      if (reserve > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new InvalidArgument('subcontractReserve', `must be at most ${Number.MAX_SAFE_INTEGER} stroops`);
       }
       subcontractReserve = Number(reserve);
     }
@@ -650,7 +651,8 @@ export class Puls3Sdk {
     // Funded, or already past it when the agent was quick (or on a retry).
     const status = detail.hire.status;
     if (status !== 'funded' && status !== 'submitted' && status !== 'completed') {
-      throw new Puls3ProtocolError(`Hire ${hireId} is ${status ?? 'not started'} after fund, not funded`);
+      // Also a retry of a hire that already ended (rejected, expired).
+      throw new Puls3ProtocolError(`Hire ${hireId} is ${status ?? 'not started'}, not funded`);
     }
     return detail;
   }
@@ -841,6 +843,10 @@ export class Puls3Sdk {
   /**
    * Reads hire [hireId] until [done], or until the submission of [prepared]
    * failed on chain ([ChainSubmissionFailed]) or the step timed out.
+   *
+   * [purpose] matters only when [prepared] is null: a retry that waits for
+   * the call sent before it. A completed step then wins, and otherwise the
+   * latest submission of [purpose] failing ends the wait.
    */
   async #waitHire(
     hireId: number,
@@ -854,19 +860,13 @@ export class Puls3Sdk {
     for (;;) {
       const detail = await this.getHire(hireId, consumer);
       const submission = detail.escrowSubmission;
-      if (prepared !== null) {
-        if (submission?.preparationId === prepared.preparationId && submission.state === 'failed') {
-          throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
-        }
-      } else {
-        // Nothing was prepared here (a retry waits for the call sent before):
-        // the step is done, or that call is the latest of its purpose and failed.
-        if (done(detail)) return detail;
-        if (submission?.purpose === purpose && submission.state === 'failed') {
-          throw new ChainSubmissionFailed(purpose, submission.errorCode);
-        }
+      if (prepared !== null && submission?.preparationId === prepared.preparationId && submission.state === 'failed') {
+        throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
       }
       if (done(detail)) return detail;
+      if (prepared === null && submission?.purpose === purpose && submission.state === 'failed') {
+        throw new ChainSubmissionFailed(purpose, submission.errorCode);
+      }
       await this.#wait(deadline, step);
     }
   }
