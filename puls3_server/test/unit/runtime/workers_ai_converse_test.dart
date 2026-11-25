@@ -300,6 +300,36 @@ void main() {
       expect(turn.text, '');
     });
 
+    for (final (label, function) in [
+      ('blank', {'name': 'search_agents', 'arguments': ''}),
+      ('null', {'name': 'search_agents', 'arguments': null}),
+      ('missing', {'name': 'search_agents'}),
+    ]) {
+      test('$label arguments are read as no arguments, not as a malformed '
+          'call', () async {
+        replyBody = completion({
+          'role': 'assistant',
+          'content': null,
+          'tool_calls': [
+            {'id': 'call_3', 'type': 'function', 'function': function},
+          ],
+        }, finish: 'tool_calls');
+
+        final turn = await toolRuntime().converse(
+          _task(
+            model: _toolModel,
+            messages: [UserMessage('hi')],
+            tools: const [_searchTool],
+          ),
+        );
+
+        final call = (turn as ToolCallsTurn).calls.single;
+        expect(call.id, 'call_3');
+        expect(call.name, 'search_agents');
+        expect(call.arguments, isEmpty);
+      });
+    }
+
     final malformedCall = throwsA(
       isA<RuntimeProviderFailed>().having(
         (e) => e.errorType,

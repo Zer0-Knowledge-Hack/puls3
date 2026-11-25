@@ -11,6 +11,7 @@ import '../domain/usdc.dart';
 import '../hire/hire_flow_controller.dart';
 import '../l10n/l10n.dart';
 import '../state/app_scope.dart';
+import '../state/wallet_controller.dart';
 import '../studio/studio_gateway.dart';
 import '../theme/puls3_theme.dart';
 import '../ui/atoms/copy_to_clipboard.dart';
@@ -18,6 +19,8 @@ import '../ui/atoms/primary_button.dart';
 import '../ui/organisms/agent_hire_panel.dart';
 import '../ui/organisms/hire_payment_view.dart';
 import '../ui/organisms/hire_subcontract_section.dart';
+import '../ui/organisms/wallet_panel.dart' show signInNotice;
+import '../wallet/wallet_port.dart' show WalletException;
 import 'agent_hire_tracker.dart';
 
 export '../hire/hire_flow_controller.dart' show walletErrorMessage;
@@ -130,18 +133,50 @@ class _HireSheetState extends State<HireSheet> {
       flow.addListener(_showResumedTask);
       // A connected wallet: offer to resume an unfinished hire right away.
       final consumer = scope.wallet.address;
-      if (consumer != null) {
-        flow.restore(consumer);
-        unawaited(_loadPayingAgents(consumer));
-      }
+      if (consumer != null) flow.restore(consumer);
       _showResumedTask();
-      // Without the terms the hire goes on as a plain one.
-      unawaited(flow.loadTerms());
+      _wallet = scope.wallet..addListener(_onWallet);
+      unawaited(_loadSessionData());
     }
   }
 
+  WalletController? _wallet;
+
+  /// The wallet whose session the terms and paying agents were read with.
+  String? _loadedFor;
+
+  /// A wallet that connects (and so signs in) while the sheet is open.
+  void _onWallet() {
+    final address = _wallet?.address;
+    if (address != null && address != _loadedFor) {
+      unawaited(_loadSessionData());
+    }
+  }
+
+  /// Reads what needs the server session: the reserve terms and the user's
+  /// paying agents. Without a session it reads nothing and never opens a
+  /// wallet prompt (#334 T8.2); the sheet still hires as a plain hire.
+  Future<void> _loadSessionData() async {
+    final wallet = _wallet;
+    final flow = _flow;
+    if (wallet == null || flow == null || !await wallet.hasSession()) return;
+    if (!mounted) return;
+    final consumer = wallet.address;
+    // The wallet listener and the confirm may both ask: read once.
+    final pending = _sessionLoad;
+    if (consumer == _loadedFor && pending != null) return pending;
+    _loadedFor = consumer;
+    return _sessionLoad = Future.wait([
+      flow.loadTerms(),
+      if (consumer != null) _loadPayingAgents(consumer),
+    ]).then((_) {});
+  }
+
+  Future<void>? _sessionLoad;
+
   @override
   void dispose() {
+    _wallet?.removeListener(_onWallet);
     _flow?.dispose();
     _input.dispose();
     _reserve.dispose();
@@ -283,14 +318,40 @@ class _HireSheetState extends State<HireSheet> {
   }
 
   void _run() {
+    // A second tap while the sign-in prompt is open must not open another.
+    if (_confirming) return;
+    _confirming = true;
+    unawaited(_confirm().whenComplete(() => _confirming = false));
+  }
+
+  bool _confirming = false;
+
+  /// Confirms the hire. Without a session it first connects and signs in,
+  /// then reads the terms: when they offer a reserve the user has not seen
+  /// yet, it stops so the reserve is reviewed before anything is paid.
+  Future<void> _confirm() async {
     final flow = _flow!;
+    final wallet = _wallet;
+    if (wallet != null && flow.canEditTask && !await wallet.hasSession()) {
+      final offeredBefore = flow.terms.offered;
+      try {
+        // Connecting signs in: one prompt. A server failure leaves no
+        // session, and the hire's own sign-in reports it.
+        await wallet.connect();
+      } on WalletException {
+        // Declined or failed: the wallet state shows why; nothing started.
+        return;
+      }
+      await _loadSessionData();
+      if (!mounted) return;
+      if (!offeredBefore && flow.terms.offered) return;
+    }
+    if (!mounted) return;
     final subcontract = _subcontract(flow);
-    unawaited(
-      flow.run(
-        _input.text.trim(),
-        subcontractReserve: subcontract.reserve,
-        allowRelatedParty: _allowRelatedParty,
-      ),
+    await flow.run(
+      _input.text.trim(),
+      subcontractReserve: subcontract.reserve,
+      allowRelatedParty: _allowRelatedParty,
     );
   }
 
@@ -547,8 +608,7 @@ class _HireSheetState extends State<HireSheet> {
   }
 
   static String? _progress(HireStep step) => switch (step) {
-    HireStep.signingIn =>
-      'Sign in with your wallet: it only proves the account is yours.',
+    HireStep.signingIn => signInNotice('Your wallet'),
     HireStep.creating => 'Creating the hire…',
     HireStep.signingCreateJob => 'Sign the escrow job in your wallet (1 of 2).',
     HireStep.submittingCreateJob => 'Creating the escrow job on Stellar…',

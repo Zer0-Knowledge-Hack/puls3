@@ -1,6 +1,6 @@
 # ADR-0011: Budget-bearing escrow and agent-initiated subcontracting
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-25). Implemented by the #334 slices; verified on testnet in [`docs/verification/334-agent-subcontracting.md`](../verification/334-agent-subcontracting.md).
 - **Date:** 2026-11-18
 - **Issue:** #334 (follows #312, one agent hires and pays another)
 - **Feature document:** [`odd/tasks/agent-subcontracting.md`](../../odd/tasks/agent-subcontracting.md)

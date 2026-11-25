@@ -75,6 +75,7 @@ class WalletPanel extends StatelessWidget {
       ),
       WalletStatus.connecting => _Connecting(walletName: walletName),
       WalletStatus.signing => _Signing(walletName: walletName),
+      WalletStatus.signingIn => _SigningIn(walletName: walletName),
       WalletStatus.rejected ||
       WalletStatus.wrongNetwork ||
       WalletStatus.error => _Error(
@@ -246,6 +247,38 @@ class _Signing extends StatelessWidget {
     );
   }
 }
+
+/// The sign-in prompt is open. The wallet shows it as a transaction with a
+/// fee, so the copy says what it really is before the user decides.
+class _SigningIn extends StatelessWidget {
+  const _SigningIn({required this.walletName});
+
+  final String walletName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('wallet-state-signing-in'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Header(
+          icon: Icons.verified_user_outlined,
+          title: 'Sign in with $walletName',
+          message: signInNotice(walletName),
+          color: Puls3Colors.accent,
+        ),
+        const SizedBox(height: Puls3Spacing.md),
+        const _WaitingBar(),
+      ],
+    );
+  }
+}
+
+/// What the sign-in prompt is, wherever the app asks for it (#334 T8.3).
+String signInNotice(String walletName) =>
+    '$walletName asks you to confirm a sign-in. It only proves this account '
+    'is yours: it is not a payment, it is never sent to the network and the '
+    'fee it shows is never charged.';
 
 class _Connected extends StatelessWidget {
   const _Connected({

@@ -498,9 +498,80 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
      Studio enables the subcontract opt-in only for a model that calls tools.
   4. ADR-0011 D8 amended: Anthropic or a verified Workers AI tool model.
   Evidence for the model choice: the spike of 2026-11-24 (Progress).
-- [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
+- [x] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
-  `docs/verification/334-agent-subcontracting.md`.
+  `docs/verification/334-agent-subcontracting.md`. (done 2026-11-25: hire 2 / child hire 3 on the
+  local stack against escrow v0.2.0 `CD4C…GLJM`; eight transactions `SUCCESS` on the RPC; the
+  `complete` effects credit A 0.1 and refund the consumer 0.1. Limit: A was deployed by the local
+  tool because of T8.1.)
+- [x] **T8.1** (done 2026-11-25. User: "Dale, arranquemos con esas ahora". Route: inline. RED: the
+  server endpoint test read the opt-in back as `null`, the gateway test sent `null`. GREEN: server
+  1685 passed (5 skipped) plus integration 243 with the test database up, Flutter 600 passed,
+  `dart analyze` clean in server, client, sdk, cli and mcp, `flutter analyze --fatal-infos` clean.
+  Risk: none (an optional field added to the draft transport). The Studio form already read the
+  opt-in from a saved draft (`studio_form_check.dart:202`).) The server Studio carries the subcontract opt-in: the transport
+  `AgentManifestDraft` gets the `subcontract` block (max children, suggested reserve),
+  `draftDocument` and `transportDraft` map it both ways, and `server_studio_gateway.dart` sends and
+  reads it, so an agent deployed from the web with the opt-in on can subcontract. Found during the
+  T8 local run (Log, 2026-11-24).
+- [ ] **T8.2 + T8.3** One sign-in, never a surprise prompt (approved 2026-11-25: "Si, me cierra,
+  sigamos con eso"). Route: inline (one understood change, no writer reason). Implemented,
+  uncommitted, pending the independent verifier (Risk: item 2, auth/session):
+  1. Connecting the wallet signs in, in the same gesture (`WalletController.connect` →
+     `ensureSession`); the wallet panel shows `signingIn` with copy that the prompt is not a
+     payment, is never sent and its fee is never charged.
+  2. The session's wallet is kept in `localStorage` (`BrowserSessionWalletStore`), so a reload
+     keeps the session; disconnect still forgets both.
+  3. With a session nothing asks to sign in again; the hire sheet reads terms and paying agents
+     silently.
+  4. Opening the hire sheet never prompts and never calls the server without a session;
+     confirming without one signs in, reads the terms and stops when a reserve the user has not
+     seen is offered.
+  Evidence: RED, the old `hire_sheet.dart` fails 3 of the 5 new sheet tests; GREEN, Flutter 596
+  passed (586 + 10 new), `flutter analyze --fatal-infos` clean. The test-first order was not
+  followed (code before tests); RED was observed afterwards by restoring the old sheet.
+  Independent verifier: no blockers, behaviors 1-4 PASS. Its non-blocking notes applied: a second
+  tap while signing in opens no second prompt, a finished sign-in notifies so the sheet reads the
+  terms, the two readers share one read, the F5-2 comment says the sign-in now comes first; tests
+  added for the double tap and for a session of another wallet. Flutter 598 passed, analyze clean.
+  Left as notes: no unit test for `BrowserSessionWalletStore` (web-only), and a server failure
+  after the user signed can ask again once in the same confirm. Commit `44db635`. Native review:
+  assessed high (`review_due` true, item 2 escalation, base `cfde939`, untracked excluded);
+  pending: STATUS asks for an `intended_untracked_selection` whose JSON shape the CLI does not
+  document, so no START was issued.
+- 2026-11-25: Happy path from the web on the rebuilt app (`44db635`). User: "Dale, todo funciono
+  de manera excepcional". Hire 2 (job 2) on agent 40 with reserve 2000000; A subcontracted agent
+  39 as child hire 3 (job 3), receipt line `completed`, budget and payout 1000000, related party
+  false; A delivered the Spanish post plus B's English translation. RPC `getTransaction` SUCCESS:
+  createJob `79807e9a58978b18ab265f676f195a369f69877438140c16a36efa31bfb1edf2`, fund
+  `fcb1f2ea8e7a58f08ca2533d1d71a758bf69395df6e1aa68f892a7aa647f282f`, createChildJob
+  `299048ac5334d4855614f51d97cb77f1caa68c0d8ba1172cba6620b9a1ae9289`, child submit
+  `5a57a551332ed249852f1eb55747d3fb0b1f922ba21fd521f869318b590fb44f`, childComplete
+  `f67a56f454346fbc53d210a095c9ec95745b6d003487c4864487b147617cfef2`, A submit
+  `e115259e429f1cf52e563d3878c2b3212cc017cdebd98ee839f90ab2d5e6d117`. Next: the consumer
+  approves; check the unspent 1000000 reserve returns and the Horizon balances.
+- 2026-11-25: User: "Okey, aprove y ademas deje una calificacion". `complete`
+  `e8418d795e4ab1815c125ad8024072eed2226d2c9f77d0264b36db574af60f92` (ledger 5909013) and
+  `give_feedback` `10a31bb41c6c6ef466873be80828c33e66eb934dfef1984a83cacf266bf4b0cc` (ledger
+  5909021), both `SUCCESS`. Horizon effects of `complete`: 0.1 USDC to A and 0.1 USDC back to the
+  consumer. Horizon USDC: A 0.1, B 0.1; escrow `claimable` 0 for all three; job 2 `state` 3
+  (Completed), reserve 0. Recorded in `docs/verification/334-agent-subcontracting.md`. T8 done.
+  Open: T8.1 (Studio opt-in transport), T8.4 (reject reason), the native review of `44db635`, and
+  moving production to escrow v0.2.0 (user decision).
+- 2026-11-25: Delivery. User: "Dale, hagamoslo asi" (stacked-to-main, four slices). Pushed and
+  opened, each based on the previous branch: #416 16a `feat/334-t8a-workers-ai` (`6d10d5d`,
+  `d7f12cb`, `cfde939`; 805 lines, 457 tests, recommends `size:exception`), #417 16b
+  `feat/334-t8b-wallet-session` (`44db635`; 727 lines, 356 tests, recommends `size:exception`),
+  #418 16c `docs/334-t8c-testnet-evidence` (`b8e9de8`; 107), #419 16d
+  `feat/334-t8d-studio-optin-transport` (`85b77d9`, `3dc83fd`; 420, 262 generated). All say
+  `Refs #334`: the team rule asks for closing evidence from someone other than TOMOKI977.
+- [x] **T8.4** (done 2026-11-25: the server contract stays, since api.md and ADR-0010 publish the
+  reason as required; the app sends `defaultRejectReason` ("Rejected by the consumer.") when the
+  field is empty, so "optional" is true for the user. RED: two hire detail tests expecting the
+  default failed; GREEN: Flutter 600 passed, analyze clean. Risk: none.) Reject reason contract: the app labels the field "Motivo (opcional)"
+  (`hireRejectReasonHint`) but `EscrowRelayService._prepare` refuses an empty reason with
+  `InvalidRejectReason`, and the click shows nothing (Log, 2026-11-24). Pre-existing since `f799ca5`
+  (#96).
 
 ## Acceptance
 
@@ -603,3 +674,70 @@ StellarExpert.
   Next: T8 local run: Docker sandbox for Postgres, a v0.2.0 escrow on testnet, the server and web on
   this machine against it, agent A on Mistral (opt-in) and B on llama or Mistral, then the user's
   own hire with Varial (Freighter). Production stays on its escrow until the user approves.
+- 2026-11-24: T8 local escrow. User: "Dale, empieza a levantar el entorno local para empezar con
+  las pruebas". Escrow v0.2.0 deployed to testnet by the new identity `puls3-t8-admin`
+  (`GBLPJKFGTHDQUECAO3T6DGGGOCTXI5R7EF7DL4ZSY3PJKMGQCHX5ENUS`), recorded in a scratch copy of the
+  record so `contracts/deployments/testnet.json` keeps the production escrow: contract
+  `CD4CKHGKEHVDFETFUF662REOSCDEAEYQR736MGMGYU4ZO4VLTMV3GLJM`, wasm sha256
+  `bc1082ea86c7c2ba4c1216692f29087c07678815aadf6cec25dd09dc2f931059`, deploy tx
+  `a191cd55b8b16e45cf265db319d6a8ddedddf6c2e6093d06518b1f5923f9c456`, USDC allow-list tx
+  `2e4cc2c8603bd684cadc26290de3332851687b9245ec47487e44eb7391ec61f1`; `version` answers `0.2.0`.
+  Built with Rust 1.98.1 (the default 1.91.0 is refused by the Stellar CLI).
+- 2026-11-24: T8 local stack up: Postgres/Redis in Docker, database `puls3_t8`, server on :8080
+  (`PULS3_STELLAR_ESCROW` the v0.2.0 escrow, reserve ceiling 50000000 stroops, tracker on, "Agent
+  runtime started ... providers workers-ai ... subcontracting on"), web on :8190 with `HIRE=server`
+  and `STUDIO=server`. On Windows, `SERVERPOD_PASSWORD_<name>` variables arrive upper-cased and
+  are not found, so `workersAiApiToken`, `walletAuthSigningKey` (`puls3-auth`) and
+  `escrowRelaySigningKey` (`puls3-t8-admin`) were added to the `development` section of the
+  ignored `config/passwords.yaml`. Next: the user's own test from the web.
+- 2026-11-24: Finding: the server Studio drops the subcontract opt-in. The transport
+  `AgentManifestDraft` (`puls3_server/lib/src/studio/agent_manifest_draft.spy.yaml`) has no
+  `subcontract` field, `draftDocument` does not write one, and `server_studio_gateway.dart` does not
+  send it, so an agent deployed from the web never subcontracts. User: "Si, hagamoslo asi" (seed A
+  and B with a tool now, fix the Studio as T8.1 after the test). Untracked
+  `puls3_server/tool/t8_seed_agents.dart` saved A's draft through `StudioDraftService` with the
+  block and deployed both through the Studio endpoints, each from its own Friendbot builder:
+  B = registry agent 39 "T8 English Translator" (llama), wallet
+  `GCUBN6GFPLMO5TOZCEVUL6OINEHYSA7NHFUGKC4VT67B2TXTRKA6UGXO`, register_full
+  `1a1814e5583919010b6497dd95757e89fbe814e6c273ef550cfcaaeed9d5684f`, set_agent_wallet
+  `62ff058051a670059fe3a23fa08399a0df2fc516cf6f8a2e96ccdbd567600c68`; A = registry agent 40
+  "T8 Post Writer" (Mistral, `subcontract {max_children: 1, suggested_reserve: 2000000}` read back
+  from `studio_agent_version`), wallet `GCSEKUIH7NEQX44VYL2Q2F5Q7YPN6A3AHOQYBVY66ER6CU5FTNAUWNXN`,
+  register_full `6655f397efd8c0de64d47a41510f5ab9d53070a640fabb5a09a79a326f7d6e20`,
+  set_agent_wallet `3a10136fe9c14003f67782aac212076b98318e6578cc37b74589c25833817a4b`. Both
+  wallets hold a USDC trustline; both are in the catalog index.
+- 2026-11-24: First hire attempt. User: "No se de que seccion de subcontratar hablas, cuando le das
+  a contratar, aparece este forms [...] e instantaneameten, sin haber escrito su tarea, me aparece
+  una ventana flotante para darle dinero, sin haber escrito nada, eso es una mala configuracion de
+  UX/UI, que usuario estaria dispuesto a dejar dinero, sin antes haber hecho nada?". Findings:
+  (1) the server log shows `hire.getHireTerms` with no `user=` (unauthenticated, 163 µs), because
+  `hire_sheet.dart` calls `flow.loadTerms()` on open and the session is only ensured in `start`; the
+  failure is swallowed as `SubcontractTerms.none`, so no reserve section (T8.2). Server side is
+  right: agent 40 has `puls3.manifestVersion` 1 and its version row carries the opt-in. (2) The
+  sheet showed escrow `CBRD…TPE2` because the local web build lacked `PULS3_ESCROW_CONTRACT`
+  (display only; envelopes come from the server); rebuilt with it. (3) UX feedback (T8.3).
+  User: "La ventana flotante de la que te hablo era una de freigter, pidiendo confirmar algo, no
+  alcnace a leerlo porque involuntariamente le di a confirmar". Server log at 23:52:53-58:
+  `getHireTerms` (no session), then `walletAuth.createChallenge`, `walletAuth.verifyChallenge`,
+  then `studio.listDrafts` with the user: the Freighter prompt was the SEP-10 sign-in challenge,
+  opened by `_loadPayingAgents` (Studio `listDrafts`) when the sheet opens. No `createHire`,
+  `prepare*` or `submitEscrowCall` call: nothing was paid. The terms request raced ahead of that
+  sign-in, which is the T8.2 cause.
+- 2026-11-25: Hire 1 (job 1, agent 40) was a plain hire: `subcontractReserve` 0, since the terms
+  were read again without a session at 00:11:43. The run succeeded with "No hay agentes
+  disponibles para contratar." (no tools without a reserve). The three Freighter prompts were the
+  sign-in, `create_job` and the 0.10 USDC fund. User: "Le doy a rechazar y no sucede nada. Revisa
+  que sucede en el log": eight `hire.prepareReject` calls, each `InvalidRejectReason`, with an
+  empty reason (T8.4).
+- 2026-11-25: In-session code review of the whole T8 stack (#416 to #419) before merging without a
+  human reviewer. Fixed, test first: (1) My hires and the hire detail did not reload once
+  connecting signed in, because they compared the address only; `WalletController.sessionEpoch`
+  now changes with the session. (2) A disconnect while the sign-in prompt was open kept the
+  session it stored; `ensureSession` now forgets it again and fails the connect. (3) One Confirm
+  tap could open four sign-in prompts when `verifyChallenge` failed; now at most two. (4) The web
+  session-wallet store kept reading `localStorage` after a refused write; it now answers from
+  memory (`FallbackSessionWalletStore`). (5) A Workers AI tool call with null or blank arguments
+  failed as malformed; it is now `{}`. Left as follow-ups: hire terms still offer a reserve for an
+  opted-in manifest whose model calls no tools (pre-existing), and two UX nits (the funds check
+  now follows the sign-in; a Confirm that stops for the reserve shows no notice). ADR-0011
+  accepted.

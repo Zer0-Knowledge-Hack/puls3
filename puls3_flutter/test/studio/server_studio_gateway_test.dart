@@ -128,6 +128,56 @@ void main() {
     });
   });
 
+  test('saveDraft sends the subcontract opt-in and reads it back '
+      '(#334 T8.1)', () async {
+    api.AgentManifestDraft? sent;
+    final saved = await gateway(
+      saveDraft: (draft, draftId, revision, overwrite) async {
+        sent = draft;
+        return api.StudioDraft(
+          draftId: 7,
+          manifest: draft,
+          revision: 1,
+          deployState: 'draft',
+        );
+      },
+    ).saveDraft(
+      AgentManifestDraft(
+        name: 'T8 Post Writer',
+        subcontract: SubcontractOptIn(
+          maxChildren: 2,
+          suggestedReserve: 2000000,
+        ),
+      ),
+      owner: 'G',
+    );
+
+    expect(sent?.subcontract?.maxChildren, 2);
+    expect(sent?.subcontract?.suggestedReserve, 2000000);
+    expect(
+      saved.manifest.subcontract,
+      SubcontractOptIn(maxChildren: 2, suggestedReserve: 2000000),
+    );
+  });
+
+  test('a draft without the opt-in is sent and read without it', () async {
+    api.AgentManifestDraft? sent;
+    final saved = await gateway(
+      saveDraft: (draft, draftId, revision, overwrite) async {
+        sent = draft;
+        return api.StudioDraft(
+          draftId: 7,
+          manifest: draft,
+          revision: 1,
+          deployState: 'draft',
+        );
+      },
+    ).saveDraft(AgentManifestDraft(name: 'Copy Forge'), owner: 'G');
+
+    expect(sent?.subcontract, isNull);
+    expect(saved.manifest.subcontract, isNull);
+  });
+
   test(
     'saveDraft keeps the prompt and the revision the server returns',
     () async {

@@ -119,6 +119,43 @@ void main() {
     expect(listed.single.manifest.systemPrompt, prompt);
   });
 
+  test('the subcontract opt-in is saved, read back and kept for the deploy '
+      '(#334 T8.1)', () async {
+    final saved = await endpoint.saveDraft(
+      session,
+      draft().copyWith(
+        subcontract: ManifestSubcontract(
+          maxChildren: 1,
+          suggestedReserve: 2000000,
+        ),
+      ),
+      null,
+      null,
+      null,
+    );
+    expect(saved.manifest.subcontract?.maxChildren, 1);
+    expect(saved.manifest.subcontract?.suggestedReserve, 2000000);
+
+    final loaded = await endpoint.getDraft(session, saved.draftId);
+    expect(loaded.manifest.subcontract?.maxChildren, 1);
+    expect(loaded.manifest.subcontract?.suggestedReserve, 2000000);
+
+    final stored = await StudioDraftService(
+      store,
+    ).get(owner: StellarAddress.parse(owner), draftId: saved.draftId);
+    expect(
+      stored.manifest.subcontract,
+      SubcontractOptIn(maxChildren: 1, suggestedReserve: 2000000),
+    );
+  });
+
+  test('a draft without the opt-in reads back without it', () async {
+    final saved = await endpoint.saveDraft(session, draft(), null, null, null);
+    expect(saved.manifest.subcontract, isNull);
+    final loaded = await endpoint.getDraft(session, saved.draftId);
+    expect(loaded.manifest.subcontract, isNull);
+  });
+
   test(
     'a stale revision is DraftVersionConflict and keeps the prompt',
     () async {

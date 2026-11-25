@@ -11,6 +11,7 @@ import 'src/data/app_config.dart';
 import 'src/data/server_agent_repository.dart';
 import 'src/deploy/deploy_gateway.dart';
 import 'src/deploy/server_deploy_gateway.dart';
+import 'src/hire/create_session_wallet_store.dart';
 import 'src/hire/hire_gateway.dart';
 import 'src/hire/server_hire_gateway.dart';
 import 'src/hire/wallet_funds.dart';
@@ -78,6 +79,8 @@ WalletSession _walletSession(Client client, String configJson) {
     verifyChallenge: client.walletAuth.verifyChallenge,
     isAuthenticated: () => client.auth.isAuthenticated,
     storeSession: client.auth.updateSignedInUser,
+    // The session survives a reload, so the wallet it belongs to must too.
+    walletStore: createSessionWalletStore(),
     serverSigningKey: auth.serverSigningKey,
     homeDomain: auth.homeDomain,
     webAuthDomain: auth.webAuthDomain,
@@ -173,6 +176,10 @@ Future<void> main() async {
       demoRepository: AssetAgentRepository(),
       wallet: wallet,
       onWalletDisconnect: session.forget,
+      // Connecting signs in once, for every server-backed screen (#334).
+      walletSignIn: _hireKind == 'server' || _studioKind == 'server'
+          ? session
+          : null,
       hireGateway: _createHireGateway(client, session),
       studioGateway: _createStudioGateway(client, wallet, session),
       deployGateway: _createDeployGateway(client, wallet, session),

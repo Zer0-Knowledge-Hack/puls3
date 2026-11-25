@@ -167,7 +167,9 @@ class HireFlowController extends ChangeNotifier {
           '${formatUsdc(_terms.reserveMaxStroops)} USDC.',
         );
       }
-      await _wallet.connect();
+      // A connected wallet is not connected again: that would sign in
+      // once more right before the sign-in below.
+      if (!_wallet.isConnected) await _wallet.connect();
       final consumer = _wallet.address!;
       final agentId = agent.registryId;
       if (agentId == null && !_gateway.isDemo) {
@@ -175,8 +177,9 @@ class HireFlowController extends ChangeNotifier {
           'This agent is not registered on chain, so it cannot be hired.',
         );
       }
-      // A new payment is checked before any signature, the sign-in
-      // included (F5-2). A resumed hire may have paid already, so its
+      // A new payment is checked before any payment signature (F5-2). The
+      // sign-in comes first now: connecting signs in (#334 T8.2), and it
+      // moves no funds. A resumed hire may have paid already, so its
       // balance says nothing: the server decides.
       restore(consumer);
       // The reserve is funded with the price, so both must be there.

@@ -15,6 +15,7 @@ import 'package:serverpod/serverpod.dart' as _is;
 import '../studio/manifest_model.dart' as _it5558gr;
 import '../studio/manifest_price.dart' as _ic3zks5j;
 import '../studio/manifest_skill.dart' as _igiu5xyp;
+import '../studio/manifest_subcontract.dart' as _i655sd6t;
 
 /// An editable agent manifest (ADR-0004). No version: a draft has none.
 /// Fields are flat camelCase. The domain wire document, which is what gets
@@ -32,6 +33,7 @@ abstract class AgentManifestDraft
     this.outputType,
     this.outputMaxChars,
     this.price,
+    this.subcontract,
   });
 
   factory AgentManifestDraft({
@@ -45,6 +47,7 @@ abstract class AgentManifestDraft
     String? outputType,
     int? outputMaxChars,
     _ic3zks5j.ManifestPrice? price,
+    _i655sd6t.ManifestSubcontract? subcontract,
   }) = _AgentManifestDraftImpl;
 
   factory AgentManifestDraft.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -71,6 +74,11 @@ abstract class AgentManifestDraft
           : _i7k47pdw.Protocol().deserialize<_ic3zks5j.ManifestPrice>(
               jsonSerialization['price'],
             ),
+      subcontract: jsonSerialization['subcontract'] == null
+          ? null
+          : _i7k47pdw.Protocol().deserialize<_i655sd6t.ManifestSubcontract>(
+              jsonSerialization['subcontract'],
+            ),
     );
   }
 
@@ -94,6 +102,9 @@ abstract class AgentManifestDraft
 
   _ic3zks5j.ManifestPrice? price;
 
+  /// The opt-in to subcontract; null for an agent that never does.
+  _i655sd6t.ManifestSubcontract? subcontract;
+
   /// Returns a shallow copy of this [AgentManifestDraft]
   /// with some or all fields replaced by the given arguments.
   @_is.useResult
@@ -108,6 +119,7 @@ abstract class AgentManifestDraft
     String? outputType,
     int? outputMaxChars,
     _ic3zks5j.ManifestPrice? price,
+    _i655sd6t.ManifestSubcontract? subcontract,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -124,6 +136,7 @@ abstract class AgentManifestDraft
       if (outputType != null) 'outputType': outputType,
       if (outputMaxChars != null) 'outputMaxChars': outputMaxChars,
       if (price != null) 'price': price?.toJson(),
+      if (subcontract != null) 'subcontract': subcontract?.toJson(),
     };
   }
 
@@ -142,6 +155,7 @@ abstract class AgentManifestDraft
       if (outputType != null) 'outputType': outputType,
       if (outputMaxChars != null) 'outputMaxChars': outputMaxChars,
       if (price != null) 'price': price?.toJsonForProtocol(),
+      if (subcontract != null) 'subcontract': subcontract?.toJsonForProtocol(),
     };
   }
 
@@ -165,6 +179,7 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
     String? outputType,
     int? outputMaxChars,
     _ic3zks5j.ManifestPrice? price,
+    _i655sd6t.ManifestSubcontract? subcontract,
   }) : super._(
          name: name,
          description: description,
@@ -176,6 +191,7 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
          outputType: outputType,
          outputMaxChars: outputMaxChars,
          price: price,
+         subcontract: subcontract,
        );
 
   /// Returns a shallow copy of this [AgentManifestDraft]
@@ -193,6 +209,7 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
     Object? outputType = _Undefined,
     Object? outputMaxChars = _Undefined,
     Object? price = _Undefined,
+    Object? subcontract = _Undefined,
   }) {
     return AgentManifestDraft(
       name: name is String? ? name : this.name,
@@ -209,6 +226,9 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
           ? outputMaxChars
           : this.outputMaxChars,
       price: price is _ic3zks5j.ManifestPrice? ? price : this.price?.copyWith(),
+      subcontract: subcontract is _i655sd6t.ManifestSubcontract?
+          ? subcontract
+          : this.subcontract?.copyWith(),
     );
   }
 }
