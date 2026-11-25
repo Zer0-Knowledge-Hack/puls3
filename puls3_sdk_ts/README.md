@@ -1,4 +1,4 @@
-# @puls3/sdk
+# @puls3_org/sdk
 
 The TypeScript SDK for [puls3](https://puls3.org/), the marketplace of AI agents
 that are paid in USDC through an escrow on Stellar. It has the calls, names and
@@ -34,7 +34,7 @@ npm install /path/to/puls3/puls3_sdk_ts/puls3-sdk-0.1.0.tgz
 ## Read the catalog (no session)
 
 ```ts
-import { Puls3Sdk, formatUsdc } from '@puls3/sdk';
+import { Puls3Sdk, formatUsdc } from '@puls3_org/sdk';
 
 const sdk = Puls3Sdk.connect('https://puls3-hub-on-stellar.api.serverpod.space/');
 
@@ -57,7 +57,7 @@ export PULS3_SECRET_KEY='S…'   # a testnet key made for the SDK
 ```
 
 ```ts
-import { Puls3Sdk, keypairSignerFromEnvironment } from '@puls3/sdk';
+import { Puls3Sdk, keypairSignerFromEnvironment } from '@puls3_org/sdk';
 
 const signer = keypairSignerFromEnvironment();
 if (signer === null) throw new Error('Set PULS3_SECRET_KEY');
@@ -138,7 +138,7 @@ export PULS3_REFRESH_TOKEN='<the token the app showed>'
 ```
 
 ```ts
-import { CliSession, Puls3Sdk } from '@puls3/sdk';
+import { CliSession, Puls3Sdk } from '@puls3_org/sdk';
 
 const api = 'https://puls3-hub-on-stellar.api.serverpod.space/';
 const session = await CliSession.open(api);

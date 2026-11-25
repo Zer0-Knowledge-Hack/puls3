@@ -60,5 +60,5 @@ if (result.hire.status !== 'submitted') process.exit(1);
 
 const approved = await sdk.approve(id);
 console.log(`complete ${tx(approved.escrowSubmission?.transaction)}`);
-const rated = await sdk.rate(id, 5, 'Run from @puls3/sdk.');
+const rated = await sdk.rate(id, 5, 'Run from @puls3_org/sdk.');
 console.log(`give_feedback ${tx(rated.feedbackSubmission?.transaction)}`);

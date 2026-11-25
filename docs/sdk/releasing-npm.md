@@ -1,6 +1,6 @@
 # Releasing the TypeScript SDK to npm
 
-`@puls3/sdk` (`puls3_sdk_ts/`) is published to npm **with provenance** (#302),
+`@puls3_org/sdk` (`puls3_sdk_ts/`) is published to npm **with provenance** (#302),
 which only a CI run can produce: the registry records which repository,
 commit and workflow built each version. So, unlike the Dart packages
 ([`releasing.md`](releasing.md)), its versions after the first are published
@@ -21,7 +21,8 @@ tag `sdk-ts-vX.Y.Z`, and the workflow refuses a tag that does not match
 1. **The npm organization.** Sign in to npmjs.com as `hello@puls3.org`, turn
    on two-factor authentication with an authenticator app, keep the recovery
    codes where the maintainers can reach them, and create the organization
-   `puls3` (the `@puls3` scope). Add at least two maintainers as owners.
+   `puls3_org` (the `@puls3_org` scope; `@puls3` belongs to another npm
+   organization). Add at least two maintainers as owners.
 2. **The GitHub environment.** In Settings > Environments, create `npm` with
    required reviewers, so a pushed tag waits for a maintainer's approval.
 3. **Tag protection.** Add a tag ruleset for `sdk-ts-v*`, so only maintainers
@@ -65,7 +66,7 @@ on npmjs.com:
 3. Approve the run in the `npm` environment. The workflow checks, tests,
    builds and publishes.
 4. Check the version on npmjs.com (it shows the provenance), and install it
-   in a project outside the repository: `npm install @puls3/sdk`.
+   in a project outside the repository: `npm install @puls3_org/sdk`.
 
 A published version cannot be deleted or published again. To withdraw one,
-deprecate it (`npm deprecate @puls3/sdk@0.1.1 "<why>"`) and release a fix.
+deprecate it (`npm deprecate @puls3_org/sdk@0.1.1 "<why>"`) and release a fix.

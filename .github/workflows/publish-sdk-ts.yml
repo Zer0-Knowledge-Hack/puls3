@@ -1,10 +1,10 @@
-# Publishes @puls3/sdk (puls3_sdk_ts/) to npm when a tag sdk-ts-vX.Y.Z is
+# Publishes @puls3_org/sdk (puls3_sdk_ts/) to npm when a tag sdk-ts-vX.Y.Z is
 # pushed (#302). npm trusted publishing: no token, the OIDC identity of this
 # workflow authenticates, and npm adds provenance on its own. The trusted
 # publisher on npmjs.com must name this repository, this file
 # (publish-sdk-ts.yml) and the `npm` environment. The first version is
 # published by hand: see docs/sdk/releasing-npm.md.
-name: Publish @puls3/sdk to npm
+name: Publish @puls3_org/sdk to npm
 
 on:
   push:
