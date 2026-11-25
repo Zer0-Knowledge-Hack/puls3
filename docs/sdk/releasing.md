@@ -23,7 +23,7 @@ Both packages use [semantic versioning](https://semver.org), and each has a
     bump (`0.1.0` → `0.2.0`);
   - an addition is a **patch** bump.
 - **It pins the exact Serverpod version** of the server it was generated from
-  (`serverpod_client: 4.0.4`, not `^4.0.4`). Serverpod's own client packages
+  (`serverpod_client: 4.1.2`, not `^4.1.2`). Serverpod's own client packages
   pin the same way, because the generated protocol has to match the server.
   `dart pub publish --dry-run` reports these pins as warnings, and CI accepts
   them.

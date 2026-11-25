@@ -54,7 +54,8 @@ abstract class CreateHireResult
   @_isc.useResult
   CreateHireResult copyWith({
     _ibbrviw7.Hire? hire,
-    _i83uy5s0.PreparedTransaction? preparedCreateJob,
+    _i83uy5s0.PreparedTransaction? preparedCreateJob =
+        const _UndefinedCreateHireResult$preparedCreateJob(),
   });
   @override
   Map<String, dynamic> toJson() {
@@ -82,7 +83,11 @@ abstract class CreateHireResult
   }
 }
 
-class _Undefined {}
+class _UndefinedCreateHireResult$preparedCreateJob
+    extends _isc.UndefinedSentinel
+    implements _i83uy5s0.PreparedTransaction {
+  const _UndefinedCreateHireResult$preparedCreateJob();
+}
 
 class _CreateHireResultImpl extends CreateHireResult {
   _CreateHireResultImpl({
@@ -99,13 +104,14 @@ class _CreateHireResultImpl extends CreateHireResult {
   @override
   CreateHireResult copyWith({
     _ibbrviw7.Hire? hire,
-    Object? preparedCreateJob = _Undefined,
+    _i83uy5s0.PreparedTransaction? preparedCreateJob =
+        const _UndefinedCreateHireResult$preparedCreateJob(),
   }) {
     return CreateHireResult(
       hire: hire ?? this.hire.copyWith(),
-      preparedCreateJob: preparedCreateJob is _i83uy5s0.PreparedTransaction?
-          ? preparedCreateJob
-          : this.preparedCreateJob?.copyWith(),
+      preparedCreateJob: preparedCreateJob is _isc.UndefinedSentinel
+          ? this.preparedCreateJob?.copyWith()
+          : preparedCreateJob,
     );
   }
 }

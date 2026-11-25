@@ -58,7 +58,7 @@ abstract class ManifestSkill
     String? id,
     String? name,
     String? description,
-    List<String>? tags,
+    List<String>? tags = const _isc.$UndefinedList<String>(),
   });
   @override
   Map<String, dynamic> toJson() {
@@ -111,13 +111,15 @@ class _ManifestSkillImpl extends ManifestSkill {
     String? id,
     String? name,
     Object? description = _Undefined,
-    Object? tags = _Undefined,
+    List<String>? tags = const _isc.$UndefinedList<String>(),
   }) {
     return ManifestSkill(
       id: id ?? this.id,
       name: name ?? this.name,
       description: description is String? ? description : this.description,
-      tags: tags is List<String>? ? tags : this.tags?.map((e0) => e0).toList(),
+      tags: tags is _isc.UndefinedSentinel
+          ? this.tags?.map((e0) => e0).toList()
+          : tags,
     );
   }
 }

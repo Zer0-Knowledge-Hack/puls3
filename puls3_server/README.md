@@ -1,6 +1,6 @@
 # puls3 Serverpod backend
 
-Serverpod **4.0.4**, pinned on **2026-10-07**. The backend currently exposes a
+Serverpod **4.1.2**, pinned on **2026-11-24**. The backend currently exposes a
 `health` endpoint so the Flutter app can verify the generated client, server,
 and shared workspace are connected, and a read-only `agent` endpoint that serves
 the agent catalog from the on-chain identity registry.
@@ -472,7 +472,7 @@ registration (`register_full` / `set_agent_wallet`), are the next part of #18.
 - Dart 3.12.2
 - Flutter 3.44.4 (to run the app)
 - Docker with Docker Compose
-- Serverpod CLI 4.0.4: `dart pub global activate serverpod_cli 4.0.4`
+- Serverpod CLI 4.1.2: `dart pub global activate serverpod_cli 4.1.2`
 
 ## Start the backend
 
@@ -644,7 +644,7 @@ Browsers may call the API server only from an origin listed in
 origin, or with several `Origin` headers, gets `403` before an endpoint runs.
 Requests without an `Origin` header, such as `curl`, are not affected.
 
-Serverpod 4.0.4 answers CORS preflight (`OPTIONS`) requests in its own core
+Serverpod 4.1.2 answers CORS preflight (`OPTIONS`) requests in its own core
 middleware, before added middleware runs, so preflight responses still carry
 `Access-Control-Allow-Origin: *`. The request that follows is still rejected
 when its origin is not allowed.

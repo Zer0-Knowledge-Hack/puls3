@@ -214,7 +214,7 @@ design/          Design sources (logo lab)
 
 ## Build and run
 
-Prerequisites (the versions CI uses): **Flutter 3.44.4** (bundles Dart 3.12.2), **Serverpod CLI 4.0.4**, and **Docker**. Rust and the Stellar CLI are only needed for the contracts. Machine setup: [CONTRIBUTING.md §1](CONTRIBUTING.md#1-set-up-your-machine).
+Prerequisites (the versions CI uses): **Flutter 3.44.4** (bundles Dart 3.12.2), **Serverpod CLI 4.1.2**, and **Docker**. Rust and the Stellar CLI are only needed for the contracts. Machine setup: [CONTRIBUTING.md §1](CONTRIBUTING.md#1-set-up-your-machine).
 
 ```bash
 # 1. Clone and install the Dart workspace (domain, server, client, app)

@@ -60,7 +60,7 @@ abstract class Puls3ApiException
   Puls3ApiException copyWith({
     String? code,
     String? message,
-    Map<String, String>? details,
+    Map<String, String>? details = const _is.$UndefinedMap<String, String>(),
   });
   @override
   Map<String, dynamic> toJson() {
@@ -108,14 +108,13 @@ class _Puls3ApiExceptionImpl extends Puls3ApiException {
   Puls3ApiException copyWith({
     String? code,
     Object? message = _Undefined,
-    Object? details = _Undefined,
+    Map<String, String>? details = const _is.$UndefinedMap<String, String>(),
   }) {
     return Puls3ApiException(
       code: code ?? this.code,
       message: message is String? ? message : this.message,
-      details: details is Map<String, String>?
-          ? details
-          : this.details?.map(
+      details: details is _is.UndefinedSentinel
+          ? this.details?.map(
               (
                 key0,
                 value0,
@@ -123,7 +122,8 @@ class _Puls3ApiExceptionImpl extends Puls3ApiException {
                 key0,
                 value0,
               ),
-            ),
+            )
+          : details,
     );
   }
 }

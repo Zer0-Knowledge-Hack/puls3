@@ -10,6 +10,7 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'dart:async' as _ida;
 import 'package:serverpod/serverpod.dart' as _is;
 
 /// The agent run of one funded hire (#20). Created as queued in the same
@@ -146,12 +147,12 @@ abstract class HireRunRecord
     int? hireId,
     String? state,
     DateTime? queuedAt,
-    DateTime? startedAt,
-    DateTime? finishedAt,
+    DateTime? startedAt = const _is.$UndefinedDateTime(),
+    DateTime? finishedAt = const _is.$UndefinedDateTime(),
     String? result,
     String? failureReason,
     int? attempts,
-    DateTime? notBefore,
+    DateTime? notBefore = const _is.$UndefinedDateTime(),
     String? lastError,
     String? loopState,
     String? pendingToolCallId,
@@ -259,12 +260,12 @@ class _HireRunRecordImpl extends HireRunRecord {
     int? hireId,
     String? state,
     DateTime? queuedAt,
-    Object? startedAt = _Undefined,
-    Object? finishedAt = _Undefined,
+    DateTime? startedAt = const _is.$UndefinedDateTime(),
+    DateTime? finishedAt = const _is.$UndefinedDateTime(),
     Object? result = _Undefined,
     Object? failureReason = _Undefined,
     int? attempts,
-    Object? notBefore = _Undefined,
+    DateTime? notBefore = const _is.$UndefinedDateTime(),
     Object? lastError = _Undefined,
     Object? loopState = _Undefined,
     Object? pendingToolCallId = _Undefined,
@@ -276,14 +277,20 @@ class _HireRunRecordImpl extends HireRunRecord {
       hireId: hireId ?? this.hireId,
       state: state ?? this.state,
       queuedAt: queuedAt ?? this.queuedAt,
-      startedAt: startedAt is DateTime? ? startedAt : this.startedAt,
-      finishedAt: finishedAt is DateTime? ? finishedAt : this.finishedAt,
+      startedAt: startedAt is _is.UndefinedSentinel
+          ? this.startedAt
+          : startedAt,
+      finishedAt: finishedAt is _is.UndefinedSentinel
+          ? this.finishedAt
+          : finishedAt,
       result: result is String? ? result : this.result,
       failureReason: failureReason is String?
           ? failureReason
           : this.failureReason,
       attempts: attempts ?? this.attempts,
-      notBefore: notBefore is DateTime? ? notBefore : this.notBefore,
+      notBefore: notBefore is _is.UndefinedSentinel
+          ? this.notBefore
+          : notBefore,
       lastError: lastError is String? ? lastError : this.lastError,
       loopState: loopState is String? ? loopState : this.loopState,
       pendingToolCallId: pendingToolCallId is String?
@@ -580,6 +587,69 @@ class HireRunRecordRepository {
       transaction: transaction,
       lockMode: lockMode,
       lockBehavior: lockBehavior,
+    );
+  }
+
+  /// Emits [HireRunRecord]s matching the given query parameters every time the
+  /// source tables are modified.
+  ///
+  /// Use [where] to specify which items to include in the return value.
+  /// If none is specified, all items will be returned.
+  ///
+  /// To specify the order of the items use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
+  /// The maximum number of items can be set by [limit]. If no limit is set,
+  /// all items matching the query will be returned.
+  ///
+  /// [offset] defines how many items to skip, after which [limit] (or all)
+  /// items are read from the database.
+  ///
+  /// Use [throttle] to specify the minimum interval between queries. It can
+  /// also be set to `null`, in which case the stream will only be throttled
+  /// when its subscription is paused.
+  ///
+  /// Source tables are collected from the queried table, [where], [orderBy],
+  /// [orderByList], and the [include] graph. [alsoTriggerOnTables] is added
+  /// to that set. Pass [Table] instances such as `HireRunRecord.t`.
+  ///
+  /// Raw [Expression] SQL is not inspected. Tables referenced only in raw
+  /// SQL must be passed via [alsoTriggerOnTables].
+  ///
+  /// The stream always reads committed state and never joins an ambient
+  /// [Transaction]. Emissions for a write fire after that write commits.
+  ///
+  /// Currently only supported on SQLite. Calling this method on PostgreSQL
+  /// throws an [UnsupportedError].
+  ///
+  /// ```dart
+  /// var subscription = Persons.db.watch(
+  ///   session,
+  ///   where: (t) => t.lastName.equals('Jones'),
+  ///   orderBy: (t) => t.firstName,
+  ///   limit: 100,
+  /// ).listen((persons) {
+  ///   // Handle the latest matching rows.
+  /// });
+  /// ```
+  _ida.Stream<List<HireRunRecord>> watch(
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<HireRunRecordTable>? where,
+    int? limit,
+    int? offset,
+    _is.OrderByBuilder<HireRunRecordTable>? orderBy,
+    _is.OrderByListBuilder<HireRunRecordTable>? orderByList,
+    Duration? throttle = const Duration(milliseconds: 30),
+    Iterable<_is.Table>? alsoTriggerOnTables,
+  }) {
+    return session.db.watch<HireRunRecord>(
+      where: where?.call(HireRunRecord.t),
+      orderBy: orderBy?.call(HireRunRecord.t),
+      orderByList: orderByList?.call(HireRunRecord.t),
+      limit: limit,
+      offset: offset,
+      throttle: throttle,
+      alsoTriggerOnTables: alsoTriggerOnTables,
     );
   }
 

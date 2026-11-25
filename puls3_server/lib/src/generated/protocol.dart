@@ -57,7 +57,6 @@ import 'hire_terms.dart' as _ij38jwy0;
 import 'ledger/terminal_job_fact.dart' as _itxj7opn;
 import 'payment.dart' as _ikmm2vup;
 import 'prepared_transaction.dart' as _i83uy5s0;
-import 'puls3_api_error_details.dart' as _i6knfj5b;
 import 'puls3_api_exception.dart' as _i5rj3edu;
 import 'runtime/hire_run.dart' as _iw9spjs5;
 import 'studio/agent_hire_started.dart' as _i3ggywhi;
@@ -106,7 +105,6 @@ export 'hire_terms.dart';
 export 'ledger/terminal_job_fact.dart';
 export 'payment.dart';
 export 'prepared_transaction.dart';
-export 'puls3_api_error_details.dart';
 export 'puls3_api_exception.dart';
 export 'runtime/hire_run.dart';
 export 'studio/agent_hire_started.dart';
@@ -122,14 +120,190 @@ export 'studio/studio_draft.dart';
 export 'studio/studio_draft_record.dart';
 export 'studio/test_run_result.dart';
 
-class Protocol extends _is.DatabaseSerializationManager {
+class Protocol extends _is.DatabaseSerializationManager
+    implements _is.DatabaseProtocolDeserializationProvider {
   Protocol._();
 
   factory Protocol() => _instance;
 
   static final Protocol _instance = Protocol._().._registerHostProtocols();
 
+  @override
+  _is.ProtocolDeserialization get deserializationMetadata =>
+      _is.ProtocolDeserialization.cached(
+        this,
+        types: const [
+          _is.getType<_it6c3ckv.AgentCatalogUnavailable>,
+          _is.getType<_ia7sdlqn.AgentRecord>,
+          _is.getType<_ipe500bk.AgentSummary>,
+          _is.getType<_ickya0iq.AgentWallet>,
+          _is.getType<_ixu8n9dt.CatalogIndexState>,
+          _is.getType<_iu0b4rj2.CliSession>,
+          _is.getType<_i4vjaol5.CliSessionGrant>,
+          _is.getType<_izqstcym.WalletAccount>,
+          _is.getType<_idvb5xlo.WalletChallenge>,
+          _is.getType<_i1hfx2wv.WalletChallengeRecord>,
+          _is.getType<_iz6hnyrm.ChainSubmission>,
+          _is.getType<_i4si20vg.CreateHireResult>,
+          _is.getType<_i4f19055.DeploySession>,
+          _is.getType<_i640bgq8.FeedbackEligibility>,
+          _is.getType<_izw8z7ou.Greeting>,
+          _is.getType<_ikpil6ki.BackendHealth>,
+          _is.getType<_ibbrviw7.Hire>,
+          _is.getType<_ialkjq09.AgentCannotDeliver>,
+          _is.getType<_i3db3d86.AgentUnavailable>,
+          _is.getType<_ir9uo1i9.EscrowPreparation>,
+          _is.getType<_ikb6z54u.HireRecord>,
+          _is.getType<_izyyjkbb.HireConfigurationMissing>,
+          _is.getType<_izuscvxu.HireLedgerUnavailable>,
+          _is.getType<_i7gyvijy.HirePaymentRecord>,
+          _is.getType<_iuo7hy2q.HireReceiptLineRecord>,
+          _is.getType<_i1txwkfs.HireRequestInvalid>,
+          _is.getType<_izumcaty.HireSummary>,
+          _is.getType<_ivruwodq.HireView>,
+          _is.getType<_ipbsq2gs.HireDetail>,
+          _is.getType<_i404ykkm.HireReceiptLine>,
+          _is.getType<_ij38jwy0.HireTerms>,
+          _is.getType<_itxj7opn.TerminalJobFact>,
+          _is.getType<_ikmm2vup.Payment>,
+          _is.getType<_i83uy5s0.PreparedTransaction>,
+          _is.getType<_i5rj3edu.Puls3ApiException>,
+          _is.getType<_iw9spjs5.HireRunRecord>,
+          _is.getType<_i3ggywhi.AgentHireStarted>,
+          _is.getType<_i1fcn02s.AgentManifestDraft>,
+          _is.getType<_i4wr3q5v.BuilderCredentialRecord>,
+          _is.getType<_ihtr58tu.ManifestModel>,
+          _is.getType<_iyhnvuqa.ManifestPrice>,
+          _is.getType<_ige837u7.ManifestSkill>,
+          _is.getType<_irxkujl5.StudioAgentVersionRecord>,
+          _is.getType<_ie0z856o.StudioDeployRecord>,
+          _is.getType<_iakoztug.StudioDraft>,
+          _is.getType<_iofpgncb.StudioDraftRecord>,
+          _is.getType<_if6sgnfl.TestRunResult>,
+          _is.getType<_it6c3ckv.AgentCatalogUnavailable?>,
+          _is.getType<_ia7sdlqn.AgentRecord?>,
+          _is.getType<_ipe500bk.AgentSummary?>,
+          _is.getType<_ickya0iq.AgentWallet?>,
+          _is.getType<_ixu8n9dt.CatalogIndexState?>,
+          _is.getType<_iu0b4rj2.CliSession?>,
+          _is.getType<_i4vjaol5.CliSessionGrant?>,
+          _is.getType<_izqstcym.WalletAccount?>,
+          _is.getType<_idvb5xlo.WalletChallenge?>,
+          _is.getType<_i1hfx2wv.WalletChallengeRecord?>,
+          _is.getType<_iz6hnyrm.ChainSubmission?>,
+          _is.getType<_i4si20vg.CreateHireResult?>,
+          _is.getType<_i4f19055.DeploySession?>,
+          _is.getType<_i640bgq8.FeedbackEligibility?>,
+          _is.getType<_izw8z7ou.Greeting?>,
+          _is.getType<_ikpil6ki.BackendHealth?>,
+          _is.getType<_ibbrviw7.Hire?>,
+          _is.getType<_ialkjq09.AgentCannotDeliver?>,
+          _is.getType<_i3db3d86.AgentUnavailable?>,
+          _is.getType<_ir9uo1i9.EscrowPreparation?>,
+          _is.getType<_ikb6z54u.HireRecord?>,
+          _is.getType<_izyyjkbb.HireConfigurationMissing?>,
+          _is.getType<_izuscvxu.HireLedgerUnavailable?>,
+          _is.getType<_i7gyvijy.HirePaymentRecord?>,
+          _is.getType<_iuo7hy2q.HireReceiptLineRecord?>,
+          _is.getType<_i1txwkfs.HireRequestInvalid?>,
+          _is.getType<_izumcaty.HireSummary?>,
+          _is.getType<_ivruwodq.HireView?>,
+          _is.getType<_ipbsq2gs.HireDetail?>,
+          _is.getType<_i404ykkm.HireReceiptLine?>,
+          _is.getType<_ij38jwy0.HireTerms?>,
+          _is.getType<_itxj7opn.TerminalJobFact?>,
+          _is.getType<_ikmm2vup.Payment?>,
+          _is.getType<_i83uy5s0.PreparedTransaction?>,
+          _is.getType<_i5rj3edu.Puls3ApiException?>,
+          _is.getType<_iw9spjs5.HireRunRecord?>,
+          _is.getType<_i3ggywhi.AgentHireStarted?>,
+          _is.getType<_i1fcn02s.AgentManifestDraft?>,
+          _is.getType<_i4wr3q5v.BuilderCredentialRecord?>,
+          _is.getType<_ihtr58tu.ManifestModel?>,
+          _is.getType<_iyhnvuqa.ManifestPrice?>,
+          _is.getType<_ige837u7.ManifestSkill?>,
+          _is.getType<_irxkujl5.StudioAgentVersionRecord?>,
+          _is.getType<_ie0z856o.StudioDeployRecord?>,
+          _is.getType<_iakoztug.StudioDraft?>,
+          _is.getType<_iofpgncb.StudioDraftRecord?>,
+          _is.getType<_if6sgnfl.TestRunResult?>,
+          _is.getType<List<String>>,
+          _is.getType<List<_i404ykkm.HireReceiptLine>>,
+          _is.getType<List<_i404ykkm.HireReceiptLine>?>,
+          _is.getType<Map<String, String>>,
+          _is.getType<Map<String, String>?>,
+          _is.getType<List<_ige837u7.ManifestSkill>>,
+          _is.getType<List<_ige837u7.ManifestSkill>?>,
+          _is.getType<List<String>?>,
+          _is.getType<List<_ih3rdrku.AgentSummary>>,
+          _is.getType<List<_i0cajwtn.CliSession>>,
+          _is.getType<List<_iyt3gzh8.HireSummary>>,
+          _is.getType<List<_i3089e9p.StudioDraft>>,
+        ],
+        modules: const [
+          _iais.Protocol.new,
+          _iacs.Protocol.new,
+          _isp.Protocol.new,
+        ],
+        classNames: const [
+          'AgentCatalogUnavailable',
+          'AgentRecord',
+          'AgentSummary',
+          'AgentWallet',
+          'CatalogIndexState',
+          'CliSession',
+          'CliSessionGrant',
+          'WalletAccount',
+          'WalletChallenge',
+          'WalletChallengeRecord',
+          'ChainSubmission',
+          'CreateHireResult',
+          'DeploySession',
+          'FeedbackEligibility',
+          'Greeting',
+          'BackendHealth',
+          'Hire',
+          'AgentCannotDeliver',
+          'AgentUnavailable',
+          'EscrowPreparation',
+          'HireRecord',
+          'HireConfigurationMissing',
+          'HireLedgerUnavailable',
+          'HirePaymentRecord',
+          'HireReceiptLineRecord',
+          'HireRequestInvalid',
+          'HireSummary',
+          'HireView',
+          'HireDetail',
+          'HireReceiptLine',
+          'HireTerms',
+          'TerminalJobFact',
+          'Payment',
+          'PreparedTransaction',
+          'Puls3ApiException',
+          'HireRunRecord',
+          'AgentHireStarted',
+          'AgentManifestDraft',
+          'BuilderCredentialRecord',
+          'ManifestModel',
+          'ManifestPrice',
+          'ManifestSkill',
+          'StudioAgentVersionRecord',
+          'StudioDeployRecord',
+          'StudioDraft',
+          'StudioDraftRecord',
+          'TestRunResult',
+        ],
+      );
+
   static List<_isp.TableDefinition> get targetTableDefinitions => [
+    ..._ownTableDefinitions,
+    ..._iais.Protocol().getOwnTableDefinitions(),
+    ..._iacs.Protocol().getOwnTableDefinitions(),
+    ..._isp.Protocol.targetTableDefinitions,
+  ];
+
+  static List<_isp.TableDefinition> get _ownTableDefinitions => [
     _isp.TableDefinition(
       name: 'agent_record',
       dartName: 'AgentRecord',
@@ -1789,16 +1963,10 @@ class Protocol extends _is.DatabaseSerializationManager {
       ],
       managed: true,
     ),
-    ..._iais.Protocol.targetTableDefinitions,
-    ..._iacs.Protocol.targetTableDefinitions,
-    ..._isp.Protocol.targetTableDefinitions,
   ];
 
-  static String? getClassNameFromObjectJson(dynamic data) {
-    if (data is! Map) return null;
-    final className = data['__className__'] as String?;
-    return className;
-  }
+  static String? getClassNameFromObjectJson(dynamic data) =>
+      _is.ProtocolDeserialization.readClassName(data);
 
   @override
   T deserialize<T>(
@@ -1806,8 +1974,8 @@ class Protocol extends _is.DatabaseSerializationManager {
     Type? t,
   ]) {
     t ??= T;
-
-    final dataClassName = getClassNameFromObjectJson(data);
+    final rawDataClassName = _is.ProtocolDeserialization.readClassName(data);
+    final dataClassName = rawDataClassName;
     if (dataClassName != null && dataClassName != getClassNameForType(t)) {
       try {
         return deserializeByClassName({
@@ -1922,9 +2090,6 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (t == _i83uy5s0.PreparedTransaction) {
       return _i83uy5s0.PreparedTransaction.fromJson(data) as T;
-    }
-    if (t == _i6knfj5b.Puls3ApiErrorDetails) {
-      return _i6knfj5b.Puls3ApiErrorDetails.fromJson(data) as T;
     }
     if (t == _i5rj3edu.Puls3ApiException) {
       return _i5rj3edu.Puls3ApiException.fromJson(data) as T;
@@ -2106,12 +2271,6 @@ class Protocol extends _is.DatabaseSerializationManager {
               : null)
           as T;
     }
-    if (t == _is.getType<_i6knfj5b.Puls3ApiErrorDetails?>()) {
-      return (data != null
-              ? _i6knfj5b.Puls3ApiErrorDetails.fromJson(data)
-              : null)
-          as T;
-    }
     if (t == _is.getType<_i5rj3edu.Puls3ApiException?>()) {
       return (data != null ? _i5rj3edu.Puls3ApiException.fromJson(data) : null)
           as T;
@@ -2196,6 +2355,15 @@ class Protocol extends _is.DatabaseSerializationManager {
           )
           as T;
     }
+    if (t == _is.getType<Map<String, String>?>()) {
+      return (data != null
+              ? (data as Map).map(
+                  (k, v) =>
+                      MapEntry(deserialize<String>(k), deserialize<String>(v)),
+                )
+              : null)
+          as T;
+    }
     if (t == List<_ige837u7.ManifestSkill>) {
       return (data as List)
               .map((e) => deserialize<_ige837u7.ManifestSkill>(e))
@@ -2240,15 +2408,16 @@ class Protocol extends _is.DatabaseSerializationManager {
               .toList()
           as T;
     }
-    try {
-      return _iais.Protocol().deserialize<T>(data, t);
-    } on _is.DeserializationTypeNotFoundException catch (_) {}
-    try {
-      return _iacs.Protocol().deserialize<T>(data, t);
-    } on _is.DeserializationTypeNotFoundException catch (_) {}
-    try {
-      return _isp.Protocol().deserialize<T>(data, t);
-    } on _is.DeserializationTypeNotFoundException catch (_) {}
+    final modules = deserializationMetadata.modulesForDeserialization(
+      t,
+      className: rawDataClassName,
+    );
+    for (final module in modules) {
+      try {
+        return module.deserialize<T>(data, t);
+      } on _is.DeserializationTypeNotFoundException catch (_) {}
+    }
+
     return super.deserialize<T>(data, t);
   }
 
@@ -2288,7 +2457,6 @@ class Protocol extends _is.DatabaseSerializationManager {
       _itxj7opn.TerminalJobFact => 'TerminalJobFact',
       _ikmm2vup.Payment => 'Payment',
       _i83uy5s0.PreparedTransaction => 'PreparedTransaction',
-      _i6knfj5b.Puls3ApiErrorDetails => 'Puls3ApiErrorDetails',
       _i5rj3edu.Puls3ApiException => 'Puls3ApiException',
       _iw9spjs5.HireRunRecord => 'HireRunRecord',
       _i3ggywhi.AgentHireStarted => 'AgentHireStarted',
@@ -2385,8 +2553,6 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'Payment';
       case _i83uy5s0.PreparedTransaction():
         return 'PreparedTransaction';
-      case _i6knfj5b.Puls3ApiErrorDetails():
-        return 'Puls3ApiErrorDetails';
       case _i5rj3edu.Puls3ApiException():
         return 'Puls3ApiException';
       case _iw9spjs5.HireRunRecord():
@@ -2543,9 +2709,6 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (dataClassName == 'PreparedTransaction') {
       return deserialize<_i83uy5s0.PreparedTransaction>(data['data']);
     }
-    if (dataClassName == 'Puls3ApiErrorDetails') {
-      return deserialize<_i6knfj5b.Puls3ApiErrorDetails>(data['data']);
-    }
     if (dataClassName == 'Puls3ApiException') {
       return deserialize<_i5rj3edu.Puls3ApiException>(data['data']);
     }
@@ -2589,16 +2752,22 @@ class Protocol extends _is.DatabaseSerializationManager {
       return deserialize<_if6sgnfl.TestRunResult>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
-      data['className'] = dataClassName.substring(19);
-      return _iais.Protocol().deserializeByClassName(data);
+      return _iais.Protocol().deserializeByClassName({
+        ...data,
+        'className': dataClassName.substring(19),
+      });
     }
     if (dataClassName.startsWith('serverpod_auth_core.')) {
-      data['className'] = dataClassName.substring(20);
-      return _iacs.Protocol().deserializeByClassName(data);
+      return _iacs.Protocol().deserializeByClassName({
+        ...data,
+        'className': dataClassName.substring(20),
+      });
     }
     if (dataClassName.startsWith('serverpod.')) {
-      data['className'] = dataClassName.substring(10);
-      return _isp.Protocol().deserializeByClassName(data);
+      return _isp.Protocol().deserializeByClassName({
+        ...data,
+        'className': dataClassName.substring(10),
+      });
     }
     return super.deserializeByClassName(data);
   }
@@ -2668,6 +2837,9 @@ class Protocol extends _is.DatabaseSerializationManager {
   @override
   List<_isp.TableDefinition> getTargetTableDefinitions() =>
       targetTableDefinitions;
+
+  @override
+  List<_isp.TableDefinition> getOwnTableDefinitions() => _ownTableDefinitions;
 
   @override
   String getModuleName() => 'puls3';

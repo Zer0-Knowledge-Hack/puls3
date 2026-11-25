@@ -73,7 +73,8 @@ abstract class DeploySession
   @_is.useResult
   DeploySession copyWith({
     String? state,
-    _i83uy5s0.PreparedTransaction? preparation,
+    _i83uy5s0.PreparedTransaction? preparation =
+        const _UndefinedDeploySession$preparation(),
     int? agentId,
     String? agentWallet,
     String? failureCode,
@@ -113,6 +114,11 @@ abstract class DeploySession
 
 class _Undefined {}
 
+class _UndefinedDeploySession$preparation extends _is.UndefinedSentinel
+    implements _i83uy5s0.PreparedTransaction {
+  const _UndefinedDeploySession$preparation();
+}
+
 class _DeploySessionImpl extends DeploySession {
   _DeploySessionImpl({
     required String state,
@@ -136,7 +142,8 @@ class _DeploySessionImpl extends DeploySession {
   @override
   DeploySession copyWith({
     String? state,
-    Object? preparation = _Undefined,
+    _i83uy5s0.PreparedTransaction? preparation =
+        const _UndefinedDeploySession$preparation(),
     Object? agentId = _Undefined,
     Object? agentWallet = _Undefined,
     Object? failureCode = _Undefined,
@@ -144,9 +151,9 @@ class _DeploySessionImpl extends DeploySession {
   }) {
     return DeploySession(
       state: state ?? this.state,
-      preparation: preparation is _i83uy5s0.PreparedTransaction?
-          ? preparation
-          : this.preparation?.copyWith(),
+      preparation: preparation is _is.UndefinedSentinel
+          ? this.preparation?.copyWith()
+          : preparation,
       agentId: agentId is int? ? agentId : this.agentId,
       agentWallet: agentWallet is String? ? agentWallet : this.agentWallet,
       failureCode: failureCode is String? ? failureCode : this.failureCode,

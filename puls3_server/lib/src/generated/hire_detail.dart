@@ -166,18 +166,21 @@ abstract class HireDetail
     _ipe500bk.AgentSummary? agent,
     String? input,
     String? result,
-    _ikmm2vup.Payment? payment,
+    _ikmm2vup.Payment? payment = const _UndefinedHireDetail$payment(),
     int? jobId,
-    DateTime? expiresAt,
-    DateTime? approvalDeadline,
+    DateTime? expiresAt = const _is.$UndefinedDateTime(),
+    DateTime? approvalDeadline = const _is.$UndefinedDateTime(),
     bool? runFinished,
     String? submitErrorCode,
     String? rejectReason,
-    _iz6hnyrm.ChainSubmission? escrowSubmission,
-    _iz6hnyrm.ChainSubmission? feedbackSubmission,
+    _iz6hnyrm.ChainSubmission? escrowSubmission =
+        const _UndefinedHireDetail$escrowSubmission(),
+    _iz6hnyrm.ChainSubmission? feedbackSubmission =
+        const _UndefinedHireDetail$escrowSubmission(),
     int? feedbackScore,
     String? paymentExplorerUrl,
-    List<_i404ykkm.HireReceiptLine>? receipt,
+    List<_i404ykkm.HireReceiptLine>? receipt =
+        const _is.$UndefinedList<_i404ykkm.HireReceiptLine>(),
   });
   @override
   Map<String, dynamic> toJson() {
@@ -241,6 +244,16 @@ abstract class HireDetail
 
 class _Undefined {}
 
+class _UndefinedHireDetail$payment extends _is.UndefinedSentinel
+    implements _ikmm2vup.Payment {
+  const _UndefinedHireDetail$payment();
+}
+
+class _UndefinedHireDetail$escrowSubmission extends _is.UndefinedSentinel
+    implements _iz6hnyrm.ChainSubmission {
+  const _UndefinedHireDetail$escrowSubmission();
+}
+
 class _HireDetailImpl extends HireDetail {
   _HireDetailImpl({
     required _ibbrviw7.Hire hire,
@@ -287,50 +300,55 @@ class _HireDetailImpl extends HireDetail {
     _ipe500bk.AgentSummary? agent,
     String? input,
     Object? result = _Undefined,
-    Object? payment = _Undefined,
+    _ikmm2vup.Payment? payment = const _UndefinedHireDetail$payment(),
     Object? jobId = _Undefined,
-    Object? expiresAt = _Undefined,
-    Object? approvalDeadline = _Undefined,
+    DateTime? expiresAt = const _is.$UndefinedDateTime(),
+    DateTime? approvalDeadline = const _is.$UndefinedDateTime(),
     bool? runFinished,
     Object? submitErrorCode = _Undefined,
     Object? rejectReason = _Undefined,
-    Object? escrowSubmission = _Undefined,
-    Object? feedbackSubmission = _Undefined,
+    _iz6hnyrm.ChainSubmission? escrowSubmission =
+        const _UndefinedHireDetail$escrowSubmission(),
+    _iz6hnyrm.ChainSubmission? feedbackSubmission =
+        const _UndefinedHireDetail$escrowSubmission(),
     Object? feedbackScore = _Undefined,
     Object? paymentExplorerUrl = _Undefined,
-    Object? receipt = _Undefined,
+    List<_i404ykkm.HireReceiptLine>? receipt =
+        const _is.$UndefinedList<_i404ykkm.HireReceiptLine>(),
   }) {
     return HireDetail(
       hire: hire ?? this.hire.copyWith(),
       agent: agent ?? this.agent.copyWith(),
       input: input ?? this.input,
       result: result is String? ? result : this.result,
-      payment: payment is _ikmm2vup.Payment?
-          ? payment
-          : this.payment?.copyWith(),
+      payment: payment is _is.UndefinedSentinel
+          ? this.payment?.copyWith()
+          : payment,
       jobId: jobId is int? ? jobId : this.jobId,
-      expiresAt: expiresAt is DateTime? ? expiresAt : this.expiresAt,
-      approvalDeadline: approvalDeadline is DateTime?
-          ? approvalDeadline
-          : this.approvalDeadline,
+      expiresAt: expiresAt is _is.UndefinedSentinel
+          ? this.expiresAt
+          : expiresAt,
+      approvalDeadline: approvalDeadline is _is.UndefinedSentinel
+          ? this.approvalDeadline
+          : approvalDeadline,
       runFinished: runFinished ?? this.runFinished,
       submitErrorCode: submitErrorCode is String?
           ? submitErrorCode
           : this.submitErrorCode,
       rejectReason: rejectReason is String? ? rejectReason : this.rejectReason,
-      escrowSubmission: escrowSubmission is _iz6hnyrm.ChainSubmission?
-          ? escrowSubmission
-          : this.escrowSubmission?.copyWith(),
-      feedbackSubmission: feedbackSubmission is _iz6hnyrm.ChainSubmission?
-          ? feedbackSubmission
-          : this.feedbackSubmission?.copyWith(),
+      escrowSubmission: escrowSubmission is _is.UndefinedSentinel
+          ? this.escrowSubmission?.copyWith()
+          : escrowSubmission,
+      feedbackSubmission: feedbackSubmission is _is.UndefinedSentinel
+          ? this.feedbackSubmission?.copyWith()
+          : feedbackSubmission,
       feedbackScore: feedbackScore is int? ? feedbackScore : this.feedbackScore,
       paymentExplorerUrl: paymentExplorerUrl is String?
           ? paymentExplorerUrl
           : this.paymentExplorerUrl,
-      receipt: receipt is List<_i404ykkm.HireReceiptLine>?
-          ? receipt
-          : this.receipt?.map((e0) => e0.copyWith()).toList(),
+      receipt: receipt is _is.UndefinedSentinel
+          ? this.receipt?.map((e0) => e0.copyWith()).toList()
+          : receipt,
     );
   }
 }
