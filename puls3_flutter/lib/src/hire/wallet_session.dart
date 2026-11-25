@@ -40,6 +40,55 @@ final class InMemorySessionWalletStore implements SessionWalletStore {
   Future<void> write(String? wallet) async => _wallet = wallet;
 }
 
+/// Storage that keeps one wallet across reloads and may refuse: the
+/// browser's `localStorage` throws when it is full or blocked.
+abstract interface class SessionWalletStorage {
+  String? getItem();
+  void setItem(String wallet);
+  void removeItem();
+}
+
+/// [SessionWalletStore] over a [SessionWalletStorage] that may fail. Once a
+/// read or a write fails, it answers from memory for the rest of the visit:
+/// a refused write never hides a sign-in, and a refused removal never brings
+/// back a wallet that signed out (#261). Without storage it is memory only.
+final class FallbackSessionWalletStore implements SessionWalletStore {
+  FallbackSessionWalletStore(this._storage);
+
+  final SessionWalletStorage? _storage;
+  final _memory = InMemorySessionWalletStore();
+  bool _memoryOnly = false;
+
+  @override
+  Future<String?> read() async {
+    final storage = _storage;
+    if (storage != null && !_memoryOnly) {
+      try {
+        return storage.getItem();
+      } on Object {
+        _memoryOnly = true;
+      }
+    }
+    return _memory.read();
+  }
+
+  @override
+  Future<void> write(String? wallet) async {
+    await _memory.write(wallet);
+    final storage = _storage;
+    if (storage == null || _memoryOnly) return;
+    try {
+      if (wallet == null) {
+        storage.removeItem();
+      } else {
+        storage.setItem(wallet);
+      }
+    } on Object {
+      _memoryOnly = true;
+    }
+  }
+}
+
 /// The wallet-bound Serverpod session (#136, api.md "Wallet session
 /// lifecycle", F1-2/F1-3): the server issues a SEP-10 challenge, the wallet
 /// signs it, and the server answers with the session credentials, which the
