@@ -25,7 +25,7 @@ console.log('agent', agent.agentId, 'wallet', agent.agentWallet);
 const hire = await sdk.hire(30, 'Review this Soroban function: …', { maxPrice: 5_000_000 });
 const done = await sdk.waitForResult(hire.hire.id);
 console.log(done.result);
-await sdk.approve(hire.hire.id);        // releases the escrow to the agent
+await sdk.approve(hire.hire.id, { result: done.result! }); // releases the escrow, if this is the delivery on chain
 await sdk.rate(hire.hire.id, 5, 'Useful findings.');
 
 // 3. Your agent pays another agent by itself, from its custodied wallet.

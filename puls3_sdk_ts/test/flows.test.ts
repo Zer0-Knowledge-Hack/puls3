@@ -354,6 +354,33 @@ describe('Puls3Sdk.approve, reject, rate', () => {
     });
   }
 
+  // The B1 probe: the server is consistent about every field it returns, and
+  // describes another job with that job's own result. Only the result the
+  // caller reviewed tells them apart.
+  for (const decide of ['approve', 'reject'] as const) {
+    it(`${decide} with the reviewed result signs nothing when the server shows another job's result`, async () => {
+      const { sdk, submitted, chain } = hireServer();
+      chain.status = 'submitted';
+      const reviewed = { result: 'What I reviewed.' };
+      await assert.rejects(
+        decide === 'approve' ? sdk.approve(21, reviewed) : sdk.reject(21, 'Not usable.', reviewed),
+        (e: unknown) => {
+          assert.ok(e instanceof SigningRefused);
+          assert.equal(e.rule, 'call');
+          return true;
+        },
+      );
+      assert.equal(submitted.length, 0);
+    });
+  }
+
+  it('approve with the reviewed result signs when it is the delivery on chain', async () => {
+    const { sdk, submitted, chain } = hireServer();
+    chain.status = 'submitted';
+    assert.equal((await sdk.approve(21, { result: 'Two findings.' })).hire.status, 'completed');
+    assert.equal(submitted.length, 1);
+  });
+
   it('approve accepts a job whose agent has since bound another wallet', async () => {
     // The escrow pays the provider it stored, so a later rebind is no reason to refuse.
     const { sdk, submitted, chain } = hireServer({

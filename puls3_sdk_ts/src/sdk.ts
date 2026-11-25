@@ -653,10 +653,16 @@ export class Puls3Sdk {
   /**
    * Approves the delivered hire [hireId]: signs `complete`, which releases
    * the escrow to the agent, and waits until the hire is `completed`.
+   *
+   * Pass [options.result], the result you reviewed (from [waitForResult]),
+   * and the SDK signs only if the delivery the agent recorded on chain is
+   * that result. Without it, the SDK checks the job against what the server
+   * says about the hire, which a server that lies about every field can
+   * still describe as another of your jobs.
    */
-  async approve(hireId: number): Promise<HireDetail> {
+  async approve(hireId: number, options: { result?: string } = {}): Promise<HireDetail> {
     const wallet = this.#requireSigner('approve').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet, 'complete');
+    const jobId = await this.#checkHireJob(hireId, wallet, 'complete', options.result);
     const prepared = await this.prepareComplete(hireId);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
@@ -665,10 +671,13 @@ export class Puls3Sdk {
   /**
    * Rejects hire [hireId] for [reason]: signs `reject`, which refunds the
    * escrow to the signer, and waits until the hire is `rejected`.
+   *
+   * [options.result] is the result you reviewed, as for [approve]: the SDK
+   * then signs only if it is the delivery recorded on chain.
    */
-  async reject(hireId: number, reason: string): Promise<HireDetail> {
+  async reject(hireId: number, reason: string, options: { result?: string } = {}): Promise<HireDetail> {
     const wallet = this.#requireSigner('reject').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet, 'reject');
+    const jobId = await this.#checkHireJob(hireId, wallet, 'reject', options.result);
     const prepared = await this.prepareReject(hireId, reason);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
@@ -709,25 +718,43 @@ export class Puls3Sdk {
   // --- Internals ----------------------------------------------------------
 
   /**
-   * Hire [hireId]'s escrow job, after checking it on chain. The job id, the
-   * agent and the price all come from the server, so the binding that holds
-   * is the delivery itself: the agent's `submit` recorded the SHA-256 of its
-   * result on the job, and it must be the result this hire shows. A server
-   * that points approve(A) at another job B fails here, unless it also shows
-   * B's result as A's, and then the signer approves the work it was shown.
+   * Hire [hireId]'s escrow job, after checking it on chain. The agent's
+   * `submit` recorded the SHA-256 of its result on the job.
+   *
+   * With [evaluated], the result the caller reviewed, the job's delivery
+   * must be that result: this is the only binding the server cannot steer,
+   * since the job id, the agent, the price and the result it returns now
+   * all come from the same server.
+   *
+   * Without it, the delivery must be the result the server returns now.
+   * That catches a server that lies about some fields, not one that lies
+   * about all of them: it could describe another of the signer's jobs,
+   * with that job's own result.
+   *
    * [purpose] `complete` needs a delivery; `reject` accepts none (a funded
    * hire), but then the job must have none either.
    */
-  async #checkHireJob(hireId: number, wallet: string, purpose: 'complete' | 'reject'): Promise<bigint> {
+  async #checkHireJob(
+    hireId: number,
+    wallet: string,
+    purpose: 'complete' | 'reject',
+    evaluated: string | undefined,
+  ): Promise<bigint> {
     const detail = await this.getHire(hireId, wallet);
     const jobId = requireJobId(detail);
     const job = await this.#checkJob(jobId, detail.hire.agentId, BigInt(detail.hire.price));
-    const shown = detail.result === null ? null : createHash('sha256').update(detail.result, 'utf8').digest('hex');
-    if (purpose === 'complete' && (job.deliverable === null || shown === null)) {
+    const result = evaluated ?? detail.result;
+    const expected = result === null ? null : createHash('sha256').update(result, 'utf8').digest('hex');
+    if (purpose === 'complete' && (job.deliverable === null || expected === null)) {
       throw new SigningRefused('call', `job ${jobId} has no delivery to approve`);
     }
-    if (job.deliverable !== shown) {
-      throw new SigningRefused('call', `job ${jobId}'s delivery is not the result hire ${hireId} shows`);
+    if (job.deliverable !== expected) {
+      throw new SigningRefused(
+        'call',
+        evaluated === undefined
+          ? `job ${jobId}'s delivery is not the result hire ${hireId} shows`
+          : `job ${jobId}'s delivery is not the result you reviewed`,
+      );
     }
     return jobId;
   }
