@@ -558,7 +558,10 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   (Completed), reserve 0. Recorded in `docs/verification/334-agent-subcontracting.md`. T8 done.
   Open: T8.1 (Studio opt-in transport), T8.4 (reject reason), the native review of `44db635`, and
   moving production to escrow v0.2.0 (user decision).
-- [ ] **T8.4** Reject reason contract: the app labels the field "Motivo (opcional)"
+- [x] **T8.4** (done 2026-11-25: the server contract stays, since api.md and ADR-0010 publish the
+  reason as required; the app sends `defaultRejectReason` ("Rejected by the consumer.") when the
+  field is empty, so "optional" is true for the user. RED: two hire detail tests expecting the
+  default failed; GREEN: Flutter 600 passed, analyze clean. Risk: none.) Reject reason contract: the app labels the field "Motivo (opcional)"
   (`hireRejectReasonHint`) but `EscrowRelayService._prepare` refuses an empty reason with
   `InvalidRejectReason`, and the click shows nothing (Log, 2026-11-24). Pre-existing since `f799ca5`
   (#96).

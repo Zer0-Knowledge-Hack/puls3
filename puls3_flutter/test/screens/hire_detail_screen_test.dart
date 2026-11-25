@@ -385,7 +385,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(gateway.prepared, contains(('reject', '')));
+    expect(gateway.prepared, contains(('reject', defaultRejectReason)));
     expect(
       gateway.submitted,
       contains((3, 'reject', 'signed:AAAA-reject')),
@@ -793,7 +793,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('hire-detail-reject')));
     await tester.pump();
     await tester.pump();
-    expect(gateway.prepared, [('reject', '')]);
+    expect(gateway.prepared, [('reject', defaultRejectReason)]);
     expect(_status('Rejected'), findsOneWidget);
   });
 

@@ -74,6 +74,13 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   String? _address;
   final _reason = TextEditingController();
 
+  /// The typed reason, or [defaultRejectReason] when the user gave none:
+  /// the field is optional, the server needs a reason (#334 T8.4).
+  String get _rejectReason {
+    final typed = _reason.text.trim();
+    return typed.isEmpty ? defaultRejectReason : typed;
+  }
+
   /// Bumped per request, so a stale answer never overwrites a newer one.
   int _request = 0;
 
@@ -261,7 +268,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
       await gateway.ensureSignedIn(address, wallet.signChallenge);
       final preparation = approve
           ? await gateway.prepareComplete(hire.hireId)
-          : await gateway.prepareReject(hire.hireId, _reason.text.trim());
+          : await gateway.prepareReject(hire.hireId, _rejectReason);
       final signed = await wallet.signTransaction(
         preparation.unsignedTransaction,
       );
