@@ -112,6 +112,13 @@ describe('SorobanRpcReader', () => {
         init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
       })) as typeof fetch;
     const reader = new SorobanRpcReader(TESTNET, source, hung, { timeoutMs: 50 });
-    await assert.rejects(reader.latestLedger(), Puls3NetworkError);
+    // A real request holds a socket that keeps the process alive; this fake
+    // holds nothing, and AbortSignal.timeout does not keep it alive itself.
+    const alive = setTimeout(() => undefined, 5_000);
+    try {
+      await assert.rejects(reader.latestLedger(), Puls3NetworkError);
+    } finally {
+      clearTimeout(alive);
+    }
   });
 });

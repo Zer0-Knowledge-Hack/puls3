@@ -44,6 +44,9 @@ The remaining checks and errors of #424.
   default, `new SorobanRpcReader(network, source, fetch, { timeoutMs })`), so
   a hung RPC ends as `Puls3NetworkError` instead of hanging `hire` and
   `deploy`.
+- **Node 20:** `npm test` lists the test files itself
+  (`scripts/run-tests.mjs`) instead of passing a glob, which `node --test`
+  expands only from Node 21. CI now runs the package on Node 20 and 22.
 
 ## 0.1.0
 
