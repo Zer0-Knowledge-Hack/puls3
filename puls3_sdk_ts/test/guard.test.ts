@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { FeeBumpTransaction, Networks, TransactionBuilder, xdr } from '@stellar/stellar-base';
+import { Address, FeeBumpTransaction, Networks, TransactionBuilder, xdr } from '@stellar/stellar-base';
 
 import { SigningRefused } from '../src/errors.js';
 import {
@@ -25,6 +25,7 @@ import {
   invocation,
   otherContract,
   prepared,
+  provider,
   preparedTx,
   registerFullCall,
   server,
@@ -35,8 +36,8 @@ import {
 } from './chain.js';
 
 const me = builder.publicKey();
-const createJob: Expectation = { purpose: 'createJob', maxBudget: 5_000_000n };
-const fund: Expectation = { purpose: 'fund', maxBudget: 5_000_000n, maxReserve: 0n };
+const createJob: Expectation = { purpose: 'createJob', maxBudget: 5_000_000n, price: 5_000_000n, agentId: 30, provider };
+const fund: Expectation = { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 0n, jobId: 35n };
 
 function refused(rule: SigningRefused['rule'], run: () => unknown): void {
   assert.throws(run, (error: unknown) => {
@@ -65,12 +66,12 @@ describe('checkPreparedTransaction accepts what the server prepares', () => {
   it('fund_with_reserve when the caller allowed the reserve', () => {
     const call = fundWithReserveCall(5_000_000n, 2_000_000n);
     const p = preparedTx('fund', call, { auth: [sourceAuth(call, [invocation(transferCall(7_000_000n))])] });
-    assert.ok(check(p, { purpose: 'fund', maxBudget: 5_000_000n, maxReserve: 2_000_000n }));
+    assert.ok(check(p, { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 2_000_000n, jobId: 35n }));
   });
 
   for (const fn of ['complete', 'reject'] as const) {
     it(fn, () => {
-      assert.ok(check(preparedTx(fn, escrowCall(fn)), { purpose: fn }));
+      assert.ok(check(preparedTx(fn, escrowCall(fn)), { purpose: fn, jobId: 35n }));
     });
   }
 
@@ -79,11 +80,11 @@ describe('checkPreparedTransaction accepts what the server prepares', () => {
   });
 
   it('give_feedback on the Reputation Registry', () => {
-    assert.ok(check(preparedTx('giveFeedback', giveFeedbackCall()), { purpose: 'giveFeedback' }));
+    assert.ok(check(preparedTx('giveFeedback', giveFeedbackCall()), { purpose: 'giveFeedback', agentId: 30 }));
   });
 
   it('a call with no authorization entries', () => {
-    assert.ok(check(preparedTx('complete', escrowCall('complete'), { auth: [] }), { purpose: 'complete' }));
+    assert.ok(check(preparedTx('complete', escrowCall('complete'), { auth: [] }), { purpose: 'complete', jobId: 35n }));
   });
 });
 
@@ -119,13 +120,13 @@ describe('checkPreparedTransaction refuses (ADR-0010 D3)', () => {
     });
 
     it('a call made in the name of another account', () => {
-      refused('signer', () => check(preparedTx('complete', escrowCall('complete', stranger.publicKey())), { purpose: 'complete' }));
+      refused('signer', () => check(preparedTx('complete', escrowCall('complete', stranger.publicKey())), { purpose: 'complete', jobId: 35n }));
     });
 
     it('an authorization another account has to give', () => {
       const call = escrowCall('complete');
       refused('signer', () =>
-        check(preparedTx('complete', call, { auth: [addressAuth(stranger.publicKey(), call)] }), { purpose: 'complete' }),
+        check(preparedTx('complete', call, { auth: [addressAuth(stranger.publicKey(), call)] }), { purpose: 'complete', jobId: 35n }),
       );
     });
   });
@@ -136,40 +137,40 @@ describe('checkPreparedTransaction refuses (ADR-0010 D3)', () => {
     });
 
     it('a call to a contract that is not the pinned escrow', () => {
-      refused('call', () => check(preparedTx('complete', { ...escrowCall('complete'), contract: otherContract }), { purpose: 'complete' }));
+      refused('call', () => check(preparedTx('complete', { ...escrowCall('complete'), contract: otherContract }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('another function on the right contract', () => {
-      refused('call', () => check(preparedTx('complete', { ...escrowCall('complete'), fn: 'claim_refund' }), { purpose: 'complete' }));
+      refused('call', () => check(preparedTx('complete', { ...escrowCall('complete'), fn: 'claim_refund' }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('complete dressed as reject', () => {
-      refused('call', () => check(preparedTx('reject', escrowCall('complete')), { purpose: 'reject' }));
+      refused('call', () => check(preparedTx('reject', escrowCall('complete')), { purpose: 'reject', jobId: 35n }));
     });
 
     it('a second operation', () => {
-      refused('call', () => check(preparedTx('complete', escrowCall('complete'), { extraOperation: true }), { purpose: 'complete' }));
+      refused('call', () => check(preparedTx('complete', escrowCall('complete'), { extraOperation: true }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('an authorization for another call than the transaction makes', () => {
       const call = escrowCall('complete');
       const other = escrowCall('reject');
-      refused('call', () => check(preparedTx('complete', call, { auth: [sourceAuth(other)] }), { purpose: 'complete' }));
+      refused('call', () => check(preparedTx('complete', call, { auth: [sourceAuth(other)] }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('a fee-bump envelope', () => {
       const inner = TransactionBuilder.fromXDR(envelope(escrowCall('complete')), TESTNET.passphrase);
       const bump = TransactionBuilder.buildFeeBumpTransaction(stranger, '200000', inner as never, TESTNET.passphrase);
       assert.ok(bump instanceof FeeBumpTransaction);
-      refused('call', () => check(prepared('complete', { unsignedTransactionXdr: bump.toXDR() }), { purpose: 'complete' }));
+      refused('call', () => check(prepared('complete', { unsignedTransactionXdr: bump.toXDR() }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('a preparation with no transaction', () => {
-      refused('call', () => check(prepared('complete'), { purpose: 'complete' }));
+      refused('call', () => check(prepared('complete'), { purpose: 'complete', jobId: 35n }));
     });
 
     it('bytes that are not a transaction', () => {
-      refused('call', () => check(prepared('complete', { unsignedTransactionXdr: 'bm90IHhkcg==' }), { purpose: 'complete' }));
+      refused('call', () => check(prepared('complete', { unsignedTransactionXdr: 'bm90IHhkcg==' }), { purpose: 'complete', jobId: 35n }));
     });
   });
 
@@ -224,7 +225,7 @@ describe('checkPreparedTransaction refuses (ADR-0010 D3)', () => {
     it('any nested call on complete', () => {
       const call = escrowCall('complete');
       refused('money', () =>
-        check(preparedTx('complete', call, { auth: [sourceAuth(call, [invocation(transferCall(1n))])] }), { purpose: 'complete' }),
+        check(preparedTx('complete', call, { auth: [sourceAuth(call, [invocation(transferCall(1n))])] }), { purpose: 'complete', jobId: 35n }),
       );
     });
   });
@@ -232,21 +233,21 @@ describe('checkPreparedTransaction refuses (ADR-0010 D3)', () => {
   describe('rule 5, bounds', () => {
     it('an expired preparation', () => {
       const p = preparedTx('complete', escrowCall('complete'));
-      refused('bounds', () => check({ ...p, expiresAt: new Date(Date.now() - 1000) }, { purpose: 'complete' }));
+      refused('bounds', () => check({ ...p, expiresAt: new Date(Date.now() - 1000) }, { purpose: 'complete', jobId: 35n }));
     });
 
     it('a fee above the cap', () => {
-      refused('bounds', () => check(preparedTx('complete', escrowCall('complete'), { fee: 60_000_000 }), { purpose: 'complete' }));
+      refused('bounds', () => check(preparedTx('complete', escrowCall('complete'), { fee: 60_000_000 }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('an envelope with no end time', () => {
-      refused('bounds', () => check(preparedTx('complete', escrowCall('complete'), { timeoutSeconds: 0 }), { purpose: 'complete' }));
+      refused('bounds', () => check(preparedTx('complete', escrowCall('complete'), { timeoutSeconds: 0 }), { purpose: 'complete', jobId: 35n }));
     });
 
     it('an envelope past its end time', () => {
       const p = preparedTx('complete', escrowCall('complete'), { timeoutSeconds: 60 });
       refused('bounds', () =>
-        checkPreparedTransaction({ ...p, expiresAt: new Date(Date.now() + 3_600_000) }, { purpose: 'complete' }, me, TESTNET, new Date(Date.now() + 120_000)),
+        checkPreparedTransaction({ ...p, expiresAt: new Date(Date.now() + 3_600_000) }, { purpose: 'complete', jobId: 35n }, me, TESTNET, new Date(Date.now() + 120_000)),
       );
     });
   });
@@ -258,55 +259,72 @@ describe('checkPreparedAuthorization (set_agent_wallet, F4-7)', () => {
   const expectation = { agentId: 31, agentWallet };
 
   it('accepts the builder binding the deploy wallet to its agent', () => {
-    const result = checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall())), expectation, me, TESTNET);
+    const result = checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall())), expectation, me, TESTNET, 900);
     assert.equal(result.validUntilLedger, 1_000);
   });
 
   it('refuses another agent id', () => {
-    refused('call', () => checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(99))), expectation, me, TESTNET));
+    refused('call', () => checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(99))), expectation, me, TESTNET, 900));
   });
 
   it('refuses another wallet than the deploy created', () => {
     refused('call', () =>
-      checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(31, stranger.publicKey()))), expectation, me, TESTNET),
+      checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(31, stranger.publicKey()))), expectation, me, TESTNET, 900),
     );
   });
 
   it('refuses an entry for another account', () => {
     refused('signer', () =>
-      checkPreparedAuthorization(entry(addressAuth(stranger.publicKey(), setAgentWalletCall())), expectation, me, TESTNET),
+      checkPreparedAuthorization(entry(addressAuth(stranger.publicKey(), setAgentWalletCall())), expectation, me, TESTNET, 900),
     );
   });
 
   it('refuses source-account credentials, which would sign a whole transaction', () => {
-    refused('signer', () => checkPreparedAuthorization(entry(sourceAuth(setAgentWalletCall())), expectation, me, TESTNET));
+    refused('signer', () => checkPreparedAuthorization(entry(sourceAuth(setAgentWalletCall())), expectation, me, TESTNET, 900));
   });
 
   it('refuses another function', () => {
-    refused('call', () => checkPreparedAuthorization(entry(addressAuth(me, registerFullCall())), expectation, me, TESTNET));
+    refused('call', () => checkPreparedAuthorization(entry(addressAuth(me, registerFullCall())), expectation, me, TESTNET, 900));
   });
 
   it('refuses a nested call', () => {
     refused('money', () =>
-      checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(), [invocation(transferCall(1n))])), expectation, me, TESTNET),
+      checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall(), [invocation(transferCall(1n))])), expectation, me, TESTNET, 900),
     );
   });
 
   it('refuses an entry with no expiration ledger', () => {
-    refused('bounds', () => checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall()), null), expectation, me, TESTNET));
+    refused('bounds', () => checkPreparedAuthorization(entry(addressAuth(me, setAgentWalletCall()), null), expectation, me, TESTNET, 900));
   });
 });
 
 describe('checkChallenge (rule 6, login)', () => {
-  const pinned = withNetwork({ serverSigningKey: server.publicKey(), homeDomain: 'puls3.example' });
+  const pinned = withNetwork({
+    serverSigningKey: server.publicKey(),
+    homeDomain: 'puls3.example',
+    webAuthDomain: 'puls3.example',
+  });
+  const unpinned = withNetwork({ serverSigningKey: null, homeDomain: null, webAuthDomain: null });
 
   it('accepts a challenge from the pinned server key, for the signer', () => {
     const c = challenge();
     assert.equal(checkChallenge(c, me, pinned), c.payload);
   });
 
-  it('accepts any server when no key is pinned', () => {
-    assert.ok(checkChallenge(challenge({ from: stranger }), me, TESTNET));
+  it('accepts any server only when the developer unpins the key', () => {
+    assert.ok(checkChallenge(challenge({ from: stranger }), me, unpinned));
+  });
+
+  it('refuses a challenge from another key with the default network, which pins the server', () => {
+    refused('login', () => checkChallenge(challenge(), me, TESTNET));
+  });
+
+  it('refuses a third operation', () => {
+    refused('login', () => checkChallenge(challenge({ extraOperation: true }), me, pinned));
+  });
+
+  it('refuses another web_auth_domain', () => {
+    refused('login', () => checkChallenge(challenge({ webAuthDomain: 'evil.example' }), me, pinned));
   });
 
   it('refuses a challenge from another server key', () => {
@@ -318,15 +336,15 @@ describe('checkChallenge (rule 6, login)', () => {
   });
 
   it('refuses a transaction with a sequence number, which a network could accept', () => {
-    refused('login', () => checkChallenge(challenge({ sequence: '7' }), me, TESTNET));
+    refused('login', () => checkChallenge(challenge({ sequence: '7' }), me, pinned));
   });
 
   it('refuses a "challenge" from the signer\'s own account', () => {
-    refused('login', () => checkChallenge(challenge({ from: builder }), me, TESTNET));
+    refused('login', () => checkChallenge(challenge({ from: builder }), me, pinned));
   });
 
   it('refuses a payment dressed as a challenge', () => {
-    refused('login', () => checkChallenge(challenge({ payment: true }), me, TESTNET));
+    refused('login', () => checkChallenge(challenge({ payment: true }), me, pinned));
   });
 
   it('refuses a first operation for another account', () => {
@@ -342,7 +360,7 @@ describe('checkChallenge (rule 6, login)', () => {
   });
 
   it('refuses an expired challenge', () => {
-    refused('login', () => checkChallenge(challenge({ timeoutSeconds: 60 }), me, TESTNET, new Date(Date.now() + 120_000)));
+    refused('login', () => checkChallenge(challenge({ timeoutSeconds: 60 }), me, pinned, new Date(Date.now() + 120_000)));
   });
 });
 
@@ -359,5 +377,81 @@ describe('withNetwork', () => {
     const local = withNetwork({ escrow: otherContract });
     assert.equal(local.escrow, otherContract);
     assert.equal(local.usdc, TESTNET.usdc);
+  });
+});
+
+describe('ADR-0010 D3 rules 4, 6 and 8: what the server cannot change', () => {
+  it('create_job must pay the wallet the Identity Registry binds to the agent', () => {
+    refused('money', () => check(preparedTx('createJob', createJobCall({ provider: stranger.publicKey() })), createJob));
+  });
+
+  it('create_job must have no hook', () => {
+    const hook = new Address(otherContract).toScVal();
+    refused('call', () => check(preparedTx('createJob', createJobCall({ hook })), createJob));
+  });
+
+  it('create_job must be for the requested agent', () => {
+    refused('call', () => check(preparedTx('createJob', createJobCall({ agentId: 31 })), createJob));
+  });
+
+  it("create_job's budget must be the agent's price, not merely under maxPrice", () => {
+    refused('money', () => check(preparedTx('createJob', createJobCall({ budget: 4_000_000n })), createJob));
+  });
+
+  it("fund must be for this hire's job", () => {
+    const call = fundCall(5_000_000n, 36n);
+    const p = preparedTx('fund', call, { auth: [sourceAuth(call, [invocation(transferCall(5_000_000n))])] });
+    refused('call', () => check(p, fund));
+  });
+
+  it("fund must pull the agent's price", () => {
+    const call = fundCall(4_000_000n);
+    const p = preparedTx('fund', call, { auth: [sourceAuth(call, [invocation(transferCall(4_000_000n))])] });
+    refused('money', () => check(p, fund));
+  });
+
+  for (const fn of ['complete', 'reject'] as const) {
+    it(`${fn} must be for this hire's job, not another job of the signer`, () => {
+      refused('call', () => check(preparedTx(fn, escrowCall(fn, me, 36n)), { purpose: fn, jobId: 35n }));
+    });
+  }
+
+  it('give_feedback must be for the hired agent', () => {
+    refused('call', () => check(preparedTx('giveFeedback', giveFeedbackCall(31)), { purpose: 'giveFeedback', agentId: 30 }));
+  });
+
+  it('a transaction valid for longer than the horizon is refused', () => {
+    const p = preparedTx('complete', escrowCall('complete'), { timeoutSeconds: 3_600 });
+    refused('bounds', () => check(p, { purpose: 'complete', jobId: 35n }));
+  });
+
+  it('an authorization valid too many ledgers ahead is refused', () => {
+    const p = prepared('setAgentWallet', {
+      authorizationEntryXdr: addressAuth(me, setAgentWalletCall()).toXDR('base64'),
+      signatureExpirationLedger: 900 + TESTNET.maxAuthLedgers + 1,
+    });
+    refused('bounds', () => checkPreparedAuthorization(p, { agentId: 31, agentWallet }, me, TESTNET, 900));
+  });
+
+  it('an authorization that already expired on chain is refused', () => {
+    const p = prepared('setAgentWallet', {
+      authorizationEntryXdr: addressAuth(me, setAgentWalletCall()).toXDR('base64'),
+      signatureExpirationLedger: 900,
+    });
+    refused('bounds', () => checkPreparedAuthorization(p, { agentId: 31, agentWallet }, me, TESTNET, 900));
+  });
+});
+
+describe('TESTNET pins the server', () => {
+  it("ships the server's SEP-10 key and domains", () => {
+    assert.equal(TESTNET.serverSigningKey, 'GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG');
+    assert.equal(TESTNET.homeDomain, 'puls3-hub-on-stellar.api.serverpod.space');
+    assert.equal(TESTNET.webAuthDomain, 'puls3-hub-on-stellar.api.serverpod.space');
+  });
+
+  it('withNetwork refuses an RPC that is not a URL, and bounds that are not positive', () => {
+    assert.throws(() => withNetwork({ rpcUrl: 'not a url' }), TypeError);
+    assert.throws(() => withNetwork({ maxTimeHorizonSeconds: 0 }), TypeError);
+    assert.throws(() => withNetwork({ maxAuthLedgers: -1 }), TypeError);
   });
 });

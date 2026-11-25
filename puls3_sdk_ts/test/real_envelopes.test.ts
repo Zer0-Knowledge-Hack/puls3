@@ -54,8 +54,18 @@ function withEndTime(tx: Transaction): Transaction {
 }
 
 const cases: [string, Expectation][] = [
-  ['get_transaction_create_job_3_xdr', { purpose: 'createJob', maxBudget: 5_000_000n }],
-  ['get_transaction_fund_job_3_xdr', { purpose: 'fund', maxBudget: 5_000_000n, maxReserve: 0n }],
+  // Job 3's provider and agent id, as `get_job 3` returns them on chain.
+  [
+    'get_transaction_create_job_3_xdr',
+    {
+      purpose: 'createJob',
+      maxBudget: 5_000_000n,
+      price: 5_000_000n,
+      agentId: 7,
+      provider: 'GAFUYV5G3SBKIPAFDVAKZVGYNJY3YCMO2KD6OXTU2KYCIEMTM3SMIFKY',
+    },
+  ],
+  ['get_transaction_fund_job_3_xdr', { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 0n, jobId: 3n }],
 ];
 
 describe('the checks on real testnet envelopes (escrow job 3)', () => {

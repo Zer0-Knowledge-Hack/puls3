@@ -25,20 +25,30 @@ import type { Puls3Network } from './network.js';
 export type Expectation =
   | {
       purpose: 'createJob';
-      /** The highest job budget, in USDC stroops. */
+      /** The highest job budget the caller allowed, in USDC stroops. */
       maxBudget: bigint;
+      /** The agent's price: the job's budget must be exactly this. */
+      price: bigint;
+      /** The registry id of the agent being hired. */
+      agentId: number;
+      /** The agent's wallet, read from the Identity Registry, not the server. */
+      provider: string;
     }
   | {
       purpose: 'fund';
       /** The highest budget `fund` may pull, in USDC stroops. */
       maxBudget: bigint;
+      /** The agent's price: `expected_budget` must be exactly this. */
+      price: bigint;
       /** The highest subcontract reserve it may pull on top. 0 by default. */
       maxReserve: bigint;
+      /** The escrow job this hire's `create_job` produced. */
+      jobId: bigint;
     }
-  | { purpose: 'complete' }
-  | { purpose: 'reject' }
+  | { purpose: 'complete'; jobId: bigint }
+  | { purpose: 'reject'; jobId: bigint }
   | { purpose: 'registerFull' }
-  | { purpose: 'giveFeedback' };
+  | { purpose: 'giveFeedback'; agentId: number };
 
 /** What the caller expects the builder's `set_agent_wallet` entry to bind. */
 export interface WalletAuthorizationExpectation {
@@ -87,6 +97,9 @@ export function checkPreparedTransaction(
   if (Number(bounds.maxTime) * 1000 < now.getTime()) {
     refuse('bounds', 'the transaction has expired');
   }
+  if (Number(bounds.maxTime) * 1000 > now.getTime() + network.maxTimeHorizonSeconds * 1000) {
+    refuse('bounds', `the transaction stays valid more than ${network.maxTimeHorizonSeconds} s ahead`);
+  }
   if (tx.operations.length !== 1) {
     refuse('call', `the transaction has ${tx.operations.length} operations, not 1`);
   }
@@ -122,12 +135,15 @@ export function checkPreparedTransaction(
 /**
  * Checks the builder's `set_agent_wallet` authorization entry (deploy step
  * F4-7) and returns it with the ledger it must stay valid until.
+ * [latestLedger] is read from the chain by the SDK, not from the server: the
+ * entry must expire after it and within [Puls3Network.maxAuthLedgers].
  */
 export function checkPreparedAuthorization(
   prepared: PreparedTransaction,
   expectation: WalletAuthorizationExpectation,
   signer: string,
   network: Puls3Network,
+  latestLedger: number,
   now: Date = new Date(),
 ): { entryXdr: string; validUntilLedger: number } {
   checkPreparation(prepared, 'setAgentWallet', signer, network, now);
@@ -136,6 +152,15 @@ export function checkPreparedAuthorization(
   const validUntilLedger = prepared.signatureExpirationLedger;
   if (validUntilLedger === null || validUntilLedger <= 0) {
     refuse('bounds', 'the authorization has no expiration ledger');
+  }
+  if (validUntilLedger <= latestLedger) {
+    refuse('bounds', `the authorization expired at ledger ${validUntilLedger}`);
+  }
+  if (validUntilLedger > latestLedger + network.maxAuthLedgers) {
+    refuse(
+      'bounds',
+      `the authorization stays valid until ledger ${validUntilLedger}, more than ${network.maxAuthLedgers} ahead`,
+    );
   }
   let entry: xdr.SorobanAuthorizationEntry;
   try {
@@ -171,9 +196,10 @@ export function checkPreparedAuthorization(
 }
 
 /**
- * Checks a SEP-10 login challenge (D3 rule 6) and returns its envelope. It
+ * Checks a SEP-10 login challenge (D3 rule 7) and returns its envelope. It
  * must be a challenge for the signer that no network accepts as a payment:
- * sequence 0, from another account, with `manage_data` operations only.
+ * sequence 0, from the server's key and signed by it, with exactly the two
+ * `manage_data` operations `<home domain> auth` and `web_auth_domain`.
  */
 export function checkChallenge(
   challenge: WalletChallenge,
@@ -200,21 +226,27 @@ export function checkChallenge(
   if (bounds === undefined || bounds.maxTime === '0') refuse('login', 'the challenge has no time bounds');
   const seconds = now.getTime() / 1000;
   if (Number(bounds.maxTime) < seconds) refuse('login', 'the challenge has expired');
-  if (tx.operations.length === 0) refuse('login', 'the challenge has no operations');
-  tx.operations.forEach((operation, index) => {
-    if (operation.type !== 'manageData') {
-      refuse('login', `operation ${index} is ${operation.type}, not manage_data`);
-    }
-    if (index === 0) {
-      if (operation.source !== signer) refuse('login', 'the first operation is not for the signer');
-      const name = network.homeDomain === null ? null : `${network.homeDomain} auth`;
-      if (name === null ? !operation.name.endsWith(' auth') : operation.name !== name) {
-        refuse('login', `the first operation is "${operation.name}", not the home domain's auth`);
-      }
-    } else if (operation.source !== tx.source) {
-      refuse('login', `operation ${index} acts for another account`);
-    }
-  });
+  if (tx.operations.length !== 2) {
+    refuse('login', `the challenge has ${tx.operations.length} operations, not 2`);
+  }
+  const [auth, domain] = tx.operations;
+  if (auth!.type !== 'manageData') refuse('login', `operation 0 is ${auth!.type}, not manage_data`);
+  if (domain!.type !== 'manageData') refuse('login', `operation 1 is ${domain!.type}, not manage_data`);
+  if (auth.source !== signer) refuse('login', 'the first operation is not for the signer');
+  const name = network.homeDomain === null ? null : `${network.homeDomain} auth`;
+  if (name === null ? !auth.name.endsWith(' auth') : auth.name !== name) {
+    refuse('login', `the first operation is "${auth.name}", not the home domain's auth`);
+  }
+  if (domain.name !== 'web_auth_domain') {
+    refuse('login', `the second operation is "${domain.name}", not web_auth_domain`);
+  }
+  if (domain.source !== tx.source) refuse('login', 'web_auth_domain acts for another account');
+  if (
+    network.webAuthDomain !== null &&
+    (domain.value === undefined || domain.value.toString() !== network.webAuthDomain)
+  ) {
+    refuse('login', `the challenge's web_auth_domain is not ${network.webAuthDomain}`);
+  }
   return challenge.payload;
 }
 
@@ -270,21 +302,35 @@ function checkCall(
       expectCall(network.escrow, 'escrow', ['create_job']);
       // create_job(caller, provider, evaluator, expired_at, description, hook, agent_id, token, budget)
       if (call.args.length !== 9) refuse('call', 'create_job does not have 9 arguments');
+      if (addressArg(call.args, 1) !== expectation.provider) {
+        refuse('money', "the job would pay another account than the agent's registered wallet");
+      }
       if (addressArg(call.args, 2) !== signer) {
         refuse('money', 'the job would be judged by another account than the signer');
+      }
+      if (call.args[5]!.switch().name !== 'scvVoid') refuse('call', 'the job has a hook');
+      if (intArg(call.args, 6) !== BigInt(expectation.agentId)) {
+        refuse('call', `the job is for agent ${intArg(call.args, 6)}, not ${expectation.agentId}`);
       }
       if (addressArg(call.args, 7) !== network.usdc) refuse('money', 'the job is not paid in USDC');
       const budget = intArg(call.args, 8);
       if (budget <= 0n || budget > expectation.maxBudget) {
         refuse('money', `the budget ${budget} is above the allowed ${expectation.maxBudget}`);
       }
+      if (budget !== expectation.price) {
+        refuse('money', `the budget ${budget} is not the agent's price ${expectation.price}`);
+      }
       return;
     }
     case 'fund': {
       expectCall(network.escrow, 'escrow', ['fund', 'fund_with_reserve']);
       const { budget, reserve } = fundAmounts(call);
+      expectJob(call, expectation.jobId);
       if (budget <= 0n || budget > expectation.maxBudget) {
         refuse('money', `fund pulls ${budget}, above the allowed ${expectation.maxBudget}`);
+      }
+      if (budget !== expectation.price) {
+        refuse('money', `fund pulls ${budget}, not the agent's price ${expectation.price}`);
       }
       if (reserve < 0n || reserve > expectation.maxReserve) {
         refuse('money', `fund pulls a reserve of ${reserve}, above the allowed ${expectation.maxReserve}`);
@@ -294,13 +340,24 @@ function checkCall(
     case 'complete':
     case 'reject':
       expectCall(network.escrow, 'escrow', [expectation.purpose]);
+      expectJob(call, expectation.jobId);
       return;
     case 'registerFull':
       expectCall(network.identityRegistry, 'Identity Registry', ['register_full']);
       return;
     case 'giveFeedback':
       expectCall(network.reputationRegistry, 'Reputation Registry', ['give_feedback']);
+      if (intArg(call.args, 1) !== BigInt(expectation.agentId)) {
+        refuse('call', `the feedback is for agent ${intArg(call.args, 1)}, not ${expectation.agentId}`);
+      }
       return;
+  }
+}
+
+/** `job_id` (argument 1) is the job of the hire the flow works on. */
+function expectJob(call: ContractCall, jobId: bigint): void {
+  if (intArg(call.args, 1) !== jobId) {
+    refuse('call', `${call.fn} is for job ${intArg(call.args, 1)}, not ${jobId}`);
   }
 }
 

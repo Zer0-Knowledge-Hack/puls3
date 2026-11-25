@@ -26,6 +26,29 @@ export interface Puls3Network {
   readonly serverSigningKey: string | null;
   /** The SEP-10 home domain. When set, the challenge must name it. */
   readonly homeDomain: string | null;
+  /**
+   * The SEP-10 `web_auth_domain`: the host that serves the challenge. When
+   * set, the challenge's `web_auth_domain` operation must carry it.
+   */
+  readonly webAuthDomain: string | null;
+  /**
+   * The Soroban RPC the SDK reads the chain from itself, for what it must
+   * not take from the puls3 server: an agent's registered wallet and the
+   * latest ledger (ADR-0010 D3 rules 4 and 8).
+   */
+  readonly rpcUrl: string;
+  /**
+   * How far ahead, in seconds, a transaction's `maxTime` may be (D3 rule 6).
+   * A preparation the server made long ago, or one valid for years, is
+   * refused. The server prepares for 10 minutes.
+   */
+  readonly maxTimeHorizonSeconds: number;
+  /**
+   * How many ledgers past the latest one an authorization entry may stay
+   * valid (D3 rule 8). The server asks for about 180 (its 10-minute window
+   * plus a margin); 360 is about 30 minutes.
+   */
+  readonly maxAuthLedgers: number;
 }
 
 /**
@@ -40,8 +63,14 @@ export const TESTNET: Puls3Network = Object.freeze({
   reputationRegistry: 'CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4',
   usdc: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
   maxFeeStroops: 50_000_000,
-  serverSigningKey: null,
-  homeDomain: null,
+  // The public `G…` of the server's `walletAuthSigningKey` and its SEP-10
+  // domains (puls3_server/README.md, "Deploy to Serverpod Cloud").
+  serverSigningKey: 'GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG',
+  homeDomain: 'puls3-hub-on-stellar.api.serverpod.space',
+  webAuthDomain: 'puls3-hub-on-stellar.api.serverpod.space',
+  rpcUrl: 'https://soroban-testnet.stellar.org',
+  maxTimeHorizonSeconds: 900,
+  maxAuthLedgers: 360,
 });
 
 /**
@@ -65,8 +94,19 @@ export function withNetwork(
   if (network.serverSigningKey !== null && !StrKey.isValidEd25519PublicKey(network.serverSigningKey)) {
     throw new TypeError('serverSigningKey is not a G… address');
   }
-  if (!Number.isSafeInteger(network.maxFeeStroops) || network.maxFeeStroops <= 0) {
-    throw new TypeError('maxFeeStroops must be a positive integer');
+  for (const key of ['maxFeeStroops', 'maxTimeHorizonSeconds', 'maxAuthLedgers'] as const) {
+    if (!Number.isSafeInteger(network[key]) || network[key] <= 0) {
+      throw new TypeError(`${key} must be a positive integer`);
+    }
+  }
+  let rpc: URL;
+  try {
+    rpc = new URL(network.rpcUrl);
+  } catch {
+    throw new TypeError('rpcUrl is not a URL');
+  }
+  if (rpc.protocol !== 'https:' && rpc.protocol !== 'http:') {
+    throw new TypeError('rpcUrl must be an http or https URL');
   }
   return Object.freeze(network);
 }

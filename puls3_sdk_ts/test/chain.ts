@@ -102,26 +102,32 @@ export function envelope(call: Call, options: EnvelopeOptions = {}): string {
   return tx.setTimeout(options.timeoutSeconds ?? 300).build().toXDR();
 }
 
-export const createJobCall = (overrides: Partial<Record<'caller' | 'evaluator' | 'token', string>> & { budget?: bigint } = {}): Call => ({
+export const createJobCall = (
+  overrides: Partial<Record<'caller' | 'evaluator' | 'token' | 'provider', string>> & {
+    budget?: bigint;
+    hook?: xdr.ScVal;
+    agentId?: number;
+  } = {},
+): Call => ({
   contract: TESTNET.escrow,
   fn: 'create_job',
   args: [
     addr(overrides.caller ?? builder.publicKey()),
-    addr(provider),
+    addr(overrides.provider ?? provider),
     addr(overrides.evaluator ?? builder.publicKey()),
     u64(1_900_000_000n),
     str('Summarize this transaction.'),
-    xdr.ScVal.scvVoid(),
-    u32(30),
+    overrides.hook ?? xdr.ScVal.scvVoid(),
+    u32(overrides.agentId ?? 30),
     addr(overrides.token ?? TESTNET.usdc),
     i128(overrides.budget ?? 5_000_000n),
   ],
 });
 
-export const fundCall = (budget = 5_000_000n): Call => ({
+export const fundCall = (budget = 5_000_000n, jobId = 35n): Call => ({
   contract: TESTNET.escrow,
   fn: 'fund',
-  args: [addr(builder.publicKey()), u64(35n), i128(budget), u32(500)],
+  args: [addr(builder.publicKey()), u64(jobId), i128(budget), u32(500)],
 });
 
 export const fundWithReserveCall = (budget: bigint, reserve: bigint): Call => ({
@@ -143,10 +149,10 @@ export const transferCall = (
   ],
 });
 
-export const escrowCall = (fn: 'complete' | 'reject', caller = builder.publicKey()): Call => ({
+export const escrowCall = (fn: 'complete' | 'reject', caller = builder.publicKey(), jobId = 35n): Call => ({
   contract: TESTNET.escrow,
   fn,
-  args: [addr(caller), u64(35n), bytes32()],
+  args: [addr(caller), u64(jobId), bytes32()],
 });
 
 export const registerFullCall = (caller = builder.publicKey()): Call => ({
@@ -155,12 +161,12 @@ export const registerFullCall = (caller = builder.publicKey()): Call => ({
   args: [addr(caller), str('https://puls3.org/agents/x.json'), xdr.ScVal.scvVec([])],
 });
 
-export const giveFeedbackCall = (): Call => ({
+export const giveFeedbackCall = (agentId = 30): Call => ({
   contract: TESTNET.reputationRegistry,
   fn: 'give_feedback',
   args: [
     addr(builder.publicKey()),
-    u32(30),
+    u32(agentId),
     i128(5n),
     u32(0),
     str('puls3'),
@@ -208,6 +214,10 @@ export interface ChallengeOptions {
   payment?: boolean;
   sign?: boolean;
   timeoutSeconds?: number;
+  /** The `web_auth_domain` value. Defaults to `puls3.example`. */
+  webAuthDomain?: string;
+  /** Adds a third `manage_data` operation, which no real challenge has. */
+  extraOperation?: boolean;
 }
 
 /** A SEP-10 challenge like `StellarSep10Codec.build`. */
@@ -216,7 +226,7 @@ export function challenge(options: ChallengeOptions = {}): WalletChallenge {
   const wallet = options.wallet ?? builder.publicKey();
   // TransactionBuilder adds one to the account's sequence.
   const sequence = options.sequence === undefined ? '-1' : String(BigInt(options.sequence) - 1n);
-  const tx = new TransactionBuilder(new Account(from.publicKey(), sequence), {
+  const builderTx = new TransactionBuilder(new Account(from.publicKey(), sequence), {
     fee: '100',
     networkPassphrase: TESTNET.passphrase,
   })
@@ -235,8 +245,16 @@ export function challenge(options: ChallengeOptions = {}): WalletChallenge {
           }),
     )
     .addOperation(
-      Operation.manageData({ name: 'web_auth_domain', value: 'puls3.example', source: from.publicKey() }),
-    )
+      Operation.manageData({
+        name: 'web_auth_domain',
+        value: options.webAuthDomain ?? 'puls3.example',
+        source: from.publicKey(),
+      }),
+    );
+  if (options.extraOperation) {
+    builderTx.addOperation(Operation.manageData({ name: 'extra', value: 'x', source: from.publicKey() }));
+  }
+  const tx = builderTx
     .setTimeout(options.timeoutSeconds ?? 900)
     .build();
   if (options.sign !== false) tx.sign(from);

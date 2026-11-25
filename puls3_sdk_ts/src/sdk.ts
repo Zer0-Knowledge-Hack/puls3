@@ -14,6 +14,7 @@ import {
   checkPreparedTransaction,
   type Expectation,
 } from './guard.js';
+import { SorobanRpcReader, type ChainReader } from './chain_reader.js';
 import { KeySession } from './key_session.js';
 import { TESTNET, type Puls3Network } from './network.js';
 import type { Puls3Signer } from './signer.js';
@@ -64,6 +65,12 @@ export interface ConnectOptions {
   pollIntervalMs?: number;
   /** How long a flow waits for one transaction. Defaults to 3 minutes. */
   stepTimeoutMs?: number;
+  /**
+   * Reads the chain for the checks that must not trust the server (an
+   * agent's registered wallet, the latest ledger). Defaults to the
+   * network's Soroban RPC ([Puls3Network.rpcUrl]).
+   */
+  chain?: ChainReader;
 }
 
 /** What [Puls3Sdk]'s constructor takes besides its transport. */
@@ -79,6 +86,8 @@ export interface SdkOptions {
   now?: () => Date;
   /** For tests: how a flow waits between two reads. */
   sleep?: (ms: number) => Promise<void>;
+  /** See [ConnectOptions.chain]. Defaults to the network's Soroban RPC. */
+  chain?: ChainReader;
 }
 
 /**
@@ -108,6 +117,7 @@ export class Puls3Sdk {
   readonly #stepMs: number;
   readonly #now: () => Date;
   readonly #sleep: (ms: number) => Promise<void>;
+  readonly #chain: ChainReader | null;
 
   /** An SDK over any [Transport], for tests and other runtimes. */
   constructor(transport: Transport, options: SdkOptions) {
@@ -119,6 +129,10 @@ export class Puls3Sdk {
     this.#stepMs = options.stepTimeoutMs ?? 180_000;
     this.#now = options.now ?? (() => new Date());
     this.#sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    const signer = this.#signer;
+    this.#chain =
+      options.chain ??
+      (signer === null ? null : new SorobanRpcReader(this.#network, signer.publicKey()));
   }
 
   /**
@@ -151,6 +165,7 @@ export class Puls3Sdk {
       ...(options.signer === undefined ? {} : { signer: options.signer }),
       ...(options.pollIntervalMs === undefined ? {} : { pollIntervalMs: options.pollIntervalMs }),
       ...(options.stepTimeoutMs === undefined ? {} : { stepTimeoutMs: options.stepTimeoutMs }),
+      ...(options.chain === undefined ? {} : { chain: options.chain }),
     });
   }
 
@@ -523,6 +538,7 @@ export class Puls3Sdk {
             { agentId, agentWallet },
             wallet,
             this.#network,
+            await this.#requireChain().latestLedger(),
             this.#now(),
           );
           const signed = await signer.signAuthEntry(entryXdr, validUntilLedger, this.#network.passphrase);
@@ -566,7 +582,8 @@ export class Puls3Sdk {
       options.requestId ?? `sdk-${randomUUID()}`,
     );
     const hireId = started.hire.id;
-    if (BigInt(started.hire.price) > maxBudget) {
+    const price = BigInt(started.hire.price);
+    if (price > maxBudget) {
       throw new SigningRefused(
         'money',
         `the agent's price ${started.hire.price} is above the allowed ${maxBudget}`,
@@ -579,13 +596,31 @@ export class Puls3Sdk {
       // retried requestId): wait for that one instead of preparing another.
       const createJob = started.preparedCreateJob;
       if (createJob !== null) {
-        await this.#signEscrowCall(hireId, createJob, { purpose: 'createJob', maxBudget });
+        // The job must pay the wallet the Identity Registry binds to the
+        // agent, read from the chain: never the one the server names.
+        const provider = await this.#requireChain().agentWallet(agentId);
+        if (provider === null) {
+          throw new SigningRefused('money', `agent ${agentId} has no wallet on the Identity Registry`);
+        }
+        await this.#signEscrowCall(hireId, createJob, {
+          purpose: 'createJob',
+          maxBudget,
+          price,
+          agentId,
+          provider,
+        });
       }
       detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job');
     }
     if (detail.hire.status === 'open') {
       const fund = await this.prepareFund(hireId);
-      await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, maxReserve });
+      await this.#signEscrowCall(hireId, fund, {
+        purpose: 'fund',
+        maxBudget,
+        price,
+        maxReserve,
+        jobId: requireJobId(detail),
+      });
       detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
     }
     return detail;
@@ -619,8 +654,9 @@ export class Puls3Sdk {
    */
   async approve(hireId: number): Promise<HireDetail> {
     const wallet = this.#requireSigner('approve').publicKey();
+    const jobId = requireJobId(await this.getHire(hireId, wallet));
     const prepared = await this.prepareComplete(hireId);
-    await this.#signEscrowCall(hireId, prepared, { purpose: 'complete' });
+    await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
   }
 
@@ -630,8 +666,9 @@ export class Puls3Sdk {
    */
   async reject(hireId: number, reason: string): Promise<HireDetail> {
     const wallet = this.#requireSigner('reject').publicKey();
+    const jobId = requireJobId(await this.getHire(hireId, wallet));
     const prepared = await this.prepareReject(hireId, reason);
-    await this.#signEscrowCall(hireId, prepared, { purpose: 'reject' });
+    await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
   }
 
@@ -642,10 +679,11 @@ export class Puls3Sdk {
   async rate(hireId: number, score: number, comment: string): Promise<HireDetail> {
     const signer = this.#requireSigner('rate');
     const wallet = signer.publicKey();
+    const { agentId } = (await this.getHire(hireId, wallet)).hire;
     const prepared = await this.prepareFeedback(hireId, score, comment);
     const envelope = checkPreparedTransaction(
       prepared,
-      { purpose: 'giveFeedback' },
+      { purpose: 'giveFeedback', agentId },
       wallet,
       this.#network,
       this.#now(),
@@ -667,6 +705,12 @@ export class Puls3Sdk {
   }
 
   // --- Internals ----------------------------------------------------------
+
+  #requireChain(): ChainReader {
+    // A signer always comes with a reader (the RPC by default).
+    if (this.#chain === null) throw new SignerRequired('reading the chain');
+    return this.#chain;
+  }
 
   #requireSigner(operation: string): Puls3Signer {
     if (this.#signer === null) throw new SignerRequired(operation);
@@ -772,4 +816,12 @@ export function formatUsdc(stroops: number | bigint): string {
     fraction = fraction.slice(0, -1);
   }
   return `${sign}${whole}.${fraction}`;
+}
+
+/** The escrow job of [detail], which the escrow calls must name. */
+function requireJobId(detail: HireDetail): bigint {
+  if (detail.jobId === null) {
+    throw new Puls3ProtocolError(`Hire ${detail.hire.id} has no escrow job yet`);
+  }
+  return BigInt(detail.jobId);
 }

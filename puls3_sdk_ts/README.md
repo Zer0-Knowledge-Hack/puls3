@@ -87,6 +87,8 @@ await sdk.approve(hire.hire.id);        // releases the escrow to the agent
 await sdk.rate(hire.hire.id, 5, 'Useful findings.');
 
 // 3. Your agent pays another agent by itself, from its custodied wallet.
+//    Send USDC to agent.agentWallet first: a new agent's wallet holds none,
+//    and the hire it starts here then fails at `fund`.
 await sdk.hireAgentAs(agent.agentId!, 30, 'Audit this function: …', 5_000_000);
 ```
 
@@ -99,10 +101,10 @@ sign** (`SigningRefused`, with the rule that failed) unless:
 |---|---|
 | `network` | It is for testnet, the network the SDK was configured with. The public network is always refused. |
 | `signer` | The preparation, the transaction's source, the call's `caller` and every authorization are the signer's own. |
-| `call` | One contract call, to the contract **pinned in the SDK** for it (escrow, Identity Registry or Reputation Registry), with the function the purpose names. The ids never come from the server. |
-| `money` | Only `fund` moves money: USDC, at most `maxPrice` (plus a reserve only if you allow one), as one transfer from you to the escrow. A job must be judged by you. |
-| `bounds` | The fee is under the cap, the transaction has an end time, and the preparation has not expired. |
-| `login` | A sign-in challenge is a SEP-10 challenge for your wallet that no network would accept as a payment. |
+| `call` | One contract call, to the contract **pinned in the SDK** for it (escrow, Identity Registry or Reputation Registry), with the function the purpose names. The ids never come from the server. Its arguments are the ones this flow asked for: `create_job` is for the agent you hire and has no hook; `fund`, `complete` and `reject` name this hire's escrow job; `give_feedback` names the hired agent. |
+| `money` | Only `fund` moves money: USDC, exactly the agent's price (at most `maxPrice`, plus a reserve only if you allow one), as one transfer from you to the escrow. A job must be judged by you, and must pay the wallet the **Identity Registry** binds to the agent, which the SDK reads from the chain itself, not from the server. |
+| `bounds` | The fee is under the cap, the transaction ends within `maxTimeHorizonSeconds` (15 minutes), the preparation has not expired, and an authorization expires within `maxAuthLedgers` (360) of the latest ledger. |
+| `login` | A sign-in challenge is a SEP-10 challenge for your wallet that no network would accept as a payment: from the server's pinned key and signed by it, with exactly the `<home domain> auth` and `web_auth_domain` operations. |
 
 | Transaction | Signed by |
 |---|---|
@@ -114,10 +116,10 @@ The secret stays in your process: it is never sent, logged, or put in an
 error, `toString`, `JSON.stringify` or `util.inspect`. To keep it out of the
 SDK entirely, pass your own `Puls3Signer` (a KMS, a hardware key).
 
-The pinned testnet contracts are in `TESTNET`. For a local sandbox, override
-them with `withNetwork({ escrow, identityRegistry, reputationRegistry, usdc })`.
-Pin the server's sign-in key too, as the app does
-(`withNetwork({ serverSigningKey: 'G…', homeDomain: '…' })`).
+The pinned testnet values are in `TESTNET`: the contracts, the server's
+sign-in key and domains, and the Soroban RPC (`rpcUrl`) the SDK reads the
+chain from. For a local server, override what differs, for example
+`withNetwork({ escrow, serverSigningKey: 'G…', homeDomain: 'localhost', webAuthDomain: 'localhost:8080' })`.
 
 ## Act for a wallet without a key (a CLI session)
 

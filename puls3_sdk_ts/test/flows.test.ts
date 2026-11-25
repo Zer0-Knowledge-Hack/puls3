@@ -11,6 +11,7 @@ import {
   SignerRequired,
   SigningRefused,
 } from '../src/errors.js';
+import type { ChainReader } from '../src/chain_reader.js';
 import { KeySession } from '../src/key_session.js';
 import { TESTNET, withNetwork } from '../src/network.js';
 import { Puls3Sdk } from '../src/sdk.js';
@@ -31,8 +32,19 @@ import {
   setAgentWalletCall,
   sourceAuth,
   transferCall,
+  provider,
 } from './chain.js';
 import { agentJson, fakeTransport, hireJson, type Call } from './support.js';
+
+/**
+ * The chain as the SDK reads it itself: agent 30 is bound to [provider] on
+ * the Identity Registry, and the latest ledger is 4,900 (the deploy's
+ * authorization is prepared until 5,000).
+ */
+const fakeChain: ChainReader = {
+  agentWallet: async (agentId) => (agentId === 30 ? provider : null),
+  latestLedger: async () => 4_900,
+};
 
 const me = builder.publicKey();
 const signer = keypairSigner(builder.secret());
@@ -77,6 +89,8 @@ function hireServer(options: {
   outcome?: Record<string, 'failed' | 'pending'>;
   /** createHire answers as for a retried requestId: create_job already sent. */
   createJobAlreadySent?: boolean;
+  /** The chain the SDK reads itself. Defaults to [fakeChain]. */
+  chainReader?: ChainReader;
 } = {}) {
   const chain: Chain = { status: null, last: null, feedback: null };
   let reads = 0;
@@ -169,6 +183,7 @@ function hireServer(options: {
   const sdk = new Puls3Sdk(transport, {
     hasSession: true,
     signer,
+    chain: options.chainReader ?? fakeChain,
     pollIntervalMs: 1_000,
     stepTimeoutMs: 10_000,
     now: () => new Date(clock),
@@ -223,6 +238,28 @@ describe('Puls3Sdk.hire', () => {
       assert.equal(e.rule, 'money');
       return true;
     });
+    assert.equal(submitted.length, 0);
+  });
+
+  it("signs nothing when the job would pay another wallet than the agent's on the registry", async () => {
+    // The server names [provider]; the Identity Registry binds agent 30 to a stranger.
+    const stranger = Keypair.random().publicKey();
+    const { sdk, submitted } = hireServer({
+      chainReader: { agentWallet: async () => stranger, latestLedger: async () => 4_900 },
+    });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), (e: unknown) => {
+      assert.ok(e instanceof SigningRefused);
+      assert.equal(e.rule, 'money');
+      return true;
+    });
+    assert.equal(submitted.length, 0);
+  });
+
+  it('signs nothing when the agent has no wallet on the registry', async () => {
+    const { sdk, submitted } = hireServer({
+      chainReader: { agentWallet: async () => null, latestLedger: async () => 4_900 },
+    });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), SigningRefused);
     assert.equal(submitted.length, 0);
   });
 
@@ -342,6 +379,7 @@ describe('Puls3Sdk.deploy', () => {
     const sdk = new Puls3Sdk(transport, {
       hasSession: true,
       signer,
+      chain: fakeChain,
       pollIntervalMs: 1_000,
       stepTimeoutMs: 10_000,
       now: () => new Date(clock),
@@ -401,7 +439,11 @@ describe('KeySession', () => {
     return { transport, calls, logins: () => logins };
   }
 
-  const network = withNetwork({ serverSigningKey: server.publicKey() });
+  const network = withNetwork({
+    serverSigningKey: server.publicKey(),
+    homeDomain: 'puls3.example',
+    webAuthDomain: 'puls3.example',
+  });
 
   it('signs in with the signer and gives a bearer header', async () => {
     const { transport, calls } = authServer();
