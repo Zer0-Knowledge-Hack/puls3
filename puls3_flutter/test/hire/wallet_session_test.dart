@@ -109,7 +109,7 @@ void main() {
     final signingIn = session.ensureSignedIn(_alice, (_) => prompt.future);
     await pumpEventQueue();
 
-    await session.forget();
+    await session.signOut();
     prompt.complete('signed:late');
 
     await expectLater(signingIn, throwsA(isA<WalletSignatureRejected>()));
@@ -118,10 +118,26 @@ void main() {
     expect(server.verified, isEmpty);
   });
 
+  test('a refused call that drops the session while a sign-in prompt is open '
+      'does not cancel that sign-in', () async {
+    final prompt = Completer<String>();
+    final signingIn = session.ensureSignedIn(_alice, (_) => prompt.future);
+    await pumpEventQueue();
+
+    // A call made without a session got a 401 (the terms read when the
+    // hire sheet opens): it drops the stale session, nothing more.
+    await session.forget();
+    prompt.complete('signed:challenge-for-$_alice');
+    await signingIn;
+
+    expect(stored?.token, 'token-for-$_alice');
+    expect(await session.isSignedInAs(_alice), isTrue);
+  });
+
   test('a sign-out after the session is stored is not undone', () async {
     await session.ensureSignedIn(_alice, sign);
 
-    await session.forget();
+    await session.signOut();
 
     expect(stored, isNull);
     expect(await session.isSignedInAs(_alice), isFalse);

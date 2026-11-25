@@ -175,7 +175,7 @@ Future<void> main() async {
       ),
       demoRepository: AssetAgentRepository(),
       wallet: wallet,
-      onWalletDisconnect: session.forget,
+      onWalletDisconnect: session.signOut,
       // Connecting signs in once, for every server-backed screen (#334).
       walletSignIn: _hireKind == 'server' || _studioKind == 'server'
           ? session

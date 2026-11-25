@@ -132,7 +132,7 @@ class WalletSession implements WalletSignIn {
   /// declines) or a `Puls3ApiException` from the server, unchanged, so the
   /// caller maps them like every other call.
   ///
-  /// A [forget] while the prompt is open (the user disconnected) wins: the
+  /// A [signOut] while the prompt is open (the user disconnected) wins: the
   /// sign-in throws `WalletSignatureRejected` and stores nothing, so no
   /// session outlives a sign-out (#261), whichever screen started it.
   @override
@@ -166,13 +166,18 @@ class WalletSession implements WalletSignIn {
     await _walletStore.write(wallet);
   }
 
-  /// Counts [forget] calls, so a sign-in that finishes after one is dropped.
+  /// Counts [signOut] calls, so a sign-in that finishes after one is dropped.
   int _signOuts = 0;
 
-  /// Drops the stored session, for example after the user disconnected or
-  /// the server refused it. The next [ensureSignedIn] signs in again, and
-  /// one still in progress stores nothing.
-  Future<void> forget() async {
+  /// Drops the stored session after the server refused it. The next
+  /// [ensureSignedIn] signs in again; one already in progress still stores
+  /// its new session, since a refused call made without one (for example
+  /// the terms read when the hire sheet opens) says nothing about it.
+  Future<void> forget() => _drop();
+
+  /// The user disconnected: drops the session, and a sign-in still in
+  /// progress stores nothing (#261).
+  Future<void> signOut() async {
     _signOuts++;
     await _drop();
   }
