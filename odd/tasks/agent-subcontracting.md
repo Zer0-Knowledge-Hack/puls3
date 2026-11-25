@@ -498,9 +498,12 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
      Studio enables the subcontract opt-in only for a model that calls tools.
   4. ADR-0011 D8 amended: Anthropic or a verified Workers AI tool model.
   Evidence for the model choice: the spike of 2026-11-24 (Progress).
-- [ ] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
+- [x] **T8** Testnet evidence from the web: a consumer hires A, A subcontracts B from the reserve, A
   delivers, the unspent reserve is refunded, and every hash is checked. Record it in
-  `docs/verification/334-agent-subcontracting.md`.
+  `docs/verification/334-agent-subcontracting.md`. (done 2026-11-25: hire 2 / child hire 3 on the
+  local stack against escrow v0.2.0 `CD4C…GLJM`; eight transactions `SUCCESS` on the RPC; the
+  `complete` effects credit A 0.1 and refund the consumer 0.1. Limit: A was deployed by the local
+  tool because of T8.1.)
 - [ ] **T8.1** The server Studio carries the subcontract opt-in: the transport
   `AgentManifestDraft` gets the `subcontract` block (max children, suggested reserve),
   `draftDocument` and `transportDraft` map it both ways, and `server_studio_gateway.dart` sends and
@@ -527,7 +530,29 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   terms, the two readers share one read, the F5-2 comment says the sign-in now comes first; tests
   added for the double tap and for a session of another wallet. Flutter 598 passed, analyze clean.
   Left as notes: no unit test for `BrowserSessionWalletStore` (web-only), and a server failure
-  after the user signed can ask again once in the same confirm.
+  after the user signed can ask again once in the same confirm. Commit `44db635`. Native review:
+  assessed high (`review_due` true, item 2 escalation, base `cfde939`, untracked excluded);
+  pending: STATUS asks for an `intended_untracked_selection` whose JSON shape the CLI does not
+  document, so no START was issued.
+- 2026-11-25: Happy path from the web on the rebuilt app (`44db635`). User: "Dale, todo funciono
+  de manera excepcional". Hire 2 (job 2) on agent 40 with reserve 2000000; A subcontracted agent
+  39 as child hire 3 (job 3), receipt line `completed`, budget and payout 1000000, related party
+  false; A delivered the Spanish post plus B's English translation. RPC `getTransaction` SUCCESS:
+  createJob `79807e9a58978b18ab265f676f195a369f69877438140c16a36efa31bfb1edf2`, fund
+  `fcb1f2ea8e7a58f08ca2533d1d71a758bf69395df6e1aa68f892a7aa647f282f`, createChildJob
+  `299048ac5334d4855614f51d97cb77f1caa68c0d8ba1172cba6620b9a1ae9289`, child submit
+  `5a57a551332ed249852f1eb55747d3fb0b1f922ba21fd521f869318b590fb44f`, childComplete
+  `f67a56f454346fbc53d210a095c9ec95745b6d003487c4864487b147617cfef2`, A submit
+  `e115259e429f1cf52e563d3878c2b3212cc017cdebd98ee839f90ab2d5e6d117`. Next: the consumer
+  approves; check the unspent 1000000 reserve returns and the Horizon balances.
+- 2026-11-25: User: "Okey, aprove y ademas deje una calificacion". `complete`
+  `e8418d795e4ab1815c125ad8024072eed2226d2c9f77d0264b36db574af60f92` (ledger 5909013) and
+  `give_feedback` `10a31bb41c6c6ef466873be80828c33e66eb934dfef1984a83cacf266bf4b0cc` (ledger
+  5909021), both `SUCCESS`. Horizon effects of `complete`: 0.1 USDC to A and 0.1 USDC back to the
+  consumer. Horizon USDC: A 0.1, B 0.1; escrow `claimable` 0 for all three; job 2 `state` 3
+  (Completed), reserve 0. Recorded in `docs/verification/334-agent-subcontracting.md`. T8 done.
+  Open: T8.1 (Studio opt-in transport), T8.4 (reject reason), the native review of `44db635`, and
+  moving production to escrow v0.2.0 (user decision).
 - [ ] **T8.4** Reject reason contract: the app labels the field "Motivo (opcional)"
   (`hireRejectReasonHint`) but `EscrowRelayService._prepare` refuses an empty reason with
   `InvalidRejectReason`, and the click shows nothing (Log, 2026-11-24). Pre-existing since `f799ca5`
