@@ -19,6 +19,7 @@ jobs:
       contracts: ${{ steps.paths.outputs.contracts }}
       docker: ${{ steps.paths.outputs.docker }}
       sdk: ${{ steps.paths.outputs.sdk }}
+      sdk_ts: ${{ steps.paths.outputs.sdk_ts }}
       e2e: ${{ steps.paths.outputs.e2e }}
       migrations: ${{ steps.paths.outputs.migrations }}
     steps:
@@ -32,7 +33,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          domain=false server=false app=false contracts=false docker=false sdk=false e2e=false migrations=false
+          domain=false server=false app=false contracts=false docker=false sdk=false sdk_ts=false e2e=false migrations=false
           while IFS= read -r path; do
             case "$path" in
               pubspec.yaml|pubspec.lock)
@@ -56,6 +57,10 @@ jobs:
                 server=true; sdk=true; docker=true ;;
               puls3_cli/*)
                 sdk=true ;;
+              # The TypeScript SDK (#302) follows the server's wire format, which
+              # its tests pin with fakes; it has no Dart dependency.
+              puls3_sdk_ts/*)
+                sdk_ts=true ;;
               puls3_flutter/*)
                 app=true ;;
               contracts/*)
@@ -70,7 +75,7 @@ jobs:
               .github/actions/start-sandbox/*)
                 e2e=true ;;
               .github/workflows/ci.yml)
-                domain=true; server=true; app=true; contracts=true; docker=true; sdk=true; e2e=true ;;
+                domain=true; server=true; app=true; contracts=true; docker=true; sdk=true; sdk_ts=true; e2e=true ;;
             esac
             case "$path" in
               puls3_server/migrations/*|puls3_server/*.spy.yaml|scripts/check-migrations.sh|.github/workflows/ci.yml)
@@ -83,6 +88,7 @@ jobs:
           echo "contracts=$contracts" >> "$GITHUB_OUTPUT"
           echo "docker=$docker" >> "$GITHUB_OUTPUT"
           echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
+          echo "sdk_ts=$sdk_ts" >> "$GITHUB_OUTPUT"
           echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
           echo "migrations=$migrations" >> "$GITHUB_OUTPUT"
 
@@ -121,6 +127,26 @@ jobs:
         run: dart analyze --fatal-infos && dart test
       - working-directory: puls3_mcp
         run: dart analyze --fatal-infos && dart test
+
+  sdk-ts:
+    needs: changes
+    if: needs.changes.outputs.sdk_ts == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: puls3_sdk_ts
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: puls3_sdk_ts/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      # What `npm publish` would ship: dist with its .d.ts, README, CHANGELOG.
+      - run: npm pack --dry-run
 
   server:
     needs: changes
@@ -261,7 +287,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, domain, sdk, server, app, docker, scripts, contracts, e2e]
+    needs: [changes, domain, sdk, sdk-ts, server, app, docker, scripts, contracts, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Require every applicable component
@@ -269,6 +295,7 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           DOMAIN: ${{ needs.domain.result }}
           SDK: ${{ needs.sdk.result }}
+          SDK_TS: ${{ needs.sdk-ts.result }}
           SERVER: ${{ needs.server.result }}
           APP: ${{ needs.app.result }}
           DOCKER: ${{ needs.docker.result }}
@@ -276,7 +303,7 @@ jobs:
           CONTRACTS: ${{ needs.contracts.result }}
           E2E: ${{ needs.e2e.result }}
         run: |
-          for result in "$CHANGES" "$DOMAIN" "$SDK" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS" "$E2E"; do
+          for result in "$CHANGES" "$DOMAIN" "$SDK" "$SDK_TS" "$SERVER" "$APP" "$DOCKER" "$SCRIPTS" "$CONTRACTS" "$E2E"; do
             if [[ "$result" != success && "$result" != skipped ]]; then
               echo "A required CI job finished with: $result" >&2
               exit 1

@@ -194,6 +194,7 @@ puls3_flutter/   Flutter app (Studio + Marketplace)
 puls3_server/    Serverpod backend
 puls3_client/    Generated client shared by app and server
 puls3_sdk/       Dart SDK for the puls3 API (catalog); never signs
+puls3_sdk_ts/    TypeScript SDK for the same API (@puls3/sdk, Node 20+); this version never signs
 contracts/       Soroban workspace: identity-registry, escrow, placeholder; deployments/ holds testnet.json and demo-agents.json
 scripts/         Testnet deploy (deploy-testnet.sh, deploy-escrow-testnet.sh), seed (seed-demo-agents.sh) and funding (fund-testnet-accounts.sh) scripts
 puls3_cli/       The puls3 command line, a client of puls3_sdk
