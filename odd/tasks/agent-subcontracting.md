@@ -558,6 +558,13 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   (Completed), reserve 0. Recorded in `docs/verification/334-agent-subcontracting.md`. T8 done.
   Open: T8.1 (Studio opt-in transport), T8.4 (reject reason), the native review of `44db635`, and
   moving production to escrow v0.2.0 (user decision).
+- 2026-11-25: Delivery. User: "Dale, hagamoslo asi" (stacked-to-main, four slices). Pushed and
+  opened, each based on the previous branch: #416 16a `feat/334-t8a-workers-ai` (`6d10d5d`,
+  `d7f12cb`, `cfde939`; 805 lines, 457 tests, recommends `size:exception`), #417 16b
+  `feat/334-t8b-wallet-session` (`44db635`; 727 lines, 356 tests, recommends `size:exception`),
+  #418 16c `docs/334-t8c-testnet-evidence` (`b8e9de8`; 107), #419 16d
+  `feat/334-t8d-studio-optin-transport` (`85b77d9`, `3dc83fd`; 420, 262 generated). All say
+  `Refs #334`: the team rule asks for closing evidence from someone other than TOMOKI977.
 - [x] **T8.4** (done 2026-11-25: the server contract stays, since api.md and ADR-0010 publish the
   reason as required; the app sends `defaultRejectReason` ("Rejected by the consumer.") when the
   field is empty, so "optional" is true for the user. RED: two hire detail tests expecting the
