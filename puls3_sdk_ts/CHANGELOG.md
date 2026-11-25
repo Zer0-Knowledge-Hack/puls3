@@ -7,6 +7,12 @@ minor version may change the API.
 
 The remaining checks and errors of #424.
 
+- **Breaking: `approve` and `reject` require the reviewed result.** Pass
+  `{ result }`, the result you reviewed (`{ result: null }` to reject a
+  funded hire with no delivery), or `{ trustServer: true }` to keep the old
+  behaviour of trusting the server's description of the hire. With neither,
+  they throw `InvalidArgument` and send nothing.
+
 - **Signing checks (ADR-0010 D3 rule 4):** `give_feedback` must carry the
   score passed to `rate` with 0 decimals; `fund` must accept a platform fee
   (`max_fee_bps`) of at most the new `Puls3Network.maxFeeBps` (0 in

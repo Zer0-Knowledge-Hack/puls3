@@ -363,7 +363,7 @@ describe('Puls3Sdk.hire', () => {
     const sdk = new Puls3Sdk(transport, { hasSession: true });
     await assert.rejects(sdk.hire(30, 'x', { maxPrice: 1 }), SignerRequired);
     await assert.rejects(sdk.deploy(1), SignerRequired);
-    await assert.rejects(sdk.approve(21), SignerRequired);
+    await assert.rejects(sdk.approve(21, { result: 'Two findings.' }), SignerRequired);
     assert.equal(calls.length, 0);
   });
 });
@@ -372,7 +372,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
   it('approve signs complete and waits until the hire is completed', async () => {
     const { sdk, submitted, chain } = hireServer();
     chain.status = 'submitted';
-    const detail = await sdk.approve(21);
+    const detail = await sdk.approve(21, { trustServer: true });
     assert.equal(detail.hire.status, 'completed');
     assert.equal(submitted[0]!.purpose, 'complete');
     assert.ok(signedBy(submitted[0]!.signed, builder));
@@ -381,7 +381,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
   it('reject signs reject and waits until the hire is rejected', async () => {
     const { sdk, chain } = hireServer();
     chain.status = 'funded';
-    assert.equal((await sdk.reject(21, 'Not usable.')).hire.status, 'rejected');
+    assert.equal((await sdk.reject(21, 'Not usable.', { trustServer: true })).hire.status, 'rejected');
   });
 
   // ADR-0010 D3 rule 4: the job id comes from the server, so the job is read
@@ -403,7 +403,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
         const { sdk, submitted, chain } = hireServer({ chainReader: { ...fakeChain, job: async () => job } });
         chain.status = 'submitted';
         await assert.rejects(
-          decide === 'approve' ? sdk.approve(21) : sdk.reject(21, 'Not usable.'),
+          decide === 'approve' ? sdk.approve(21, { trustServer: true }) : sdk.reject(21, 'Not usable.', { trustServer: true }),
           SigningRefused,
         );
         assert.equal(submitted.length, 0, decide);
@@ -448,7 +448,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       },
     });
     chain.status = 'submitted';
-    assert.equal((await sdk.approve(21)).hire.status, 'completed');
+    assert.equal((await sdk.approve(21, { trustServer: true })).hire.status, 'completed');
     assert.equal(submitted.length, 1);
   });
 
@@ -457,7 +457,55 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       chainReader: { ...fakeChain, job: async () => ({ ...chainJob, deliverable: delivered }) },
     });
     chain.status = 'funded';
-    await assert.rejects(sdk.reject(21, 'Not usable.'), SigningRefused);
+    await assert.rejects(sdk.reject(21, 'Not usable.', { trustServer: true }), SigningRefused);
+    assert.equal(submitted.length, 0);
+  });
+
+  // #424: the reviewed result is required, and trusting the server is an
+  // explicit choice. Typed loosely, as a JavaScript caller would call it.
+  type Loose = {
+    approve(hireId: number, options?: unknown): Promise<unknown>;
+    reject(hireId: number, reason: string, options?: unknown): Promise<unknown>;
+  };
+  for (const [label, options] of [
+    ['no options', undefined],
+    ['empty options', {}],
+    ['a result and trustServer together', { result: 'Two findings.', trustServer: true }],
+    ['trustServer other than true', { trustServer: false }],
+  ] as const) {
+    it(`approve and reject refuse ${label} with InvalidArgument, sending nothing (#424)`, async () => {
+      for (const decide of ['approve', 'reject'] as const) {
+        const { sdk, calls, chain } = hireServer();
+        chain.status = 'submitted';
+        const loose = sdk as unknown as Loose;
+        await assert.rejects(
+          decide === 'approve' ? loose.approve(21, options) : loose.reject(21, 'Not usable.', options),
+          (e: unknown) => {
+            assert.ok(e instanceof InvalidArgument, `${decide}: expected InvalidArgument, got ${String(e)}`);
+            assert.equal(e.argument, 'result');
+            return true;
+          },
+        );
+        assert.equal(calls.length, 0, decide);
+      }
+    });
+  }
+
+  it('reject with result null signs for a funded hire with no delivery (#424)', async () => {
+    const { sdk, submitted, chain } = hireServer();
+    chain.status = 'funded';
+    const loose = sdk as unknown as Loose;
+    await loose.reject(21, 'Not usable.', { result: null });
+    assert.equal(submitted.length, 1);
+  });
+
+  it('reject with result null refuses a job that has a delivery (#424)', async () => {
+    const { sdk, submitted, chain } = hireServer({
+      chainReader: { ...fakeChain, job: async () => ({ ...chainJob, deliverable: delivered }) },
+    });
+    chain.status = 'funded';
+    const loose = sdk as unknown as Loose;
+    await assert.rejects(loose.reject(21, 'Not usable.', { result: null }), SigningRefused);
     assert.equal(submitted.length, 0);
   });
 
