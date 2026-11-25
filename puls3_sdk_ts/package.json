@@ -30,7 +30,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "tsc -p tsconfig.test.json && node --test \"build-test/test/*.test.js\"",
-    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "live": "tsc -p tsconfig.test.json && node build-test/examples/live-testnet.js"
   },
   "devDependencies": {
     "@types/node": "20.19.43",
