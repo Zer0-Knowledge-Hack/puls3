@@ -702,6 +702,29 @@ describe('KeySession', () => {
     assert.ok(!calls.some((c) => c.method === 'verifyChallenge'));
   });
 
+  it('reports a signer that fails during sign-in, instead of sending the call without a session (#424)', async () => {
+    const { transport, calls } = authServer();
+    const broken = {
+      publicKey: () => signer.publicKey(),
+      signTransaction: async () => {
+        throw new Error('the hardware key is unplugged');
+      },
+      signAuthEntry: (entry: string, until: number, passphrase: string) => signer.signAuthEntry(entry, until, passphrase),
+    };
+    const session = new KeySession(transport, broken, network);
+    await assert.rejects(session.authorization(), /the hardware key is unplugged/);
+    assert.ok(!calls.some((c) => c.method === 'verifyChallenge'));
+  });
+
+  it('reports a sign-in answer it cannot read as Puls3ProtocolError (#424)', async () => {
+    const { transport } = fakeTransport((call) => {
+      if (call.method === 'createChallenge') return { unexpected: true };
+      throw new Error(`unexpected ${call.method}`);
+    });
+    const session = new KeySession(transport, signer, network);
+    await assert.rejects(session.authorization(), Puls3ProtocolError);
+  });
+
   it('never shows a token', async () => {
     const { transport } = authServer();
     const session = new KeySession(transport, signer, network);

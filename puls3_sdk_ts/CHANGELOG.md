@@ -35,6 +35,15 @@ The remaining checks and errors of #424.
   over a stale lock and present the same refresh token, which revokes the
   session. A 0.1.0 program sharing the same file still sees a live holder
   as alive.
+- **Typed errors:** a 200 whose body is not JSON throws `Puls3ProtocolError`,
+  not a raw `SyntaxError`. A `KeySession` sign-in that fails for any reason
+  other than the server refusing it (the signer failed, an answer this
+  version cannot read, an unreachable server) throws that error, instead of
+  sending the call without a session and reporting a 401.
+- **Soroban RPC timeout:** each read of the chain is bounded (20 seconds by
+  default, `new SorobanRpcReader(network, source, fetch, { timeoutMs })`), so
+  a hung RPC ends as `Puls3NetworkError` instead of hanging `hire` and
+  `deploy`.
 
 ## 0.1.0
 

@@ -104,4 +104,14 @@ describe('SorobanRpcReader', () => {
     }) as typeof fetch);
     await assert.rejects(down.latestLedger(), Puls3NetworkError);
   });
+
+  it('gives up on an RPC that never answers, after its timeout (#424)', { timeout: 5_000 }, async () => {
+    // A fetch that hangs until its request is aborted, as a hung RPC does.
+    const hung = (async (_url: string | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+      })) as typeof fetch;
+    const reader = new SorobanRpcReader(TESTNET, source, hung, { timeoutMs: 50 });
+    await assert.rejects(reader.latestLedger(), Puls3NetworkError);
+  });
 });
