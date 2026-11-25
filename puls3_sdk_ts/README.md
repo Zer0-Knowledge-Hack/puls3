@@ -205,6 +205,11 @@ console.log(await sdk.listMyHires());
 | `Puls3NetworkError` | The server could not be reached or did not answer in time. |
 | `Puls3ProtocolError` | An answer this version cannot read; usually the SDK is older than the server. |
 
+## Release
+
+Versions are published to npm with provenance by a workflow when a tag
+`sdk-ts-vX.Y.Z` is pushed: see [`docs/sdk/releasing-npm.md`](../docs/sdk/releasing-npm.md).
+
 ## Develop
 
 ```bash
