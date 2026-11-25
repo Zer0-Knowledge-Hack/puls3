@@ -24,48 +24,21 @@ server are built on ([ADR-0007](../adr/0007-developer-sdk.md)).
 
 Reading the catalog needs no wallet, key or account.
 
-## 1. Create a project outside the repository
+## 1. Create a project and add the SDK
 
-`puls3_sdk` is a member of the repository's Dart workspace and is not on pub.dev
-yet ([#300](https://github.com/Zer0-Knowledge-Hack/puls3/issues/300)). An outside
-project depends on the checkout by **absolute path**:
+`puls3_sdk` 0.1.0 is on [pub.dev](https://pub.dev/packages/puls3_sdk). Create an
+empty project and add it; nothing in this page depends on a clone of the
+repository:
 
 ```bash
 dart create -t console puls3_quickstart
 cd puls3_quickstart
+dart pub add puls3_sdk
 ```
 
-Replace `pubspec.yaml` with this, changing the path to where you cloned the
-repository. Keep the `dev_dependencies` so `dart analyze` and `dart test` still
-work on the project `dart create` generated:
-
-```yaml
-name: puls3_quickstart
-description: A project outside the puls3 repository.
-environment:
-  sdk: ^3.12.2
-dependencies:
-  puls3_sdk:
-    path: /absolute/path/to/puls3/puls3_sdk
-dev_dependencies:
-  lints: '>=3.0.0 <7.0.0'
-  test: ^1.25.5
-# Until puls3_client 0.1.0 is published (#300, #388), keep the sibling client
-# on the checkout too. Remove this block once both packages are on pub.dev.
-dependency_overrides:
-  puls3_client:
-    path: /absolute/path/to/puls3/puls3_client
-```
-
-A relative path such as `../puls3_sdk` only works inside the repository's
-workspace. Since [#388](https://github.com/Zer0-Knowledge-Hack/puls3/pull/388),
-`puls3_sdk` depends on `puls3_client: ^0.1.0` from pub.dev instead of the sibling
-path, and that version is not published yet, so the `dependency_overrides` block
-keeps both packages on the checkout. Remove it once #300 publishes them.
-
-```bash
-dart pub get
-```
+`dart pub add` writes the constraint (`puls3_sdk: ^0.1.0`) and runs
+`dart pub get`. Keep the generated `dev_dependencies`, so `dart analyze` and
+`dart test` still work on the project.
 
 ## 2. Point it at a server
 
@@ -229,7 +202,7 @@ Future<void> main() async {
     );
     // One call per hire: each `prepare*` replaces the previous envelope.
     // `complete` needs a submitted hire (the agent runtime moves it there);
-    // `reject` also works on a funded hire.
+    // `reject` works on an open, funded or submitted hire.
     switch (hire.hire.status) {
       case 'submitted': {
         final prepared = await sdk.prepareComplete(hireId);
@@ -255,12 +228,13 @@ Future<void> main() async {
 Every `prepare*` call returns an envelope with no signatures, and each call
 replaces the previous unsigned envelope for that hire, so prepare one call per
 signature. `prepareComplete` works only on a `submitted` hire, which the agent
-runtime produces (see step 5); `prepareReject` also works on a funded hire. The
-SDK never signs or submits it; a wallet does that, as in the app. The session
-wallet must be the hire's consumer, and `PULS3_CONSUMER` is its `G…` address. The `hireId`
-must exist on that server. A fresh local sandbox has a seeded agent but no hire;
-create and fund one from the app pointed at that server, or start it from the
-SDK:
+runtime produces (see step 5); `prepareReject` works on an open, funded or
+submitted hire. The SDK never signs or submits it: a wallet signs, and the
+signed envelope goes back through the server's `submitEscrowCall` (see the
+snippet below). The session wallet must be the hire's consumer, and
+`PULS3_CONSUMER` is its `G…` address. The `hireId` must exist on that server. A
+fresh local sandbox has a seeded agent but no hire; create and fund one from the
+app pointed at that server, or start it from the SDK and relay the envelopes:
 
 ```dart
 final consumer = Platform.environment['PULS3_CONSUMER']!;
@@ -274,20 +248,30 @@ final started = await sdk.createHire(
   'quickstart-${DateTime.now().millisecondsSinceEpoch}',
 );
 final createJob = started.preparedCreateJob;
-// Sign and submit `createJob` from the wallet, and wait until it is confirmed.
+// Sign `createJob` with the wallet, send the signed envelope back through
+// `HireEndpoint.submitEscrowCall`, and wait until it is confirmed.
 
 // 2. The hire is `open` from then on, so the server can prepare `fund`.
 final fund = await sdk.prepareFund(started.hire.id);
-// Sign and submit `fund` the same way.
+// Sign `fund` and send it back the same way.
 ```
+
+**Submitting is a server round trip, not a network call from the SDK.** The
+server only learns about a signed envelope through
+`HireEndpoint.submitEscrowCall(hireId, preparationId, signedXdr)`, which checks
+it against the envelope it prepared, relays it, and tracks it until the chain
+confirms it. The SDK does not wrap that call yet: today it runs in the app, or
+from `puls3_client` with
+`client.hire.submitEscrowCall(hireId, preparationId, signedXdr)` added to this
+project. Until `create_job` is confirmed the hire is not `open`, so
+`prepareFund` keeps answering `InvalidHireTransition`.
 
 `requestId` is the server's idempotency key: reuse it with the same agent and
 input to retry safely, but do not reuse it for a different hire.
 `preparedCreateJob` is null when the hire already has a submitted `create_job`,
 for example a retried `requestId`, so there is nothing new to sign. Because
 `createHire` already returns `create_job`, call `prepareCreateJob` only when that
-envelope expired or was lost. `prepareFund` answers `InvalidHireTransition`
-until `create_job` is on chain, so submit the two envelopes in that order.
+envelope expired or was lost.
 
 The Studio calls work the same way: `testRun(draftId, input)` runs a saved draft
 once, and `hireAgentAs(...)` lets one of the session wallet's live agents hire
@@ -383,12 +367,14 @@ credential saved from the Studio); otherwise a funded hire can only be rejected.
 ## What this SDK will not do
 
 - **It does not sign or submit transactions.** Each `prepare*` call returns an
-  unsigned envelope. A wallet signs it, never the SDK.
+  unsigned envelope. A wallet signs it, never the SDK; the signed envelope then
+  goes back through the server's `submitEscrowCall`, which the SDK does not wrap
+  yet.
 - **It does not hold a seed or a secret key.** Do not paste an `S…` secret into
   the examples or into your code to "make it work". Wallet secrets stay where
   [`docs/infra/secrets.md`](../infra/secrets.md) puts them.
-- **It is not on pub.dev yet.** Depend on it by absolute path from the
-  repository, as in step 1 ([#300](https://github.com/Zer0-Knowledge-Hack/puls3/issues/300)).
+- **It ships as `0.1.0` on pub.dev.** `dart pub add puls3_sdk` pins the
+  published release; the repository's `main` may be ahead of it.
 
 ## Next
 
