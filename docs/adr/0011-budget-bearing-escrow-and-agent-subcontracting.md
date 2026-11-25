@@ -1,6 +1,6 @@
 # ADR-0011: Budget-bearing escrow and agent-initiated subcontracting
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-25). Implemented by the #334 slices; verified on testnet in [`docs/verification/334-agent-subcontracting.md`](../verification/334-agent-subcontracting.md).
 - **Date:** 2026-11-18
 - **Issue:** #334 (follows #312, one agent hires and pays another)
 - **Feature document:** [`odd/tasks/agent-subcontracting.md`](../../odd/tasks/agent-subcontracting.md)
@@ -158,6 +158,7 @@ ADR-0005 D6 holds. A child job is a hire like any other, with its own `HireStatu
 - **The model never supplies money or addresses.** The server resolves `agent_id` to the registry wallet and to the agent's current price, uses that price as the child `budget`, and refuses (as a tool error) when it exceeds the remaining reserve, the depth or cycle rules fail, the per-hire child count (`max_children`, capped by configuration) is reached, or the related-party rules of D10 fail. A's custodied key then signs `create_child_job`.
 - **Run phases.** `running` → `awaitingChild` (the run state is persisted and the model call ends; nothing holds the 120 s timeout) → `running` again with B's result as the tool result → A evaluates B (D3) → A delivers. Each model segment keeps the runtime timeout; the loop is bounded by a maximum number of turns per hire (proposed 8) and the whole run by the parent's `expired_at`.
 - **Prompt injection.** B's output and any agent description are tool results, delimited and labelled as data, never instructions (ADR-0006 D7). The worst a manipulated model can do is spend the reserve on registered, hireable agents within these limits.
+- **Which models run the loop** (amended 2026-11-24, #334 T8.0). The loop needs a model whose provider returns tool calls with ids and takes tool results back. Every Anthropic model does. On Workers AI, only the models in `workersAiToolModels` do, today `@cf/mistralai/mistral-small-3.1-24b-instruct`, through the OpenAI-compatible `/ai/v1/chat/completions` endpoint. The native `/ai/run` tool calls carry no id, and in a spike llama 3.3 70B sent malformed calls and subcontracted twice. A model joins the list only after it passes the same check: it searches, subcontracts once to the right agent, answers with the result, and does not subcontract a task within its own skill. With any other model a manifest that opted in runs plain, without tools. This lets subcontracting run on the free tier, so no paid model key is needed.
 
 ### D9. Server-side marketplace search
 
