@@ -42,15 +42,26 @@ npm publish --access public
 git tag sdk-ts-v0.1.0 && git push origin sdk-ts-v0.1.0
 ```
 
-This first version has no provenance. Then, on the package's settings page
-on npmjs.com:
+With a security key or passkey as the second factor, `npm publish` asks you to
+confirm in the browser, so run it in an interactive terminal: a
+non-interactive shell prints the URL and exits without waiting.
+
+The tag runs `publish-sdk-ts.yml`, which finds the version already on npm and
+ends with a notice. This first version has no provenance; 0.1.0 was published
+this way from `b55d64c`.
+
+## Before the second release
+
+On the package's settings page on npmjs.com:
 
 - **Trusted publisher:** GitHub Actions, organization `Zer0-Knowledge-Hack`,
   repository `puls3`, workflow `publish-sdk-ts.yml`, environment `npm`. The
-  fields are case-sensitive and npm checks them only at the next publish. A
-  new trusted publisher that does not publish within 2 days expires.
-- **Publishing access:** "Require two-factor authentication and disallow
-  tokens".
+  fields are case-sensitive and npm checks them only at the next publish.
+  **Add it right before that release:** a new trusted publisher that has not
+  published within 2 days expires, and a run that skips a version already on
+  npm does not count.
+- **Publishing access:** once a version has come from the workflow,
+  "Require two-factor authentication and disallow tokens".
 
 ## Every release after that
 
