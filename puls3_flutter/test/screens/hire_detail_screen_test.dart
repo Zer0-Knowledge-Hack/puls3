@@ -236,10 +236,34 @@ class _ProgressGateway implements HireGateway {
 final _opened = <Uri>[];
 final _copied = <String>[];
 
+/// A server session that signs in through the wallet, like `WalletSession`.
+class _SignIn implements WalletSignIn {
+  String? signedInAs;
+
+  @override
+  Future<bool> isSignedInAs(String wallet) async => signedInAs == wallet;
+
+  @override
+  Future<void> ensureSignedIn(
+    String wallet,
+    Future<String> Function(SignInChallenge challenge) sign,
+  ) async {
+    if (signedInAs == wallet) return;
+    await sign(
+      const SignInChallenge(
+        transactionXdr: 'session-challenge',
+        networkPassphrase: stellarTestnetPassphrase,
+      ),
+    );
+    signedInAs = wallet;
+  }
+}
+
 Future<void> _pumpDetail(
   WidgetTester tester, {
   required HireGateway gateway,
   WalletPort? wallet,
+  WalletController? controller,
   String id = '3',
   DateTime Function()? now,
   Widget Function()? page,
@@ -277,9 +301,9 @@ Future<void> _pumpDetail(
   await tester.pumpWidget(
     AppScope(
       catalog: AgentCatalog(const InMemoryAgentRepository(testAgents)),
-      wallet: WalletController(
-        wallet ?? TestWallet(initialAddress: _consumer),
-      ),
+      wallet:
+          controller ??
+          WalletController(wallet ?? TestWallet(initialAddress: _consumer)),
       deployGateway: FakeDeployGateway(),
       studioGateway: FakeStudioGateway(),
       hireGateway: gateway,
@@ -385,7 +409,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(gateway.prepared, contains(('reject', '')));
+    expect(gateway.prepared, contains(('reject', defaultRejectReason)));
     expect(
       gateway.submitted,
       contains((3, 'reject', 'signed:AAAA-reject')),
@@ -633,6 +657,26 @@ void main() {
     expect(_status('Completed'), findsOneWidget);
   });
 
+  testWidgets('a session that appears after the address reloads the hire, '
+      'with no second sign-in', (tester) async {
+    final wallet = TestWallet(initialAddress: _consumer);
+    final controller = WalletController(wallet, signIn: _SignIn());
+    final gateway = _ProgressGateway([
+      const HireNotSignedIn(),
+      _hire(status: 'completed'),
+    ]);
+    await _pumpDetail(tester, gateway: gateway, controller: controller);
+    expect(find.text('Sign in to see this hire'), findsOneWidget);
+
+    await tester.runAsync(controller.ensureSession);
+    await tester.pump();
+    await tester.pump();
+
+    expect(wallet.challenges, ['session-challenge']);
+    expect(gateway.signIns, isEmpty);
+    expect(_status('Completed'), findsOneWidget);
+  });
+
   testWidgets('a declined sign-in says so and can be retried', (tester) async {
     final wallet = TestWallet(initialAddress: _consumer)
       ..failNextChallenge = const WalletSignatureRejected();
@@ -793,7 +837,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('hire-detail-reject')));
     await tester.pump();
     await tester.pump();
-    expect(gateway.prepared, [('reject', '')]);
+    expect(gateway.prepared, [('reject', defaultRejectReason)]);
     expect(_status('Rejected'), findsOneWidget);
   });
 

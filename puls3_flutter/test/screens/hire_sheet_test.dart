@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -115,6 +117,7 @@ class ScriptedHireGateway implements HireGateway {
   /// What `hireTerms` answers; [failTerms] makes it throw instead.
   SubcontractTerms terms = SubcontractTerms.none;
   Object? failTerms;
+  var termsReads = 0;
   final submitted = <String>[];
   var createJobPreparations = 0;
   var fundPreparations = 0;
@@ -230,6 +233,7 @@ class ScriptedHireGateway implements HireGateway {
 
   @override
   Future<SubcontractTerms> hireTerms(int agentId) async {
+    termsReads++;
     final failure = failTerms;
     if (failure != null) throw failure;
     return terms;
@@ -355,6 +359,7 @@ Future<void> pumpSheet(
   Agent agent = _onChainAgent,
   HireFlowStore? store,
   StudioGateway? studio,
+  WalletSignIn? signIn,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   opened.clear();
@@ -363,7 +368,7 @@ Future<void> pumpSheet(
       theme: Puls3Theme.dark(),
       home: AppScope(
         catalog: AgentCatalog(InMemoryAgentRepository([agent])),
-        wallet: WalletController(wallet),
+        wallet: WalletController(wallet, signIn: signIn),
         deployGateway: FakeDeployGateway(),
         studioGateway: studio ?? FakeStudioGateway(delay: Duration.zero),
         hireGateway: gateway ?? FakeHireGateway(delay: Duration.zero),
@@ -1214,4 +1219,219 @@ void main() {
       expect(gateway.relatedPartyFlags, [false, false]);
     });
   });
+
+  group('Wallet session on the hire form (#334 T8.2)', () {
+    const offered = SubcontractTerms(
+      reserveMaxStroops: 20000000,
+      maxChildren: 2,
+      suggestedReserveStroops: 30000000,
+    );
+    const section = ValueKey('hire-subcontract');
+    const reserveField = ValueKey('hire-subcontract-reserve');
+    const consentBox = ValueKey('hire-subcontract-consent');
+
+    Future<
+      ({
+        ScriptedHireGateway gateway,
+        _TestSignIn signIn,
+        _RecordingStudio studio,
+        TestWallet wallet,
+      })
+    >
+    open(
+      WidgetTester tester, {
+      SubcontractTerms terms = offered,
+      bool signedIn = false,
+    }) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()..terms = terms;
+      final signIn = _TestSignIn(signedInAs: signedIn ? 'GUSER123' : null);
+      final studio = _RecordingStudio();
+      await pumpSheet(
+        tester,
+        wallet: wallet,
+        gateway: gateway,
+        studio: studio,
+        signIn: signIn,
+      );
+      await settle(tester);
+      return (gateway: gateway, signIn: signIn, studio: studio, wallet: wallet);
+    }
+
+    testWidgets('opening the sheet without a session reads nothing and opens '
+        'no wallet prompt', (tester) async {
+      final opened = await open(tester);
+
+      expect(opened.gateway.termsReads, 0);
+      expect(opened.studio.owners, isEmpty);
+      expect(opened.signIn.prompts, isEmpty);
+      expect(opened.wallet.challenges, isEmpty);
+      expect(find.byKey(section), findsNothing);
+    });
+
+    testWidgets('opening the sheet with a session reads the terms and the '
+        'paying agents without a prompt', (tester) async {
+      final opened = await open(tester, signedIn: true);
+
+      expect(opened.gateway.termsReads, 1);
+      expect(opened.studio.owners, ['GUSER123']);
+      expect(opened.signIn.prompts, isEmpty);
+      expect(opened.wallet.challenges, isEmpty);
+      expect(find.byKey(section), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byKey(reserveField)).controller!.text,
+        '2.00',
+      );
+    });
+
+    testWidgets('confirming without a session signs in once, then shows the '
+        'reserve before anything is created or paid', (tester) async {
+      final opened = await open(tester);
+
+      await confirm(tester);
+
+      expect(opened.signIn.prompts, ['GUSER123']);
+      expect(opened.gateway.termsReads, 1);
+      expect(find.byKey(section), findsOneWidget);
+      expect(opened.gateway.reserves, isEmpty);
+      expect(opened.wallet.signed, isEmpty);
+
+      await tester.ensureVisible(find.byKey(consentBox));
+      await tester.pump();
+      await tester.tap(find.byKey(consentBox));
+      await tester.pump();
+      await tap(tester, 'Confirm & sign');
+
+      expect(opened.signIn.prompts, ['GUSER123']);
+      expect(opened.gateway.reserves, [20000000]);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+
+    testWidgets('confirming without a session hires right after the sign-in '
+        'when the agent offers no reserve', (tester) async {
+      final opened = await open(tester, terms: SubcontractTerms.none);
+
+      await confirm(tester);
+
+      expect(opened.signIn.prompts, ['GUSER123']);
+      expect(opened.gateway.reserves, [0]);
+      expect(find.text('Payment sent, confirming on Stellar…'), findsOneWidget);
+    });
+
+    testWidgets('a second tap while signing in opens no second prompt', (
+      tester,
+    ) async {
+      final opened = await open(tester);
+      final gate = Completer<void>();
+      opened.signIn.gate = gate;
+      await tester.enterText(
+        find.byKey(const ValueKey('hire-input')),
+        'Audit my token',
+      );
+      await tester.pump();
+      await tester.ensureVisible(find.text('Confirm & sign'));
+      await tester.tap(find.text('Confirm & sign'));
+      await tester.pump();
+      await tester.tap(find.text('Confirm & sign'));
+      await tester.pump();
+      gate.complete();
+      await settle(tester);
+
+      expect(opened.signIn.prompts, ['GUSER123']);
+      expect(opened.gateway.reserves, isEmpty);
+      expect(find.byKey(section), findsOneWidget);
+    });
+
+    testWidgets('a session of another wallet is not used', (tester) async {
+      final wallet = TestWallet(initialAddress: 'GUSER123');
+      final gateway = ScriptedHireGateway()..terms = offered;
+      final studio = _RecordingStudio();
+      await pumpSheet(
+        tester,
+        wallet: wallet,
+        gateway: gateway,
+        studio: studio,
+        signIn: _TestSignIn(signedInAs: 'GOTHER456'),
+      );
+      await settle(tester);
+
+      expect(gateway.termsReads, 0);
+      expect(studio.owners, isEmpty);
+      expect(find.byKey(section), findsNothing);
+    });
+
+    testWidgets('a sign-in the server refuses after the wallet signed asks '
+        'once more at most, not once per step', (tester) async {
+      final opened = await open(tester, terms: SubcontractTerms.none);
+      opened.signIn.verifyFailure = StateError('verifyChallenge failed');
+
+      await confirm(tester);
+
+      expect(opened.wallet.challenges, hasLength(2));
+    });
+
+    testWidgets('declining the sign-in starts nothing', (tester) async {
+      final opened = await open(tester);
+      opened.wallet.failNextChallenge = const WalletSignatureRejected();
+
+      await confirm(tester);
+
+      expect(opened.signIn.prompts, isEmpty);
+      expect(opened.gateway.termsReads, 0);
+      expect(opened.gateway.reserves, isEmpty);
+      expect(opened.wallet.signed, isEmpty);
+    });
+  });
+}
+
+/// A wallet session that signs in through the wallet, like `WalletSession`.
+class _TestSignIn implements WalletSignIn {
+  _TestSignIn({this.signedInAs});
+
+  String? signedInAs;
+
+  /// When set, a sign-in waits for it, like an open wallet prompt.
+  Completer<void>? gate;
+
+  /// When set, the server refuses every signed challenge with it, as when
+  /// `verifyChallenge` fails after the wallet signed.
+  Object? verifyFailure;
+
+  /// Wallets that were asked to sign in, in order.
+  final prompts = <String>[];
+
+  @override
+  Future<bool> isSignedInAs(String wallet) async => signedInAs == wallet;
+
+  @override
+  Future<void> ensureSignedIn(
+    String wallet,
+    Future<String> Function(SignInChallenge challenge) sign,
+  ) async {
+    if (signedInAs == wallet) return;
+    await gate?.future;
+    await sign(
+      const SignInChallenge(
+        transactionXdr: 'session-challenge',
+        networkPassphrase: stellarTestnetPassphrase,
+      ),
+    );
+    final failure = verifyFailure;
+    if (failure != null) throw failure;
+    prompts.add(wallet);
+    signedInAs = wallet;
+  }
+}
+
+/// The demo Studio, recording whose drafts were listed.
+class _RecordingStudio extends FakeStudioGateway {
+  _RecordingStudio() : super(delay: Duration.zero);
+
+  final owners = <String>[];
+
+  @override
+  Future<List<StudioDraft>> listDrafts({required String owner}) {
+    owners.add(owner);
+    return super.listDrafts(owner: owner);
+  }
 }

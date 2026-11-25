@@ -43,7 +43,7 @@ The manifest must pass the deploy rules (`AgentManifestDraft.validate` in `puls3
 
 | `model.provider` | Accepted `model.id` |
 |---|---|
-| `workers-ai` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| `workers-ai` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, `@cf/mistralai/mistral-small-3.1-24b-instruct` |
 | `anthropic` | any Claude model id, for example `claude-sonnet-5-5` |
 
 ## 3. Set your credential

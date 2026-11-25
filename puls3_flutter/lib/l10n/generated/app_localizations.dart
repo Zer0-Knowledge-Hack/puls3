@@ -1929,7 +1929,7 @@ abstract class AppLocalizations {
   /// No description provided for @studioSubcontractNeedsTools.
   ///
   /// In en, this message translates to:
-  /// **'Subcontracting needs a Claude model: the free model cannot call tools.'**
+  /// **'Subcontracting needs a model that can call tools: Mistral Small 3.1 (free) or Claude.'**
   String get studioSubcontractNeedsTools;
 
   /// No description provided for @studioSubcontractMaxChildren.

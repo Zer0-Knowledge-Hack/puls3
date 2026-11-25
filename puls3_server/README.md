@@ -170,9 +170,14 @@ For the subcontracting tool loop (#334, ADR-0011 D8) the model layer also
 holds conversations with tools: `ConversationRuntime.converse` returns one
 `ModelTurn`, the final text or the tool calls, and
 `AgentRunner.converseOnce` applies the same timeout, abort and limits to each
-turn (the input limit counts the whole conversation). Anthropic supports
-tools; Workers AI holds plain conversations only and fails a call with tools
-as `tools_unsupported`, so subcontracting is Anthropic-only.
+turn (the input limit counts the whole conversation). Every Anthropic model
+supports tools. On Workers AI, the models in `workersAiToolModels`
+(`@cf/mistralai/mistral-small-3.1-24b-instruct`) hold tool conversations
+through the OpenAI-compatible `/ai/v1/chat/completions` endpoint, whose tool
+calls carry ids; any other Workers AI model holds plain conversations only and
+fails a call with tools as `tools_unsupported`. `ToolLoop.offersTools`
+(`callsTools`) applies the same rule per model, so subcontracting works on
+Anthropic or on that free model (#334 T8.0).
 
 Each run goes through the domain (`Hire.startRun`, `Hire.failRun`).
 `HireEndpoint.getHire` shows the progress as `runtimeStatus` (`queued`,

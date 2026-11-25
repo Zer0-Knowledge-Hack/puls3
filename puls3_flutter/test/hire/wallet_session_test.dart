@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_client/puls3_client.dart';
 import 'package:puls3_flutter/src/hire/server_hire_gateway.dart';
@@ -100,6 +102,46 @@ void main() {
       expect(stored?.token, 'token-for-$_alice');
     },
   );
+
+  test('a sign-out while the challenge prompt is open stores no session, '
+      'on every sign-in path', () async {
+    final prompt = Completer<String>();
+    final signingIn = session.ensureSignedIn(_alice, (_) => prompt.future);
+    await pumpEventQueue();
+
+    await session.signOut();
+    prompt.complete('signed:late');
+
+    await expectLater(signingIn, throwsA(isA<WalletSignatureRejected>()));
+    expect(stored, isNull);
+    expect(await session.isSignedInAs(_alice), isFalse);
+    expect(server.verified, isEmpty);
+  });
+
+  test('a refused call that drops the session while a sign-in prompt is open '
+      'does not cancel that sign-in', () async {
+    final prompt = Completer<String>();
+    final signingIn = session.ensureSignedIn(_alice, (_) => prompt.future);
+    await pumpEventQueue();
+
+    // A call made without a session got a 401 (the terms read when the
+    // hire sheet opens): it drops the stale session, nothing more.
+    await session.forget();
+    prompt.complete('signed:challenge-for-$_alice');
+    await signingIn;
+
+    expect(stored?.token, 'token-for-$_alice');
+    expect(await session.isSignedInAs(_alice), isTrue);
+  });
+
+  test('a sign-out after the session is stored is not undone', () async {
+    await session.ensureSignedIn(_alice, sign);
+
+    await session.signOut();
+
+    expect(stored, isNull);
+    expect(await session.isSignedInAs(_alice), isFalse);
+  });
 
   test('passes the server key and home domain to the wallet check', () async {
     session = build(serverKey: 'GSERVER', homeDomain: 'puls3.example');

@@ -351,11 +351,12 @@ class AgentForm extends StatelessWidget {
     );
   }
 
-  /// The opt-in to hire other agents during a run. A free model cannot call
-  /// tools, so the toggle is off and disabled while one is selected.
+  /// The opt-in to hire other agents during a run. A model that cannot call
+  /// tools cannot subcontract, so the toggle is off and disabled while one
+  /// is selected.
   Widget _subcontractSection(BuildContext context) {
     final l10n = context.l10n;
-    final toolsMissing = selectedModel?.isFree ?? false;
+    final toolsMissing = !(selectedModel?.supportsTools ?? true);
     final on = subcontract && !toolsMissing;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

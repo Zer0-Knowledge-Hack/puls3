@@ -109,6 +109,7 @@ class Puls3App extends StatefulWidget {
     this.hireFlowStore,
     this.cliSessions,
     this.onWalletDisconnect,
+    this.walletSignIn,
     this.localeStore,
     this.locale,
     this.initialLocation = '/',
@@ -144,6 +145,10 @@ class Puls3App extends StatefulWidget {
   /// (#261). `main.dart` passes the same [WalletSession] the gateways use.
   final Future<void> Function()? onWalletDisconnect;
 
+  /// The wallet's server session: connecting signs in once (#334 T8.2).
+  /// Null when no backend needs a session (the demo).
+  final WalletSignIn? walletSignIn;
+
   /// Where the language tag is kept: the browser's storage by default.
   final LocaleStore? localeStore;
 
@@ -164,6 +169,7 @@ class _Puls3AppState extends State<Puls3App> {
   late final WalletController _wallet = WalletController(
     widget.wallet,
     onDisconnect: widget.onWalletDisconnect,
+    signIn: widget.walletSignIn,
   );
   late final GoRouter _router = buildRouter(
     initialLocation: widget.initialLocation,

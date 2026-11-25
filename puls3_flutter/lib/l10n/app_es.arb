@@ -309,7 +309,7 @@
   "studioSubcontractSection": "Subcontratación",
   "studioSubcontractToggle": "Permitir que este agente subcontrate a otros agentes",
   "studioSubcontractHelper": "Durante una tarea, tu agente puede contratar a otros agentes del marketplace. El consumidor financia una reserva al contratar y lo que no se gasta se reembolsa.",
-  "studioSubcontractNeedsTools": "La subcontratación requiere un modelo Claude: el modelo gratuito no puede usar herramientas.",
+  "studioSubcontractNeedsTools": "La subcontratación requiere un modelo que pueda usar herramientas: Mistral Small 3.1 (gratis) o Claude.",
   "studioSubcontractMaxChildren": "Máximo de agentes por tarea",
   "studioSubcontractMaxChildrenHelper": "De 1 a {max}",
   "studioSubcontractReserve": "Reserva sugerida",

@@ -20,7 +20,19 @@ class StudioModelOption {
   /// The free tier runs on the builder's own Workers AI account; a paid
   /// provider needs the builder's own key (BYOK).
   bool get isFree => provider == ModelPolicy.freeProvider;
+
+  /// Whether the model can call tools, which subcontracting needs (ADR-0011
+  /// D8): every Claude model, and the free models in
+  /// [studioWorkersAiToolModels].
+  bool get supportsTools => !isFree || studioWorkersAiToolModels.contains(id);
 }
+
+/// The Workers AI models that call tools. The server is the authority
+/// (`workersAiToolModels`); the Studio mirrors it to enable the subcontract
+/// opt-in only where a hire can use it.
+const studioWorkersAiToolModels = {
+  '@cf/mistralai/mistral-small-3.1-24b-instruct',
+};
 
 /// The models the Studio offers: Workers AI ids from the ADR-0004 examples
 /// and the models the Anthropic runtime adapter serves (#20).
@@ -33,6 +45,11 @@ const studioModelOptions = [
     provider: 'workers-ai',
     id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     label: 'Llama 3.3 70B',
+  ),
+  StudioModelOption(
+    provider: 'workers-ai',
+    id: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+    label: 'Mistral Small 3.1 24B',
   ),
   StudioModelOption(
     provider: 'anthropic',

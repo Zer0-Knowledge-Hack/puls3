@@ -127,8 +127,9 @@ StudioFormCheck checkStudioForm(
 
   final inputMax = count(values.inputMaxChars, StudioField.input);
 
-  // A free model cannot call tools, so it never subcontracts (#334 T5.1).
-  final subcontracting = values.subcontract && !(values.model?.isFree ?? false);
+  // A model that cannot call tools never subcontracts (#334 T5.1, T8.0).
+  final subcontracting =
+      values.subcontract && (values.model?.supportsTools ?? true);
   int? maxChildren;
   int? reserve;
   if (subcontracting) {

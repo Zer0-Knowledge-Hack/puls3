@@ -57,8 +57,9 @@ abstract interface class HireGateway {
   /// The unsigned `complete` of a submitted hire (F6 Approve).
   Future<EscrowPreparation> prepareComplete(int hireId);
 
-  /// The unsigned `reject` of [hireId] (F6 Reject and refund). [reason] may
-  /// be empty.
+  /// The unsigned `reject` of [hireId] (F6 Reject and refund). The server
+  /// refuses a blank [reason] (`InvalidRejectReason`), so the app sends
+  /// [defaultRejectReason] when the user gives none (#334 T8.4).
   Future<EscrowPreparation> prepareReject(int hireId, String reason);
 
   /// The unsigned `claim_refund` of a funded hire past `expired_at`, so the
@@ -99,6 +100,10 @@ abstract interface class HireGateway {
   /// hires only, so [consumer] never reaches anyone else's.
   Future<List<HireSummaryItem>> listMyHires(String consumer);
 }
+
+/// The reason a reject carries when the user leaves it empty: the reason
+/// field is optional for the user, and the server needs one.
+const defaultRejectReason = 'Rejected by the consumer.';
 
 /// Where a hire sits in My hires.
 enum HireListTab {

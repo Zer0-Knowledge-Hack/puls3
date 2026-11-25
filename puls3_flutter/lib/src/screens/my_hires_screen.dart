@@ -36,6 +36,10 @@ class _MyHiresScreenState extends State<MyHiresScreen> {
   WalletController? _wallet;
   String? _address;
 
+  /// The wallet's [WalletController.sessionEpoch] when this screen loaded:
+  /// a sign-in that completes after the address appeared reloads it.
+  int? _epoch;
+
   /// Bumped per request, so a stale answer never overwrites a newer one.
   int _request = 0;
 
@@ -47,6 +51,7 @@ class _MyHiresScreenState extends State<MyHiresScreen> {
     _wallet?.removeListener(_onWallet);
     _wallet = wallet..addListener(_onWallet);
     _address = wallet.address;
+    _epoch = wallet.sessionEpoch;
     unawaited(_load());
   }
 
@@ -58,8 +63,10 @@ class _MyHiresScreenState extends State<MyHiresScreen> {
 
   void _onWallet() {
     final address = _wallet?.address;
-    if (address == _address) return;
+    final epoch = _wallet?.sessionEpoch;
+    if (address == _address && epoch == _epoch) return;
     _address = address;
+    _epoch = epoch;
     setState(() {
       _hires = const [];
       _status = _Status.loading;

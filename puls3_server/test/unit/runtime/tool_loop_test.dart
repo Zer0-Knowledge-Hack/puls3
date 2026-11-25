@@ -17,10 +17,11 @@ const _timeout = Duration(seconds: 120);
 
 RunManifest _manifest({
   String provider = 'anthropic',
+  String modelId = 'claude-opus-5-5',
   SubcontractOptIn? subcontract,
 }) => RunManifest(
   provider: provider,
-  modelId: 'claude-opus-5-5',
+  modelId: modelId,
   systemPrompt: 'You write reports.',
   inputMaxChars: 200,
   outputMaxChars: 500,
@@ -225,13 +226,17 @@ void main() {
     });
 
     test(
-      'a provider without tool calling never gets tools (Workers AI)',
+      'a Workers AI model without tool calling never gets tools',
       () async {
         model = _Scripted(const []);
 
         final outcome = await loop().start(
           _run(
-            manifest: _manifest(provider: 'workers-ai', subcontract: _optIn),
+            manifest: _manifest(
+              provider: 'workers-ai',
+              modelId: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+              subcontract: _optIn,
+            ),
           ),
         );
 
@@ -240,6 +245,27 @@ void main() {
         expect(model.completes, hasLength(1));
       },
     );
+
+    test('tools are offered per model: Anthropic, or a Workers AI tool '
+        'model, and only with the opt-in', () {
+      const mistral = '@cf/mistralai/mistral-small-3.1-24b-instruct';
+      const llama = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+      bool offers(String provider, String modelId, {bool optIn = true}) =>
+          ToolLoop.offersTools(
+            _manifest(
+              provider: provider,
+              modelId: modelId,
+              subcontract: optIn ? _optIn : null,
+            ),
+          );
+
+      expect(offers('anthropic', 'claude-opus-5-5'), isTrue);
+      expect(offers('workers-ai', mistral), isTrue);
+      expect(offers('workers-ai', llama), isFalse);
+      expect(offers('workers-ai', mistral, optIn: false), isFalse);
+      expect(offers('anthropic', 'claude-opus-5-5', optIn: false), isFalse);
+      expect(offers('openai', 'gpt-x'), isFalse);
+    });
 
     test('a plain run failure is a LoopFailed with its code', () async {
       model = _Scripted(const []);

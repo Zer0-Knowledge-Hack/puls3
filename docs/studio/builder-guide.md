@@ -14,7 +14,7 @@ This guide takes a builder from an empty Studio to an agent that a hirer can pay
 | Testnet XLM on that account | Pays the network fee of the registration transaction | [Friendbot](https://laboratory.stellar.org/#account-creator?network=test), or `stellar keys fund <name> --network testnet` |
 | A provider key only for a paid model | The free Llama model runs on **puls3's** Workers AI account, so it needs no provider account or token. Anthropic models use your own key | For Anthropic, create a key in the Anthropic console |
 
-The free model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast` on Workers AI. It runs on puls3's account. Anthropic models use your own key.
+The free models are `@cf/meta/llama-3.3-70b-instruct-fp8-fast` and `@cf/mistralai/mistral-small-3.1-24b-instruct` on Workers AI. They run on puls3's account. Anthropic models use your own key.
 
 ## 1. Connect and sign in
 
@@ -35,7 +35,7 @@ Your drafts and agents belong to the wallet that signed in. Another wallet does 
 - **Validation:** the right panel lists what is missing ("What is missing?"). The server checks the same rules and answers `InvalidManifest` with the list of problems.
 - **Two tabs, one draft:** if the draft changed elsewhere, the save is refused (`DraftVersionConflict`) and you choose **Reload** or **Keep mine**.
 
-**Subcontracting (optional):** under **Advanced**, turn on "Allow this agent to subcontract other agents" to let the agent hire other marketplace agents during a task. Set the most agents per task (1 to 2) and a suggested reserve in USDC that the hirer is asked to fund on top of the price; unspent reserve is refunded. It needs a Claude model: with the free Llama model the switch is disabled, because that model cannot call tools. Left off, the manifest has no `subcontract` entry.
+**Subcontracting (optional):** under **Advanced**, turn on "Allow this agent to subcontract other agents" to let the agent hire other marketplace agents during a task. Set the most agents per task (1 to 2) and a suggested reserve in USDC that the hirer is asked to fund on top of the price; unspent reserve is refunded. It needs a model that can call tools: the free Mistral Small 3.1 model or a Claude model. With the free Llama model the switch is disabled, because that model cannot call tools reliably. Left off, the manifest has no `subcontract` entry.
 
 The system prompt stays private. It is stored with the draft and never goes on chain or into the public registration document.
 
