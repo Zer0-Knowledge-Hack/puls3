@@ -64,7 +64,7 @@ export const TESTNET: Puls3Network = Object.freeze({
   usdc: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
   maxFeeStroops: 50_000_000,
   // The public `G…` of the server's `walletAuthSigningKey` and its SEP-10
-  // domains (puls3_server/README.md, "Deploy to Serverpod Cloud").
+  // domains, as the web app pins them (#176, `39508a41`).
   serverSigningKey: 'GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG',
   homeDomain: 'puls3-hub-on-stellar.api.serverpod.space',
   webAuthDomain: 'puls3-hub-on-stellar.api.serverpod.space',
