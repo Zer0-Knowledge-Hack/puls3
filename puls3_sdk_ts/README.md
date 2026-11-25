@@ -19,16 +19,22 @@ It signs with a key **you** supply, and it signs only what it has checked
 
 - **Runtime:** Node 20 or later, ESM. Types ship with the package.
 - **Network:** Stellar testnet.
-- **Not on npm yet.** Until it is, build it from this repository (below).
+- **On npm** as `@puls3_org/sdk`.
 
-## Install from the repository
+## Install
+
+```bash
+npm install @puls3_org/sdk
+```
+
+To try an unreleased change, build it from this repository:
 
 ```bash
 git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
 cd puls3/puls3_sdk_ts
 npm ci && npm run build && npm pack
-# In your project:
-npm install /path/to/puls3/puls3_sdk_ts/puls3-sdk-0.1.0.tgz
+# In your project (the file name carries the version in package.json):
+npm install /path/to/puls3/puls3_sdk_ts/puls3_org-sdk-<version>.tgz
 ```
 
 ## Read the catalog (no session)
@@ -112,11 +118,13 @@ sign** (`SigningRefused`, with the rule that failed) unless:
 | `create_job`, `fund`, `complete`, `reject`, `give_feedback` | your key, as the client |
 | The agent's `submit`, and every transaction of `hireAgentAs` | the server, with the agent's custodied key |
 
-Pass the result you reviewed to `approve` and `reject` (`{ result }`). The
-SDK then signs only if the agent recorded that result on chain. Without it,
-the job is checked against what the server says about the hire, and a server
-that lies about every field could still point the call at another of your
-jobs.
+`approve` and `reject` require the result you reviewed (`{ result }`). The
+SDK then signs only if the agent recorded that result on chain. To reject a
+funded hire with no delivery yet, pass `{ result: null }`: the SDK then
+signs only if the job has no delivery. `{ trustServer: true }` is the
+explicit opt-out: the job is checked against what the server says about the
+hire, and a server that lies about every field could still point the call at
+another of your jobs. Leaving both out throws `InvalidArgument`.
 
 The secret stays in your process: it is never sent, logged, or put in an
 error, `toString`, `JSON.stringify` or `util.inspect`. To keep it out of the
@@ -184,7 +192,7 @@ console.log(await sdk.listMyHires());
 | `deploy(draftId)` | prepare, sign `register_full`, submit, sign `set_agent_wallet`, submit, wait for `active` | signer |
 | `hire(agentId, input, { maxPrice, maxReserve })` | `createHire`, sign `create_job`, submit, wait, `prepareFund`, sign `fund`, submit, wait for `funded` | signer |
 | `waitForResult(hireId)` | `hire.getHire` until the agent delivered | session |
-| `approve(hireId)`, `reject(hireId, reason)` | prepare, sign `complete` / `reject`, submit, wait | signer |
+| `approve(hireId, { result })`, `reject(hireId, reason, { result })` | prepare, sign `complete` / `reject`, submit, wait | signer |
 | `rate(hireId, score, comment)` | prepare, sign `give_feedback`, submit, wait | signer |
 
 - `agentId` in a hire is the agent's on-chain `registryId`, not its metadata id.
