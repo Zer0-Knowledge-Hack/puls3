@@ -699,7 +699,7 @@ export class Puls3Sdk {
     const prepared = await this.prepareFeedback(hireId, score, comment);
     const envelope = checkPreparedTransaction(
       prepared,
-      { purpose: 'giveFeedback', agentId },
+      { purpose: 'giveFeedback', agentId, score },
       wallet,
       this.#network,
       this.#now(),

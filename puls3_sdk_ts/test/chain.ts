@@ -125,16 +125,17 @@ export const createJobCall = (
   ],
 });
 
-export const fundCall = (budget = 5_000_000n, jobId = 35n): Call => ({
+/** `max_fee_bps` as the server sends it: `PULS3_PLATFORM_FEE_BPS`, 0 in production. */
+export const fundCall = (budget = 5_000_000n, jobId = 35n, maxFeeBps = 0): Call => ({
   contract: TESTNET.escrow,
   fn: 'fund',
-  args: [addr(builder.publicKey()), u64(jobId), i128(budget), u32(500)],
+  args: [addr(builder.publicKey()), u64(jobId), i128(budget), u32(maxFeeBps)],
 });
 
-export const fundWithReserveCall = (budget: bigint, reserve: bigint): Call => ({
+export const fundWithReserveCall = (budget: bigint, reserve: bigint, maxFeeBps = 0): Call => ({
   contract: TESTNET.escrow,
   fn: 'fund_with_reserve',
-  args: [addr(builder.publicKey()), u64(35n), i128(budget), i128(reserve), u32(500)],
+  args: [addr(builder.publicKey()), u64(35n), i128(budget), i128(reserve), u32(maxFeeBps)],
 });
 
 export const transferCall = (
@@ -202,6 +203,9 @@ export const registration = {
 
 const manifestHashBytes = createHash('sha256').update('draft 7 manifest', 'utf8').digest();
 
+/** The manifest hash `registerFullCall` registers, as lowercase hex. */
+export const manifestHash = manifestHashBytes.toString('hex');
+
 const metadataEntry = (key: string, value: Buffer) =>
   xdr.ScVal.scvMap([
     new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('key'), val: xdr.ScVal.scvString(key) }),
@@ -240,20 +244,21 @@ export const registerFullCall = (
     fn: 'register_full',
     args: [
       addr(options.caller ?? builder.publicKey()),
-      str(options.uri ?? `https://puls3.example/registry/${manifestHashBytes.toString('hex')}`),
+      str(options.uri ?? `${TESTNET.registrationOrigin}/registry/${manifestHashBytes.toString('hex')}`),
       xdr.ScVal.scvVec(entries),
     ],
   };
 };
 
-export const giveFeedbackCall = (agentId = 30): Call => ({
+/** give_feedback as `reputation_calls.dart` builds it: the score as `value`, with 0 decimals. */
+export const giveFeedbackCall = (agentId = 30, score = 5n, decimals = 0): Call => ({
   contract: TESTNET.reputationRegistry,
   fn: 'give_feedback',
   args: [
     addr(builder.publicKey()),
     u32(agentId),
-    i128(5n),
-    u32(0),
+    i128(score),
+    u32(decimals),
     str('puls3'),
     str('puls3:job:v1:x:35'),
     str(''),
