@@ -74,6 +74,12 @@ class WalletController extends ChangeNotifier {
   /// dropped instead of reconnecting behind the user's back.
   int _session = 0;
 
+  /// Bumped when the wallet gets a new server session or loses it, so
+  /// screens that loaded without one reload once it exists, even though the
+  /// address did not change.
+  int get sessionEpoch => _sessionEpoch;
+  int _sessionEpoch = 0;
+
   /// [WalletStatus.connecting] or [WalletStatus.signing] while the wallet
   /// is busy; null otherwise.
   WalletStatus? _busy;
@@ -165,16 +171,28 @@ class WalletController extends ChangeNotifier {
     final signIn = this.signIn;
     final address = _wallet.address;
     if (signIn == null || address == null) return;
+    final session = _session;
+    var had = false;
     try {
-      final had = await signIn.isSignedInAs(address);
+      had = await signIn.isSignedInAs(address);
       await signIn.ensureSignedIn(address, signChallenge);
-      // Screens waiting for a session (the hire sheet) read it now.
-      if (!had) notifyListeners();
     } on WalletException {
       rethrow;
     } on Object catch (e) {
       debugPrint('Wallet sign-in failed: ${e.runtimeType}');
+      return;
     }
+    if (session != _session) {
+      // Disconnected while the sign-in prompt was open: the session it just
+      // stored must not outlive the sign-out (#261).
+      await onDisconnect?.call();
+      throw const WalletSignatureRejected();
+    }
+    if (had) return;
+    // Screens waiting for a session (the hire sheet, My hires, the hire
+    // detail) read it now.
+    _sessionEpoch++;
+    notifyListeners();
   }
 
   /// Connects from a button: a failure becomes [lastError] (a recoverable
@@ -198,6 +216,7 @@ class WalletController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     _session++;
+    _sessionEpoch++;
     _busy = null;
     try {
       await _wallet.disconnect();

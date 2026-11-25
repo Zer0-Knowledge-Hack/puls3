@@ -338,6 +338,13 @@ class ServerStudioGateway implements StudioGateway {
           : OutputType.values.byName(draft.outputType!),
       outputMaxChars: draft.outputMaxChars,
       price: price == null ? null : UsdcAmount.stroops(price.amount),
+      subcontract: switch (draft.subcontract) {
+        final subcontract? => SubcontractOptIn(
+          maxChildren: subcontract.maxChildren,
+          suggestedReserve: subcontract.suggestedReserve,
+        ),
+        null => null,
+      },
     );
   }
 
@@ -370,6 +377,15 @@ class ServerStudioGateway implements StudioGateway {
       price: price == null
           ? null
           : api.ManifestPrice(asset: 'USDC', amount: price.stroops),
+      // The opt-in reaches the server, so a web-deployed agent can
+      // subcontract (#334 T8.1).
+      subcontract: switch (manifest.subcontract) {
+        final subcontract? => api.ManifestSubcontract(
+          maxChildren: subcontract.maxChildren,
+          suggestedReserve: subcontract.suggestedReserve,
+        ),
+        null => null,
+      },
     );
   }
 }

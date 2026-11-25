@@ -40,6 +40,55 @@ final class InMemorySessionWalletStore implements SessionWalletStore {
   Future<void> write(String? wallet) async => _wallet = wallet;
 }
 
+/// Storage that keeps one wallet across reloads and may refuse: the
+/// browser's `localStorage` throws when it is full or blocked.
+abstract interface class SessionWalletStorage {
+  String? getItem();
+  void setItem(String wallet);
+  void removeItem();
+}
+
+/// [SessionWalletStore] over a [SessionWalletStorage] that may fail. Once a
+/// read or a write fails, it answers from memory for the rest of the visit:
+/// a refused write never hides a sign-in, and a refused removal never brings
+/// back a wallet that signed out (#261). Without storage it is memory only.
+final class FallbackSessionWalletStore implements SessionWalletStore {
+  FallbackSessionWalletStore(this._storage);
+
+  final SessionWalletStorage? _storage;
+  final _memory = InMemorySessionWalletStore();
+  bool _memoryOnly = false;
+
+  @override
+  Future<String?> read() async {
+    final storage = _storage;
+    if (storage != null && !_memoryOnly) {
+      try {
+        return storage.getItem();
+      } on Object {
+        _memoryOnly = true;
+      }
+    }
+    return _memory.read();
+  }
+
+  @override
+  Future<void> write(String? wallet) async {
+    await _memory.write(wallet);
+    final storage = _storage;
+    if (storage == null || _memoryOnly) return;
+    try {
+      if (wallet == null) {
+        storage.removeItem();
+      } else {
+        storage.setItem(wallet);
+      }
+    } on Object {
+      _memoryOnly = true;
+    }
+  }
+}
+
 /// The wallet-bound Serverpod session (#136, api.md "Wallet session
 /// lifecycle", F1-2/F1-3): the server issues a SEP-10 challenge, the wallet
 /// signs it, and the server answers with the session credentials, which the
@@ -82,10 +131,15 @@ class WalletSession implements WalletSignIn {
   /// Throws a `WalletException` from the wallet (for example when the user
   /// declines) or a `Puls3ApiException` from the server, unchanged, so the
   /// caller maps them like every other call.
+  ///
+  /// A [forget] while the prompt is open (the user disconnected) wins: the
+  /// sign-in throws `WalletSignatureRejected` and stores nothing, so no
+  /// session outlives a sign-out (#261), whichever screen started it.
   @override
   Future<void> ensureSignedIn(String wallet, ChallengeSigner sign) async {
     if (_isAuthenticated() && await _walletStore.read() == wallet) return;
-    await forget();
+    await _drop();
+    final signOuts = _signOuts;
     final challenge = await _createChallenge(wallet);
     if (challenge.wallet != wallet) {
       throw const WalletInvalidPayload(
@@ -101,18 +155,29 @@ class WalletSession implements WalletSignIn {
         webAuthDomain: webAuthDomain,
       ),
     );
+    if (signOuts != _signOuts) throw const WalletSignatureRejected();
     final session = await _verifyChallenge(
       challenge.challengeId,
       wallet,
       signed,
     );
+    if (signOuts != _signOuts) throw const WalletSignatureRejected();
     await _storeSession(session);
     await _walletStore.write(wallet);
   }
 
-  /// Drops the stored session, for example after the server refused it.
-  /// The next [ensureSignedIn] signs in again.
+  /// Counts [forget] calls, so a sign-in that finishes after one is dropped.
+  int _signOuts = 0;
+
+  /// Drops the stored session, for example after the user disconnected or
+  /// the server refused it. The next [ensureSignedIn] signs in again, and
+  /// one still in progress stores nothing.
   Future<void> forget() async {
+    _signOuts++;
+    await _drop();
+  }
+
+  Future<void> _drop() async {
     if (_isAuthenticated()) await _storeSession(null);
     await _walletStore.write(null);
   }
