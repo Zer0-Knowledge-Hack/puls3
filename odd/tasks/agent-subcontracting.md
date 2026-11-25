@@ -729,3 +729,15 @@ StellarExpert.
   sign-in, `create_job` and the 0.10 USDC fund. User: "Le doy a rechazar y no sucede nada. Revisa
   que sucede en el log": eight `hire.prepareReject` calls, each `InvalidRejectReason`, with an
   empty reason (T8.4).
+- 2026-11-25: In-session code review of the whole T8 stack (#416 to #419) before merging without a
+  human reviewer. Fixed, test first: (1) My hires and the hire detail did not reload once
+  connecting signed in, because they compared the address only; `WalletController.sessionEpoch`
+  now changes with the session. (2) A disconnect while the sign-in prompt was open kept the
+  session it stored; `ensureSession` now forgets it again and fails the connect. (3) One Confirm
+  tap could open four sign-in prompts when `verifyChallenge` failed; now at most two. (4) The web
+  session-wallet store kept reading `localStorage` after a refused write; it now answers from
+  memory (`FallbackSessionWalletStore`). (5) A Workers AI tool call with null or blank arguments
+  failed as malformed; it is now `{}`. Left as follow-ups: hire terms still offer a reserve for an
+  opted-in manifest whose model calls no tools (pre-existing), and two UX nits (the funds check
+  now follows the sign-in; a Confirm that stops for the reserve shows no notice). ADR-0011
+  accepted.
