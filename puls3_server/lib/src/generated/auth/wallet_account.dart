@@ -68,7 +68,7 @@ abstract class WalletAccount
 
   /// The auth user this wallet signs in as.
   ///
-  /// Serverpod 4.0.4 requires a model relation to be nullable. WalletIdp
+  /// Serverpod requires a model relation to be nullable here. WalletIdp
   /// always sets it; the unique index keeps one user per row.
   _iacs.AuthUser? authUser;
 
@@ -227,7 +227,7 @@ class WalletAccountTable extends _is.Table<int?> {
 
   /// The auth user this wallet signs in as.
   ///
-  /// Serverpod 4.0.4 requires a model relation to be nullable. WalletIdp
+  /// Serverpod requires a model relation to be nullable here. WalletIdp
   /// always sets it; the unique index keeps one user per row.
   _iacs.AuthUserTable? _authUser;
 
