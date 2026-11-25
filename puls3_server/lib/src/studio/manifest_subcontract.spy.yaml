@@ -1,0 +1,7 @@
+### A draft's opt-in to subcontract other agents (ADR-0011 D8, #334 T8.1):
+### at most [maxChildren] children per hire, and a [suggestedReserve] in USDC
+### stroops the consumer is asked to fund on top of the price.
+class: ManifestSubcontract
+fields:
+  maxChildren: int
+  suggestedReserve: int

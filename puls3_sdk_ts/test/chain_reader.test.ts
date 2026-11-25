@@ -1,0 +1,107 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { Address, Keypair, TransactionBuilder, nativeToScVal, xdr } from '@stellar/stellar-base';
+
+import { SorobanRpcReader } from '../src/chain_reader.js';
+import { Puls3NetworkError, Puls3ProtocolError } from '../src/errors.js';
+import { TESTNET } from '../src/network.js';
+
+const source = Keypair.random().publicKey();
+const wallet = Keypair.random().publicKey();
+
+/** A Soroban RPC that answers each JSON-RPC call with [result] and records it. */
+function rpc(answer: (method: string) => unknown) {
+  const requests: { url: string; method: string; params: Record<string, unknown> }[] = [];
+  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body)) as { method: string; params: Record<string, unknown> };
+    requests.push({ url: String(url), method: body.method, params: body.params });
+    return new Response(JSON.stringify(answer(body.method)), { status: 200 });
+  }) as typeof fetch;
+  return { reader: new SorobanRpcReader(TESTNET, source, fetchImpl), requests };
+}
+
+const simulated = (value: xdr.ScVal) => ({ jsonrpc: '2.0', id: 1, result: { results: [{ xdr: value.toXDR('base64') }] } });
+
+describe('SorobanRpcReader', () => {
+  it("reads an agent's wallet from the Identity Registry with a simulation, nothing signed", async () => {
+    const { reader, requests } = rpc(() => simulated(new Address(wallet).toScVal()));
+
+    assert.equal(await reader.agentWallet(39), wallet);
+
+    const [request] = requests;
+    assert.equal(request!.url, TESTNET.rpcUrl);
+    assert.equal(request!.method, 'simulateTransaction');
+    const tx = TransactionBuilder.fromXDR(String(request!.params.transaction), TESTNET.passphrase);
+    assert.equal(tx.signatures.length, 0);
+    const op = (tx as unknown as { operations: { func: xdr.HostFunction }[] }).operations[0]!;
+    const call = op.func.invokeContract();
+    assert.equal(Address.fromScAddress(call.contractAddress()).toString(), TESTNET.identityRegistry);
+    assert.equal(call.functionName().toString(), 'get_agent_wallet');
+    assert.equal(call.args()[0]!.u32(), 39);
+  });
+
+  it('returns null for an agent with no wallet', async () => {
+    const { reader } = rpc(() => simulated(xdr.ScVal.scvVoid()));
+    assert.equal(await reader.agentWallet(39), null);
+  });
+
+  it('refuses a simulation error or an answer that is not an address', async () => {
+    const failed = rpc(() => ({ jsonrpc: '2.0', id: 1, result: { error: 'HostError: contract not found' } }));
+    await assert.rejects(failed.reader.agentWallet(39), Puls3ProtocolError);
+    const number = rpc(() => simulated(xdr.ScVal.scvU32(5)));
+    await assert.rejects(number.reader.agentWallet(39), Puls3ProtocolError);
+    const refused = rpc(() => ({ jsonrpc: '2.0', id: 1, error: { code: -32600, message: 'bad request' } }));
+    await assert.rejects(refused.reader.agentWallet(39), Puls3ProtocolError);
+  });
+
+  it('reads an escrow job by name, ignoring fields it does not check', async () => {
+    const client = Keypair.random().publicKey();
+    const provider = Keypair.random().publicKey();
+    const entry = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val });
+    const job = xdr.ScVal.scvMap([
+      entry('agent_id', nativeToScVal(39, { type: 'u32' })),
+      entry('budget', nativeToScVal(1_000_000n, { type: 'i128' })),
+      entry('client', new Address(client).toScVal()),
+      entry('deliverable', xdr.ScVal.scvBytes(Buffer.alloc(32, 0xab))),
+      entry('evaluator', new Address(client).toScVal()),
+      entry('provider', new Address(provider).toScVal()),
+      entry('reserve', nativeToScVal(0n, { type: 'i128' })),
+      entry('state', nativeToScVal(2, { type: 'u32' })),
+      entry('token', new Address(TESTNET.usdc).toScVal()),
+    ]);
+    const { reader, requests } = rpc(() => simulated(job));
+
+    assert.deepEqual(await reader.job(8n), {
+      client,
+      provider,
+      evaluator: client,
+      agentId: 39,
+      token: TESTNET.usdc,
+      budget: 1_000_000n,
+      deliverable: 'ab'.repeat(32),
+    });
+    const tx = TransactionBuilder.fromXDR(String(requests[0]!.params.transaction), TESTNET.passphrase);
+    const call = (tx as unknown as { operations: { func: xdr.HostFunction }[] }).operations[0]!.func.invokeContract();
+    assert.equal(Address.fromScAddress(call.contractAddress()).toString(), TESTNET.escrow);
+    assert.equal(call.functionName().toString(), 'get_job');
+  });
+
+  it('refuses a job the escrow does not return', async () => {
+    const { reader } = rpc(() => ({ jsonrpc: '2.0', id: 1, result: { error: 'HostError: Error(Contract, #1)' } }));
+    await assert.rejects(reader.job(999n), Puls3ProtocolError);
+  });
+
+  it('reads the latest ledger', async () => {
+    const { reader, requests } = rpc(() => ({ jsonrpc: '2.0', id: 1, result: { sequence: 5_911_000 } }));
+    assert.equal(await reader.latestLedger(), 5_911_000);
+    assert.equal(requests[0]!.method, 'getLatestLedger');
+  });
+
+  it('reports an RPC it cannot reach', async () => {
+    const down = new SorobanRpcReader(TESTNET, source, (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof fetch);
+    await assert.rejects(down.latestLedger(), Puls3NetworkError);
+  });
+});

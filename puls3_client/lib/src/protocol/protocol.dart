@@ -53,6 +53,7 @@ import 'studio/agent_manifest_draft.dart' as _i1fcn02s;
 import 'studio/manifest_model.dart' as _ihtr58tu;
 import 'studio/manifest_price.dart' as _iyhnvuqa;
 import 'studio/manifest_skill.dart' as _ige837u7;
+import 'studio/manifest_subcontract.dart' as _i44dhrk0;
 import 'studio/studio_draft.dart' as _iakoztug;
 import 'studio/test_run_result.dart' as _if6sgnfl;
 export 'agent/agent_catalog_unavailable.dart';
@@ -86,6 +87,7 @@ export 'studio/agent_manifest_draft.dart';
 export 'studio/manifest_model.dart';
 export 'studio/manifest_price.dart';
 export 'studio/manifest_skill.dart';
+export 'studio/manifest_subcontract.dart';
 export 'studio/studio_draft.dart';
 export 'studio/test_run_result.dart';
 export 'client.dart';
@@ -216,6 +218,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (t == _ige837u7.ManifestSkill) {
       return _ige837u7.ManifestSkill.fromJson(data) as T;
+    }
+    if (t == _i44dhrk0.ManifestSubcontract) {
+      return _i44dhrk0.ManifestSubcontract.fromJson(data) as T;
     }
     if (t == _iakoztug.StudioDraft) {
       return _iakoztug.StudioDraft.fromJson(data) as T;
@@ -350,6 +355,12 @@ class Protocol extends _isc.SerializationManager {
       return (data != null ? _ige837u7.ManifestSkill.fromJson(data) : null)
           as T;
     }
+    if (t == _isc.getType<_i44dhrk0.ManifestSubcontract?>()) {
+      return (data != null
+              ? _i44dhrk0.ManifestSubcontract.fromJson(data)
+              : null)
+          as T;
+    }
     if (t == _isc.getType<_iakoztug.StudioDraft?>()) {
       return (data != null ? _iakoztug.StudioDraft.fromJson(data) : null) as T;
     }
@@ -466,6 +477,7 @@ class Protocol extends _isc.SerializationManager {
       _ihtr58tu.ManifestModel => 'ManifestModel',
       _iyhnvuqa.ManifestPrice => 'ManifestPrice',
       _ige837u7.ManifestSkill => 'ManifestSkill',
+      _i44dhrk0.ManifestSubcontract => 'ManifestSubcontract',
       _iakoztug.StudioDraft => 'StudioDraft',
       _if6sgnfl.TestRunResult => 'TestRunResult',
       _ => null,
@@ -544,6 +556,8 @@ class Protocol extends _isc.SerializationManager {
         return 'ManifestPrice';
       case _ige837u7.ManifestSkill():
         return 'ManifestSkill';
+      case _i44dhrk0.ManifestSubcontract():
+        return 'ManifestSubcontract';
       case _iakoztug.StudioDraft():
         return 'StudioDraft';
       case _if6sgnfl.TestRunResult():
@@ -662,6 +676,9 @@ class Protocol extends _isc.SerializationManager {
     }
     if (dataClassName == 'ManifestSkill') {
       return deserialize<_ige837u7.ManifestSkill>(data['data']);
+    }
+    if (dataClassName == 'ManifestSubcontract') {
+      return deserialize<_i44dhrk0.ManifestSubcontract>(data['data']);
     }
     if (dataClassName == 'StudioDraft') {
       return deserialize<_iakoztug.StudioDraft>(data['data']);

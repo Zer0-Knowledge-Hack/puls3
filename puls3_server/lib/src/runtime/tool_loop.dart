@@ -1,6 +1,8 @@
 import 'package:puls3_domain/puls3_domain.dart' show AgentCandidate;
 
 import 'adapters/anthropic_runtime.dart' show AnthropicRuntime;
+import 'adapters/workers_ai_runtime.dart'
+    show WorkersAiRuntime, workersAiToolModels;
 import 'agent_runner.dart';
 import 'conversation.dart';
 import 'run_manifest.dart';
@@ -14,10 +16,15 @@ const defaultMaxLoopTurns = 8;
 /// `input.max_chars`, in runes.
 const defaultConversationHeadroomChars = 32000;
 
-/// The providers whose adapters hold tool conversations. Workers AI cannot
-/// return tool results (T5.1), so it is never offered tools and its hires
-/// run plain: subcontracting is Anthropic-only.
-const toolCallingProviders = {AnthropicRuntime.provider};
+/// Whether the adapter of [provider] holds tool conversations with
+/// [modelId]: every Anthropic model, and the Workers AI models in
+/// [workersAiToolModels] (ADR-0011 D8). Any other model is never offered
+/// tools and its hires run plain.
+bool callsTools(String provider, String modelId) => switch (provider) {
+  AnthropicRuntime.provider => true,
+  WorkersAiRuntime.provider => workersAiToolModels.contains(modelId),
+  _ => false,
+};
 
 /// One hire's run, as the loop needs it on start and on every resume.
 final class ToolLoopRun {
@@ -143,8 +150,8 @@ final class ChildFailed extends ChildToolResult {
 /// and limits. It holds no state between calls and persists nothing.
 ///
 /// Tools are offered only when the manifest opted in
-/// ([RunManifest.effectiveMaxChildren] above 0) and its provider is in
-/// [toolCallingProviders]; otherwise the loop is one plain [AgentRunner.run],
+/// ([RunManifest.effectiveMaxChildren] above 0) and its model calls tools
+/// ([callsTools]); otherwise the loop is one plain [AgentRunner.run],
 /// exactly today's run.
 final class ToolLoop {
   ToolLoop({
@@ -172,7 +179,7 @@ final class ToolLoop {
   /// Whether a run of [manifest] is offered the subcontract tools.
   static bool offersTools(RunManifest manifest) =>
       manifest.effectiveMaxChildren > 0 &&
-      toolCallingProviders.contains(manifest.provider);
+      callsTools(manifest.provider, manifest.modelId);
 
   /// Runs [run] from its input.
   Future<LoopOutcome> start(ToolLoopRun run) async {

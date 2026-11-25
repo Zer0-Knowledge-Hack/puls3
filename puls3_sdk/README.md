@@ -8,19 +8,21 @@ The catalog needs no session. Everything that acts for a wallet (hire and Studio
 calls) needs a CLI session; see the [quickstart](../docs/sdk/quickstart.md) and
 [CLI sessions](../docs/sdk/sessions.md).
 
-## Use it from this repo
+## Install
 
-`puls3_sdk` is a workspace member and is not on pub.dev yet. From another
-package in this repo:
+`puls3_sdk` is on [pub.dev](https://pub.dev/packages/puls3_sdk):
 
-```yaml
-dependencies:
-  puls3_sdk:
-    path: ../puls3_sdk
+```bash
+dart pub add puls3_sdk
 ```
 
-A package in this workspace also needs `resolution: workspace` and an entry in
-the root `pubspec.yaml`.
+It brings [`puls3_client`](https://pub.dev/packages/puls3_client), the API
+client generated from the server, at the version that matches it.
+
+Inside this repository, `puls3_sdk` is a workspace member: another package in
+the workspace depends on `puls3_sdk: ^0.1.0` with `resolution: workspace` and an
+entry in the root `pubspec.yaml`, and the workspace resolves it to
+`../puls3_sdk`.
 
 ```dart
 import 'package:puls3_sdk/puls3_sdk.dart';

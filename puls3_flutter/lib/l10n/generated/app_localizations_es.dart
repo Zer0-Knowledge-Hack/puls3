@@ -1051,7 +1051,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get studioSubcontractNeedsTools =>
-      'La subcontratación requiere un modelo Claude: el modelo gratuito no puede usar herramientas.';
+      'La subcontratación requiere un modelo que pueda usar herramientas: Mistral Small 3.1 (gratis) o Claude.';
 
   @override
   String get studioSubcontractMaxChildren => 'Máximo de agentes por tarea';

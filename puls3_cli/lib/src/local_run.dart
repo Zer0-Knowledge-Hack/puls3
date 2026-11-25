@@ -18,7 +18,10 @@ abstract final class CredentialVariables {
 /// applies on deploy (`studioServerModelPolicy` in `puls3_server`), so a
 /// manifest that runs locally also deploys.
 final localModelPolicy = ModelPolicy(
-  workersAiModels: {'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},
+  workersAiModels: {
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    '@cf/mistralai/mistral-small-3.1-24b-instruct',
+  },
   paidProviders: {'anthropic'},
 );
 

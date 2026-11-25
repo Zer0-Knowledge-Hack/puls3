@@ -13,3 +13,5 @@ fields:
   outputType: String?
   outputMaxChars: int?
   price: ManifestPrice?
+  ### The opt-in to subcontract; null for an agent that never does.
+  subcontract: ManifestSubcontract?

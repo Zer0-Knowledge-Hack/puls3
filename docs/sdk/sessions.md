@@ -40,7 +40,14 @@ and the session file exactly as the snippets below do. The app (or the script in
 section 3) is what creates the session.
 
 The CLI and the MCP server share the file and lock it while refreshing, so two
-programs never present the same refresh token. To end a session early, revoke it
+programs never present the same refresh token.
+
+The TypeScript SDK ([`puls3_sdk_ts/`](../../puls3_sdk_ts/README.md), #302) keeps
+its own file, `node-session.json` in the same folder (`PULS3_NODE_SESSION_FILE`
+moves it), because Node cannot take the lock the Dart programs use. **Copy a
+separate session for a Node program.** Seeding it and the CLI with the same
+token makes both rotate it, and the server revokes the session on the second
+use. To end a session early, revoke it
 from the wallet sheet (**Revoke**, under **Copy session for CLI**). A revoked
 session can still answer for up to 10 minutes, because access tokens are checked
 without a database read until they expire. Copying a new session does not revoke
