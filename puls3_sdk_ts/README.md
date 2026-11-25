@@ -204,7 +204,8 @@ console.log(await sdk.listMyHires());
   price, and refunded when the agent does not spend it. Leave it out for no
   reserve. A retry must repeat the same one.
 - `hire` returns once the hire is `funded` (or already further along). A
-  hire the chain left in any other state is a `Puls3ProtocolError`.
+  hire in any other state, for example a retry of one already rejected or
+  expired, is a `Puls3ProtocolError`.
 - The `prepare…` calls return an unsigned envelope. The flows (`deploy`,
   `hire`, `approve`, …) sign it with your signer after the checks above; with
   only a session, sign it in a wallet and use the `submit…` call.

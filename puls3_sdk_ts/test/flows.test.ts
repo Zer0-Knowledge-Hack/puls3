@@ -350,6 +350,28 @@ describe('Puls3Sdk.hire', () => {
     assert.equal(plain.calls.find((c) => c.method === 'createHire')!.args['subcontractReserve'], null);
   });
 
+  it('a retry of a hire that was already rejected is not returned as funded (#424)', async () => {
+    const { sdk, chain } = hireServer();
+    chain.status = 'rejected';
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000, requestId: 'req-1' }), (e: unknown) => {
+      assert.ok(e instanceof Puls3ProtocolError);
+      assert.match(e.message, /is rejected, not funded/);
+      return true;
+    });
+  });
+
+  it('createHire refuses a reserve that is negative, too large or not an integer, sending nothing (#424)', async () => {
+    for (const subcontractReserve of [-1, 2n ** 60n, 0.5]) {
+      const { sdk, calls } = hireServer();
+      await assert.rejects(sdk.createHire(30, me, 'x', 'req-1', { subcontractReserve }), (e: unknown) => {
+        assert.ok(e instanceof InvalidArgument, `${String(subcontractReserve)}: got ${String(e)}`);
+        assert.equal(e.argument, 'subcontractReserve');
+        return true;
+      });
+      assert.equal(calls.length, 0);
+    }
+  });
+
   it('refuses a maxPrice or maxReserve that is not an integer with InvalidArgument, sending nothing (#424)', async () => {
     for (const options of [{ maxPrice: 1.5 }, { maxPrice: 5_000_000, maxReserve: 0.5 }, { maxPrice: Number.NaN }]) {
       const { sdk, calls } = hireServer();

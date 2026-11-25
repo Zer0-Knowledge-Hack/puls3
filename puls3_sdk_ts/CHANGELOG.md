@@ -23,7 +23,8 @@ The remaining checks and errors of #424.
   `{ subcontractReserve }`); before, it was checked but never sent. A
   retried hire whose earlier `create_job` failed on chain throws
   `ChainSubmissionFailed`, not `Puls3Timeout`. A hire left unfunded after
-  `fund` throws `Puls3ProtocolError` instead of being returned. A
+  `fund`, or a retried one that already ended (rejected, expired), throws
+  `Puls3ProtocolError` instead of being returned. A
   `maxPrice` or `maxReserve` that is not an integer throws
   `InvalidArgument`, not `RangeError`.
 
