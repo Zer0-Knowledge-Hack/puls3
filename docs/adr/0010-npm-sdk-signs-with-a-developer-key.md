@@ -1,6 +1,6 @@
 # ADR-0010: The npm SDK creates agents and signs with a developer key
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-25). Implemented in #415 (merged `2fe943e`, reviewed and approved by moises-cisneros) and published to npm as `@puls3_org/sdk` 0.1.0 (the `@puls3` scope belongs to another npm organization).
 - **Date:** 2026-11-17
 - **Issue:** #314 (SOW week 3, SDK npm package)
 - **Amends:** [ADR-0007](0007-developer-sdk.md) D1 ("never signs or submits", "a TypeScript SDK is out of this milestone"). The rest of ADR-0007 is unchanged.
