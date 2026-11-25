@@ -72,7 +72,18 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
   Timer? _poll;
   WalletController? _wallet;
   String? _address;
+
+  /// The wallet's [WalletController.sessionEpoch] when this screen loaded:
+  /// a sign-in that completes after the address appeared reloads it.
+  int? _epoch;
   final _reason = TextEditingController();
+
+  /// The typed reason, or [defaultRejectReason] when the user gave none:
+  /// the field is optional, the server needs a reason (#334 T8.4).
+  String get _rejectReason {
+    final typed = _reason.text.trim();
+    return typed.isEmpty ? defaultRejectReason : typed;
+  }
 
   /// Bumped per request, so a stale answer never overwrites a newer one.
   int _request = 0;
@@ -85,6 +96,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
     _wallet?.removeListener(_onWallet);
     _wallet = wallet..addListener(_onWallet);
     _address = wallet.address;
+    _epoch = wallet.sessionEpoch;
     unawaited(_load());
   }
 
@@ -102,11 +114,14 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
     super.dispose();
   }
 
-  /// Another account can read other hires only: start over with it.
+  /// Another account can read other hires only, and a new session can read
+  /// what a missing one could not: start over with it.
   void _onWallet() {
     final address = _wallet?.address;
-    if (address == _address) return;
+    final epoch = _wallet?.sessionEpoch;
+    if (address == _address && epoch == _epoch) return;
     _address = address;
+    _epoch = epoch;
     _restart();
   }
 
@@ -261,7 +276,7 @@ class _HireDetailScreenState extends State<HireDetailScreen> {
       await gateway.ensureSignedIn(address, wallet.signChallenge);
       final preparation = approve
           ? await gateway.prepareComplete(hire.hireId)
-          : await gateway.prepareReject(hire.hireId, _reason.text.trim());
+          : await gateway.prepareReject(hire.hireId, _rejectReason);
       final signed = await wallet.signTransaction(
         preparation.unsignedTransaction,
       );

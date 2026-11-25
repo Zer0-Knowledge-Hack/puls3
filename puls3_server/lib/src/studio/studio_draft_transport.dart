@@ -32,6 +32,11 @@ Map<String, Object?> draftDocument(AgentManifestDraft draft) {
         'max_chars': ?draft.outputMaxChars,
       },
     if (price != null) 'price': {'asset': price.asset, 'amount': price.amount},
+    if (draft.subcontract case final subcontract?)
+      'subcontract': {
+        'max_children': subcontract.maxChildren,
+        'suggested_reserve': subcontract.suggestedReserve,
+      },
   };
 }
 
@@ -65,6 +70,13 @@ AgentManifestDraft transportDraft(domain.AgentManifestDraft manifest) {
     price: price == null
         ? null
         : ManifestPrice(asset: 'USDC', amount: price.stroops),
+    subcontract: switch (manifest.subcontract) {
+      final subcontract? => ManifestSubcontract(
+        maxChildren: subcontract.maxChildren,
+        suggestedReserve: subcontract.suggestedReserve,
+      ),
+      null => null,
+    },
   );
 }
 

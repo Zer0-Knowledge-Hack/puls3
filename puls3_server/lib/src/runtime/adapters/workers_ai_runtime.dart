@@ -362,7 +362,12 @@ final class WorkersAiRuntime implements ConversationRuntime {
       throw _malformedToolCall;
     }
     var arguments = (function as Map)['arguments'];
-    if (arguments is String) {
+    // OpenAI-compatible endpoints send a call with no arguments as null, an
+    // empty string or no field: that is `{}`, and the tool validates it.
+    if (arguments == null ||
+        (arguments is String && arguments.trim().isEmpty)) {
+      arguments = <String, Object?>{};
+    } else if (arguments is String) {
       try {
         arguments = jsonDecode(arguments);
       } on FormatException {

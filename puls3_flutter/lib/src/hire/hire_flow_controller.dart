@@ -167,7 +167,9 @@ class HireFlowController extends ChangeNotifier {
           '${formatUsdc(_terms.reserveMaxStroops)} USDC.',
         );
       }
-      await _wallet.connect();
+      // A connected wallet is not connected again: that would sign in
+      // once more right before the sign-in below.
+      if (!_wallet.isConnected) await _wallet.connect();
       final consumer = _wallet.address!;
       final agentId = agent.registryId;
       if (agentId == null && !_gateway.isDemo) {

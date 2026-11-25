@@ -66,6 +66,7 @@ import 'studio/builder_credential_record.dart' as _i4wr3q5v;
 import 'studio/manifest_model.dart' as _ihtr58tu;
 import 'studio/manifest_price.dart' as _iyhnvuqa;
 import 'studio/manifest_skill.dart' as _ige837u7;
+import 'studio/manifest_subcontract.dart' as _i44dhrk0;
 import 'studio/studio_agent_version_record.dart' as _irxkujl5;
 import 'studio/studio_deploy_record.dart' as _ie0z856o;
 import 'studio/studio_draft.dart' as _iakoztug;
@@ -114,6 +115,7 @@ export 'studio/builder_credential_record.dart';
 export 'studio/manifest_model.dart';
 export 'studio/manifest_price.dart';
 export 'studio/manifest_skill.dart';
+export 'studio/manifest_subcontract.dart';
 export 'studio/studio_agent_version_record.dart';
 export 'studio/studio_deploy_record.dart';
 export 'studio/studio_draft.dart';
@@ -1948,6 +1950,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     if (t == _ige837u7.ManifestSkill) {
       return _ige837u7.ManifestSkill.fromJson(data) as T;
     }
+    if (t == _i44dhrk0.ManifestSubcontract) {
+      return _i44dhrk0.ManifestSubcontract.fromJson(data) as T;
+    }
     if (t == _irxkujl5.StudioAgentVersionRecord) {
       return _irxkujl5.StudioAgentVersionRecord.fromJson(data) as T;
     }
@@ -2141,6 +2146,12 @@ class Protocol extends _is.DatabaseSerializationManager {
       return (data != null ? _ige837u7.ManifestSkill.fromJson(data) : null)
           as T;
     }
+    if (t == _is.getType<_i44dhrk0.ManifestSubcontract?>()) {
+      return (data != null
+              ? _i44dhrk0.ManifestSubcontract.fromJson(data)
+              : null)
+          as T;
+    }
     if (t == _is.getType<_irxkujl5.StudioAgentVersionRecord?>()) {
       return (data != null
               ? _irxkujl5.StudioAgentVersionRecord.fromJson(data)
@@ -2286,6 +2297,7 @@ class Protocol extends _is.DatabaseSerializationManager {
       _ihtr58tu.ManifestModel => 'ManifestModel',
       _iyhnvuqa.ManifestPrice => 'ManifestPrice',
       _ige837u7.ManifestSkill => 'ManifestSkill',
+      _i44dhrk0.ManifestSubcontract => 'ManifestSubcontract',
       _irxkujl5.StudioAgentVersionRecord => 'StudioAgentVersionRecord',
       _ie0z856o.StudioDeployRecord => 'StudioDeployRecord',
       _iakoztug.StudioDraft => 'StudioDraft',
@@ -2391,6 +2403,8 @@ class Protocol extends _is.DatabaseSerializationManager {
         return 'ManifestPrice';
       case _ige837u7.ManifestSkill():
         return 'ManifestSkill';
+      case _i44dhrk0.ManifestSubcontract():
+        return 'ManifestSubcontract';
       case _irxkujl5.StudioAgentVersionRecord():
         return 'StudioAgentVersionRecord';
       case _ie0z856o.StudioDeployRecord():
@@ -2555,6 +2569,9 @@ class Protocol extends _is.DatabaseSerializationManager {
     }
     if (dataClassName == 'ManifestSkill') {
       return deserialize<_ige837u7.ManifestSkill>(data['data']);
+    }
+    if (dataClassName == 'ManifestSubcontract') {
+      return deserialize<_i44dhrk0.ManifestSubcontract>(data['data']);
     }
     if (dataClassName == 'StudioAgentVersionRecord') {
       return deserialize<_irxkujl5.StudioAgentVersionRecord>(data['data']);

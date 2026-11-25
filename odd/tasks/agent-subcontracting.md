@@ -504,7 +504,12 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   local stack against escrow v0.2.0 `CD4C…GLJM`; eight transactions `SUCCESS` on the RPC; the
   `complete` effects credit A 0.1 and refund the consumer 0.1. Limit: A was deployed by the local
   tool because of T8.1.)
-- [ ] **T8.1** The server Studio carries the subcontract opt-in: the transport
+- [x] **T8.1** (done 2026-11-25. User: "Dale, arranquemos con esas ahora". Route: inline. RED: the
+  server endpoint test read the opt-in back as `null`, the gateway test sent `null`. GREEN: server
+  1685 passed (5 skipped) plus integration 243 with the test database up, Flutter 600 passed,
+  `dart analyze` clean in server, client, sdk, cli and mcp, `flutter analyze --fatal-infos` clean.
+  Risk: none (an optional field added to the draft transport). The Studio form already read the
+  opt-in from a saved draft (`studio_form_check.dart:202`).) The server Studio carries the subcontract opt-in: the transport
   `AgentManifestDraft` gets the `subcontract` block (max children, suggested reserve),
   `draftDocument` and `transportDraft` map it both ways, and `server_studio_gateway.dart` sends and
   reads it, so an agent deployed from the web with the opt-in on can subcontract. Found during the
@@ -553,7 +558,17 @@ returns to the consumer, and the contract emits an itemized, on-chain receipt.
   (Completed), reserve 0. Recorded in `docs/verification/334-agent-subcontracting.md`. T8 done.
   Open: T8.1 (Studio opt-in transport), T8.4 (reject reason), the native review of `44db635`, and
   moving production to escrow v0.2.0 (user decision).
-- [ ] **T8.4** Reject reason contract: the app labels the field "Motivo (opcional)"
+- 2026-11-25: Delivery. User: "Dale, hagamoslo asi" (stacked-to-main, four slices). Pushed and
+  opened, each based on the previous branch: #416 16a `feat/334-t8a-workers-ai` (`6d10d5d`,
+  `d7f12cb`, `cfde939`; 805 lines, 457 tests, recommends `size:exception`), #417 16b
+  `feat/334-t8b-wallet-session` (`44db635`; 727 lines, 356 tests, recommends `size:exception`),
+  #418 16c `docs/334-t8c-testnet-evidence` (`b8e9de8`; 107), #419 16d
+  `feat/334-t8d-studio-optin-transport` (`85b77d9`, `3dc83fd`; 420, 262 generated). All say
+  `Refs #334`: the team rule asks for closing evidence from someone other than TOMOKI977.
+- [x] **T8.4** (done 2026-11-25: the server contract stays, since api.md and ADR-0010 publish the
+  reason as required; the app sends `defaultRejectReason` ("Rejected by the consumer.") when the
+  field is empty, so "optional" is true for the user. RED: two hire detail tests expecting the
+  default failed; GREEN: Flutter 600 passed, analyze clean. Risk: none.) Reject reason contract: the app labels the field "Motivo (opcional)"
   (`hireRejectReasonHint`) but `EscrowRelayService._prepare` refuses an empty reason with
   `InvalidRejectReason`, and the click shows nothing (Log, 2026-11-24). Pre-existing since `f799ca5`
   (#96).
@@ -714,3 +729,15 @@ StellarExpert.
   sign-in, `create_job` and the 0.10 USDC fund. User: "Le doy a rechazar y no sucede nada. Revisa
   que sucede en el log": eight `hire.prepareReject` calls, each `InvalidRejectReason`, with an
   empty reason (T8.4).
+- 2026-11-25: In-session code review of the whole T8 stack (#416 to #419) before merging without a
+  human reviewer. Fixed, test first: (1) My hires and the hire detail did not reload once
+  connecting signed in, because they compared the address only; `WalletController.sessionEpoch`
+  now changes with the session. (2) A disconnect while the sign-in prompt was open kept the
+  session it stored; `ensureSession` now forgets it again and fails the connect. (3) One Confirm
+  tap could open four sign-in prompts when `verifyChallenge` failed; now at most two. (4) The web
+  session-wallet store kept reading `localStorage` after a refused write; it now answers from
+  memory (`FallbackSessionWalletStore`). (5) A Workers AI tool call with null or blank arguments
+  failed as malformed; it is now `{}`. Left as follow-ups: hire terms still offer a reserve for an
+  opted-in manifest whose model calls no tools (pre-existing), and two UX nits (the funds check
+  now follows the sign-in; a Confirm that stops for the reserve shows no notice). ADR-0011
+  accepted.
