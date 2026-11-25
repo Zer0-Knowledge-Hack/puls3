@@ -169,7 +169,7 @@ console.log(await sdk.listMyHires());
 | Call | Endpoint | Needs |
 |---|---|---|
 | `listAgents()`, `getAgent(id)` | `agent.list`, `agent.get` | nothing |
-| `createHire(agentId, consumer, input, requestId)` | `hire.createHire` | session |
+| `createHire(agentId, consumer, input, requestId, { subcontractReserve })` | `hire.createHire` | session |
 | `getHire(hireId, consumer)`, `listMyHires()` | `hire.getHire`, `hire.listMyHires` | session |
 | `prepareCreateJob`, `prepareFund`, `prepareComplete(hireId)` | `hire.prepare…` | session |
 | `prepareReject(hireId, reason)` | `hire.prepareReject` | session |
@@ -182,7 +182,7 @@ console.log(await sdk.listMyHires());
 | `submitEscrowCall(hireId, preparationId, signedXdr)` | `hire.submitEscrowCall` | session |
 | `prepareFeedback(hireId, score, comment)`, `submitFeedback(…)` | `feedback.*` | session |
 | `deploy(draftId)` | prepare, sign `register_full`, submit, sign `set_agent_wallet`, submit, wait for `active` | signer |
-| `hire(agentId, input, { maxPrice })` | `createHire`, sign `create_job`, submit, wait, `prepareFund`, sign `fund`, submit, wait for `funded` | signer |
+| `hire(agentId, input, { maxPrice, maxReserve })` | `createHire`, sign `create_job`, submit, wait, `prepareFund`, sign `fund`, submit, wait for `funded` | signer |
 | `waitForResult(hireId)` | `hire.getHire` until the agent delivered | session |
 | `approve(hireId)`, `reject(hireId, reason)` | prepare, sign `complete` / `reject`, submit, wait | signer |
 | `rate(hireId, score, comment)` | prepare, sign `give_feedback`, submit, wait | signer |
@@ -191,6 +191,12 @@ console.log(await sdk.listMyHires());
 - Amounts are USDC stroops (7 decimals) as integers. `formatUsdc` prints them.
 - `requestId` is the idempotency key of `createHire`: the same key returns the
   same hire, so a retry is safe. It is sent exactly as given.
+- `maxReserve` in `hire` is the subcontract reserve (#334): it is sent to
+  `createHire` as `subcontractReserve`, funded with the hire on top of the
+  price, and refunded when the agent does not spend it. Leave it out for no
+  reserve. A retry must repeat the same one.
+- `hire` returns once the hire is `funded` (or already further along). A
+  hire the chain left in any other state is a `Puls3ProtocolError`.
 - The `prepare…` calls return an unsigned envelope. The flows (`deploy`,
   `hire`, `approve`, …) sign it with your signer after the checks above; with
   only a session, sign it in a wallet and use the `submit…` call.
@@ -203,9 +209,9 @@ console.log(await sdk.listMyHires());
 | `SessionRequired` | A hire or Studio call without a session. Nothing was sent. |
 | `SignerRequired` | A flow that signs (`deploy`, `hire`, `approve`, …) without a signer. Nothing was sent. |
 | `SigningRefused` | The server prepared something that broke a rule above. `rule` names it. Nothing was signed. |
-| `ChainSubmissionFailed` | The chain refused a transaction the SDK signed. `errorCode` is the server's code. |
+| `ChainSubmissionFailed` | The chain refused a transaction the SDK signed, or, on a retried `hire`, the `create_job` sent before. `errorCode` is the server's code. |
 | `Puls3Timeout` | A transaction did not land in time (3 minutes a step). It may still land: read the hire again. |
-| `InvalidArgument` | An argument the server would refuse (a blank input, an id below 1). Nothing was sent. |
+| `InvalidArgument` | An argument the server would refuse (a blank input, an id below 1, an amount that is not an integer). Nothing was sent. |
 | `Puls3HttpError` | Another HTTP status, for example 401 when the session is no longer valid. |
 | `Puls3NetworkError` | The server could not be reached or did not answer in time. |
 | `Puls3ProtocolError` | An answer this version cannot read; usually the SDK is older than the server. |

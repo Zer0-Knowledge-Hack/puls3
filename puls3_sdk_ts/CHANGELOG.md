@@ -13,6 +13,13 @@ The remaining checks and errors of #424.
   `TESTNET`, as production charges); a `register_full` URI must be on the
   new `Puls3Network.registrationOrigin`. A server that charges a fee needs
   `withNetwork({ maxFeeBps })`.
+- **`hire`:** `maxReserve` now reaches the server (`createHire` takes
+  `{ subcontractReserve }`); before, it was checked but never sent. A
+  retried hire whose earlier `create_job` failed on chain throws
+  `ChainSubmissionFailed`, not `Puls3Timeout`. A hire left unfunded after
+  `fund` throws `Puls3ProtocolError` instead of being returned. A
+  `maxPrice` or `maxReserve` that is not an integer throws
+  `InvalidArgument`, not `RangeError`.
 
 ## 0.1.0
 
