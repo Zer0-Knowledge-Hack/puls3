@@ -33,6 +33,9 @@ import {
   sourceAuth,
   stranger,
   transferCall,
+  reasonBytes,
+  registration,
+  rejectReason,
 } from './chain.js';
 
 const me = builder.publicKey();
@@ -47,6 +50,10 @@ function refused(rule: SigningRefused['rule'], run: () => unknown): void {
     return true;
   });
 }
+
+/** The expectation of complete or reject on job 35. */
+const decision = (fn: 'complete' | 'reject'): Expectation =>
+  fn === 'complete' ? { purpose: 'complete', jobId: 35n } : { purpose: 'reject', jobId: 35n, reason: rejectReason };
 
 const check = (p: ReturnType<typeof prepared>, e: Expectation, network = TESTNET) =>
   checkPreparedTransaction(p, e, me, network);
@@ -71,12 +78,12 @@ describe('checkPreparedTransaction accepts what the server prepares', () => {
 
   for (const fn of ['complete', 'reject'] as const) {
     it(fn, () => {
-      assert.ok(check(preparedTx(fn, escrowCall(fn)), { purpose: fn, jobId: 35n }));
+      assert.ok(check(preparedTx(fn, escrowCall(fn)), decision(fn)));
     });
   }
 
   it('register_full on the Identity Registry', () => {
-    assert.ok(check(preparedTx('registerFull', registerFullCall()), { purpose: 'registerFull' }));
+    assert.ok(check(preparedTx('registerFull', registerFullCall()), { purpose: 'registerFull', registration }));
   });
 
   it('give_feedback on the Reputation Registry', () => {
@@ -145,7 +152,7 @@ describe('checkPreparedTransaction refuses (ADR-0010 D3)', () => {
     });
 
     it('complete dressed as reject', () => {
-      refused('call', () => check(preparedTx('reject', escrowCall('complete')), { purpose: 'reject', jobId: 35n }));
+      refused('call', () => check(preparedTx('reject', escrowCall('complete')), { purpose: 'reject', jobId: 35n, reason: rejectReason }));
     });
 
     it('a second operation', () => {
@@ -412,7 +419,7 @@ describe('ADR-0010 D3 rules 4, 6 and 8: what the server cannot change', () => {
 
   for (const fn of ['complete', 'reject'] as const) {
     it(`${fn} must be for this hire's job, not another job of the signer`, () => {
-      refused('call', () => check(preparedTx(fn, escrowCall(fn, me, 36n)), { purpose: fn, jobId: 35n }));
+      refused('call', () => check(preparedTx(fn, escrowCall(fn, me, 36n)), decision(fn)));
     });
   }
 
@@ -454,4 +461,40 @@ describe('TESTNET pins the server', () => {
     assert.throws(() => withNetwork({ maxTimeHorizonSeconds: 0 }), TypeError);
     assert.throws(() => withNetwork({ maxAuthLedgers: -1 }), TypeError);
   });
+});
+
+describe("ADR-0010 D3 rule 4: the reason and the registration are the caller's", () => {
+  it('complete must carry no reason (32 zero bytes)', () => {
+    const p = preparedTx('complete', escrowCall('complete', me, 35n, reasonBytes('reject')));
+    refused('call', () => check(p, decision('complete')));
+  });
+
+  it("reject must carry the SHA-256 of the caller's reason", () => {
+    const p = preparedTx('reject', escrowCall('reject', me, 35n, reasonBytes('reject', 'Something else.')));
+    refused('call', () => check(p, decision('reject')));
+  });
+
+  const register = (call: ReturnType<typeof registerFullCall>) =>
+    check(preparedTx('registerFull', call), { purpose: 'registerFull', registration });
+
+  it("register_full is accepted when it registers the draft's metadata", () => {
+    assert.ok(register(registerFullCall()));
+  });
+
+  for (const [label, call] of [
+    ['another catalog id', registerFullCall({ fields: { id: 'studio-8' } })],
+    ['another name', registerFullCall({ fields: { name: 'Impostor' } })],
+    ['another description', registerFullCall({ fields: { description: 'Something else.' } })],
+    ['other skills', registerFullCall({ fields: { skills: JSON.stringify(['summarize', 'trade']) } })],
+    ['another price', registerFullCall({ fields: { priceUsdcStroops: '9000000' } })],
+    ['another model', registerFullCall({ fields: { model: 'claude-opus' } })],
+    ['an extra metadata entry', registerFullCall({ extra: ['payout', 'GABC'] })],
+    ['no manifest hash', registerFullCall({ drop: 'manifestHash' })],
+    ['a URI for another manifest', registerFullCall({ uri: `https://puls3.example/registry/${'0'.repeat(64)}` })],
+    ['a URI that is not a registration file', registerFullCall({ uri: 'https://evil.example/agent.json' })],
+  ] as const) {
+    it(`register_full with ${label} is refused`, () => {
+      refused('call', () => register(call));
+    });
+  }
 });

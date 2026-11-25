@@ -13,6 +13,7 @@ import {
   checkPreparedAuthorization,
   checkPreparedTransaction,
   type Expectation,
+  type RegistrationExpectation,
 } from './guard.js';
 import { SorobanRpcReader, type ChainReader, type EscrowJob } from './chain_reader.js';
 import { KeySession } from './key_session.js';
@@ -497,6 +498,7 @@ export class Puls3Sdk {
     const wallet = signer.publicKey();
     let session = await this.prepareDeploy(draftId, wallet);
     let deadline = this.#deadline();
+    let registration: RegistrationExpectation | undefined;
     for (;;) {
       options.onState?.(session);
       switch (session.state) {
@@ -511,9 +513,12 @@ export class Puls3Sdk {
             session = await this.prepareDeploy(draftId, wallet);
             continue;
           }
+          // The registration is checked against the draft, read here rather
+          // than taken from the preparation.
+          registration ??= registrationOf(await this.getDraft(draftId));
           const envelope = checkPreparedTransaction(
             prepared,
-            { purpose: 'registerFull' },
+            { purpose: 'registerFull', registration },
             wallet,
             this.#network,
             this.#now(),
@@ -679,7 +684,7 @@ export class Puls3Sdk {
     const wallet = this.#requireSigner('reject').publicKey();
     const jobId = await this.#checkHireJob(hireId, wallet, 'reject', options.result);
     const prepared = await this.prepareReject(hireId, reason);
-    await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId });
+    await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId, reason: reason.trim() });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
   }
 
@@ -893,4 +898,20 @@ function requireJobId(detail: HireDetail): bigint {
     throw new Puls3ProtocolError(`Hire ${detail.hire.id} has no escrow job yet`);
   }
   return BigInt(detail.jobId);
+}
+
+/** What `register_full` must register for [draft] (`registerFullArgs` on the server). */
+function registrationOf(draft: StudioDraft): RegistrationExpectation {
+  const { name, description, skills, price, model } = draft.manifest;
+  if (name === null || description === null || skills === null || price === null || model === null) {
+    throw new Puls3ProtocolError(`Draft ${draft.draftId} is not complete, so it cannot be deployed`);
+  }
+  return {
+    catalogId: `studio-${draft.draftId}`,
+    name,
+    description,
+    skills: skills.map((skill) => skill.id),
+    priceUsdcStroops: String(price.amount),
+    model: model.id,
+  };
 }

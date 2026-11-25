@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   Address,
   FeeBumpTransaction,
@@ -46,9 +48,31 @@ export type Expectation =
       jobId: bigint;
     }
   | { purpose: 'complete'; jobId: bigint }
-  | { purpose: 'reject'; jobId: bigint }
-  | { purpose: 'registerFull' }
+  | {
+      purpose: 'reject';
+      jobId: bigint;
+      /** The reason the SDK sent to the server; the call carries its SHA-256. */
+      reason: string;
+    }
+  | { purpose: 'registerFull'; registration: RegistrationExpectation }
   | { purpose: 'giveFeedback'; agentId: number };
+
+/**
+ * What `register_full` must register, from the draft the SDK read itself
+ * (`getDraft`). The server builds the same values in `registerFullArgs`.
+ */
+export interface RegistrationExpectation {
+  /** `studio-<draftId>`. */
+  catalogId: string;
+  name: string;
+  description: string;
+  /** The skill ids, in the draft's order. */
+  skills: string[];
+  /** The price in USDC stroops, as a decimal string. */
+  priceUsdcStroops: string;
+  /** The model id. */
+  model: string;
+}
 
 /** What the caller expects the builder's `set_agent_wallet` entry to bind. */
 export interface WalletAuthorizationExpectation {
@@ -338,12 +362,30 @@ function checkCall(
       return;
     }
     case 'complete':
-    case 'reject':
+    case 'reject': {
       expectCall(network.escrow, 'escrow', [expectation.purpose]);
+      // complete(caller, job_id, reason) / reject(caller, job_id, reason)
+      if (call.args.length !== 3) refuse('call', `${call.fn} does not have 3 arguments`);
       expectJob(call, expectation.jobId);
+      // The server sends 32 zero bytes for complete and the SHA-256 of the
+      // reason for reject (escrow_relay_service.dart, _jobArgs).
+      const reason =
+        expectation.purpose === 'complete'
+          ? Buffer.alloc(32)
+          : createHash('sha256').update(expectation.reason, 'utf8').digest();
+      if (!bytesArg(call.args, 2).equals(reason)) {
+        refuse(
+          'call',
+          expectation.purpose === 'complete'
+            ? 'complete carries a reason, where it must carry none'
+            : 'reject carries another reason than the one you gave',
+        );
+      }
       return;
+    }
     case 'registerFull':
       expectCall(network.identityRegistry, 'Identity Registry', ['register_full']);
+      checkRegistration(call, expectation.registration);
       return;
     case 'giveFeedback':
       expectCall(network.reputationRegistry, 'Reputation Registry', ['give_feedback']);
@@ -351,6 +393,80 @@ function checkCall(
         refuse('call', `the feedback is for agent ${intArg(call.args, 1)}, not ${expectation.agentId}`);
       }
       return;
+  }
+}
+
+/** The metadata keys `register_full` carries, and nothing else. */
+const registrationKeys = [
+  'id',
+  'name',
+  'description',
+  'skills',
+  'priceUsdcStroops',
+  'model',
+  'puls3.manifestVersion',
+  'manifestHash',
+] as const;
+
+/**
+ * `register_full(caller, agent_uri, metadata)`: the metadata is the draft's,
+ * and the URI is the registration file of the manifest hash it carries
+ * (`<origin>/registry/<hex>`). The hash itself is not recomputed: that
+ * would mean reproducing the server's JSON encoding of the manifest, so it
+ * is tied to the URI instead, and every field it covers is compared.
+ */
+function checkRegistration(call: ContractCall, expected: RegistrationExpectation): void {
+  if (call.args.length !== 3) refuse('call', 'register_full does not have 3 arguments');
+  const uri = stringArg(call.args, 1);
+  const metadata = call.args[2]!;
+  if (metadata.switch().name !== 'scvVec') refuse('call', 'register_full has no metadata list');
+  const entries = new Map<string, Buffer>();
+  for (const item of metadata.vec() ?? []) {
+    if (item.switch().name !== 'scvMap') refuse('call', 'a metadata entry is not a map');
+    const fields = new Map(
+      (item.map() ?? []).map((e) => [e.key().switch().name === 'scvSymbol' ? e.key().sym().toString() : '', e.val()]),
+    );
+    const key = fields.get('key');
+    const value = fields.get('value');
+    if (key?.switch().name !== 'scvString' || value?.switch().name !== 'scvBytes') {
+      refuse('call', 'a metadata entry is not a key and its bytes');
+    }
+    const name = key.str().toString();
+    if (entries.has(name)) refuse('call', `the metadata repeats "${name}"`);
+    entries.set(name, Buffer.from(value.bytes()));
+  }
+  const keys = [...entries.keys()].sort();
+  if (keys.join('\n') !== [...registrationKeys].sort().join('\n')) {
+    refuse('call', `the metadata has the keys ${keys.join(', ')}, not the draft's`);
+  }
+  const text = (key: string) => entries.get(key)!.toString('utf8');
+  const same = (key: string, value: string) => {
+    if (text(key).trim() !== value.trim()) {
+      refuse('call', `the registered ${key} is not the draft's`);
+    }
+  };
+  same('id', expected.catalogId);
+  same('name', expected.name);
+  same('description', expected.description);
+  same('priceUsdcStroops', expected.priceUsdcStroops);
+  same('model', expected.model);
+  let skills: unknown;
+  try {
+    skills = JSON.parse(text('skills'));
+  } catch {
+    refuse('call', 'the registered skills are not a list');
+  }
+  if (!Array.isArray(skills) || skills.join('\n') !== expected.skills.join('\n')) {
+    refuse('call', "the registered skills are not the draft's");
+  }
+  if (!/^[1-9][0-9]*$/.test(text('puls3.manifestVersion'))) {
+    refuse('call', 'the registered manifest version is not a version number');
+  }
+  const hash = entries.get('manifestHash')!;
+  if (hash.length !== 32) refuse('call', 'the manifest hash is not 32 bytes');
+  const path = /\/registry\/([0-9a-f]{64})$/.exec(uri);
+  if (path === null || path[1] !== hash.toString('hex')) {
+    refuse('call', "the agent URI is not the registration file of the manifest it registers");
   }
 }
 
@@ -436,6 +552,22 @@ function contractArgs(call: xdr.InvokeContractArgs): ContractCall {
 
 function sameArgs(a: xdr.ScVal[], b: xdr.ScVal[]): boolean {
   return a.length === b.length && a.every((v, i) => v.toXDR('base64') === b[i]!.toXDR('base64'));
+}
+
+function bytesArg(args: xdr.ScVal[], index: number): Buffer {
+  const value = args[index];
+  if (value === undefined || value.switch().name !== 'scvBytes') {
+    refuse('call', `argument ${index} is not bytes`);
+  }
+  return Buffer.from(value.bytes());
+}
+
+function stringArg(args: xdr.ScVal[], index: number): string {
+  const value = args[index];
+  if (value === undefined || value.switch().name !== 'scvString') {
+    refuse('call', `argument ${index} is not a string`);
+  }
+  return value.str().toString();
 }
 
 function addressArg(args: xdr.ScVal[], index: number): string {

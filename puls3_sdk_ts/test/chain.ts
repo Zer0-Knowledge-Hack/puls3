@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   Account,
   Address,
@@ -149,17 +150,101 @@ export const transferCall = (
   ],
 });
 
-export const escrowCall = (fn: 'complete' | 'reject', caller = builder.publicKey(), jobId = 35n): Call => ({
+/** The reason the tests reject with. */
+export const rejectReason = 'Not usable.';
+
+/** complete carries 32 zero bytes, reject the SHA-256 of the reason (as the server). */
+export const reasonBytes = (fn: 'complete' | 'reject', reason = rejectReason) =>
+  xdr.ScVal.scvBytes(fn === 'complete' ? Buffer.alloc(32) : createHash('sha256').update(reason, 'utf8').digest());
+
+export const escrowCall = (
+  fn: 'complete' | 'reject',
+  caller = builder.publicKey(),
+  jobId = 35n,
+  reason: xdr.ScVal = reasonBytes(fn),
+): Call => ({
   contract: TESTNET.escrow,
   fn,
-  args: [addr(caller), u64(jobId), bytes32()],
+  args: [addr(caller), u64(jobId), reason],
 });
 
-export const registerFullCall = (caller = builder.publicKey()): Call => ({
-  contract: TESTNET.identityRegistry,
-  fn: 'register_full',
-  args: [addr(caller), str('https://puls3.org/agents/x.json'), xdr.ScVal.scvVec([])],
-});
+/** Draft 7, as the deploy tests serve it from `getDraft`. */
+export const draft7 = {
+  draftId: 7,
+  manifest: {
+    name: 'Summarizer',
+    description: 'Summarizes a text in five bullets.',
+    skills: [{ id: 'summarize', name: 'Summarize', description: null, tags: ['text'] }],
+    model: { provider: 'workers-ai', id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
+    systemPrompt: 'Summarize the text in five short bullet points.',
+    inputType: 'text',
+    inputMaxChars: 4000,
+    outputType: 'text',
+    outputMaxChars: 2000,
+    price: { asset: 'USDC', amount: 1_000_000 },
+  },
+  revision: 3,
+  deployState: 'draft',
+  liveVersion: null,
+  agentId: null,
+  retryFromStep: null,
+};
+
+/** What draft 7 must register. */
+export const registration = {
+  catalogId: 'studio-7',
+  name: 'Summarizer',
+  description: 'Summarizes a text in five bullets.',
+  skills: ['summarize'],
+  priceUsdcStroops: '1000000',
+  model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+};
+
+const manifestHashBytes = createHash('sha256').update('draft 7 manifest', 'utf8').digest();
+
+const metadataEntry = (key: string, value: Buffer) =>
+  xdr.ScVal.scvMap([
+    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('key'), val: xdr.ScVal.scvString(key) }),
+    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('value'), val: xdr.ScVal.scvBytes(value) }),
+  ]);
+
+/** register_full as `registerFullArgs` builds it, with [overrides] for the refusals. */
+export const registerFullCall = (
+  options: {
+    caller?: string;
+    uri?: string;
+    fields?: Partial<Record<string, string>>;
+    extra?: [string, string];
+    drop?: string;
+  } = {},
+): Call => {
+  const fields: Record<string, string> = {
+    id: registration.catalogId,
+    name: registration.name,
+    description: registration.description,
+    skills: JSON.stringify(registration.skills),
+    priceUsdcStroops: registration.priceUsdcStroops,
+    model: registration.model,
+    'puls3.manifestVersion': '1',
+  };
+  for (const [key, value] of Object.entries(options.fields ?? {})) {
+    if (value !== undefined) fields[key] = value;
+  }
+  const entries = Object.entries(fields)
+    .filter(([key]) => key !== options.drop)
+    .map(([key, value]) => metadataEntry(key, Buffer.from(value, 'utf8')));
+  if (options.drop !== 'manifestHash') entries.push(metadataEntry('manifestHash', manifestHashBytes));
+  if (options.extra) entries.push(metadataEntry(options.extra[0], Buffer.from(options.extra[1], 'utf8')));
+  return {
+    contract: TESTNET.identityRegistry,
+    fn: 'register_full',
+    args: [
+      addr(options.caller ?? builder.publicKey()),
+      str(options.uri ?? `https://puls3.example/registry/${manifestHashBytes.toString('hex')}`),
+      xdr.ScVal.scvVec(entries),
+    ],
+  };
+};
 
 export const giveFeedbackCall = (agentId = 30): Call => ({
   contract: TESTNET.reputationRegistry,

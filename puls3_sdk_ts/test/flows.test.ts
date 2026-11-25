@@ -22,6 +22,7 @@ import {
   builder,
   challenge,
   createJobCall,
+  draft7,
   envelope,
   escrowCall,
   fundCall,
@@ -443,6 +444,9 @@ describe('Puls3Sdk.deploy', () => {
     });
     const { transport, calls } = fakeTransport((call) => {
       switch (call.method) {
+        case 'getDraft':
+          assert.equal(call.args['draftId'], 7);
+          return draft7;
         case 'prepareDeploy':
           assert.equal(call.args['builder'], me);
           return session();
