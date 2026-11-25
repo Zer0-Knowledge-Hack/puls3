@@ -58,10 +58,49 @@ class _ListGateway extends FakeHireGateway {
   Future<List<HireSummaryItem>> listMyHires(String consumer) async => hires;
 }
 
+/// A server session that signs in through the wallet, like `WalletSession`.
+class _SignIn implements WalletSignIn {
+  String? signedInAs;
+
+  @override
+  Future<bool> isSignedInAs(String wallet) async => signedInAs == wallet;
+
+  @override
+  Future<void> ensureSignedIn(
+    String wallet,
+    Future<String> Function(SignInChallenge challenge) sign,
+  ) async {
+    if (signedInAs == wallet) return;
+    await sign(
+      const SignInChallenge(
+        transactionXdr: 'challenge',
+        networkPassphrase: stellarTestnetPassphrase,
+      ),
+    );
+    signedInAs = wallet;
+  }
+}
+
+/// Lists hires only for a wallet with a session, like the server.
+class _SessionGateway extends _ListGateway {
+  _SessionGateway(this.signIn) : super(_rows);
+
+  final _SignIn signIn;
+  int lists = 0;
+
+  @override
+  Future<List<HireSummaryItem>> listMyHires(String consumer) async {
+    lists++;
+    if (!await signIn.isSignedInAs(consumer)) throw const HireNotSignedIn();
+    return hires;
+  }
+}
+
 Future<void> _pump(
   WidgetTester tester, {
   required HireGateway gateway,
   WalletPort? wallet,
+  WalletController? controller,
 }) async {
   Puls3Fonts.useGoogleFonts = false;
   tester.view.physicalSize = const Size(1200, 1600);
@@ -93,9 +132,9 @@ Future<void> _pump(
   await tester.pumpWidget(
     AppScope(
       catalog: AgentCatalog(const InMemoryAgentRepository(testAgents)),
-      wallet: WalletController(
-        wallet ?? TestWallet(initialAddress: _consumer),
-      ),
+      wallet:
+          controller ??
+          WalletController(wallet ?? TestWallet(initialAddress: _consumer)),
       deployGateway: FakeDeployGateway(),
       studioGateway: FakeStudioGateway(),
       hireGateway: gateway,
@@ -197,6 +236,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('market'), findsOneWidget);
+  });
+
+  testWidgets('connecting signs in once and the list loads, with no second '
+      'sign-in', (tester) async {
+    final signIn = _SignIn();
+    final gateway = _SessionGateway(signIn);
+    final wallet = TestWallet();
+    final controller = WalletController(wallet, signIn: signIn);
+    await _pump(tester, gateway: gateway, controller: controller);
+    expect(find.byKey(const ValueKey('my-hires-connect')), findsOneWidget);
+
+    await tester.runAsync(controller.connect);
+    await tester.pumpAndSettle();
+
+    expect(wallet.challenges, ['challenge']);
+    expect(find.text('Support Relay'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
   });
 
   testWidgets('without a wallet it asks to connect one', (tester) async {

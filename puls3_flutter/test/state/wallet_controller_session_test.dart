@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puls3_flutter/src/state/wallet_controller.dart';
 import 'package:puls3_flutter/src/wallet/wallet_port.dart';
@@ -9,6 +11,9 @@ class _Wallet implements WalletPort {
   /// When set, the next sign-in challenge fails with it once.
   WalletException? failNextChallenge;
   final challenges = <String>[];
+
+  /// When set, a sign-in prompt stays open until it completes.
+  Completer<void>? challengeGate;
 
   @override
   String? get address => _address;
@@ -41,6 +46,7 @@ class _Wallet implements WalletPort {
       failNextChallenge = null;
       throw failure;
     }
+    await challengeGate?.future;
     challenges.add(challenge.transactionXdr);
     return 'signed:${challenge.transactionXdr}';
   }
@@ -146,5 +152,52 @@ void main() {
 
     expect(controller.status, WalletStatus.signing);
     await pending;
+  });
+  test('a new session bumps sessionEpoch and notifies, so screens waiting '
+      'for it reload', () async {
+    var notified = 0;
+    final epochs = <int>[];
+    controller.addListener(() {
+      notified++;
+      epochs.add(controller.sessionEpoch);
+    });
+    final before = controller.sessionEpoch;
+
+    await controller.connect();
+
+    expect(controller.sessionEpoch, before + 1);
+    expect(epochs.last, before + 1);
+    final afterConnect = notified;
+
+    await controller.ensureSession();
+    expect(controller.sessionEpoch, before + 1);
+    expect(notified, afterConnect);
+  });
+
+  test('a disconnect while the sign-in prompt is open drops the session it '
+      'stored, and the connect fails', () async {
+    var forgets = 0;
+    controller = WalletController(
+      wallet,
+      signIn: signIn,
+      onDisconnect: () async {
+        forgets++;
+        signIn.signedInAs = null;
+      },
+    );
+    wallet.challengeGate = Completer<void>();
+
+    final connecting = controller.connect();
+    await pumpEventQueue();
+    expect(controller.status, WalletStatus.signingIn);
+
+    await controller.disconnect();
+    wallet.challengeGate!.complete();
+
+    await expectLater(connecting, throwsA(isA<WalletSignatureRejected>()));
+    expect(signIn.signedInAs, isNull);
+    expect(forgets, 2);
+    expect(controller.address, isNull);
+    expect(await controller.hasSession(), isFalse);
   });
 }
