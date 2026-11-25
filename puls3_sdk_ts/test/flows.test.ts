@@ -41,8 +41,20 @@ import { agentJson, fakeTransport, hireJson, type Call } from './support.js';
  * the Identity Registry, and the latest ledger is 4,900 (the deploy's
  * authorization is prepared until 5,000).
  */
+const chainJob = {
+  client: builder.publicKey(),
+  provider,
+  evaluator: builder.publicKey(),
+  agentId: 30,
+  token: TESTNET.usdc,
+  budget: 5_000_000n,
+};
 const fakeChain: ChainReader = {
   agentWallet: async (agentId) => (agentId === 30 ? provider : null),
+  job: async (jobId) => {
+    if (jobId !== 35n) throw new Error(`unexpected job ${jobId}`);
+    return chainJob;
+  },
   latestLedger: async () => 4_900,
 };
 
@@ -245,7 +257,7 @@ describe('Puls3Sdk.hire', () => {
     // The server names [provider]; the Identity Registry binds agent 30 to a stranger.
     const stranger = Keypair.random().publicKey();
     const { sdk, submitted } = hireServer({
-      chainReader: { agentWallet: async () => stranger, latestLedger: async () => 4_900 },
+      chainReader: { ...fakeChain, agentWallet: async () => stranger },
     });
     await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), (e: unknown) => {
       assert.ok(e instanceof SigningRefused);
@@ -257,7 +269,7 @@ describe('Puls3Sdk.hire', () => {
 
   it('signs nothing when the agent has no wallet on the registry', async () => {
     const { sdk, submitted } = hireServer({
-      chainReader: { agentWallet: async () => null, latestLedger: async () => 4_900 },
+      chainReader: { ...fakeChain, agentWallet: async () => null },
     });
     await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), SigningRefused);
     assert.equal(submitted.length, 0);
@@ -303,6 +315,28 @@ describe('Puls3Sdk.approve, reject, rate', () => {
     chain.status = 'funded';
     assert.equal((await sdk.reject(21, 'Not usable.')).hire.status, 'rejected');
   });
+
+  // ADR-0010 D3 rule 4: the job id comes from the server, so the job is read
+  // from the escrow. A server that answers approve(hire A) with the complete
+  // of another of the signer's jobs is refused, and nothing is signed.
+  for (const [label, job] of [
+    ['another agent', { ...chainJob, agentId: 31 }],
+    ['another price', { ...chainJob, budget: 9_000_000n }],
+    ['another wallet', { ...chainJob, provider: Keypair.random().publicKey() }],
+    ["another client's job", { ...chainJob, client: Keypair.random().publicKey() }],
+  ] as const) {
+    it(`approve and reject sign nothing when the server points at a job for ${label}`, async () => {
+      for (const decide of ['approve', 'reject'] as const) {
+        const { sdk, submitted, chain } = hireServer({ chainReader: { ...fakeChain, job: async () => job } });
+        chain.status = 'submitted';
+        await assert.rejects(
+          decide === 'approve' ? sdk.approve(21) : sdk.reject(21, 'Not usable.'),
+          SigningRefused,
+        );
+        assert.equal(submitted.length, 0, decide);
+      }
+    });
+  }
 
   it('rate signs give_feedback and waits for it on chain', async () => {
     const { sdk, submitted, chain } = hireServer();

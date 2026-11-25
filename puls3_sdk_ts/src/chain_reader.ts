@@ -4,6 +4,7 @@ import {
   Contract,
   TransactionBuilder,
   nativeToScVal,
+  scValToNative,
   xdr,
 } from '@stellar/stellar-base';
 
@@ -17,8 +18,20 @@ import type { Puls3Network } from './network.js';
 export interface ChainReader {
   /** The wallet the Identity Registry binds to [agentId], or null. */
   agentWallet(agentId: number): Promise<string | null>;
+  /** Escrow job [jobId] as the escrow stores it (`get_job`). */
+  job(jobId: bigint): Promise<EscrowJob>;
   /** The sequence of the latest closed ledger. */
   latestLedger(): Promise<number>;
+}
+
+/** The fields of an escrow job the SDK checks before it signs a call on it. */
+export interface EscrowJob {
+  client: string;
+  provider: string;
+  evaluator: string;
+  agentId: number;
+  token: string;
+  budget: bigint;
 }
 
 /**
@@ -39,16 +52,59 @@ export class SorobanRpcReader implements ChainReader {
   }
 
   async agentWallet(agentId: number): Promise<string | null> {
+    const scVal = await this.#read(
+      this.#network.identityRegistry,
+      'get_agent_wallet',
+      nativeToScVal(agentId, { type: 'u32' }),
+      'The Identity Registry read',
+    );
+    if (scVal.switch().name === 'scvVoid') return null;
+    if (scVal.switch().name !== 'scvAddress') {
+      throw new Puls3ProtocolError('The Identity Registry returned no address');
+    }
+    return Address.fromScVal(scVal).toString();
+  }
+
+  async job(jobId: bigint): Promise<EscrowJob> {
+    const scVal = await this.#read(
+      this.#network.escrow,
+      'get_job',
+      nativeToScVal(jobId, { type: 'u64' }),
+      `The escrow read of job ${jobId}`,
+    );
+    if (scVal.switch().name !== 'scvMap') {
+      throw new Puls3ProtocolError(`The escrow returned no job ${jobId}`);
+    }
+    const fields = new Map(scVal.map()!.map((e) => [e.key().sym().toString(), e.val()]));
+    const address = (name: string) => {
+      const value = fields.get(name);
+      if (value === undefined || value.switch().name !== 'scvAddress') {
+        throw new Puls3ProtocolError(`Job ${jobId} has no ${name}`);
+      }
+      return Address.fromScVal(value).toString();
+    };
+    const integer = (name: string) => {
+      const value = fields.get(name);
+      if (value === undefined) throw new Puls3ProtocolError(`Job ${jobId} has no ${name}`);
+      return BigInt(scValToNative(value) as number | bigint);
+    };
+    return {
+      client: address('client'),
+      provider: address('provider'),
+      evaluator: address('evaluator'),
+      agentId: Number(integer('agent_id')),
+      token: address('token'),
+      budget: integer('budget'),
+    };
+  }
+
+  /** Simulates one read-only contract call and returns its value. */
+  async #read(contract: string, fn: string, arg: xdr.ScVal, label: string): Promise<xdr.ScVal> {
     const tx = new TransactionBuilder(new Account(this.#source, '0'), {
       fee: '100',
       networkPassphrase: this.#network.passphrase,
     })
-      .addOperation(
-        new Contract(this.#network.identityRegistry).call(
-          'get_agent_wallet',
-          nativeToScVal(agentId, { type: 'u32' }),
-        ),
-      )
+      .addOperation(new Contract(contract).call(fn, arg))
       .setTimeout(30)
       .build();
     const result = (await this.#rpc('simulateTransaction', { transaction: tx.toXDR() })) as {
@@ -56,18 +112,11 @@ export class SorobanRpcReader implements ChainReader {
       results?: { xdr?: string }[];
     };
     if (typeof result.error === 'string') {
-      throw new Puls3ProtocolError(`The Identity Registry read failed: ${result.error}`);
+      throw new Puls3ProtocolError(`${label} failed: ${result.error}`);
     }
     const value = result.results?.[0]?.xdr;
-    if (typeof value !== 'string') {
-      throw new Puls3ProtocolError('The Identity Registry read returned no value');
-    }
-    const scVal = xdr.ScVal.fromXDR(value, 'base64');
-    if (scVal.switch().name === 'scvVoid') return null;
-    if (scVal.switch().name !== 'scvAddress') {
-      throw new Puls3ProtocolError('The Identity Registry returned no address');
-    }
-    return Address.fromScVal(scVal).toString();
+    if (typeof value !== 'string') throw new Puls3ProtocolError(`${label} returned no value`);
+    return xdr.ScVal.fromXDR(value, 'base64');
   }
 
   async latestLedger(): Promise<number> {

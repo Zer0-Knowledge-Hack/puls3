@@ -614,13 +614,9 @@ export class Puls3Sdk {
     }
     if (detail.hire.status === 'open') {
       const fund = await this.prepareFund(hireId);
-      await this.#signEscrowCall(hireId, fund, {
-        purpose: 'fund',
-        maxBudget,
-        price,
-        maxReserve,
-        jobId: requireJobId(detail),
-      });
+      const jobId = requireJobId(detail);
+      await this.#checkJob(jobId, agentId, price);
+      await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, price, maxReserve, jobId });
       detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
     }
     return detail;
@@ -654,7 +650,7 @@ export class Puls3Sdk {
    */
   async approve(hireId: number): Promise<HireDetail> {
     const wallet = this.#requireSigner('approve').publicKey();
-    const jobId = requireJobId(await this.getHire(hireId, wallet));
+    const jobId = await this.#checkHireJob(hireId, wallet);
     const prepared = await this.prepareComplete(hireId);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
@@ -666,7 +662,7 @@ export class Puls3Sdk {
    */
   async reject(hireId: number, reason: string): Promise<HireDetail> {
     const wallet = this.#requireSigner('reject').publicKey();
-    const jobId = requireJobId(await this.getHire(hireId, wallet));
+    const jobId = await this.#checkHireJob(hireId, wallet);
     const prepared = await this.prepareReject(hireId, reason);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId });
     return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
@@ -705,6 +701,40 @@ export class Puls3Sdk {
   }
 
   // --- Internals ----------------------------------------------------------
+
+  /**
+   * Hire [hireId]'s escrow job, after checking on chain that it is the
+   * signer's job for that hire's agent and price. The job id comes from the
+   * server, so the job itself is read from the escrow: a server cannot point
+   * an approval or a rejection at another of the signer's jobs unless that
+   * job is for the same agent and price.
+   */
+  async #checkHireJob(hireId: number, wallet: string): Promise<bigint> {
+    const detail = await this.getHire(hireId, wallet);
+    const jobId = requireJobId(detail);
+    await this.#checkJob(jobId, detail.hire.agentId, BigInt(detail.hire.price));
+    return jobId;
+  }
+
+  /** Checks escrow job [jobId], read from the chain, against what this hire is for. */
+  async #checkJob(jobId: bigint, agentId: number, price: bigint): Promise<void> {
+    const chain = this.#requireChain();
+    const signer = this.#requireSigner('reading the job').publicKey();
+    const job = await chain.job(jobId);
+    if (job.client !== signer || job.evaluator !== signer) {
+      throw new SigningRefused('signer', `job ${jobId} is not the signer's`);
+    }
+    if (job.agentId !== agentId) {
+      throw new SigningRefused('call', `job ${jobId} is for agent ${job.agentId}, not ${agentId}`);
+    }
+    if (job.token !== this.#network.usdc || job.budget !== price) {
+      throw new SigningRefused('money', `job ${jobId} is not ${price} USDC stroops`);
+    }
+    const provider = await chain.agentWallet(agentId);
+    if (provider === null || job.provider !== provider) {
+      throw new SigningRefused('money', `job ${jobId} pays another wallet than agent ${agentId}'s`);
+    }
+  }
 
   #requireChain(): ChainReader {
     // A signer always comes with a reader (the RPC by default).

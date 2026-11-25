@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { Address, Keypair, TransactionBuilder, xdr } from '@stellar/stellar-base';
+import { Address, Keypair, TransactionBuilder, nativeToScVal, xdr } from '@stellar/stellar-base';
 
 import { SorobanRpcReader } from '../src/chain_reader.js';
 import { Puls3NetworkError, Puls3ProtocolError } from '../src/errors.js';
@@ -53,6 +53,41 @@ describe('SorobanRpcReader', () => {
     await assert.rejects(number.reader.agentWallet(39), Puls3ProtocolError);
     const refused = rpc(() => ({ jsonrpc: '2.0', id: 1, error: { code: -32600, message: 'bad request' } }));
     await assert.rejects(refused.reader.agentWallet(39), Puls3ProtocolError);
+  });
+
+  it('reads an escrow job by name, ignoring fields it does not check', async () => {
+    const client = Keypair.random().publicKey();
+    const provider = Keypair.random().publicKey();
+    const entry = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val });
+    const job = xdr.ScVal.scvMap([
+      entry('agent_id', nativeToScVal(39, { type: 'u32' })),
+      entry('budget', nativeToScVal(1_000_000n, { type: 'i128' })),
+      entry('client', new Address(client).toScVal()),
+      entry('evaluator', new Address(client).toScVal()),
+      entry('provider', new Address(provider).toScVal()),
+      entry('reserve', nativeToScVal(0n, { type: 'i128' })),
+      entry('state', nativeToScVal(2, { type: 'u32' })),
+      entry('token', new Address(TESTNET.usdc).toScVal()),
+    ]);
+    const { reader, requests } = rpc(() => simulated(job));
+
+    assert.deepEqual(await reader.job(8n), {
+      client,
+      provider,
+      evaluator: client,
+      agentId: 39,
+      token: TESTNET.usdc,
+      budget: 1_000_000n,
+    });
+    const tx = TransactionBuilder.fromXDR(String(requests[0]!.params.transaction), TESTNET.passphrase);
+    const call = (tx as unknown as { operations: { func: xdr.HostFunction }[] }).operations[0]!.func.invokeContract();
+    assert.equal(Address.fromScAddress(call.contractAddress()).toString(), TESTNET.escrow);
+    assert.equal(call.functionName().toString(), 'get_job');
+  });
+
+  it('refuses a job the escrow does not return', async () => {
+    const { reader } = rpc(() => ({ jsonrpc: '2.0', id: 1, result: { error: 'HostError: Error(Contract, #1)' } }));
+    await assert.rejects(reader.job(999n), Puls3ProtocolError);
   });
 
   it('reads the latest ledger', async () => {
