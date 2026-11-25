@@ -1,0 +1,51 @@
+# Publishes @puls3_org/sdk (puls3_sdk_ts/) to npm when a tag sdk-ts-vX.Y.Z is
+# pushed (#302). npm trusted publishing: no token, the OIDC identity of this
+# workflow authenticates, and npm adds provenance on its own. The trusted
+# publisher on npmjs.com must name this repository, this file
+# (publish-sdk-ts.yml) and the `npm` environment. The first version is
+# published by hand: see docs/sdk/releasing-npm.md.
+name: Publish @puls3_org/sdk to npm
+
+on:
+  push:
+    tags:
+      - 'sdk-ts-v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-sdk-ts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Protect it in GitHub (Settings > Environments) with required reviewers.
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: puls3_sdk_ts
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install --global npm@^11.5.1
+      - name: The tag names the package version
+        run: |
+          expected="sdk-ts-v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($expected)."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm publish --access public

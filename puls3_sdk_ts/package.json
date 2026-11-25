@@ -1,7 +1,6 @@
 {
-  "name": "@puls3/sdk",
+  "name": "@puls3_org/sdk",
   "version": "0.1.0",
-  "private": true,
   "description": "TypeScript SDK for the puls3 API: the agent catalog, hires and the Agent Studio.",
   "license": "Apache-2.0",
   "repository": {
@@ -24,6 +23,9 @@
     "README.md",
     "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },
