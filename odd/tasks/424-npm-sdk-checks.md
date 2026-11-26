@@ -23,10 +23,10 @@ Quoted from #424 and its comments.
 
 | ID | Specs | Route | Risk | Status | Commit |
 |---|---|---|---|---|---|
-| T1 | S1 | inline | item 2 (signing guard) | pending | |
-| T2 | S2, S3, S10, S5 (maxPrice) | inline | none expected | pending | |
-| T3 | S9 + version 0.2.0 | inline | item 3 (public API) | pending | |
-| T4 | S4 | inline | item 4 (cross-process lock) | pending | |
+| T1 | S1 | inline | item 2 (signing guard) | done | `94c5db9` (RED 6 fail, GREEN 205/205; review approved) |
+| T2 | S2, S3, S10, S5 (maxPrice) | inline | none | done | `5a209fc` (RED 4 fail, GREEN 210/210) |
+| T3 | S9 + version 0.2.0 | inline | item 3 (public API) | done | `443933b` (RED 4 fail, GREEN 216/216; T2+T3 review approved) |
+| T4 | S4 | inline | item 4 (cross-process lock) | done | (pending hash; RED race 3/5 runs, GREEN 221/221, race test 10/10) |
 | T5 | S5 (transport, KeySession), S6 | inline | none expected | pending | |
 | T6 | S7 | inline | item 5 (CI) | pending | |
 | T7 | S8 | inline | none expected | pending | |
@@ -36,3 +36,4 @@ Quoted from #424 and its comments.
 - **L1 (2026-11-25, user):** "Okey, empecemos entonces", on the agreed order "#394 first, then #424".
 - **L2 (2026-11-25, user decision):** approve API = "Required, opt-out explicit (Recommended)".
 - **L3:** an explorer mapped the 10 items on `cb69502`, and a parent spot check confirmed `guard.ts:390-395` and `sdk.ts:668`. Route: every task runs inline, because no writer trigger applies (the units run in sequence).
+- **L4 (T1):** the fee bound is `Puls3Network.maxFeeBps`, set to 0 in TESTNET because production sets `PULS3_PLATFORM_FEE_BPS` to 0 (puls3_server/README.md, "First deploy"). `max_fee_bps` is the client's cap, and the escrow already refuses anything above 1000, so a cap of 1000 would protect nothing. `registrationOrigin` is the production web origin (docs/verification/live-hire.md:75). RDD review (risk, reliability): approved and acknowledged. Advisory findings: (a) a local `withNetwork` now needs `registrationOrigin` (pending follow-up: a refusal message that names the setting); (b) fee 0 rests on the production config, not on a live read; (c) "base with a path" does not apply, because the server uses `base.origin` (`deploy_chain.dart:85`).

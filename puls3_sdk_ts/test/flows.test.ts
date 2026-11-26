@@ -7,7 +7,9 @@ import { Keypair, TransactionBuilder, xdr } from '@stellar/stellar-base';
 
 import {
   ChainSubmissionFailed,
+  InvalidArgument,
   Puls3ApiError,
+  Puls3ProtocolError,
   Puls3Timeout,
   SignerRequired,
   SigningRefused,
@@ -106,6 +108,10 @@ function hireServer(options: {
   outcome?: Record<string, 'failed' | 'pending'>;
   /** createHire answers as for a retried requestId: create_job already sent. */
   createJobAlreadySent?: boolean;
+  /** With [createJobAlreadySent]: that earlier create_job fails on chain instead of landing. */
+  earlierCreateJobFails?: boolean;
+  /** The hire status a confirmed submission moves to, instead of the usual one. */
+  lands?: Record<string, string>;
   /** The chain the SDK reads itself. Defaults to [fakeChain]. */
   chainReader?: ChainReader;
 } = {}) {
@@ -117,6 +123,7 @@ function hireServer(options: {
     fund: 'funded',
     complete: 'completed',
     reject: 'rejected',
+    ...options.lands,
   };
   const detail = () => ({
     hire: { ...hireJson, consumer: me, price: options.price ?? 5_000_000, status: chain.status },
@@ -189,8 +196,14 @@ function hireServer(options: {
         chain.feedback = { preparationId: call.args['preparationId'] as string, state: 'confirmed' };
         return detail();
       case 'hire.getHire':
-        // The create_job sent before the retry lands on the second read.
-        if (options.createJobAlreadySent && chain.status === null && ++reads === 2) chain.status = 'open';
+        // The create_job sent before the retry lands (or fails) on the second read.
+        if (options.createJobAlreadySent && chain.status === null && ++reads === 2) {
+          if (options.earlierCreateJobFails) {
+            chain.last = { preparationId: 'prep-earlier', purpose: 'createJob', state: 'failed', errorCode: 'TransactionFailed' };
+          } else {
+            chain.status = 'open';
+          }
+        }
         return detail();
       default:
         throw new Error(`unexpected call ${call.endpoint}.${call.method}`);
@@ -302,12 +315,77 @@ describe('Puls3Sdk.hire', () => {
     await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), Puls3Timeout);
   });
 
+  it('on a retry, reports the create_job already sent when it failed on chain (#424)', async () => {
+    const { sdk, submitted } = hireServer({ createJobAlreadySent: true, earlierCreateJobFails: true });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000, requestId: 'req-1' }), (e: unknown) => {
+      assert.ok(e instanceof ChainSubmissionFailed, `expected ChainSubmissionFailed, got ${String(e)}`);
+      assert.equal(e.purpose, 'createJob');
+      assert.equal(e.errorCode, 'TransactionFailed');
+      return true;
+    });
+    assert.equal(submitted.length, 0);
+  });
+
+  it('refuses to return a hire that fund left unfunded (#424)', async () => {
+    const { sdk } = hireServer({ lands: { fund: 'expired' } });
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000 }), (e: unknown) => {
+      assert.ok(e instanceof Puls3ProtocolError, `expected Puls3ProtocolError, got ${String(e)}`);
+      assert.match(e.message, /expired/);
+      return true;
+    });
+  });
+
+  it('accepts a hire the agent already moved past funded (#424)', async () => {
+    const { sdk } = hireServer({ lands: { fund: 'submitted' } });
+    const detail = await sdk.hire(30, 'x', { maxPrice: 5_000_000 });
+    assert.equal(detail.hire.status, 'submitted');
+  });
+
+  it('sends maxReserve to createHire as the subcontract reserve, and none without it (#424)', async () => {
+    const reserved = hireServer();
+    await reserved.sdk.hire(30, 'x', { maxPrice: 5_000_000, maxReserve: 2_000_000 });
+    assert.equal(reserved.calls.find((c) => c.method === 'createHire')!.args['subcontractReserve'], 2_000_000);
+    const plain = hireServer();
+    await plain.sdk.hire(30, 'x', { maxPrice: 5_000_000 });
+    assert.equal(plain.calls.find((c) => c.method === 'createHire')!.args['subcontractReserve'], null);
+  });
+
+  it('a retry of a hire that was already rejected is not returned as funded (#424)', async () => {
+    const { sdk, chain } = hireServer();
+    chain.status = 'rejected';
+    await assert.rejects(sdk.hire(30, 'x', { maxPrice: 5_000_000, requestId: 'req-1' }), (e: unknown) => {
+      assert.ok(e instanceof Puls3ProtocolError);
+      assert.match(e.message, /is rejected, not funded/);
+      return true;
+    });
+  });
+
+  it('createHire refuses a reserve that is negative, too large or not an integer, sending nothing (#424)', async () => {
+    for (const subcontractReserve of [-1, 2n ** 60n, 0.5]) {
+      const { sdk, calls } = hireServer();
+      await assert.rejects(sdk.createHire(30, me, 'x', 'req-1', { subcontractReserve }), (e: unknown) => {
+        assert.ok(e instanceof InvalidArgument, `${String(subcontractReserve)}: got ${String(e)}`);
+        assert.equal(e.argument, 'subcontractReserve');
+        return true;
+      });
+      assert.equal(calls.length, 0);
+    }
+  });
+
+  it('refuses a maxPrice or maxReserve that is not an integer with InvalidArgument, sending nothing (#424)', async () => {
+    for (const options of [{ maxPrice: 1.5 }, { maxPrice: 5_000_000, maxReserve: 0.5 }, { maxPrice: Number.NaN }]) {
+      const { sdk, calls } = hireServer();
+      await assert.rejects(sdk.hire(30, 'x', options), InvalidArgument);
+      assert.equal(calls.length, 0);
+    }
+  });
+
   it('needs a signer, and sends nothing without one', async () => {
     const { transport, calls } = fakeTransport(() => null);
     const sdk = new Puls3Sdk(transport, { hasSession: true });
     await assert.rejects(sdk.hire(30, 'x', { maxPrice: 1 }), SignerRequired);
     await assert.rejects(sdk.deploy(1), SignerRequired);
-    await assert.rejects(sdk.approve(21), SignerRequired);
+    await assert.rejects(sdk.approve(21, { result: 'Two findings.' }), SignerRequired);
     assert.equal(calls.length, 0);
   });
 });
@@ -316,7 +394,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
   it('approve signs complete and waits until the hire is completed', async () => {
     const { sdk, submitted, chain } = hireServer();
     chain.status = 'submitted';
-    const detail = await sdk.approve(21);
+    const detail = await sdk.approve(21, { trustServer: true });
     assert.equal(detail.hire.status, 'completed');
     assert.equal(submitted[0]!.purpose, 'complete');
     assert.ok(signedBy(submitted[0]!.signed, builder));
@@ -325,7 +403,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
   it('reject signs reject and waits until the hire is rejected', async () => {
     const { sdk, chain } = hireServer();
     chain.status = 'funded';
-    assert.equal((await sdk.reject(21, 'Not usable.')).hire.status, 'rejected');
+    assert.equal((await sdk.reject(21, 'Not usable.', { trustServer: true })).hire.status, 'rejected');
   });
 
   // ADR-0010 D3 rule 4: the job id comes from the server, so the job is read
@@ -347,7 +425,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
         const { sdk, submitted, chain } = hireServer({ chainReader: { ...fakeChain, job: async () => job } });
         chain.status = 'submitted';
         await assert.rejects(
-          decide === 'approve' ? sdk.approve(21) : sdk.reject(21, 'Not usable.'),
+          decide === 'approve' ? sdk.approve(21, { trustServer: true }) : sdk.reject(21, 'Not usable.', { trustServer: true }),
           SigningRefused,
         );
         assert.equal(submitted.length, 0, decide);
@@ -392,7 +470,7 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       },
     });
     chain.status = 'submitted';
-    assert.equal((await sdk.approve(21)).hire.status, 'completed');
+    assert.equal((await sdk.approve(21, { trustServer: true })).hire.status, 'completed');
     assert.equal(submitted.length, 1);
   });
 
@@ -401,7 +479,55 @@ describe('Puls3Sdk.approve, reject, rate', () => {
       chainReader: { ...fakeChain, job: async () => ({ ...chainJob, deliverable: delivered }) },
     });
     chain.status = 'funded';
-    await assert.rejects(sdk.reject(21, 'Not usable.'), SigningRefused);
+    await assert.rejects(sdk.reject(21, 'Not usable.', { trustServer: true }), SigningRefused);
+    assert.equal(submitted.length, 0);
+  });
+
+  // #424: the reviewed result is required, and trusting the server is an
+  // explicit choice. Typed loosely, as a JavaScript caller would call it.
+  type Loose = {
+    approve(hireId: number, options?: unknown): Promise<unknown>;
+    reject(hireId: number, reason: string, options?: unknown): Promise<unknown>;
+  };
+  for (const [label, options] of [
+    ['no options', undefined],
+    ['empty options', {}],
+    ['a result and trustServer together', { result: 'Two findings.', trustServer: true }],
+    ['trustServer other than true', { trustServer: false }],
+  ] as const) {
+    it(`approve and reject refuse ${label} with InvalidArgument, sending nothing (#424)`, async () => {
+      for (const decide of ['approve', 'reject'] as const) {
+        const { sdk, calls, chain } = hireServer();
+        chain.status = 'submitted';
+        const loose = sdk as unknown as Loose;
+        await assert.rejects(
+          decide === 'approve' ? loose.approve(21, options) : loose.reject(21, 'Not usable.', options),
+          (e: unknown) => {
+            assert.ok(e instanceof InvalidArgument, `${decide}: expected InvalidArgument, got ${String(e)}`);
+            assert.equal(e.argument, 'result');
+            return true;
+          },
+        );
+        assert.equal(calls.length, 0, decide);
+      }
+    });
+  }
+
+  it('reject with result null signs for a funded hire with no delivery (#424)', async () => {
+    const { sdk, submitted, chain } = hireServer();
+    chain.status = 'funded';
+    const loose = sdk as unknown as Loose;
+    await loose.reject(21, 'Not usable.', { result: null });
+    assert.equal(submitted.length, 1);
+  });
+
+  it('reject with result null refuses a job that has a delivery (#424)', async () => {
+    const { sdk, submitted, chain } = hireServer({
+      chainReader: { ...fakeChain, job: async () => ({ ...chainJob, deliverable: delivered }) },
+    });
+    chain.status = 'funded';
+    const loose = sdk as unknown as Loose;
+    await assert.rejects(loose.reject(21, 'Not usable.', { result: null }), SigningRefused);
     assert.equal(submitted.length, 0);
   });
 

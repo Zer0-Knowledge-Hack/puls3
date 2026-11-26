@@ -7,12 +7,34 @@ minor version may change the API.
 
 The remaining checks and errors of #424.
 
+- **Breaking: `approve` and `reject` require the reviewed result.** Pass
+  `{ result }`, the result you reviewed (`{ result: null }` to reject a
+  funded hire with no delivery), or `{ trustServer: true }` to keep the old
+  behaviour of trusting the server's description of the hire. With neither,
+  they throw `InvalidArgument` and send nothing.
+
 - **Signing checks (ADR-0010 D3 rule 4):** `give_feedback` must carry the
   score passed to `rate` with 0 decimals; `fund` must accept a platform fee
   (`max_fee_bps`) of at most the new `Puls3Network.maxFeeBps` (0 in
   `TESTNET`, as production charges); a `register_full` URI must be on the
   new `Puls3Network.registrationOrigin`. A server that charges a fee needs
   `withNetwork({ maxFeeBps })`.
+- **`hire`:** `maxReserve` now reaches the server (`createHire` takes
+  `{ subcontractReserve }`); before, it was checked but never sent. A
+  retried hire whose earlier `create_job` failed on chain throws
+  `ChainSubmissionFailed`, not `Puls3Timeout`. A hire left unfunded after
+  `fund`, or a retried one that already ended (rejected, expired), throws
+  `Puls3ProtocolError` instead of being returned. A
+  `maxPrice` or `maxReserve` that is not an integer throws
+  `InvalidArgument`, not `RangeError`.
+- **`CliSession` lock:** programs that share a session file no longer race
+  on a stale lock. The holder writes an owner token and keeps it fresh
+  while it works, only one program may take over a lock whose owner died
+  (after reading again that it is the same one), and a holder removes the
+  lock only while it is still its own. Before, two programs could both take
+  over a stale lock and present the same refresh token, which revokes the
+  session. A 0.1.0 program sharing the same file still sees a live holder
+  as alive.
 
 ## 0.1.0
 

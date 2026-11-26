@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { inspect } from 'node:util';
 
 import { Puls3ApiError, Puls3NetworkError } from '../src/errors.js';
 import {
+  acrossProcesses,
   CliSession,
   defaultSessionFile,
   type RefreshCall,
@@ -27,6 +29,118 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+describe('the cross-process session lock (#424)', () => {
+  const lockDir = () => `${file}.lock.d`;
+  const old = new Date(Date.now() - 5 * 60_000);
+
+  /** A lock left by a program that died: its directory, five minutes old. */
+  async function staleLock(): Promise<void> {
+    await fs.mkdir(lockDir(), { recursive: true });
+    await fs.writeFile(join(lockDir(), 'owner'), 'dead-program');
+    await fs.utimes(join(lockDir(), 'owner'), old, old);
+    await fs.utimes(lockDir(), old, old);
+  }
+
+  it('lets only one program take over a stale lock, even when several find it at once', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await staleLock();
+    const log = join(dir, 'log.txt');
+    // The compiled module next to this compiled test (build-test/src/session.js).
+    const session = new URL('../src/session.js', import.meta.url).href;
+    const script = join(dir, 'holder.mjs');
+    await fs.writeFile(
+      script,
+      [
+        `import { appendFile } from 'node:fs/promises';`,
+        `import { acrossProcesses } from ${JSON.stringify(session)};`,
+        `const [file, log, id, start] = process.argv.slice(2);`,
+        // All programs reach the stale lock at the same moment.
+        `await new Promise((r) => setTimeout(r, Number(start) - Date.now()));`,
+        `await acrossProcesses(file, async () => {`,
+        `  await appendFile(log, 'in ' + id + '\\n');`,
+        `  await new Promise((r) => setTimeout(r, 150));`,
+        `  await appendFile(log, 'out ' + id + '\\n');`,
+        `});`,
+      ].join('\n'),
+    );
+    const start = String(Date.now() + 2_000);
+    const programs = Array.from({ length: 6 }, (_, id) =>
+      new Promise<number>((resolve, reject) => {
+        const child = spawn(process.execPath, [script, file, log, String(id), start], { stdio: 'inherit' });
+        child.on('error', reject);
+        child.on('exit', (code) => resolve(code ?? 1));
+      }),
+    );
+    assert.deepEqual(await Promise.all(programs), [0, 0, 0, 0, 0, 0]);
+
+    const lines = (await fs.readFile(log, 'utf8')).trim().split('\n');
+    assert.equal(lines.length, 12);
+    for (let i = 0; i < lines.length; i += 2) {
+      const [inside, id] = lines[i]!.split(' ');
+      assert.equal(inside, 'in', `line ${i}: ${lines.join(' | ')}`);
+      assert.equal(lines[i + 1], `out ${id}`, `two programs held the lock at once: ${lines.join(' | ')}`);
+    }
+  });
+
+  it('never takes the lock from a holder that is still alive, however long it runs', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    const timing = { staleMs: 300, heartbeatMs: 50, waitMs: 5_000 };
+    const events: string[] = [];
+    const holder = acrossProcesses(
+      file,
+      async () => {
+        events.push('a in');
+        await new Promise((r) => setTimeout(r, 1_000));
+        events.push('a out');
+      },
+      timing,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const waiter = acrossProcesses(file, async () => void events.push('b in'), timing);
+    await Promise.all([holder, waiter]);
+    assert.deepEqual(events, ['a in', 'a out', 'b in']);
+  });
+
+  it('a live holder keeps the lock directory fresh too, for 0.1.0 programs that age it by the directory', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    let before = 0;
+    let after = 0;
+    await acrossProcesses(
+      file,
+      async () => {
+        await fs.utimes(lockDir(), old, old);
+        before = (await fs.stat(lockDir())).mtimeMs;
+        await new Promise((r) => setTimeout(r, 200));
+        after = (await fs.stat(lockDir())).mtimeMs;
+      },
+      { staleMs: 1_000, heartbeatMs: 40, waitMs: 5_000 },
+    );
+    assert.ok(after > before + 60_000, `the heartbeat touched the directory (${before} -> ${after})`);
+  });
+
+  it('a stale takeover lock left by a program that died is cleared, and the stale lock taken', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await staleLock();
+    await fs.mkdir(`${lockDir()}.takeover`);
+    await fs.utimes(`${lockDir()}.takeover`, old, old);
+    let ran = false;
+    await acrossProcesses(file, async () => void (ran = true), { staleMs: 1_000, heartbeatMs: 100, waitMs: 5_000 });
+    assert.ok(ran);
+    await assert.rejects(fs.stat(`${lockDir()}.takeover`), { code: 'ENOENT' });
+  });
+
+  it('a holder whose lock was taken over leaves the new owner’s lock in place', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await acrossProcesses(file, async () => {
+      // Another program took the lock over (as after a stale takeover).
+      await fs.rm(lockDir(), { recursive: true, force: true });
+      await fs.mkdir(lockDir());
+      await fs.writeFile(join(lockDir(), 'owner'), 'another-program');
+    });
+    assert.equal(await fs.readFile(join(lockDir(), 'owner'), 'utf8'), 'another-program');
+  });
 });
 
 /** A server that rotates `rt-N` to `rt-N+1` and gives `at-N+1`. */

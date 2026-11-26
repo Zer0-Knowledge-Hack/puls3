@@ -4,7 +4,7 @@
  * signing only what passes the checks of ADR-0010.
  */
 
-export { Puls3Sdk, formatUsdc, type ConnectOptions, type SdkOptions } from './sdk.js';
+export { Puls3Sdk, formatUsdc, type ConnectOptions, type Reviewed, type SdkOptions } from './sdk.js';
 export { KeySession } from './key_session.js';
 export { SorobanRpcReader, type ChainReader } from './chain_reader.js';
 export { TESTNET, withNetwork, type Puls3Network } from './network.js';

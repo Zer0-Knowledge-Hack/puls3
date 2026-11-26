@@ -56,9 +56,10 @@ console.log(`hire ${id}, job ${hire.jobId}, fund ${tx(hire.escrowSubmission?.tra
 
 const result = await sdk.waitForResult(id);
 console.log(`status ${result.hire.status}\n${result.result ?? ''}`);
-if (result.hire.status !== 'submitted') process.exit(1);
+if (result.hire.status !== 'submitted' || result.result === null) process.exit(1);
 
-const approved = await sdk.approve(id);
+// Approve the result printed above: the SDK signs only if it is the one on chain.
+const approved = await sdk.approve(id, { result: result.result });
 console.log(`complete ${tx(approved.escrowSubmission?.transaction)}`);
 const rated = await sdk.rate(id, 5, 'Run from @puls3_org/sdk.');
 console.log(`give_feedback ${tx(rated.feedbackSubmission?.transaction)}`);
