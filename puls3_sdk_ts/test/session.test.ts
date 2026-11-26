@@ -10,7 +10,9 @@ import { Puls3ApiError, Puls3NetworkError } from '../src/errors.js';
 import {
   acrossProcesses,
   CliSession,
+  defaultLockTiming,
   defaultSessionFile,
+  type LockFs,
   type RefreshCall,
   type RefreshedTokens,
 } from '../src/session.js';
@@ -129,6 +131,124 @@ describe('the cross-process session lock (#424)', () => {
     await acrossProcesses(file, async () => void (ran = true), { staleMs: 1_000, heartbeatMs: 100, waitMs: 5_000 });
     assert.ok(ran);
     await assert.rejects(fs.stat(`${lockDir()}.takeover`), { code: 'ENOENT' });
+  });
+
+  it('by default, waits longer than a dead lock takes to go stale (#438, S5)', () => {
+    const { staleMs, heartbeatMs, waitMs } = defaultLockTiming;
+    assert.ok(waitMs > staleMs + heartbeatMs, `wait ${waitMs} ms, stale ${staleMs} ms, heartbeat ${heartbeatMs} ms`);
+  });
+
+  it('with the default timing, a waiter takes over the lock of a program that just died (#438, S5)', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    // The default timing, 200 times faster, so the test runs in under a second.
+    const scaled = {
+      staleMs: defaultLockTiming.staleMs / 200,
+      heartbeatMs: defaultLockTiming.heartbeatMs / 200,
+      waitMs: defaultLockTiming.waitMs / 200,
+    };
+    // A holder that died a moment ago: a fresh owner file that no heartbeat will touch again.
+    await fs.mkdir(lockDir());
+    await fs.writeFile(join(lockDir(), 'owner'), 'just-died');
+    let ran = false;
+    await acrossProcesses(file, async () => void (ran = true), scaled);
+    assert.ok(ran);
+  });
+
+  it('a takeover the system keeps refusing names the refusal when the wait ends (#438, S6)', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await staleLock();
+    const refusing: LockFs = {
+      mkdir: async (path) => {
+        if (path.endsWith('.takeover')) {
+          throw Object.assign(new Error(`EPERM: operation not permitted, mkdir '${path}'`), { code: 'EPERM' });
+        }
+        return fs.mkdir(path);
+      },
+      rename: (from, to) => fs.rename(from, to),
+    };
+    await assert.rejects(
+      acrossProcesses(file, async () => undefined, { staleMs: 1_000, heartbeatMs: 100, waitMs: 200 }, refusing),
+      (error: unknown) => {
+        assert.match((error as Error).message, /Timed out waiting for the session lock/);
+        assert.match((error as Error).message, /EPERM/);
+        return true;
+      },
+    );
+  });
+
+  it('a fresh takeover moved by mistake is never removed when it cannot be put back (#438, S7)', async () => {
+    await fs.mkdir(dirname(file), { recursive: true });
+    await staleLock();
+    const takeover = `${lockDir()}.takeover`;
+    await fs.mkdir(takeover);
+    await fs.utimes(takeover, old, old);
+    let moved: string | null = null;
+    const racing: LockFs = {
+      mkdir: (path) => fs.mkdir(path),
+      rename: async (from, to) => {
+        if (from === takeover && moved === null) {
+          // Between the stat and the rename, the stale takeover was replaced by a fresh one.
+          await fs.rm(takeover, { recursive: true });
+          await fs.mkdir(takeover);
+          await fs.writeFile(join(takeover, 'fresh'), 'another program');
+          moved = to;
+          return fs.rename(from, to);
+        }
+        if (from === moved) {
+          // Between the two renames, a third program took the takeover name.
+          throw Object.assign(new Error(`EEXIST: file already exists, rename '${from}'`), { code: 'EEXIST' });
+        }
+        return fs.rename(from, to);
+      },
+    };
+    await acrossProcesses(file, async () => undefined, { staleMs: 1_000, heartbeatMs: 100, waitMs: 2_000 }, racing);
+    assert.ok(moved !== null, 'the race was staged');
+    assert.equal(await fs.readFile(join(moved, 'fresh'), 'utf8'), 'another program');
+  });
+
+  describe('an owner file that cannot be read (#438, S8)', () => {
+    /** An owner that cannot be read: a directory where the file should be. */
+    async function unreadableOwner(path = lockDir()): Promise<void> {
+      await fs.mkdir(join(path, 'owner'), { recursive: true });
+    }
+
+    it('counts as alive however old it is, so the lock is never taken over', async () => {
+      await fs.mkdir(dirname(file), { recursive: true });
+      await unreadableOwner();
+      await fs.utimes(join(lockDir(), 'owner'), old, old);
+      await fs.utimes(lockDir(), old, old);
+      await assert.rejects(
+        acrossProcesses(file, async () => undefined, { staleMs: 100, heartbeatMs: 50, waitMs: 300 }),
+        /Timed out waiting for the session lock/,
+      );
+      await assert.rejects(fs.stat(`${lockDir()}.takeover`), { code: 'ENOENT' });
+      assert.ok((await fs.stat(join(lockDir(), 'owner'))).isDirectory(), 'the lock was left in place');
+    });
+
+    it('on release, is read again until it can be, and our own lock is then removed', async () => {
+      await fs.mkdir(dirname(file), { recursive: true });
+      await acrossProcesses(file, async () => {
+        const owner = join(lockDir(), 'owner');
+        const token = await fs.readFile(owner, 'utf8');
+        await fs.rm(owner);
+        await fs.mkdir(owner);
+        // Readable again a moment later, as after a write Windows held.
+        setTimeout(() => {
+          void fs.rm(owner, { recursive: true }).then(() => fs.writeFile(owner, token));
+        }, 100);
+      });
+      await assert.rejects(fs.stat(lockDir()), { code: 'ENOENT' });
+    });
+
+    it('on release, is left in place when it never becomes readable', async () => {
+      await fs.mkdir(dirname(file), { recursive: true });
+      await acrossProcesses(file, async () => {
+        const owner = join(lockDir(), 'owner');
+        await fs.rm(owner);
+        await fs.mkdir(owner);
+      });
+      assert.ok((await fs.stat(join(lockDir(), 'owner'))).isDirectory());
+    });
   });
 
   it('a holder whose lock was taken over leaves the new owner’s lock in place', async () => {
