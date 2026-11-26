@@ -3,7 +3,7 @@
 This package follows [semantic versioning](https://semver.org/). Before 1.0, a
 minor version may change the API.
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-11-26)
 
 The remaining checks and errors of #424.
 
