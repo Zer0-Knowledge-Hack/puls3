@@ -85,7 +85,9 @@ export class KeySession implements AuthProvider {
         );
         return 'success';
       } catch (error) {
-        if (!(error instanceof Puls3ApiError)) return 'failedOther';
+        // Anything but a refusal (a 5xx, an unreachable server, an answer
+        // this version cannot read) reaches the caller as it is.
+        if (!isRefusal(error)) throw error;
         // Refused: sign in again below.
         this.#refreshToken = null;
       }
@@ -94,12 +96,11 @@ export class KeySession implements AuthProvider {
       await this.#login();
       return 'success';
     } catch (error) {
-      if (error instanceof Puls3ApiError || error instanceof Puls3HttpError) {
-        return 'failedUnauthorized';
-      }
+      if (isRefusal(error)) return 'failedUnauthorized';
       // Anything else (a refused challenge, a signer that failed, an answer
-      // this version cannot read, an unreachable server) must reach the
-      // caller as it is, not as the 401 of a call sent without a session.
+      // this version cannot read, a server that failed or cannot be reached)
+      // must reach the caller as it is, not as the 401 of a call sent
+      // without a session.
       throw error;
     }
   }
@@ -147,4 +148,15 @@ export class KeySession implements AuthProvider {
   [inspect.custom](): string {
     return this.toString();
   }
+}
+
+/**
+ * The server said no: an API refusal, or an HTTP 401 or 403. Only these end
+ * as `failedUnauthorized`; any other failure reaches the caller as it is.
+ */
+function isRefusal(error: unknown): boolean {
+  return (
+    error instanceof Puls3ApiError ||
+    (error instanceof Puls3HttpError && (error.status === 401 || error.status === 403))
+  );
 }
