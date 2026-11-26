@@ -2,6 +2,7 @@ import {
   Puls3ApiError,
   Puls3HttpError,
   Puls3NetworkError,
+  Puls3ProtocolError,
 } from './errors.js';
 
 /**
@@ -90,7 +91,13 @@ export class HttpTransport implements Transport {
     }
     const text = await this.#read(response);
     if (response.status !== 200) throw errorFrom(response.status, text);
-    return text.length === 0 ? null : (JSON.parse(text) as unknown);
+    if (text.length === 0) return null;
+    try {
+      return JSON.parse(text) as unknown;
+    } catch (error) {
+      // A proxy or maintenance page answering 200: not the server's JSON.
+      throw new Puls3ProtocolError(`${endpoint}.${method} answered 200 with a body that is not JSON`, { cause: error });
+    }
   }
 
   async #post(

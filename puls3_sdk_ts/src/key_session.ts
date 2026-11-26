@@ -97,9 +97,10 @@ export class KeySession implements AuthProvider {
       if (error instanceof Puls3ApiError || error instanceof Puls3HttpError) {
         return 'failedUnauthorized';
       }
-      // A refused challenge (SigningRefused) must reach the caller.
-      if (error instanceof Error && error.name === 'SigningRefused') throw error;
-      return 'failedOther';
+      // Anything else (a refused challenge, a signer that failed, an answer
+      // this version cannot read, an unreachable server) must reach the
+      // caller as it is, not as the 401 of a call sent without a session.
+      throw error;
     }
   }
 

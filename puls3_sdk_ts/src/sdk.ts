@@ -924,8 +924,11 @@ export type Reviewed<R> = { result: R; trustServer?: never } | { trustServer: tr
  */
 function reviewedResult(options: unknown, allowNull: boolean): { result: string | null } | 'trustServer' {
   const o = (typeof options === 'object' && options !== null ? options : {}) as Record<string, unknown>;
-  const hasResult = 'result' in o && o['result'] !== undefined;
-  const trust = o['trustServer'];
+  // Own properties only: a `trustServer` inherited from a polluted
+  // Object.prototype must not opt a caller out of the check.
+  const own = (key: string) => (Object.hasOwn(o, key) ? o[key] : undefined);
+  const hasResult = own('result') !== undefined;
+  const trust = own('trustServer');
   if (hasResult && trust === undefined) {
     const result = o['result'];
     if (typeof result === 'string' || (allowNull && result === null)) return { result };

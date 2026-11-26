@@ -45,12 +45,24 @@ export class SorobanRpcReader implements ChainReader {
   readonly #network: Puls3Network;
   readonly #source: string;
   readonly #fetch: typeof fetch;
+  readonly #timeoutMs: number;
   #id = 0;
 
-  constructor(network: Puls3Network, source: string, fetchImpl: typeof fetch = fetch) {
+  /**
+   * [options.timeoutMs] bounds each RPC request (20 seconds by default, as
+   * the server calls): a hung RPC ends as `Puls3NetworkError` instead of
+   * hanging `hire` and `deploy` past their step timeout.
+   */
+  constructor(
+    network: Puls3Network,
+    source: string,
+    fetchImpl: typeof fetch = fetch,
+    options: { timeoutMs?: number } = {},
+  ) {
     this.#network = network;
     this.#source = source;
     this.#fetch = fetchImpl;
+    this.#timeoutMs = options.timeoutMs ?? 20_000;
   }
 
   async agentWallet(agentId: number): Promise<string | null> {
@@ -143,6 +155,7 @@ export class SorobanRpcReader implements ChainReader {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: ++this.#id, method, params }),
+        signal: AbortSignal.timeout(this.#timeoutMs),
       });
     } catch (e) {
       throw new Puls3NetworkError(`The Soroban RPC did not answer: ${(e as Error).message}`);
