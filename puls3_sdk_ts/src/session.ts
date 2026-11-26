@@ -419,7 +419,8 @@ export async function acrossProcesses<T>(
       await lockFs.mkdir(lock);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      refused = (await removeIfStale(lock, timing.staleMs, lockFs)) ?? refused;
+      // The last try decides: a refusal is named only while it is still the reason.
+      refused = await removeIfStale(lock, timing.staleMs, lockFs);
       if (Date.now() > deadline) {
         const cause = refused === null ? '' : `; the system refused to take over its stale lock (${refused})`;
         throw new Error(`Timed out waiting for the session lock ${lock}${cause}`);
@@ -512,7 +513,8 @@ async function removeIfStale(lock: string, staleMs: number, lockFs: LockFs): Pro
  * is first renamed to a name of its own, and removed only if it is the same
  * directory that was found stale; a fresh one renamed by mistake is put back.
  * When it cannot be put back (a third program took the name in between), it
- * is left where it is: it may belong to a program still taking over (#438).
+ * is removed: the program that made it only ever uses the plain name, so
+ * keeping it would leave a directory nothing cleans up (#438).
  */
 async function removeStaleTakeover(takeover: string, staleMs: number, lockFs: LockFs): Promise<void> {
   const stat = await fs.stat(takeover).catch(() => null);
@@ -527,7 +529,7 @@ async function removeStaleTakeover(takeover: string, staleMs: number, lockFs: Lo
   if (moved !== null && moved.ino === stat.ino && moved.mtimeMs === stat.mtimeMs) {
     await removeDir(claimed);
   } else {
-    await lockFs.rename(claimed, takeover).catch(() => undefined);
+    await lockFs.rename(claimed, takeover).catch(() => removeDir(claimed));
   }
 }
 

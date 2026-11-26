@@ -63,8 +63,9 @@ export class SorobanRpcReader implements ChainReader {
     this.#source = source;
     this.#fetch = fetchImpl;
     const timeoutMs = options.timeoutMs ?? 20_000;
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-      throw new TypeError('timeoutMs must be a positive, finite number of milliseconds');
+    // AbortSignal.timeout takes a whole number of milliseconds a Node timer can hold.
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+      throw new TypeError('timeoutMs must be a whole number of milliseconds from 1 to 2147483647');
     }
     this.#timeoutMs = timeoutMs;
   }
