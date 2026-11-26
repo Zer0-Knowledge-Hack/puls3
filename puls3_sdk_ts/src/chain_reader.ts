@@ -62,7 +62,11 @@ export class SorobanRpcReader implements ChainReader {
     this.#network = network;
     this.#source = source;
     this.#fetch = fetchImpl;
-    this.#timeoutMs = options.timeoutMs ?? 20_000;
+    const timeoutMs = options.timeoutMs ?? 20_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new TypeError('timeoutMs must be a positive, finite number of milliseconds');
+    }
+    this.#timeoutMs = timeoutMs;
   }
 
   async agentWallet(agentId: number): Promise<string | null> {
@@ -149,13 +153,14 @@ export class SorobanRpcReader implements ChainReader {
   }
 
   async #rpc(method: string, params: object): Promise<unknown> {
+    const signal = AbortSignal.timeout(this.#timeoutMs);
     let response: Response;
     try {
       response = await this.#fetch(this.#network.rpcUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: ++this.#id, method, params }),
-        signal: AbortSignal.timeout(this.#timeoutMs),
+        signal,
       });
     } catch (e) {
       throw new Puls3NetworkError(`The Soroban RPC did not answer: ${(e as Error).message}`);
@@ -163,7 +168,11 @@ export class SorobanRpcReader implements ChainReader {
     let body: { result?: unknown; error?: { message?: string } };
     try {
       body = (await response.json()) as typeof body;
-    } catch {
+    } catch (e) {
+      // The timeout also bounds the body: one that never ends is a hung RPC, not a bad answer.
+      if (signal.aborted) {
+        throw new Puls3NetworkError(`The Soroban RPC did not finish its answer: ${(e as Error).message}`);
+      }
       throw new Puls3ProtocolError(`The Soroban RPC answered ${response.status} with no JSON`);
     }
     if (body.error !== undefined || body.result === undefined) {
