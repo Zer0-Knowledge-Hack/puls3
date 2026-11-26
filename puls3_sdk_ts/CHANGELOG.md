@@ -3,6 +3,27 @@
 This package follows [semantic versioning](https://semver.org/). Before 1.0, a
 minor version may change the API.
 
+## Unreleased
+
+The open follow-ups of the #424 review (#438).
+
+- **Sign-in and refresh errors:** a server that fails during sign-in (an
+  HTTP status other than 401 or 403) or during a refresh (anything but a
+  refusal) now reaches the caller as that error, instead of the 401 of a
+  call sent without a session. A refusal still ends the session as before.
+- **RPC reads:** an answer whose body never finishes ends as
+  `Puls3NetworkError` after `timeoutMs`, not as `Puls3ProtocolError`
+  ("no JSON"). `SorobanRpcReader` throws `TypeError` for a `timeoutMs` that
+  is not a positive, finite number.
+- **`register_full` refusal:** the message for a URI on another origin says
+  to set `registrationOrigin` in `withNetwork`.
+- **`CliSession` lock:** a program now waits up to 90 seconds (was 30) for
+  the lock, longer than a dead program's lock takes to go stale (60), so it
+  takes that lock over instead of giving up. When the system keeps refusing
+  the takeover, the timeout names the refusal (`EPERM`, `EACCES`). A takeover
+  lock moved by mistake that cannot be put back is left in place, not
+  removed.
+
 ## 0.2.0 (2026-11-26)
 
 The remaining checks and errors of #424.
