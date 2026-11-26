@@ -3,7 +3,7 @@
 This package follows [semantic versioning](https://semver.org/). Before 1.0, a
 minor version may change the API.
 
-## Unreleased
+## 0.2.1 (2026-11-26)
 
 The open follow-ups of the #424 review (#438).
 

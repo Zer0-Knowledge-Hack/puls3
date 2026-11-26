@@ -1,6 +1,6 @@
 {
   "name": "@puls3_org/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "TypeScript SDK for the puls3 API: the agent catalog, hires and the Agent Studio.",
   "license": "Apache-2.0",
   "repository": {
