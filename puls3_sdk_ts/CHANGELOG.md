@@ -3,7 +3,18 @@
 This package follows [semantic versioning](https://semver.org/). Before 1.0, a
 minor version may change the API.
 
-## 0.1.0 (unreleased)
+## 0.2.0 (unreleased)
+
+The remaining checks and errors of #424.
+
+- **Signing checks (ADR-0010 D3 rule 4):** `give_feedback` must carry the
+  score passed to `rate` with 0 decimals; `fund` must accept a platform fee
+  (`max_fee_bps`) of at most the new `Puls3Network.maxFeeBps` (0 in
+  `TESTNET`, as production charges); a `register_full` URI must be on the
+  new `Puls3Network.registrationOrigin`. A server that charges a fee needs
+  `withNetwork({ maxFeeBps })`.
+
+## 0.1.0
 
 First version (#302).
 

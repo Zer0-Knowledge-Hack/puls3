@@ -1,0 +1,38 @@
+# #424: remaining npm SDK checks and errors
+
+Objective: close the signing checks, flow, session, error and server gaps of #424 in `puls3_sdk_ts` (and one in `puls3_server`).
+Branch: `fix/424-npm-sdk-checks` (worktree `puls3-worktrees/424-npm-sdk-checks`, from `cb69502`). Delivery: `ask-on-risk`. Runner: `npm run check && npm test` in `puls3_sdk_ts`; `dart test` in `puls3_server`.
+
+## Specs
+
+Quoted from #424 and its comments.
+
+- **S1** Signing checks (ADR-0010 D3 rule 4): "`give_feedback`: the score (argument 2) is the one the caller passed to `rate`." "`register_full`: the agent URI and metadata are the draft's." "`fund`: `max_fee_bps` (last argument) is bounded." Acceptance: "Each check in deliverable 1 refuses a mismatching envelope with `SigningRefused` and a test per check; envelopes the Dart server builds are still accepted." (`reject` reason hash and `register_full` metadata are already done in `89c541a`.) Assumption: the fee bound is a `maxFeeBps` on `Puls3Network`, never above the escrow's `MAX_FEE_BPS = 1_000`.
+- **S2** "A retried `hire()` waits blind. When `createHire` returns no `create_job` preparation (one is already underway), a `create_job` that then fails on chain ends as `Puls3Timeout`, not `ChainSubmissionFailed`."
+- **S3** "`hire()` can return an unfunded hire. After the fund step it does not check that the hire is `funded`."
+- **S4** "Session lock race. The stale-lock takeover in `session.ts` is check-then-remove: two processes can both take the lock and present the same refresh token, which revokes the session."
+- **S5** "Typed errors. A 200 with a non-JSON body throws a raw `SyntaxError` (`transport.ts`); a non-integer `maxPrice` throws `RangeError` instead of `InvalidArgument`; a signer or protocol failure during `KeySession` login becomes a generic 401."
+- **S6** "The Soroban RPC reads have no timeout (`chain_reader.ts`), so a hung RPC hangs `hire` and `deploy` past `stepTimeoutMs`."
+- **S7** "Node 20: `npm test` uses a glob in `node --test`, which needs Node 21, while `engines` says `>=20`." Acceptance: "`npm run check` and `npm test` pass on Node 20 and 22."
+- **S8** "a Studio draft whose name matches an agent already registered fails `prepareDeploy` with `ChainUnavailable` (`simulationFailed`), which does not say why." Acceptance: "The duplicate-name deploy returns a typed error naming the conflict." Note: the contract refuses a duplicate URI (`UriAlreadyRegistered = 100`), not a name.
+- **S9** "make the reviewed result required (or the default) for `approve`, for example `approve(hireId, { result })` with the server-trusting path as an explicit opt-out, so callers are safe by default." Decision (L2): required, with an explicit opt-out; ships as 0.2.0.
+- **S10** "`hire({ maxReserve })` is accepted, but `createHire` always sends `subcontractReserve: null` (`sdk.ts`), so the option never applies. Either wire it to `createHire` or drop it until reserves are in scope." Choice: wire it (the server accepts `subcontractReserve`).
+- Acceptance shared by S2-S7: "Deliverables 2 to 7 each have a test that fails before the fix."
+
+## Tasks
+
+| ID | Specs | Route | Risk | Status | Commit |
+|---|---|---|---|---|---|
+| T1 | S1 | inline | item 2 (signing guard) | pending | |
+| T2 | S2, S3, S10, S5 (maxPrice) | inline | none expected | pending | |
+| T3 | S9 + version 0.2.0 | inline | item 3 (public API) | pending | |
+| T4 | S4 | inline | item 4 (cross-process lock) | pending | |
+| T5 | S5 (transport, KeySession), S6 | inline | none expected | pending | |
+| T6 | S7 | inline | item 5 (CI) | pending | |
+| T7 | S8 | inline | none expected | pending | |
+
+## Log
+
+- **L1 (2026-11-25, user):** "Okey, empecemos entonces", on the agreed order "#394 first, then #424".
+- **L2 (2026-11-25, user decision):** approve API = "Required, opt-out explicit (Recommended)".
+- **L3:** an explorer mapped the 10 items on `cb69502`, and a parent spot check confirmed `guard.ts:390-395` and `sdk.ts:668`. Route: every task runs inline, because no writer trigger applies (the units run in sequence).
