@@ -491,7 +491,11 @@ function checkRegistration(
     refuse('call', "the agent URI is not the registration file of the manifest it registers");
   }
   if (origin !== null && uri !== `${origin}/registry/${path[1]}`) {
-    refuse('call', `the agent URI is not on the registration origin ${origin}`);
+    refuse(
+      'call',
+      `the agent URI is not on the registration origin ${origin}; ` +
+        "for another server, set registrationOrigin in withNetwork to that server's web origin",
+    );
   }
 }
 

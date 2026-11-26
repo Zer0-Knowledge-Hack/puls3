@@ -9,6 +9,7 @@ import {
   ChainSubmissionFailed,
   InvalidArgument,
   Puls3ApiError,
+  Puls3HttpError,
   Puls3ProtocolError,
   Puls3Timeout,
   SignerRequired,
@@ -678,17 +679,26 @@ describe('Puls3Sdk.deploy', () => {
 });
 
 describe('KeySession', () => {
-  function authServer(options: { challenge?: ReturnType<typeof challenge>; refreshFails?: boolean } = {}) {
+  function authServer(
+    options: {
+      challenge?: ReturnType<typeof challenge>;
+      refreshFails?: boolean;
+      challengeError?: Error;
+      refreshError?: Error;
+    } = {},
+  ) {
     let logins = 0;
     const { transport, calls } = fakeTransport((call) => {
       switch (`${call.endpoint}.${call.method}`) {
         case 'walletAuth.createChallenge':
+          if (options.challengeError) throw options.challengeError;
           return { ...(options.challenge ?? challenge()), expiresAt: new Date(Date.now() + 900_000).toISOString() };
         case 'walletAuth.verifyChallenge':
           assert.ok(signedBy(call.args['signedChallengeXdr'] as string, builder));
           logins++;
           return { token: `access-${logins}`, tokenExpiresAt: new Date(Date.now() + 600_000).toISOString(), refreshToken: `refresh-${logins}` };
         case 'jwtRefresh.refreshAccessToken':
+          if (options.refreshError) throw options.refreshError;
           if (options.refreshFails) throw new Puls3ApiError('RefreshTokenExpired', null, null);
           return { token: 'access-r', tokenExpiresAt: new Date(Date.now() + 600_000).toISOString(), refreshToken: 'refresh-r' };
         default:
@@ -753,6 +763,40 @@ describe('KeySession', () => {
     const session = new KeySession(transport, signer, network);
     await assert.rejects(session.authorization(), Puls3ProtocolError);
   });
+
+  it('reports a server failure during sign-in as it is, not as the 401 of a call without a session (#438, S4)', async () => {
+    const { transport, calls } = authServer({ challengeError: new Puls3HttpError(502, 'Bad Gateway') });
+    const session = new KeySession(transport, signer, network);
+    await assert.rejects(session.authorization(), (error: unknown) => {
+      assert.ok(error instanceof Puls3HttpError, `expected Puls3HttpError, got ${String(error)}`);
+      assert.equal(error.status, 502);
+      return true;
+    });
+    assert.ok(!calls.some((c) => c.method === 'verifyChallenge'));
+  });
+
+  it('reports a refresh that fails for a reason other than a refusal, instead of a 401 (#438, S4)', async () => {
+    const { transport } = authServer({ refreshError: new Puls3HttpError(503, 'Service Unavailable') });
+    const session = new KeySession(transport, signer, network);
+    await session.login();
+    await assert.rejects(session.refresh(true), (error: unknown) => {
+      assert.ok(error instanceof Puls3HttpError, `expected Puls3HttpError, got ${String(error)}`);
+      assert.equal(error.status, 503);
+      return true;
+    });
+  });
+
+  for (const [label, refusal] of [
+    ['an API refusal', new Puls3ApiError('WalletAuthRefused', null, null)],
+    ['an HTTP 401', new Puls3HttpError(401, 'Unauthorized')],
+  ] as const) {
+    it(`still reports a sign-in refused with ${label} as failedUnauthorized (#438, S4)`, async () => {
+      const { transport } = authServer({ challengeError: refusal });
+      const session = new KeySession(transport, signer, network);
+      assert.equal(await session.refresh(true), 'failedUnauthorized');
+      assert.equal(await session.authorization(), null);
+    });
+  }
 
   it('never shows a token', async () => {
     const { transport } = authServer();

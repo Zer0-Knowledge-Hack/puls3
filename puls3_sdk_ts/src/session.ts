@@ -335,7 +335,11 @@ const inProcess = new Map<string, Promise<unknown>>();
 
 /** A lock older than this is from a program that died holding it. */
 const staleLockMs = 60_000;
-const lockWaitMs = 30_000;
+/**
+ * Longer than [staleLockMs] plus a heartbeat, so a program waiting on the
+ * lock of one that just died lives to take it over (#438).
+ */
+const lockWaitMs = 90_000;
 
 /**
  * Runs [body] holding the lock of [file]: in this process a queue per path,
@@ -364,7 +368,23 @@ export interface LockTiming {
   waitMs: number;
 }
 
-const defaultTiming: LockTiming = { staleMs: staleLockMs, heartbeatMs: 15_000, waitMs: lockWaitMs };
+/** The timing of the lock unless a test shortens it. */
+export const defaultLockTiming: Readonly<LockTiming> = Object.freeze({
+  staleMs: staleLockMs,
+  heartbeatMs: 15_000,
+  waitMs: lockWaitMs,
+});
+
+/** The directory operations of the lock. Tests replace them to stage races. */
+export interface LockFs {
+  mkdir(path: string): Promise<unknown>;
+  rename(from: string, to: string): Promise<void>;
+}
+
+const realLockFs: LockFs = {
+  mkdir: (path) => fs.mkdir(path),
+  rename: (from, to) => fs.rename(from, to),
+};
 
 /**
  * Runs [body] holding `<file>.lock.d` across processes (#424).
@@ -385,21 +405,25 @@ const defaultTiming: LockTiming = { staleMs: staleLockMs, heartbeatMs: 15_000, w
 export async function acrossProcesses<T>(
   file: string,
   body: () => Promise<T>,
-  timing: LockTiming = defaultTiming,
+  timing: LockTiming = defaultLockTiming,
+  lockFs: LockFs = realLockFs,
 ): Promise<T> {
   await fs.mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const lock = `${file}.lock.d`;
   const owner = join(lock, 'owner');
   const token = randomBytes(16).toString('hex');
   const deadline = Date.now() + timing.waitMs;
+  let refused: string | null = null;
   for (;;) {
     try {
-      await fs.mkdir(lock);
+      await lockFs.mkdir(lock);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      await removeIfStale(lock, timing.staleMs);
+      // The last try decides: a refusal is named only while it is still the reason.
+      refused = await removeIfStale(lock, timing.staleMs, lockFs);
       if (Date.now() > deadline) {
-        throw new Error(`Timed out waiting for the session lock ${lock}`);
+        const cause = refused === null ? '' : `; the system refused to take over its stale lock (${refused})`;
+        throw new Error(`Timed out waiting for the session lock ${lock}${cause}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 25));
       continue;
@@ -454,20 +478,24 @@ async function ownerOf(
   }
 }
 
-/** Removes [lock] if its owner is stale, under the takeover lock (see [acrossProcesses]). */
-async function removeIfStale(lock: string, staleMs: number): Promise<void> {
+/**
+ * Removes [lock] if its owner is stale, under the takeover lock (see
+ * [acrossProcesses]). Returns the code of a refusal to create the takeover
+ * lock, so a wait that ends can say why, or null.
+ */
+async function removeIfStale(lock: string, staleMs: number, lockFs: LockFs): Promise<string | null> {
   const seen = await ownerOf(lock);
-  if (seen === null || seen.unreadable || seen.ageMs <= staleMs) return;
+  if (seen === null || seen.unreadable || seen.ageMs <= staleMs) return null;
   const takeover = `${lock}.takeover`;
   try {
-    await fs.mkdir(takeover);
+    await lockFs.mkdir(takeover);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     // Windows refuses for a moment a name whose directory is being removed: try again later.
-    if (code === 'EPERM' || code === 'EACCES') return;
+    if (code === 'EPERM' || code === 'EACCES') return code;
     if (code !== 'EEXIST') throw error;
-    await removeStaleTakeover(takeover, staleMs);
-    return;
+    await removeStaleTakeover(takeover, staleMs, lockFs);
+    return null;
   }
   try {
     const now = await ownerOf(lock);
@@ -477,19 +505,23 @@ async function removeIfStale(lock: string, staleMs: number): Promise<void> {
   } finally {
     await removeDir(takeover);
   }
+  return null;
 }
 
 /**
  * Removes a takeover lock left by a program that died while taking over. It
  * is first renamed to a name of its own, and removed only if it is the same
  * directory that was found stale; a fresh one renamed by mistake is put back.
+ * When it cannot be put back (a third program took the name in between), it
+ * is removed: the program that made it only ever uses the plain name, so
+ * keeping it would leave a directory nothing cleans up (#438).
  */
-async function removeStaleTakeover(takeover: string, staleMs: number): Promise<void> {
+async function removeStaleTakeover(takeover: string, staleMs: number, lockFs: LockFs): Promise<void> {
   const stat = await fs.stat(takeover).catch(() => null);
   if (stat === null || Date.now() - stat.mtimeMs <= staleMs) return;
   const claimed = `${takeover}.${randomBytes(8).toString('hex')}`;
   try {
-    await fs.rename(takeover, claimed);
+    await lockFs.rename(takeover, claimed);
   } catch {
     return; // Another program removed or renamed it first.
   }
@@ -497,7 +529,7 @@ async function removeStaleTakeover(takeover: string, staleMs: number): Promise<v
   if (moved !== null && moved.ino === stat.ino && moved.mtimeMs === stat.mtimeMs) {
     await removeDir(claimed);
   } else {
-    await fs.rename(claimed, takeover).catch(() => removeDir(claimed));
+    await lockFs.rename(claimed, takeover).catch(() => removeDir(claimed));
   }
 }
 

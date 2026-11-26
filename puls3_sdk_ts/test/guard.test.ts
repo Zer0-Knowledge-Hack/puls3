@@ -550,6 +550,20 @@ describe('ADR-0010 D3 rule 4: the score and the fee are the caller’s (#424)', 
     });
   }
 
+  it('register_full on another origin names the registrationOrigin setting of withNetwork (#438, S1)', () => {
+    const call = registerFullCall({ uri: `http://localhost:8082/registry/${manifestHash}` });
+    refused('call', () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }));
+    assert.throws(
+      () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }),
+      (error: unknown) => {
+        assert.ok(error instanceof SigningRefused);
+        assert.match(error.message, /registration origin https:\/\/puls3-hub-on-stellar\.serverpod\.space/);
+        assert.match(error.message, /set registrationOrigin in withNetwork/);
+        return true;
+      },
+    );
+  });
+
   it('register_full accepts any origin when the network pins none', () => {
     const call = registerFullCall({ uri: `https://puls3.example/registry/${manifestHash}` });
     assert.ok(
