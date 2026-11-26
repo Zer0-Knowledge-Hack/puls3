@@ -354,30 +354,154 @@ async function locked<T>(file: string, body: () => Promise<T>): Promise<T> {
   }
 }
 
-async function acrossProcesses<T>(file: string, body: () => Promise<T>): Promise<T> {
+/** How the cross-process lock times out. Tests shorten it. */
+export interface LockTiming {
+  /** A lock whose owner has not shown a sign of life for this long is from a program that died. */
+  staleMs: number;
+  /** How often a live holder shows its sign of life. */
+  heartbeatMs: number;
+  /** How long to wait for the lock before giving up. */
+  waitMs: number;
+}
+
+const defaultTiming: LockTiming = { staleMs: staleLockMs, heartbeatMs: 15_000, waitMs: lockWaitMs };
+
+/**
+ * Runs [body] holding `<file>.lock.d` across processes (#424).
+ *
+ * - `mkdir` creates the lock atomically, and the holder writes a random
+ *   owner token into it (`owner`). While [body] runs, the holder touches
+ *   that file every [LockTiming.heartbeatMs], so a live holder never looks
+ *   stale, however long it runs.
+ * - A lock whose owner shows no sign of life for [LockTiming.staleMs] is from
+ *   a program that died. Only the program holding `<file>.lock.d.takeover`
+ *   may remove it, and only after reading again that it is still the same
+ *   stale owner. Two programs that find it stale at once cannot both remove
+ *   it, nor remove the lock the first one took next.
+ * - On release, the holder removes the lock only while it is still its own.
+ *
+ * @internal Exported for the tests only; not part of the package API.
+ */
+export async function acrossProcesses<T>(
+  file: string,
+  body: () => Promise<T>,
+  timing: LockTiming = defaultTiming,
+): Promise<T> {
   await fs.mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const lock = `${file}.lock.d`;
-  const deadline = Date.now() + lockWaitMs;
+  const owner = join(lock, 'owner');
+  const token = randomBytes(16).toString('hex');
+  const deadline = Date.now() + timing.waitMs;
   for (;;) {
     try {
       await fs.mkdir(lock);
-      break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      const stat = await fs.stat(lock).catch(() => null);
-      if (stat !== null && Date.now() - stat.mtimeMs > staleLockMs) {
-        await fs.rm(lock, { recursive: true, force: true });
-        continue;
-      }
+      await removeIfStale(lock, timing.staleMs);
       if (Date.now() > deadline) {
         throw new Error(`Timed out waiting for the session lock ${lock}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 25));
+      continue;
     }
+    try {
+      await fs.writeFile(owner, token);
+    } catch (error) {
+      await removeDir(lock);
+      throw error;
+    }
+    break;
   }
+  const heartbeat = setInterval(() => {
+    const now = new Date();
+    void fs.utimes(owner, now, now).catch(() => undefined);
+    // The directory too: 0.1.0 ages a lock by its directory alone.
+    void fs.utimes(lock, now, now).catch(() => undefined);
+  }, timing.heartbeatMs);
+  heartbeat.unref();
   try {
     return await body();
   } finally {
-    await fs.rm(lock, { recursive: true, force: true });
+    clearInterval(heartbeat);
+    // A read Windows refuses for a moment must not leave our own lock behind.
+    let current = await ownerOf(lock);
+    for (let tries = 0; current?.unreadable && tries < 20; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      current = await ownerOf(lock);
+    }
+    if (current?.token === token) await removeDir(lock);
   }
+}
+
+/**
+ * The owner token of [lock] and how long ago it last showed a sign of life,
+ * or null when there is no lock. A lock with no owner file yet (just
+ * created, or left by an older version) is aged by its directory.
+ */
+async function ownerOf(
+  lock: string,
+): Promise<{ token: string | null; ageMs: number; unreadable?: true } | null> {
+  const owner = join(lock, 'owner');
+  try {
+    const stat = await fs.stat(owner);
+    const token = await fs.readFile(owner, 'utf8');
+    return { token, ageMs: Date.now() - stat.mtimeMs };
+  } catch (error) {
+    // Unreadable for a moment (Windows, while another program writes it): alive.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return { token: null, ageMs: 0, unreadable: true };
+    const stat = await fs.stat(lock).catch(() => null);
+    return stat === null ? null : { token: null, ageMs: Date.now() - stat.mtimeMs };
+  }
+}
+
+/** Removes [lock] if its owner is stale, under the takeover lock (see [acrossProcesses]). */
+async function removeIfStale(lock: string, staleMs: number): Promise<void> {
+  const seen = await ownerOf(lock);
+  if (seen === null || seen.unreadable || seen.ageMs <= staleMs) return;
+  const takeover = `${lock}.takeover`;
+  try {
+    await fs.mkdir(takeover);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // Windows refuses for a moment a name whose directory is being removed: try again later.
+    if (code === 'EPERM' || code === 'EACCES') return;
+    if (code !== 'EEXIST') throw error;
+    await removeStaleTakeover(takeover, staleMs);
+    return;
+  }
+  try {
+    const now = await ownerOf(lock);
+    if (now !== null && !now.unreadable && now.token === seen.token && now.ageMs > staleMs) {
+      await removeDir(lock);
+    }
+  } finally {
+    await removeDir(takeover);
+  }
+}
+
+/**
+ * Removes a takeover lock left by a program that died while taking over. It
+ * is first renamed to a name of its own, and removed only if it is the same
+ * directory that was found stale; a fresh one renamed by mistake is put back.
+ */
+async function removeStaleTakeover(takeover: string, staleMs: number): Promise<void> {
+  const stat = await fs.stat(takeover).catch(() => null);
+  if (stat === null || Date.now() - stat.mtimeMs <= staleMs) return;
+  const claimed = `${takeover}.${randomBytes(8).toString('hex')}`;
+  try {
+    await fs.rename(takeover, claimed);
+  } catch {
+    return; // Another program removed or renamed it first.
+  }
+  const moved = await fs.stat(claimed).catch(() => null);
+  if (moved !== null && moved.ino === stat.ino && moved.mtimeMs === stat.mtimeMs) {
+    await removeDir(claimed);
+  } else {
+    await fs.rename(claimed, takeover).catch(() => removeDir(claimed));
+  }
+}
+
+/** Removes a lock directory, retrying while Windows briefly refuses (`EPERM`, `EBUSY`). */
+async function removeDir(path: string): Promise<void> {
+  await fs.rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 20 });
 }
