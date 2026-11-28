@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:puls3_client/puls3_client.dart';
 
-import '../data/typed_api_error.dart';
 import 'hire_gateway.dart';
 import 'hire_receipt_mapping.dart';
 import 'wallet_funds.dart';
@@ -413,10 +412,7 @@ class ServerHireGateway implements HireGateway {
       // challenge instead of reporting an unreachable server (#261).
       await _session?.forget();
       throw const HireNotSignedIn();
-    } on ServerpodClientException catch (e) {
-      // The browser client cannot decode a typed error with `details`.
-      final typed = typedApiError(e);
-      if (typed != null) throw _map(typed, fund: fund, feedback: feedback);
+    } on ServerpodClientException {
       throw const HireBackendUnavailable('The puls3 server did not answer.');
     }
   }

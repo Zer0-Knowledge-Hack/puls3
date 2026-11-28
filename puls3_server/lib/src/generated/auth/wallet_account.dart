@@ -11,6 +11,7 @@
 // ignore_for_file: dead_code, unnecessary_null_comparison
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'dart:async' as _ida;
 import 'package:puls3_server/src/generated/protocol.dart' as _i7k47pdw;
 import 'package:serverpod/serverpod.dart' as _is;
 import 'package:serverpod_auth_core_server/serverpod_auth_core_server.dart'
@@ -67,7 +68,7 @@ abstract class WalletAccount
 
   /// The auth user this wallet signs in as.
   ///
-  /// Serverpod 4.0.4 requires a model relation to be nullable. WalletIdp
+  /// Serverpod requires a model relation to be nullable here. WalletIdp
   /// always sets it; the unique index keeps one user per row.
   _iacs.AuthUser? authUser;
 
@@ -84,7 +85,7 @@ abstract class WalletAccount
     int? id,
     String? wallet,
     _is.UuidValue? authUserId,
-    _iacs.AuthUser? authUser,
+    _iacs.AuthUser? authUser = const _UndefinedWalletAccount$authUser(),
     DateTime? createdAt,
   });
   @override
@@ -134,6 +135,11 @@ abstract class WalletAccount
 
 class _Undefined {}
 
+class _UndefinedWalletAccount$authUser extends _is.UndefinedSentinel
+    implements _iacs.AuthUser {
+  const _UndefinedWalletAccount$authUser();
+}
+
 class _WalletAccountImpl extends WalletAccount {
   _WalletAccountImpl({
     int? id,
@@ -157,16 +163,16 @@ class _WalletAccountImpl extends WalletAccount {
     Object? id = _Undefined,
     String? wallet,
     _is.UuidValue? authUserId,
-    Object? authUser = _Undefined,
+    _iacs.AuthUser? authUser = const _UndefinedWalletAccount$authUser(),
     DateTime? createdAt,
   }) {
     return WalletAccount(
       id: id is int? ? id : this.id,
       wallet: wallet ?? this.wallet,
       authUserId: authUserId ?? this.authUserId,
-      authUser: authUser is _iacs.AuthUser?
-          ? authUser
-          : this.authUser?.copyWith(),
+      authUser: authUser is _is.UndefinedSentinel
+          ? this.authUser?.copyWith()
+          : authUser,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -221,7 +227,7 @@ class WalletAccountTable extends _is.Table<int?> {
 
   /// The auth user this wallet signs in as.
   ///
-  /// Serverpod 4.0.4 requires a model relation to be nullable. WalletIdp
+  /// Serverpod requires a model relation to be nullable here. WalletIdp
   /// always sets it; the unique index keeps one user per row.
   _iacs.AuthUserTable? _authUser;
 
@@ -340,6 +346,71 @@ class WalletAccountRepository {
       include: include,
       lockMode: lockMode,
       lockBehavior: lockBehavior,
+    );
+  }
+
+  /// Emits [WalletAccount]s matching the given query parameters every time the
+  /// source tables are modified.
+  ///
+  /// Use [where] to specify which items to include in the return value.
+  /// If none is specified, all items will be returned.
+  ///
+  /// To specify the order of the items use [orderBy] or [orderByList]
+  /// when sorting by multiple columns.
+  ///
+  /// The maximum number of items can be set by [limit]. If no limit is set,
+  /// all items matching the query will be returned.
+  ///
+  /// [offset] defines how many items to skip, after which [limit] (or all)
+  /// items are read from the database.
+  ///
+  /// Use [throttle] to specify the minimum interval between queries. It can
+  /// also be set to `null`, in which case the stream will only be throttled
+  /// when its subscription is paused.
+  ///
+  /// Source tables are collected from the queried table, [where], [orderBy],
+  /// [orderByList], and the [include] graph. [alsoTriggerOnTables] is added
+  /// to that set. Pass [Table] instances such as `WalletAccount.t`.
+  ///
+  /// Raw [Expression] SQL is not inspected. Tables referenced only in raw
+  /// SQL must be passed via [alsoTriggerOnTables].
+  ///
+  /// The stream always reads committed state and never joins an ambient
+  /// [Transaction]. Emissions for a write fire after that write commits.
+  ///
+  /// Currently only supported on SQLite. Calling this method on PostgreSQL
+  /// throws an [UnsupportedError].
+  ///
+  /// ```dart
+  /// var subscription = Persons.db.watch(
+  ///   session,
+  ///   where: (t) => t.lastName.equals('Jones'),
+  ///   orderBy: (t) => t.firstName,
+  ///   limit: 100,
+  /// ).listen((persons) {
+  ///   // Handle the latest matching rows.
+  /// });
+  /// ```
+  _ida.Stream<List<WalletAccount>> watch(
+    _is.DatabaseSession session, {
+    _is.WhereExpressionBuilder<WalletAccountTable>? where,
+    int? limit,
+    int? offset,
+    _is.OrderByBuilder<WalletAccountTable>? orderBy,
+    _is.OrderByListBuilder<WalletAccountTable>? orderByList,
+    WalletAccountInclude? include,
+    Duration? throttle = const Duration(milliseconds: 30),
+    Iterable<_is.Table>? alsoTriggerOnTables,
+  }) {
+    return session.db.watch<WalletAccount>(
+      where: where?.call(WalletAccount.t),
+      orderBy: orderBy?.call(WalletAccount.t),
+      orderByList: orderByList?.call(WalletAccount.t),
+      limit: limit,
+      offset: offset,
+      include: include,
+      throttle: throttle,
+      alsoTriggerOnTables: alsoTriggerOnTables,
     );
   }
 

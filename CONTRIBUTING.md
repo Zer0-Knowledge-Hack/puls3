@@ -19,7 +19,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 | Tool | Version | Needed for |
 | --- | --- | --- |
 | Flutter (includes Dart) | **3.44.4** (Dart 3.12.2) | Everything |
-| Serverpod CLI | **4.0.4** | Backend code generation |
+| Serverpod CLI | **4.1.2** | Backend code generation |
 | Melos | **8.10.1** | Unified workspace analyze/test commands |
 | Docker Desktop | Latest | Local Postgres + Redis for the backend |
 | Git | Latest | Everything |
@@ -44,7 +44,7 @@ Use **these exact versions**. CI uses them too, and mismatches cause dependency 
 ### 1.2 Serverpod CLI
 
 ```bash
-dart pub global activate serverpod_cli 4.0.4
+dart pub global activate serverpod_cli 4.1.2
 serverpod version
 ```
 

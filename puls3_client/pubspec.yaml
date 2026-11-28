@@ -18,6 +18,6 @@ resolution: workspace
 # here: a transitive one works in the workspace but not on pub.dev.
 dependencies:
   http: ^1.6.0
-  serverpod_auth_core_client: 4.0.4
-  serverpod_auth_idp_client: 4.0.4
-  serverpod_client: 4.0.4
+  serverpod_auth_core_client: 4.1.2
+  serverpod_auth_idp_client: 4.1.2
+  serverpod_client: 4.1.2

@@ -111,15 +111,17 @@ abstract class AgentManifestDraft
   AgentManifestDraft copyWith({
     String? name,
     String? description,
-    List<_igiu5xyp.ManifestSkill>? skills,
-    _it5558gr.ManifestModel? model,
+    List<_igiu5xyp.ManifestSkill>? skills =
+        const _isc.$UndefinedList<_igiu5xyp.ManifestSkill>(),
+    _it5558gr.ManifestModel? model = const _UndefinedAgentManifestDraft$model(),
     String? systemPrompt,
     String? inputType,
     int? inputMaxChars,
     String? outputType,
     int? outputMaxChars,
-    _ic3zks5j.ManifestPrice? price,
-    _i655sd6t.ManifestSubcontract? subcontract,
+    _ic3zks5j.ManifestPrice? price = const _UndefinedAgentManifestDraft$price(),
+    _i655sd6t.ManifestSubcontract? subcontract =
+        const _UndefinedAgentManifestDraft$subcontract(),
   });
   @override
   Map<String, dynamic> toJson() {
@@ -167,6 +169,21 @@ abstract class AgentManifestDraft
 
 class _Undefined {}
 
+class _UndefinedAgentManifestDraft$model extends _isc.UndefinedSentinel
+    implements _it5558gr.ManifestModel {
+  const _UndefinedAgentManifestDraft$model();
+}
+
+class _UndefinedAgentManifestDraft$price extends _isc.UndefinedSentinel
+    implements _ic3zks5j.ManifestPrice {
+  const _UndefinedAgentManifestDraft$price();
+}
+
+class _UndefinedAgentManifestDraft$subcontract extends _isc.UndefinedSentinel
+    implements _i655sd6t.ManifestSubcontract {
+  const _UndefinedAgentManifestDraft$subcontract();
+}
+
 class _AgentManifestDraftImpl extends AgentManifestDraft {
   _AgentManifestDraftImpl({
     String? name,
@@ -201,23 +218,25 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
   AgentManifestDraft copyWith({
     Object? name = _Undefined,
     Object? description = _Undefined,
-    Object? skills = _Undefined,
-    Object? model = _Undefined,
+    List<_igiu5xyp.ManifestSkill>? skills =
+        const _isc.$UndefinedList<_igiu5xyp.ManifestSkill>(),
+    _it5558gr.ManifestModel? model = const _UndefinedAgentManifestDraft$model(),
     Object? systemPrompt = _Undefined,
     Object? inputType = _Undefined,
     Object? inputMaxChars = _Undefined,
     Object? outputType = _Undefined,
     Object? outputMaxChars = _Undefined,
-    Object? price = _Undefined,
-    Object? subcontract = _Undefined,
+    _ic3zks5j.ManifestPrice? price = const _UndefinedAgentManifestDraft$price(),
+    _i655sd6t.ManifestSubcontract? subcontract =
+        const _UndefinedAgentManifestDraft$subcontract(),
   }) {
     return AgentManifestDraft(
       name: name is String? ? name : this.name,
       description: description is String? ? description : this.description,
-      skills: skills is List<_igiu5xyp.ManifestSkill>?
-          ? skills
-          : this.skills?.map((e0) => e0.copyWith()).toList(),
-      model: model is _it5558gr.ManifestModel? ? model : this.model?.copyWith(),
+      skills: skills is _isc.UndefinedSentinel
+          ? this.skills?.map((e0) => e0.copyWith()).toList()
+          : skills,
+      model: model is _isc.UndefinedSentinel ? this.model?.copyWith() : model,
       systemPrompt: systemPrompt is String? ? systemPrompt : this.systemPrompt,
       inputType: inputType is String? ? inputType : this.inputType,
       inputMaxChars: inputMaxChars is int? ? inputMaxChars : this.inputMaxChars,
@@ -225,10 +244,10 @@ class _AgentManifestDraftImpl extends AgentManifestDraft {
       outputMaxChars: outputMaxChars is int?
           ? outputMaxChars
           : this.outputMaxChars,
-      price: price is _ic3zks5j.ManifestPrice? ? price : this.price?.copyWith(),
-      subcontract: subcontract is _i655sd6t.ManifestSubcontract?
-          ? subcontract
-          : this.subcontract?.copyWith(),
+      price: price is _isc.UndefinedSentinel ? this.price?.copyWith() : price,
+      subcontract: subcontract is _isc.UndefinedSentinel
+          ? this.subcontract?.copyWith()
+          : subcontract,
     );
   }
 }

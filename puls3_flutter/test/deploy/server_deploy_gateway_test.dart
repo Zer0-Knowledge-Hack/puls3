@@ -211,11 +211,12 @@ void main() {
     expect(registration.transactionHash, _hash);
   });
 
-  test('a typed error the browser client could not decode is mapped', () async {
+  test('a typed preparation error is mapped', () async {
     final gateway = _gateway(
-      prepareDeploy: (draftId, builder) async => throw api.ServerpodClientBadRequest(
-        '{"className":"Puls3ApiException","data":{"code":"PreparationExpired",'
-        '"message":"That signature expired.","details":{"purpose":"deploy"}}}',
+      prepareDeploy: (draftId, builder) async => throw api.Puls3ApiException(
+        code: 'PreparationExpired',
+        message: 'That signature expired.',
+        details: {'purpose': 'deploy'},
       ),
     );
     await expectLater(

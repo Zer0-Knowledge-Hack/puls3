@@ -101,7 +101,7 @@ abstract class HireSummary
     String? status,
     int? priceUsdcStroops,
     String? inputPreview,
-    DateTime? approvalDeadline,
+    DateTime? approvalDeadline = const _is.$UndefinedDateTime(),
     bool? needsAction,
     int? paidByAgentId,
     String? paidByAgentName,
@@ -186,7 +186,7 @@ class _HireSummaryImpl extends HireSummary {
     Object? status = _Undefined,
     int? priceUsdcStroops,
     String? inputPreview,
-    Object? approvalDeadline = _Undefined,
+    DateTime? approvalDeadline = const _is.$UndefinedDateTime(),
     bool? needsAction,
     Object? paidByAgentId = _Undefined,
     Object? paidByAgentName = _Undefined,
@@ -198,9 +198,9 @@ class _HireSummaryImpl extends HireSummary {
       status: status is String? ? status : this.status,
       priceUsdcStroops: priceUsdcStroops ?? this.priceUsdcStroops,
       inputPreview: inputPreview ?? this.inputPreview,
-      approvalDeadline: approvalDeadline is DateTime?
-          ? approvalDeadline
-          : this.approvalDeadline,
+      approvalDeadline: approvalDeadline is _is.UndefinedSentinel
+          ? this.approvalDeadline
+          : approvalDeadline,
       needsAction: needsAction ?? this.needsAction,
       paidByAgentId: paidByAgentId is int? ? paidByAgentId : this.paidByAgentId,
       paidByAgentName: paidByAgentName is String?

@@ -1,7 +1,7 @@
 # Work with Serverpod 4
 
 The repository is pinned to Flutter 3.44.4, Dart 3.12.2, Serverpod packages
-4.0.4, and `serverpod_cli` 4.0.4. Upgrade those versions together so generated
+4.1.2, and `serverpod_cli` 4.1.2. Upgrade those versions together so generated
 server, client, and test code stays reproducible across the team and CI.
 
 ## Update your workstation
@@ -12,7 +12,7 @@ git fetch --tags
 git checkout 3.44.4
 flutter --version
 
-dart pub global activate serverpod_cli 4.0.4
+dart pub global activate serverpod_cli 4.1.2
 serverpod version
 
 cd <puls3-repository>
@@ -22,7 +22,7 @@ serverpod generate
 git diff --exit-code -- ../puls3_server ../puls3_client
 ```
 
-The two version commands must report Dart 3.12.2 and Serverpod 4.0.4. A clean
+The two version commands must report Dart 3.12.2 and Serverpod 4.1.2. A clean
 final diff proves that the checked-in generated code matches your CLI.
 
 ## Apply the database migration
