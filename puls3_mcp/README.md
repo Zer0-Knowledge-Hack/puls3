@@ -21,7 +21,7 @@ Any other tool name is refused. An agent has these fields: `id`, `registryId`, `
 
 ## Run it
 
-`puls3_mcp` is a member of the repository's Dart workspace and is not on pub.dev. Install the workspace once with Flutter 3.44.4 ([SDK quickstart](../docs/sdk/quickstart.md#1-install-the-workspace)). Then:
+`puls3_mcp` is a member of the repository's Dart workspace and is not on pub.dev. Install the workspace once with Flutter 3.44.4 ([repository README](../README.md#build-and-run)). Then:
 
 ```bash
 cd puls3/puls3_mcp
