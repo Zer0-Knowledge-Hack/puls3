@@ -387,7 +387,7 @@ final class StudioDeployService {
       inclusionFee: _inclusionFee,
       validUntil: validUntil,
     );
-    final simulation = await _simulate(spec);
+    final simulation = await _simulateRegistration(spec, uri);
     final PreparedEnvelope envelope;
     try {
       envelope = _codec.build(spec, simulation);
@@ -740,6 +740,29 @@ final class StudioDeployService {
       throw _chain();
     }
   }
+
+  /// [_simulate] for `register_full`, which names the one refusal a builder
+  /// can act on (#424): the Identity Registry already holds an agent with
+  /// this registration file (`UriAlreadyRegistered`). The URI is the hash of
+  /// the manifest, so an identical draft collides, not only its name.
+  Future<SimulationData> _simulateRegistration(
+    EnvelopeSpec spec,
+    String uri,
+  ) async {
+    try {
+      return await _accounts.simulateRaw(spec);
+    } on LedgerContractError catch (e) {
+      if (e.code == _uriAlreadyRegistered) {
+        throw _api('AgentAlreadyRegistered', {'agentUri': uri});
+      }
+      throw _chain();
+    } on LedgerException {
+      throw _chain();
+    }
+  }
+
+  /// identity-registry `IdentityError::UriAlreadyRegistered`.
+  static const _uriAlreadyRegistered = 100;
 
   static Puls3ApiException _api(String code, [Map<String, String>? details]) =>
       Puls3ApiException(code: code, details: details);

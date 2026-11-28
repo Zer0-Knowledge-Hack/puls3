@@ -19,16 +19,22 @@ It signs with a key **you** supply, and it signs only what it has checked
 
 - **Runtime:** Node 20 or later, ESM. Types ship with the package.
 - **Network:** Stellar testnet.
-- **Not on npm yet.** Until it is, build it from this repository (below).
+- **On npm** as `@puls3_org/sdk`.
 
-## Install from the repository
+## Install
+
+```bash
+npm install @puls3_org/sdk
+```
+
+To try an unreleased change, build it from this repository:
 
 ```bash
 git clone https://github.com/Zer0-Knowledge-Hack/puls3.git
 cd puls3/puls3_sdk_ts
 npm ci && npm run build && npm pack
-# In your project:
-npm install /path/to/puls3/puls3_sdk_ts/puls3-sdk-0.1.0.tgz
+# In your project (the file name carries the version in package.json):
+npm install /path/to/puls3/puls3_sdk_ts/puls3_org-sdk-<version>.tgz
 ```
 
 ## Read the catalog (no session)
@@ -101,8 +107,8 @@ sign** (`SigningRefused`, with the rule that failed) unless:
 |---|---|
 | `network` | It is for testnet, the network the SDK was configured with. The public network is always refused. |
 | `signer` | The preparation, the transaction's source, the call's `caller` and every authorization are the signer's own. |
-| `call` | One contract call, to the contract **pinned in the SDK** for it (escrow, Identity Registry or Reputation Registry), with the function the purpose names. The ids never come from the server. Its arguments are the ones this flow asked for: `create_job` is for the agent you hire and has no hook; `fund`, `complete` and `reject` name this hire's escrow job; `give_feedback` names the hired agent. |
-| `money` | Only `fund` moves money: USDC, exactly the agent's price (at most `maxPrice`, plus a reserve only if you allow one), as one transfer from you to the escrow. A job must be judged by you, and must pay the wallet the **Identity Registry** binds to the agent, which the SDK reads from the chain itself, not from the server. |
+| `call` | One contract call, to the contract **pinned in the SDK** for it (escrow, Identity Registry or Reputation Registry), with the function the purpose names. The ids never come from the server. Its arguments are the ones this flow asked for: `create_job` is for the agent you hire and has no hook; `fund`, `complete` and `reject` name this hire's escrow job; `give_feedback` names the hired agent and carries the score you rated; `register_full` registers your draft, under the registration file of its manifest on `registrationOrigin`. |
+| `money` | Only `fund` moves money: USDC, exactly the agent's price (at most `maxPrice`, plus a reserve only if you allow one), as one transfer from you to the escrow, and with a platform fee (`max_fee_bps`) of at most `maxFeeBps`. A job must be judged by you, and must pay the wallet the **Identity Registry** binds to the agent, which the SDK reads from the chain itself, not from the server. |
 | `bounds` | The fee is under the cap, the transaction ends within `maxTimeHorizonSeconds` (15 minutes), the preparation has not expired, and an authorization expires within `maxAuthLedgers` (360) of the latest ledger. |
 | `login` | A sign-in challenge is a SEP-10 challenge for your wallet that no network would accept as a payment: from the server's pinned key and signed by it, with exactly the `<home domain> auth` and `web_auth_domain` operations. |
 
@@ -112,20 +118,27 @@ sign** (`SigningRefused`, with the rule that failed) unless:
 | `create_job`, `fund`, `complete`, `reject`, `give_feedback` | your key, as the client |
 | The agent's `submit`, and every transaction of `hireAgentAs` | the server, with the agent's custodied key |
 
-Pass the result you reviewed to `approve` and `reject` (`{ result }`). The
-SDK then signs only if the agent recorded that result on chain. Without it,
-the job is checked against what the server says about the hire, and a server
-that lies about every field could still point the call at another of your
-jobs.
+`approve` and `reject` require the result you reviewed (`{ result }`). The
+SDK then signs only if the agent recorded that result on chain. To reject a
+funded hire with no delivery yet, pass `{ result: null }`: the SDK then
+signs only if the job has no delivery. `{ trustServer: true }` is the
+explicit opt-out: the job is checked against what the server says about the
+hire, and a server that lies about every field could still point the call at
+another of your jobs. Leaving both out throws `InvalidArgument`.
 
 The secret stays in your process: it is never sent, logged, or put in an
 error, `toString`, `JSON.stringify` or `util.inspect`. To keep it out of the
 SDK entirely, pass your own `Puls3Signer` (a KMS, a hardware key).
 
 The pinned testnet values are in `TESTNET`: the contracts, the server's
-sign-in key and domains, and the Soroban RPC (`rpcUrl`) the SDK reads the
-chain from. For a local server, override what differs, for example
-`withNetwork({ escrow, serverSigningKey: 'G…', homeDomain: 'localhost', webAuthDomain: 'localhost:8080' })`.
+sign-in key and domains, the Soroban RPC (`rpcUrl`) the SDK reads the
+chain from, the platform fee it accepts (`maxFeeBps`, 0 as production
+charges) and the origin of the registration files (`registrationOrigin`).
+For a local server, override what differs, for example
+`withNetwork({ escrow, serverSigningKey: 'G…', homeDomain: 'localhost', webAuthDomain: 'localhost:8080', registrationOrigin: 'http://localhost:8082' })`.
+A server that charges a platform fee needs `maxFeeBps` raised to that fee
+(at most 1000, the escrow's cap); `registrationOrigin: null` accepts any
+origin.
 
 ## Act for a wallet without a key (a CLI session)
 
@@ -164,7 +177,7 @@ console.log(await sdk.listMyHires());
 | Call | Endpoint | Needs |
 |---|---|---|
 | `listAgents()`, `getAgent(id)` | `agent.list`, `agent.get` | nothing |
-| `createHire(agentId, consumer, input, requestId)` | `hire.createHire` | session |
+| `createHire(agentId, consumer, input, requestId, { subcontractReserve })` | `hire.createHire` | session |
 | `getHire(hireId, consumer)`, `listMyHires()` | `hire.getHire`, `hire.listMyHires` | session |
 | `prepareCreateJob`, `prepareFund`, `prepareComplete(hireId)` | `hire.prepare…` | session |
 | `prepareReject(hireId, reason)` | `hire.prepareReject` | session |
@@ -177,15 +190,22 @@ console.log(await sdk.listMyHires());
 | `submitEscrowCall(hireId, preparationId, signedXdr)` | `hire.submitEscrowCall` | session |
 | `prepareFeedback(hireId, score, comment)`, `submitFeedback(…)` | `feedback.*` | session |
 | `deploy(draftId)` | prepare, sign `register_full`, submit, sign `set_agent_wallet`, submit, wait for `active` | signer |
-| `hire(agentId, input, { maxPrice })` | `createHire`, sign `create_job`, submit, wait, `prepareFund`, sign `fund`, submit, wait for `funded` | signer |
+| `hire(agentId, input, { maxPrice, maxReserve })` | `createHire`, sign `create_job`, submit, wait, `prepareFund`, sign `fund`, submit, wait for `funded` | signer |
 | `waitForResult(hireId)` | `hire.getHire` until the agent delivered | session |
-| `approve(hireId)`, `reject(hireId, reason)` | prepare, sign `complete` / `reject`, submit, wait | signer |
+| `approve(hireId, { result })`, `reject(hireId, reason, { result })` | prepare, sign `complete` / `reject`, submit, wait | signer |
 | `rate(hireId, score, comment)` | prepare, sign `give_feedback`, submit, wait | signer |
 
 - `agentId` in a hire is the agent's on-chain `registryId`, not its metadata id.
 - Amounts are USDC stroops (7 decimals) as integers. `formatUsdc` prints them.
 - `requestId` is the idempotency key of `createHire`: the same key returns the
   same hire, so a retry is safe. It is sent exactly as given.
+- `maxReserve` in `hire` is the subcontract reserve (#334): it is sent to
+  `createHire` as `subcontractReserve`, funded with the hire on top of the
+  price, and refunded when the agent does not spend it. Leave it out for no
+  reserve. A retry must repeat the same one.
+- `hire` returns once the hire is `funded` (or already further along). A
+  hire in any other state, for example a retry of one already rejected or
+  expired, is a `Puls3ProtocolError`.
 - The `prepare…` calls return an unsigned envelope. The flows (`deploy`,
   `hire`, `approve`, …) sign it with your signer after the checks above; with
   only a session, sign it in a wallet and use the `submit…` call.
@@ -198,9 +218,9 @@ console.log(await sdk.listMyHires());
 | `SessionRequired` | A hire or Studio call without a session. Nothing was sent. |
 | `SignerRequired` | A flow that signs (`deploy`, `hire`, `approve`, …) without a signer. Nothing was sent. |
 | `SigningRefused` | The server prepared something that broke a rule above. `rule` names it. Nothing was signed. |
-| `ChainSubmissionFailed` | The chain refused a transaction the SDK signed. `errorCode` is the server's code. |
+| `ChainSubmissionFailed` | The chain refused a transaction the SDK signed, or, on a retried `hire`, the `create_job` sent before. `errorCode` is the server's code. |
 | `Puls3Timeout` | A transaction did not land in time (3 minutes a step). It may still land: read the hire again. |
-| `InvalidArgument` | An argument the server would refuse (a blank input, an id below 1). Nothing was sent. |
+| `InvalidArgument` | An argument the server would refuse (a blank input, an id below 1, an amount that is not an integer). Nothing was sent. |
 | `Puls3HttpError` | Another HTTP status, for example 401 when the session is no longer valid. |
 | `Puls3NetworkError` | The server could not be reached or did not answer in time. |
 | `Puls3ProtocolError` | An answer this version cannot read; usually the SDK is older than the server. |

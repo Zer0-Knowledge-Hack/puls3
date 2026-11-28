@@ -55,7 +55,12 @@ export type Expectation =
       reason: string;
     }
   | { purpose: 'registerFull'; registration: RegistrationExpectation }
-  | { purpose: 'giveFeedback'; agentId: number };
+  | {
+      purpose: 'giveFeedback';
+      agentId: number;
+      /** The score the caller passed to `rate`: the call's `value`, with 0 decimals. */
+      score: number;
+    };
 
 /**
  * What `register_full` must register, from the draft the SDK read itself
@@ -359,6 +364,11 @@ function checkCall(
       if (reserve < 0n || reserve > expectation.maxReserve) {
         refuse('money', `fund pulls a reserve of ${reserve}, above the allowed ${expectation.maxReserve}`);
       }
+      // `max_fee_bps` is the last argument of both calls.
+      const feeBps = intArg(call.args, call.args.length - 1);
+      if (feeBps < 0n || feeBps > BigInt(network.maxFeeBps)) {
+        refuse('money', `fund accepts a platform fee of ${feeBps} bps, above the allowed ${network.maxFeeBps}`);
+      }
       return;
     }
     case 'complete':
@@ -385,12 +395,20 @@ function checkCall(
     }
     case 'registerFull':
       expectCall(network.identityRegistry, 'Identity Registry', ['register_full']);
-      checkRegistration(call, expectation.registration);
+      checkRegistration(call, expectation.registration, network.registrationOrigin);
       return;
     case 'giveFeedback':
       expectCall(network.reputationRegistry, 'Reputation Registry', ['give_feedback']);
       if (intArg(call.args, 1) !== BigInt(expectation.agentId)) {
         refuse('call', `the feedback is for agent ${intArg(call.args, 1)}, not ${expectation.agentId}`);
+      }
+      // give_feedback(caller, agent_id, value, value_decimals, …): the score
+      // is `value` with 0 decimals, as `reputation_calls.dart` sends it.
+      if (intArg(call.args, 2) !== BigInt(expectation.score) || intArg(call.args, 3) !== 0n) {
+        refuse(
+          'call',
+          `the feedback scores ${intArg(call.args, 2)} with ${intArg(call.args, 3)} decimals, not ${expectation.score}`,
+        );
       }
       return;
   }
@@ -415,7 +433,11 @@ const registrationKeys = [
  * would mean reproducing the server's JSON encoding of the manifest, so it
  * is tied to the URI instead, and every field it covers is compared.
  */
-function checkRegistration(call: ContractCall, expected: RegistrationExpectation): void {
+function checkRegistration(
+  call: ContractCall,
+  expected: RegistrationExpectation,
+  origin: string | null,
+): void {
   if (call.args.length !== 3) refuse('call', 'register_full does not have 3 arguments');
   const uri = stringArg(call.args, 1);
   const metadata = call.args[2]!;
@@ -467,6 +489,13 @@ function checkRegistration(call: ContractCall, expected: RegistrationExpectation
   const path = /\/registry\/([0-9a-f]{64})$/.exec(uri);
   if (path === null || path[1] !== hash.toString('hex')) {
     refuse('call', "the agent URI is not the registration file of the manifest it registers");
+  }
+  if (origin !== null && uri !== `${origin}/registry/${path[1]}`) {
+    refuse(
+      'call',
+      `the agent URI is not on the registration origin ${origin}; ` +
+        "for another server, set registrationOrigin in withNetwork to that server's web origin",
+    );
   }
 }
 

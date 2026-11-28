@@ -210,24 +210,39 @@ export class Puls3Sdk {
    * [consumer] returns the same hire, so a retry is safe. It is opaque and
    * sent exactly as given, so `" req-1 "` and `"req-1"` are two keys.
    * [consumer] must be the session wallet's address; it is trimmed.
+   *
+   * [options.subcontractReserve] (USDC stroops) is what the agent may spend
+   * subcontracting other agents, funded with the hire and refunded when
+   * unspent (#334). The server refuses one above its ceiling; a retry must
+   * repeat the same one.
    */
   async createHire(
     agentId: number,
     consumer: string,
     input: string,
     requestId: string,
+    options: { subcontractReserve?: number | bigint } = {},
   ): Promise<CreateHireResult> {
     requireInt('agentId', agentId, 0);
     requireText('consumer', consumer);
     requireText('input', input);
     requireText('requestId', requestId);
+    let subcontractReserve: number | null = null;
+    if (options.subcontractReserve !== undefined) {
+      const reserve = stroops('subcontractReserve', options.subcontractReserve);
+      if (reserve < 0n) throw new InvalidArgument('subcontractReserve', 'must not be negative');
+      if (reserve > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new InvalidArgument('subcontractReserve', `must be at most ${Number.MAX_SAFE_INTEGER} stroops`);
+      }
+      subcontractReserve = Number(reserve);
+    }
     return decodeCreateHireResult(
       await this.#call('createHire', 'hire', 'createHire', {
         agentId,
         consumer: consumer.trim(),
         input,
         requestId,
-        subcontractReserve: null,
+        subcontractReserve,
         allowRelatedParty: null,
       }),
     );
@@ -576,15 +591,18 @@ export class Puls3Sdk {
   ): Promise<HireDetail> {
     const signer = this.#requireSigner('hire');
     const wallet = signer.publicKey();
-    const maxBudget = BigInt(options.maxPrice);
+    const maxBudget = stroops('maxPrice', options.maxPrice);
     if (maxBudget <= 0n) throw new InvalidArgument('maxPrice', 'must be above 0');
-    const maxReserve = BigInt(options.maxReserve ?? 0);
+    const maxReserve = stroops('maxReserve', options.maxReserve ?? 0);
     if (maxReserve < 0n) throw new InvalidArgument('maxReserve', 'must not be negative');
     const started = await this.createHire(
       agentId,
       wallet,
       input,
       options.requestId ?? `sdk-${randomUUID()}`,
+      // The server reserves it on `fund_with_reserve`; the fund check below
+      // still refuses a reserve above it.
+      options.maxReserve === undefined ? {} : { subcontractReserve: maxReserve },
     );
     const hireId = started.hire.id;
     const price = BigInt(started.hire.price);
@@ -615,7 +633,7 @@ export class Puls3Sdk {
           provider,
         });
       }
-      detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job');
+      detail = await this.#waitHire(hireId, wallet, createJob, (d) => d.hire.status !== null, 'create_job', 'createJob');
     }
     if (detail.hire.status === 'open') {
       const fund = await this.prepareFund(hireId);
@@ -628,7 +646,13 @@ export class Puls3Sdk {
         throw new SigningRefused('money', `job ${jobId} pays another wallet than agent ${agentId}'s`);
       }
       await this.#signEscrowCall(hireId, fund, { purpose: 'fund', maxBudget, price, maxReserve, jobId });
-      detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund');
+      detail = await this.#waitHire(hireId, wallet, fund, (d) => d.hire.status !== 'open', 'fund', 'fund');
+    }
+    // Funded, or already past it when the agent was quick (or on a retry).
+    const status = detail.hire.status;
+    if (status !== 'funded' && status !== 'submitted' && status !== 'completed') {
+      // Also a retry of a hire that already ended (rejected, expired).
+      throw new Puls3ProtocolError(`Hire ${hireId} is ${status ?? 'not started'}, not funded`);
     }
     return detail;
   }
@@ -659,33 +683,38 @@ export class Puls3Sdk {
    * Approves the delivered hire [hireId]: signs `complete`, which releases
    * the escrow to the agent, and waits until the hire is `completed`.
    *
-   * Pass [options.result], the result you reviewed (from [waitForResult]),
-   * and the SDK signs only if the delivery the agent recorded on chain is
-   * that result. Without it, the SDK checks the job against what the server
-   * says about the hire, which a server that lies about every field can
-   * still describe as another of your jobs.
+   * [options.result] is required: the result you reviewed (from
+   * [waitForResult]). The SDK signs only if the delivery the agent recorded
+   * on chain is that result. `{ trustServer: true }` instead checks the job
+   * against what the server says about the hire, which a server that lies
+   * about every field can still describe as another of your jobs. Anything
+   * else throws `InvalidArgument` before a call is made.
    */
-  async approve(hireId: number, options: { result?: string } = {}): Promise<HireDetail> {
+  async approve(hireId: number, options: Reviewed<string>): Promise<HireDetail> {
     const wallet = this.#requireSigner('approve').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet, 'complete', options.result);
+    const reviewed = reviewedResult(options, false);
+    const jobId = await this.#checkHireJob(hireId, wallet, 'complete', reviewed);
     const prepared = await this.prepareComplete(hireId);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'complete', jobId });
-    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete');
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'completed', 'complete', 'complete');
   }
 
   /**
    * Rejects hire [hireId] for [reason]: signs `reject`, which refunds the
    * escrow to the signer, and waits until the hire is `rejected`.
    *
-   * [options.result] is the result you reviewed, as for [approve]: the SDK
-   * then signs only if it is the delivery recorded on chain.
+   * [options.result] is required, as for [approve]: the result you reviewed,
+   * or `null` for a funded hire with no delivery yet. The SDK then signs
+   * only if it is the delivery recorded on chain (none, for `null`).
+   * `{ trustServer: true }` is the explicit opt-out.
    */
-  async reject(hireId: number, reason: string, options: { result?: string } = {}): Promise<HireDetail> {
+  async reject(hireId: number, reason: string, options: Reviewed<string | null>): Promise<HireDetail> {
     const wallet = this.#requireSigner('reject').publicKey();
-    const jobId = await this.#checkHireJob(hireId, wallet, 'reject', options.result);
+    const reviewed = reviewedResult(options, true);
+    const jobId = await this.#checkHireJob(hireId, wallet, 'reject', reviewed);
     const prepared = await this.prepareReject(hireId, reason);
     await this.#signEscrowCall(hireId, prepared, { purpose: 'reject', jobId, reason: reason.trim() });
-    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject');
+    return this.#waitHire(hireId, wallet, prepared, (d) => d.hire.status === 'rejected', 'reject', 'reject');
   }
 
   /**
@@ -699,7 +728,7 @@ export class Puls3Sdk {
     const prepared = await this.prepareFeedback(hireId, score, comment);
     const envelope = checkPreparedTransaction(
       prepared,
-      { purpose: 'giveFeedback', agentId },
+      { purpose: 'giveFeedback', agentId, score },
       wallet,
       this.#network,
       this.#now(),
@@ -743,12 +772,13 @@ export class Puls3Sdk {
     hireId: number,
     wallet: string,
     purpose: 'complete' | 'reject',
-    evaluated: string | undefined,
+    reviewed: { result: string | null } | 'trustServer',
   ): Promise<bigint> {
     const detail = await this.getHire(hireId, wallet);
     const jobId = requireJobId(detail);
     const job = await this.#checkJob(jobId, detail.hire.agentId, BigInt(detail.hire.price));
-    const result = evaluated ?? detail.result;
+    const evaluated = reviewed === 'trustServer' ? undefined : reviewed.result;
+    const result = reviewed === 'trustServer' ? detail.result : reviewed.result;
     const expected = result === null ? null : createHash('sha256').update(result, 'utf8').digest('hex');
     if (purpose === 'complete' && (job.deliverable === null || expected === null)) {
       throw new SigningRefused('call', `job ${jobId} has no delivery to approve`);
@@ -813,6 +843,10 @@ export class Puls3Sdk {
   /**
    * Reads hire [hireId] until [done], or until the submission of [prepared]
    * failed on chain ([ChainSubmissionFailed]) or the step timed out.
+   *
+   * [purpose] matters only when [prepared] is null: a retry that waits for
+   * the call sent before it. A completed step then wins, and otherwise the
+   * latest submission of [purpose] failing ends the wait.
    */
   async #waitHire(
     hireId: number,
@@ -820,19 +854,19 @@ export class Puls3Sdk {
     prepared: PreparedTransaction | null,
     done: (detail: HireDetail) => boolean,
     step: string,
+    purpose: string,
   ): Promise<HireDetail> {
     const deadline = this.#deadline();
     for (;;) {
       const detail = await this.getHire(hireId, consumer);
       const submission = detail.escrowSubmission;
-      if (
-        prepared !== null &&
-        submission?.preparationId === prepared.preparationId &&
-        submission.state === 'failed'
-      ) {
+      if (prepared !== null && submission?.preparationId === prepared.preparationId && submission.state === 'failed') {
         throw new ChainSubmissionFailed(prepared.purpose, submission.errorCode);
       }
       if (done(detail)) return detail;
+      if (prepared === null && submission?.purpose === purpose && submission.state === 'failed') {
+        throw new ChainSubmissionFailed(purpose, submission.errorCode);
+      }
       await this.#wait(deadline, step);
     }
   }
@@ -873,6 +907,47 @@ function requireInt(argument: string, value: number, min: number): void {
   if (!Number.isSafeInteger(value) || value < min) {
     throw new InvalidArgument(argument, `must be an integer of ${min} or more`);
   }
+}
+
+/**
+ * What [Puls3Sdk.approve] and [Puls3Sdk.reject] decide on: the result the
+ * caller reviewed (`null` for reject when there is no delivery yet), or an
+ * explicit `trustServer: true` to take the job from what the server says
+ * about the hire.
+ */
+export type Reviewed<R> = { result: R; trustServer?: never } | { trustServer: true; result?: never };
+
+/**
+ * [options] checked at run time too, for callers without the types: exactly
+ * one of a reviewed `result` (a string, or `null` when [allowNull]) and
+ * `trustServer: true`.
+ */
+function reviewedResult(options: unknown, allowNull: boolean): { result: string | null } | 'trustServer' {
+  const o = (typeof options === 'object' && options !== null ? options : {}) as Record<string, unknown>;
+  // Own properties only: a `trustServer` inherited from a polluted
+  // Object.prototype must not opt a caller out of the check.
+  const own = (key: string) => (Object.hasOwn(o, key) ? o[key] : undefined);
+  const hasResult = own('result') !== undefined;
+  const trust = own('trustServer');
+  if (hasResult && trust === undefined) {
+    const result = o['result'];
+    if (typeof result === 'string' || (allowNull && result === null)) return { result };
+    throw new InvalidArgument('result', allowNull ? 'must be a string or null' : 'must be a string');
+  }
+  if (!hasResult && trust === true) return 'trustServer';
+  throw new InvalidArgument(
+    'result',
+    'is required: pass the result you reviewed, or { trustServer: true } to rely on the server',
+  );
+}
+
+/** [value], an amount in stroops, as a bigint; `InvalidArgument` unless it is an integer. */
+function stroops(argument: string, value: number | bigint): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+    throw new InvalidArgument(argument, 'must be an integer amount of stroops');
+  }
+  return BigInt(value);
 }
 
 /**

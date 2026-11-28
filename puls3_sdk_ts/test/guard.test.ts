@@ -22,7 +22,9 @@ import {
   fundCall,
   fundWithReserveCall,
   giveFeedbackCall,
+  i128,
   invocation,
+  manifestHash,
   otherContract,
   prepared,
   provider,
@@ -87,7 +89,7 @@ describe('checkPreparedTransaction accepts what the server prepares', () => {
   });
 
   it('give_feedback on the Reputation Registry', () => {
-    assert.ok(check(preparedTx('giveFeedback', giveFeedbackCall()), { purpose: 'giveFeedback', agentId: 30 }));
+    assert.ok(check(preparedTx('giveFeedback', giveFeedbackCall()), { purpose: 'giveFeedback', agentId: 30, score: 5 }));
   });
 
   it('a call with no authorization entries', () => {
@@ -424,7 +426,7 @@ describe('ADR-0010 D3 rules 4, 6 and 8: what the server cannot change', () => {
   }
 
   it('give_feedback must be for the hired agent', () => {
-    refused('call', () => check(preparedTx('giveFeedback', giveFeedbackCall(31)), { purpose: 'giveFeedback', agentId: 30 }));
+    refused('call', () => check(preparedTx('giveFeedback', giveFeedbackCall(31)), { purpose: 'giveFeedback', agentId: 30, score: 5 }));
   });
 
   it('a transaction valid for longer than the horizon is refused', () => {
@@ -460,6 +462,113 @@ describe('TESTNET pins the server', () => {
     assert.throws(() => withNetwork({ rpcUrl: 'not a url' }), TypeError);
     assert.throws(() => withNetwork({ maxTimeHorizonSeconds: 0 }), TypeError);
     assert.throws(() => withNetwork({ maxAuthLedgers: -1 }), TypeError);
+  });
+
+  it("ships production's platform fee (0) and registration origin (docs/verification/live-hire.md)", () => {
+    assert.equal(TESTNET.maxFeeBps, 0);
+    assert.equal(TESTNET.registrationOrigin, 'https://puls3-hub-on-stellar.serverpod.space');
+  });
+
+  it("withNetwork refuses a fee cap outside the escrow's 0 to 1000, and a registration origin that is not an origin", () => {
+    assert.throws(() => withNetwork({ maxFeeBps: 1_001 }), TypeError);
+    assert.throws(() => withNetwork({ maxFeeBps: -1 }), TypeError);
+    assert.throws(() => withNetwork({ maxFeeBps: 2.5 }), TypeError);
+    assert.throws(() => withNetwork({ registrationOrigin: 'not a url' }), TypeError);
+    assert.throws(() => withNetwork({ registrationOrigin: 'https://puls3.example/registry' }), TypeError);
+    assert.equal(withNetwork({ maxFeeBps: 1_000 }).maxFeeBps, 1_000);
+    assert.equal(withNetwork({ registrationOrigin: null }).registrationOrigin, null);
+  });
+});
+
+describe('ADR-0010 D3 rule 4: the score and the fee are the caller’s (#424)', () => {
+  const feedback: Expectation = { purpose: 'giveFeedback', agentId: 30, score: 5 };
+
+  it('give_feedback must carry the score the caller rated', () => {
+    refused('call', () => check(preparedTx('giveFeedback', giveFeedbackCall(30, 1n)), feedback));
+  });
+
+  it('give_feedback must carry the score with 0 decimals', () => {
+    refused('call', () => check(preparedTx('giveFeedback', giveFeedbackCall(30, 5n, 1)), feedback));
+  });
+
+  const funded = (call: ReturnType<typeof fundCall>, total: bigint) =>
+    preparedTx('fund', call, { auth: [sourceAuth(call, [invocation(transferCall(total))])] });
+
+  it("fund is refused when max_fee_bps is above the network's cap", () => {
+    refused('money', () => check(funded(fundCall(5_000_000n, 35n, 500), 5_000_000n), fund));
+  });
+
+  it("fund_with_reserve is refused when max_fee_bps is above the network's cap", () => {
+    const call = fundWithReserveCall(5_000_000n, 2_000_000n, 1);
+    refused('money', () =>
+      check(funded(call, 7_000_000n), { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 2_000_000n, jobId: 35n }),
+    );
+  });
+
+  it('fund is accepted up to a cap the caller raised with withNetwork', () => {
+    const p = funded(fundCall(5_000_000n, 35n, 500), 5_000_000n);
+    assert.ok(check(p, fund, withNetwork({ maxFeeBps: 500 })));
+  });
+
+  it('register_full is refused when the registration file is on another origin', () => {
+    // The right manifest hash on the wrong origin: only the origin differs.
+    const uri = `https://evil.example/registry/${manifestHash}`;
+    const call = registerFullCall({ uri });
+    refused('call', () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }));
+  });
+
+  it('fund is refused when max_fee_bps is not a u32 the cap allows', () => {
+    for (const fee of [i128(1n), i128(-1n)]) {
+      const call = fundCall();
+      call.args[3] = fee;
+      refused('money', () => check(funded(call, 5_000_000n), fund));
+    }
+  });
+
+  it('fund_with_reserve is refused above 1000 bps even at the highest cap', () => {
+    const call = fundWithReserveCall(5_000_000n, 2_000_000n, 1_001);
+    const expectation: Expectation = { purpose: 'fund', maxBudget: 5_000_000n, price: 5_000_000n, maxReserve: 2_000_000n, jobId: 35n };
+    refused('money', () => check(funded(call, 7_000_000n), expectation, withNetwork({ maxFeeBps: 1_000 })));
+  });
+
+  // From the #424 verifier's probes: only `<origin>/registry/<lowercase hex>` is the server's URI.
+  for (const uri of [
+    `${TESTNET.registrationOrigin}/registry/${manifestHash}?x=1`,
+    `${TESTNET.registrationOrigin}/registry/${manifestHash}#f`,
+    `${TESTNET.registrationOrigin}.evil.example/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}:8443/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}/x/registry/${manifestHash}`,
+    `http://puls3-hub-on-stellar.serverpod.space/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}//registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}@evil.example/registry/${manifestHash}`,
+    `${TESTNET.registrationOrigin}/registry/${manifestHash.toUpperCase()}`,
+  ]) {
+    it(`register_full refuses the URI ${uri}`, () => {
+      refused('call', () =>
+        check(preparedTx('registerFull', registerFullCall({ uri })), { purpose: 'registerFull', registration }),
+      );
+    });
+  }
+
+  it('register_full on another origin names the registrationOrigin setting of withNetwork (#438, S1)', () => {
+    const call = registerFullCall({ uri: `http://localhost:8082/registry/${manifestHash}` });
+    refused('call', () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }));
+    assert.throws(
+      () => check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }),
+      (error: unknown) => {
+        assert.ok(error instanceof SigningRefused);
+        assert.match(error.message, /registration origin https:\/\/puls3-hub-on-stellar\.serverpod\.space/);
+        assert.match(error.message, /set registrationOrigin in withNetwork/);
+        return true;
+      },
+    );
+  });
+
+  it('register_full accepts any origin when the network pins none', () => {
+    const call = registerFullCall({ uri: `https://puls3.example/registry/${manifestHash}` });
+    assert.ok(
+      check(preparedTx('registerFull', call), { purpose: 'registerFull', registration }, withNetwork({ registrationOrigin: null })),
+    );
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@puls3_org/sdk",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "TypeScript SDK for the puls3 API: the agent catalog, hires and the Agent Studio.",
   "license": "Apache-2.0",
   "repository": {
@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.test.json && node --test \"build-test/test/*.test.js\"",
+    "test": "tsc -p tsconfig.test.json && node scripts/run-tests.mjs",
     "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "live": "tsc -p tsconfig.test.json && node build-test/examples/live-testnet.js"
   },

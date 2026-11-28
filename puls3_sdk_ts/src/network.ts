@@ -19,6 +19,18 @@ export interface Puls3Network {
   /** The highest total fee, in stroops, the SDK signs. */
   readonly maxFeeStroops: number;
   /**
+   * The highest platform fee, in basis points, a `fund` may accept: its
+   * `max_fee_bps` argument (D3 rule 4). The server sends
+   * `PULS3_PLATFORM_FEE_BPS`; the escrow caps it at 1000 (`MAX_FEE_BPS`).
+   */
+  readonly maxFeeBps: number;
+  /**
+   * The origin of the agent registration files (`<origin>/registry/<hex>`),
+   * the server's web origin or `PULS3_REGISTRATION_BASE_URL`. When set, a
+   * `register_full` URI must be on it. Null accepts any origin.
+   */
+  readonly registrationOrigin: string | null;
+  /**
    * The server's SEP-10 signing key (`G…`). When set, a login challenge must
    * come from it and carry its signature. The app reads the same value from
    * `PULS3_AUTH_SERVER_SIGNING_KEY`.
@@ -63,6 +75,11 @@ export const TESTNET: Puls3Network = Object.freeze({
   reputationRegistry: 'CBJZYEJ5DS7TDLA2ECRAW3ICQIYAOMTCQ5QSY7PYJ5PJ2W5EAHPBP5Q4',
   usdc: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
   maxFeeStroops: 50_000_000,
+  // Production runs with `PULS3_PLATFORM_FEE_BPS=0` (puls3_server/README.md,
+  // "First deploy"), and registers agents under its web origin
+  // (docs/verification/live-hire.md).
+  maxFeeBps: 0,
+  registrationOrigin: 'https://puls3-hub-on-stellar.serverpod.space',
   // The public `G…` of the server's `walletAuthSigningKey` and its SEP-10
   // domains, as the web app pins them (#176, `39508a41`).
   serverSigningKey: 'GBEELNIKCJBWCVR4KYEP4LTLXWGD5MOSLRF32CHFULLMPGNTKBBKHOEG',
@@ -97,6 +114,21 @@ export function withNetwork(
   for (const key of ['maxFeeStroops', 'maxTimeHorizonSeconds', 'maxAuthLedgers'] as const) {
     if (!Number.isSafeInteger(network[key]) || network[key] <= 0) {
       throw new TypeError(`${key} must be a positive integer`);
+    }
+  }
+  // The escrow refuses a fee above `MAX_FEE_BPS` (1000) in any case.
+  if (!Number.isSafeInteger(network.maxFeeBps) || network.maxFeeBps < 0 || network.maxFeeBps > 1_000) {
+    throw new TypeError('maxFeeBps must be an integer from 0 to 1000');
+  }
+  if (network.registrationOrigin !== null) {
+    let origin: URL;
+    try {
+      origin = new URL(network.registrationOrigin);
+    } catch {
+      throw new TypeError('registrationOrigin is not a URL');
+    }
+    if (origin.origin !== network.registrationOrigin) {
+      throw new TypeError('registrationOrigin must be an origin, such as https://example.com, with no path');
     }
   }
   let rpc: URL;

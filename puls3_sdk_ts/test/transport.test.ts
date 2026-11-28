@@ -5,6 +5,7 @@ import {
   Puls3ApiError,
   Puls3HttpError,
   Puls3NetworkError,
+  Puls3ProtocolError,
 } from '../src/errors.js';
 import {
   HttpTransport,
@@ -70,6 +71,14 @@ describe('HttpTransport', () => {
   it('reads an empty 200 as null', async () => {
     const { fetch } = fakeFetch({ status: 200, body: '' });
     assert.equal(await new HttpTransport(api, { fetch }).call('a', 'b', {}), null);
+  });
+
+  it('reports a 200 that is not JSON as Puls3ProtocolError, not a raw SyntaxError (#424)', async () => {
+    const { fetch } = fakeFetch({ status: 200, body: '<html>maintenance</html>' });
+    await assert.rejects(new HttpTransport(api, { fetch }).call('a', 'b', {}), (e: unknown) => {
+      assert.ok(e instanceof Puls3ProtocolError, `expected Puls3ProtocolError, got ${String(e)}`);
+      return true;
+    });
   });
 
   it('turns a Puls3ApiException into a Puls3ApiError with its code and details', async () => {

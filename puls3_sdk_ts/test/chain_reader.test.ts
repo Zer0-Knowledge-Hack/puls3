@@ -104,4 +104,74 @@ describe('SorobanRpcReader', () => {
     }) as typeof fetch);
     await assert.rejects(down.latestLedger(), Puls3NetworkError);
   });
+
+  it('gives up on an RPC that never answers, after its timeout (#424)', { timeout: 5_000 }, async () => {
+    // A fetch that hangs until its request is aborted, as a hung RPC does.
+    const hung = (async (_url: string | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+      })) as typeof fetch;
+    const reader = new SorobanRpcReader(TESTNET, source, hung, { timeoutMs: 50 });
+    // A real request holds a socket that keeps the process alive; this fake
+    // holds nothing, and AbortSignal.timeout does not keep it alive itself.
+    const alive = setTimeout(() => undefined, 5_000);
+    try {
+      await assert.rejects(reader.latestLedger(), Puls3NetworkError);
+    } finally {
+      clearTimeout(alive);
+    }
+  });
+
+  it('gives up on an RPC whose body never ends, as a network error (#438, S2)', { timeout: 5_000 }, async () => {
+    // The headers arrive, then the body hangs until the request is aborted.
+    const hungBody = (async (_url: string | URL, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => controller.error(init.signal!.reason));
+        },
+      });
+      return new Response(body, { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    const reader = new SorobanRpcReader(TESTNET, source, hungBody, { timeoutMs: 50 });
+    const alive = setTimeout(() => undefined, 5_000);
+    try {
+      await assert.rejects(reader.latestLedger(), (error: unknown) => {
+        assert.ok(error instanceof Puls3NetworkError, `expected Puls3NetworkError, got ${String(error)}`);
+        return true;
+      });
+    } finally {
+      clearTimeout(alive);
+    }
+  });
+
+  it('reports a body that is not JSON as a protocol error (#438, S2)', async () => {
+    const html = (async () => new Response('<html>busy</html>', { status: 200 })) as typeof fetch;
+    const reader = new SorobanRpcReader(TESTNET, source, html);
+    await assert.rejects(reader.latestLedger(), Puls3ProtocolError);
+  });
+
+  // 1.5 and 2 ** 32 reach AbortSignal.timeout and fail every read with a raw RangeError;
+  // 2 ** 31 is past the largest timer Node keeps, so it would fire after 1 ms.
+  for (const timeoutMs of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 2 ** 31, 2 ** 32]) {
+    it(`refuses timeoutMs ${timeoutMs} when it is built (#438, S3)`, () => {
+      assert.throws(
+        () => new SorobanRpcReader(TESTNET, source, fetch, { timeoutMs }),
+        (error: unknown) => error instanceof TypeError && /timeoutMs/.test(error.message),
+      );
+    });
+  }
+
+  it('accepts a whole number of milliseconds from 1 to the largest timer (#438, S3)', () => {
+    assert.ok(new SorobanRpcReader(TESTNET, source, fetch, { timeoutMs: 1 }));
+    assert.ok(new SorobanRpcReader(TESTNET, source, fetch, { timeoutMs: 2 ** 31 - 1 }));
+  });
+
+  it('reports a non-JSON 502 with the same text as before (#438, S2)', async () => {
+    const html = (async () => new Response('<html>bad gateway</html>', { status: 502 })) as typeof fetch;
+    await assert.rejects(new SorobanRpcReader(TESTNET, source, html).latestLedger(), (error: unknown) => {
+      assert.ok(error instanceof Puls3ProtocolError);
+      assert.equal(error.message, 'The Soroban RPC answered 502 with no JSON');
+      return true;
+    });
+  });
 });
