@@ -72,9 +72,20 @@ final class _ConsumerWallet implements SessionWallet {
   Future<StellarAddress> requireLogin(Session session) async => address;
 }
 
+/// A failed check. [main] maps it to exit code 1 after the `finally` that
+/// removes the placeholder custody row has run; `exit` would skip it.
+final class _ProofFailed implements Exception {
+  const _ProofFailed(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'FAIL: $message';
+}
+
 Never _fail(String message) {
   stderr.writeln('FAIL: $message');
-  exit(1);
+  throw _ProofFailed(message);
 }
 
 void _step(String message) => stdout.writeln('\n== $message');
@@ -137,6 +148,16 @@ Future<int> _usdcStroops(http.Client client, String account) async {
 String _usdc(int stroops) => (stroops / 10000000).toStringAsFixed(7);
 
 Future<void> main(List<String> args) async {
+  try {
+    await _run(args);
+  } on _ProofFailed {
+    // Already reported by [_fail]; cleanup has run by now.
+    exit(1);
+  }
+  exit(0);
+}
+
+Future<void> _run(List<String> args) async {
   final onlyAt = args.indexOf('--only');
   final only = onlyAt >= 0 && onlyAt + 1 < args.length
       ? args[onlyAt + 1]
@@ -413,18 +434,22 @@ Future<void> main(List<String> args) async {
       );
 
       _step('Claim refund (consumer-signed claim_refund)');
-      final claimTx = await signAndSend(
-        hireId,
-        await endpoint.prepareClaimRefund(session, hireId),
-      );
-      final stored = await submissions.findByPreparation(
-        (await submissions.listByHire(hireId))
-            .firstWhere((s) => s.purpose == SubmissionPurpose.claimRefund)
-            .preparationId!,
+      final claim = await endpoint.prepareClaimRefund(session, hireId);
+      final claimTx = await signAndSend(hireId, claim);
+      // preparationId tells them apart: null for a relay-signed claimRefund,
+      // set when the consumer prepared it.
+      final claims = [
+        for (final s in await submissions.listByHire(hireId))
+          if (s.purpose == SubmissionPurpose.claimRefund) s,
+      ];
+      _check(
+        claims.any((s) => s.preparationId == claim.preparationId),
+        'the claim_refund record carries the preparationId of '
+        'prepareClaimRefund',
       );
       _check(
-        stored?.preparationId != null,
-        'the claim is a consumer-prepared record, not relay traffic',
+        claims.every((s) => s.preparationId != null),
+        'no relay-signed claim_refund exists for the hire',
       );
       final expired = await _until('hire $hireId to be expired', () async {
         final row = await hires.findHire(hireId);
@@ -460,5 +485,4 @@ Future<void> main(List<String> args) async {
     await pod.shutdown(exitProcess: false);
     httpClient.close();
   }
-  exit(0);
 }
