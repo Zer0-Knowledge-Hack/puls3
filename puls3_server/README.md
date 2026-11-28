@@ -361,6 +361,38 @@ PULS3_HIRE_JOB_DURATION_SECONDS=259200 \
 dart run tool/e2e_relay_testnet.dart
 ```
 
+### Stuck submit refund proof on testnet (#277)
+
+`tool/e2e_stuck_submit_refund_testnet.dart` proves the two consumer refunds
+of #277 on **testnet**. Run 1 funds a hire, lets the runtime's submit sender
+try `submit` (the escrow refuses it with `SubmitTooLate`), checks that
+`getHire` reports `submitErrorCode`, and signs `reject` from `funded`. Run 2
+funds a second hire, waits past `expired_at`, and signs `claim_refund`
+through `prepareClaimRefund`. Both runs check the consumer's USDC balance on
+Horizon before and after. `--only reject|claim` runs one of them.
+
+The job duration must be under the escrow's approval window (one day) so the
+submit can never land. The seed agents' payee is not custodied, so the tool
+adds a placeholder `agent_wallet` row for it in the local test database
+while it runs (it holds no usable key and is removed at the end).
+`escrowRelaySigningKey` must stay unset, so the relay cannot refund on its
+own. Run it on a fresh database: `puls3_test` may hold hires of the local
+sandbox escrow, whose job ids clash with the testnet ones. The record of the
+run is `docs/verification/277-stuck-submit-refund.md`.
+
+```bash
+docker start puls3_server-postgres_test-1 puls3_server-redis_test-1
+docker exec puls3_server-postgres_test-1 psql -U postgres -c "create database puls3_e2e_277;"
+cd puls3_server
+SERVERPOD_DATABASE_NAME=puls3_e2e_277 \
+PULS3_E2E_CONSUMER_SECRET="$(stellar keys secret alice)" \
+PULS3_ESCROW_PREPARATION_VALIDITY_SECONDS=600 \
+PULS3_STELLAR_INCLUSION_FEE_STROOPS=100000 \
+PULS3_PLATFORM_FEE_BPS=0 \
+PULS3_HIRE_JOB_DURATION_SECONDS=360 \
+dart run tool/e2e_stuck_submit_refund_testnet.dart
+```
+
 ### Submit and complete proof on testnet (#208)
 
 `tool/e2e_submit_testnet.dart` continues past funding: the agent runtime
