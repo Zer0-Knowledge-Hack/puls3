@@ -258,7 +258,7 @@ The types are the branch types above, plus `build`, `refactor`, `perf` and `reve
    - Add evidence: command output, screenshots, GIFs, tx hashes, as the issue asks.
 3. Add the same labels and milestone as the issue.
 4. CI must be green.
-5. The PR title is a Conventional Commit with the issue number: `feat(server): store the escrow on old hires (#307)`. Squash merge uses the title as the commit on `main`, and GitHub appends the PR number.
+5. The PR title is a Conventional Commit with the issue number: `feat(server): store the escrow on old hires (#307)`. Squash merge is the only merge method; it uses the title as the commit on `main`, and GitHub appends the PR number.
 
 #### Stacked pull requests
 
@@ -266,7 +266,7 @@ Prefer independent PRs against `main`. When one PR has to build on another (`B -
 
 1. Keep at most **4 open PRs** in a stack.
 2. Every PR except the last one uses `Refs #N`.
-3. Merge in this order: merge `A` (when GitHub deletes `A`'s branch it retargets `B` to `main`; never delete `A`'s branch by hand while `A` is unmerged, because that closes `B`), sync `B` with `main`, then ask for the final review on `B` after that push (the last push needs its own approval).
+3. Merge in this order: merge `A` (when GitHub deletes `A`'s branch it retargets `B` to `main`; never delete `A`'s branch by hand while `A` is unmerged, because that closes `B`). Record `A`'s tip before its branch is deleted (`git rev-parse A`, or `A@{upstream}` while it exists), then run `git rebase --onto main <A's old tip> B` so only `B`'s own commits are replayed (a plain merge or rebase replays `A`'s squashed commits and usually conflicts). Push `B` with `git push --force-with-lease`, then ask for the final review on `B` after that push (the last push needs its own approval).
 
 #### Closes vs Refs (enforced by `Issue gate / issue-gate`)
 

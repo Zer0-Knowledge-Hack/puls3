@@ -36,7 +36,7 @@ Instead, we standardize on **strict GitHub Flow (trunk-based on `main`)**:
 
 1. **Single permanent branch (`main`):** always green and deployable. Direct pushes and force pushes remain blocked.
 2. **Closed branch taxonomy:**
-   - Standard work: `<type>/<issue-number>-<short-slug>` where `<type>` is strictly one of:
+   - Standard work uses `<type>/<issue-number>-<short-slug>` with one of:
      `feat` · `fix` · `docs` · `chore` · `ci` · `test` · `spike`
    - Work the Issue gate accepts without an issue (docs-only changes, or a PR labelled `no-issue`): `<type>/<short-slug>`.
    - Patching an already-published SDK release when `main` has unreleased breaking changes: `hotfix/<package>-<issue-number>-<short-slug>` branched from `<package>-v<X.Y.Z>` and cherry-picked back to `main`.
@@ -46,7 +46,7 @@ Instead, we standardize on **strict GitHub Flow (trunk-based on `main`)**:
    - Local PR reviews and agent checks run in detached worktrees (`git worktree add --detach`) rather than pushing `review-pr-*` or `local/*` branches.
    - GitHub's *Automatically delete head branches* setting is enabled and deletes the branch of a merged PR. The author deletes the branch of a PR closed without merging.
 4. **Conventional Commits in PR titles:**
-   - Because squash merge is the usual method, every PR title must follow `<type>(<scope>): <summary> (#<issue>)` (or `<type>: <summary> (#<issue>)`), so `main` history remains machine-readable for changelogs and version bumps. GitHub appends the PR number on squash, so the commit on `main` reads `<type>(<scope>): <summary> (#<issue>) (#<pr>)`, as it already does today.
+   - **Squash merge is the only merge method.** Merge commits and rebase merging are disabled in the repository settings (see *Consequences and rollout*). Every PR title must follow `<type>(<scope>): <summary> (#<issue>)` (or `<type>: <summary> (#<issue>)`), so `main` history remains machine-readable for changelogs and version bumps. GitHub appends the PR number on squash, so the commit on `main` reads `<type>(<scope>): <summary> (#<issue>) (#<pr>)`, as it already does today.
    - Commit types are the branch types above plus `build`, `refactor`, `perf` and `revert` when they apply.
 5. **Tags are for releases only.** Every tag follows the formats in section 3. Ad-hoc tags such as `backup/feat-19-pre-rework` do not belong on `origin`.
 
@@ -58,8 +58,9 @@ Prefer independent PRs against `main` (using feature flags or config toggles whe
 2. Intermediate PRs use `Refs #<issue>` (never `Closes #<issue>`), per `Issue gate`.
 3. **Required merge sequence:**
    - Merge `A`. When GitHub deletes `A`'s branch after the merge, it retargets `B` to `main` on its own. Never delete `A`'s branch by hand while `A` is unmerged: that closes `B`.
-   - Sync `B` with `main` (merge or rebase).
-   - Request final review on `B` **after** the sync push so `require_last_push_approval` is not invalidated.
+   - Before `A`'s branch is deleted, record its tip (`git rev-parse A`, or use `A@{upstream}` while it still exists). After the squash merge, replay only `B`'s own commits onto `main` with `git rebase --onto main <A's old tip> B`. A plain merge or rebase would replay `A`'s original commits against their squashed copy and usually conflicts.
+   - Force-push `B` with `git push --force-with-lease`.
+   - Request final review on `B` **after** that push so `require_last_push_approval` is not invalidated.
 
 ### 3. Artifact versioning: Independent versioning by artifact family
 
@@ -68,7 +69,7 @@ A single global repository version does not fit contracts, SDKs, and continuousl
 | Artifact family | Versioning scheme | Git tag / identifier | Metadata & provenance |
 | --- | --- | --- | --- |
 | **Publishable SDKs** (`puls3_client`, `puls3_sdk`, `@puls3_org/sdk`) | **SemVer 2.0.0** (`0.x` until 1.0 stability) + `CHANGELOG.md` with one section per release | `<package>-v<X.Y.Z>` (e.g. `puls3_sdk-v0.1.0`) on the commit it was published from. A GitHub Release is optional (none exists yet). Exception: `@puls3_org/sdk` uses the tag prefix `sdk-ts` (`sdk-ts-v<X.Y.Z>`), because a scoped name with `/` cannot be a clean tag. | Released per [docs/sdk/releasing.md](../sdk/releasing.md) (Dart: manual `dart pub publish`, no publishing from CI) and [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md) (npm: version bump in a PR, then a tag the workflow publishes with provenance). Any contract redeploy changing pinned `contract_id`s requires a new SDK release (ADR-0010). |
-| **Continuously deployed apps** (`puls3_server`, `puls3_flutter`) | **CalVer** `YYYY.MM.DD+<short_sha>` *(or SemVer `X.Y.Z+<short_sha>` — confirm in team review)* | No tag per commit (optional milestone tags) | `puls3_server` reports via `/health/check` (`PULS3_GIT_SHA`); `puls3_server/Dockerfile` sets `LABEL org.opencontainers.image.*`; `scripts/cloudflare-pages-build.sh` passes `--build-name` and `--build-number`. |
+| **Continuously deployed apps** (`puls3_server`, `puls3_flutter`) | **CalVer** `YYYY.M.D+<short_sha>` (no leading zeros, so it stays valid SemVer, e.g. `2026.11.5+3d8b852`) *(or SemVer `X.Y.Z+<short_sha>` — confirm in team review)*. The short SHA is build metadata in the version string; `github.run_number` is the `--build-number`, because Flutter needs an integer (Android `versionCode`). | No tag per commit (optional milestone tags) | `puls3_server` reports via `/health/check` (`PULS3_GIT_SHA`); `puls3_server/Dockerfile` sets `LABEL org.opencontainers.image.*`; `scripts/cloudflare-pages-build.sh` passes `--build-name` and `--build-number`. |
 | **Soroban contracts** (`escrow`, `identity-registry`, `reputation-registry`) | **SemVer** in `Cargo.toml` + `pub fn version()` | `contracts/<name>-v<X.Y.Z>-<network>` on deploy (new; no contract tag exists yet). A version without an upgrade function is a new contract id ([docs/operations/escrow-rotation.md](../operations/escrow-rotation.md)), so each deploy gets its own tag. | Release builds pass `--meta source_repo=github:Zer0-Knowledge-Hack/puls3` and `--meta revision=<sha>` (**SEP-55**). `contracts/deployments/<network>.json` keeps its snake_case keys (`contract_id`, `wasm_hash_sha256`, `deploy_tx`, `deployed_at_utc`) and adds `crate_version` and `git_commit`. |
 | **Internal / CLI packages** (`puls3_domain`, `puls3_cli`, `puls3_mcp`) | `publish_to: none` internally; **SemVer** if distributed as binaries | `<bin>-v<X.Y.Z>` (only if published) | If `puls3_cli` or `puls3_mcp` ship standalone binaries on GitHub Releases, use `<bin>-v<X.Y.Z>-<os>-<arch>` + `SHA256SUMS`. |
 | **Domain & DB artifacts** (`puls3.agent-manifest/v1`, `skill_packs`, migrations) | Schema `puls3.<type>/v<N>` + monotonic integer + SHA-256 / Serverpod timestamp | Persisted on-chain / in DB | Unchanged; follows ADR-0004, ADR-0014, and `puls3_server/migrations/migration_registry.txt`. |
@@ -82,7 +83,7 @@ A single global repository version does not fit contracts, SDKs, and continuousl
 
 Before moving this ADR to `Accepted`, the team should confirm two points on #425:
 
-1. **App versioning (`puls3_server` and `puls3_flutter`):** adopt **CalVer** (`YYYY.MM.DD+<short_sha>`) for continuous deploys, or keep **SemVer** (`1.x.y+<short_sha>`) bumped per milestone/release?
+1. **App versioning (`puls3_server` and `puls3_flutter`):** adopt **CalVer** (`YYYY.M.D+<short_sha>`, e.g. `2026.11.5+3d8b852`, with `github.run_number` as the `--build-number`) for continuous deploys, or keep **SemVer** (`1.x.y+<short_sha>`) bumped per milestone/release?
 2. **CLI / MCP binary distribution:** keep `puls3_cli` and `puls3_mcp` source-only inside the workspace, or publish prebuilt release archives?
 
 ## Consequences and rollout
@@ -93,7 +94,8 @@ The pull request that proposes this ADR also carries the #425 documentation, so 
 - **Repository settings (done 2026-11-25):** *Automatically delete head branches* is enabled, `origin` was pruned to `main`, the branches of open PRs and `sandbox/nirium`, and the ad-hoc tag `backup/feat-19-pre-rework` was removed. Only release tags remain.
 - **Repository settings (on acceptance, by an admin):**
   - add a tag ruleset that only lets maintainers create, move or delete release tags (patterns `*-v*` for `<package>-v<X.Y.Z>` and `sdk-ts-v<X.Y.Z>`, and `contracts/*-v*` for `contracts/<name>-v<X.Y.Z>-<network>`, since `*` does not match `/`). [docs/sdk/releasing-npm.md](../sdk/releasing-npm.md) already asks for one for `sdk-ts-v*`, and no ruleset exists yet;
-  - make `Issue gate / issue-gate` a required check on `main`. CONTRIBUTING lists it as required, but today `main` only requires `gate` and `scan`.
+  - make `Issue gate / issue-gate` a required check on `main`. CONTRIBUTING lists it as required, but today `main` only requires `gate` and `scan`;
+  - disable merge commits and rebase merging, so squash merge is the only method.
 - **On acceptance:** record the two open decisions in section 3 and in *Open decisions*, set the status to `Accepted`, and switch the PR to `Closes #425`.
 - **Tooling (follow-up issues):**
   - **#431, app/server version stamping:** OCI labels (`org.opencontainers.image.*`) in `puls3_server/Dockerfile`, a real `puls3_server/CHANGELOG.md` in place of the Stagehand template, and Flutter web `--build-name` / `--build-number` in `scripts/cloudflare-pages-build.sh`. Melos `command.version` is optional (see *SDK tags and release process*).
